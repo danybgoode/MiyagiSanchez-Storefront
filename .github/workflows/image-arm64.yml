@@ -1,0 +1,102 @@
+name: arm64 image (Oracle VM)
+
+# miyagi-to-oracle-vm S1.2 — the production image for the Oracle A1 VM (`panfleto-prod`, aarch64).
+#
+# Built HERE, on a native arm64 runner, because the VM has 2 shared cores and also runs panfleto: a
+# `next build` there would starve every tenant on the box, and a rollback would be another slow build.
+# The VM only ever PULLS `ghcr.io/danybgoode/miyagi-web:<sha>` — a rollback is a restart.
+#
+# Build args mirror cloudbuild.yaml EXACTLY (guarded by e2e/image-arm64-build-args.spec.ts):
+#   - the eight browser-public keys come from the `production` GitHub Environment's variables — NOT
+#     the repo-level variables of the same names, which hold CI values (localhost store URL, test keys);
+#   - the routing literals are cloudbuild.yaml's own substitution defaults, copied below.
+# A missing production variable FAILS the build: a manual image build without NEXT_PUBLIC values
+# cannot boot (Clerk fail-fast at startup — LEARNINGS, gcp-account-migration (7)).
+#
+# Cloud Build keeps deploying Cloud Run from the same push until the cutover (S2); this workflow
+# deploys nothing.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: image-arm64
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build + push linux/arm64
+    runs-on: ubuntu-24.04-arm
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse to build without every production value
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_MEDUSA_MXN_REGION_ID: ${{ vars.NEXT_PUBLIC_MEDUSA_MXN_REGION_ID }}
+          NEXT_PUBLIC_MP_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_MP_PUBLIC_KEY }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+        run: |
+          missing=0
+          for v in NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY \
+                   NEXT_PUBLIC_MEDUSA_MXN_REGION_ID NEXT_PUBLIC_MP_PUBLIC_KEY \
+                   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY NEXT_PUBLIC_SUPABASE_URL \
+                   NEXT_PUBLIC_SUPABASE_ANON_KEY NEXT_PUBLIC_VAPID_PUBLIC_KEY; do
+            if [ -z "${!v}" ]; then echo "::error::production environment variable $v is not set"; missing=1; fi
+          done
+          # A test Clerk key in a production image signs everyone into the dev instance.
+          case "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" in pk_live_*) ;; *) echo "::error::NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not a pk_live_ key"; missing=1;; esac
+          exit $missing
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ghcr.io/danybgoode/miyagi-web:${{ github.sha }}
+            ghcr.io/danybgoode/miyagi-web:main
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=miyagi-web-arm64
+          cache-to: type=gha,scope=miyagi-web-arm64,mode=max
+          build-args: |
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_MEDUSA_MXN_REGION_ID=${{ vars.NEXT_PUBLIC_MEDUSA_MXN_REGION_ID }}
+            NEXT_PUBLIC_MP_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_MP_PUBLIC_KEY }}
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+            NEXT_PUBLIC_MEDUSA_STORE_URL=https://api.miyagisanchez.com
+            NEXT_PUBLIC_SITE_URL=https://miyagisanchez.com
+            NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+            NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+            NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
+            NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+            NEXT_PUBLIC_GTM_ID=GTM-MWHVLJ3M
+            NEXT_PUBLIC_MIYAGI_WHATSAPP=
+
+      # The image's own sharp gate (`node -e "require('sharp')"` in the Dockerfile) proves the native
+      # library loads on arm64 at BUILD time. The VM smoke (S1.5) proves a real /api/img request.
