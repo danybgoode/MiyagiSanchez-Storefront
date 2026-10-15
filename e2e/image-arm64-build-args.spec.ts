@@ -44,14 +44,14 @@ test.describe('image-arm64.yml mirrors cloudbuild.yaml', () => {
   })
 
   test('every substitution-sourced arg carries cloudbuild.yaml\'s own default, verbatim', () => {
-    for (const { name, source } of cbArgs.filter((a) => a.source.startsWith('${_'))) {
+    for (const { name } of cbArgs.filter((a) => a.source.startsWith('${_'))) {
       expect(substitutions, `no substitution default for ${name}`).toHaveProperty(name)
       expect(wfArgs[name], `${name} drifted from cloudbuild.yaml`).toBe(substitutions[name])
     }
   })
 
   test('every Secret-Manager-sourced arg reads the production environment variable of the same name', () => {
-    for (const { name, source } of cbArgs.filter((a) => a.source.startsWith('$$'))) {
+    for (const { name } of cbArgs.filter((a) => a.source.startsWith('$$'))) {
       expect(wfArgs[name]).toBe(`\${{ vars.${name} }}`)
     }
     expect(workflow).toMatch(/^\s+environment: production$/m)
