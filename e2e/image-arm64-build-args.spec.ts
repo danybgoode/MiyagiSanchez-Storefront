@@ -50,11 +50,19 @@ test.describe('image-arm64.yml mirrors cloudbuild.yaml', () => {
     }
   })
 
-  test('every Secret-Manager-sourced arg reads the production environment variable of the same name', () => {
+  test('every Secret-Manager-sourced arg reads its PROD_-prefixed production environment variable', () => {
+    // Plain names would fall back to the repo-level CI variables (pk_test keys, localhost) when a
+    // production value is missing — the prefix is what makes "missing" mean empty (PR #432 review).
     for (const { name } of cbArgs.filter((a) => a.source.startsWith('$$'))) {
-      expect(wfArgs[name]).toBe(`\${{ vars.${name} }}`)
+      expect(wfArgs[name]).toBe(`\${{ vars.PROD_${name} }}`)
     }
     expect(workflow).toMatch(/^\s+environment: production$/m)
+  })
+
+  test('live-mode prefixes are enforced for every payment/auth key', () => {
+    expect(workflow).toMatch(/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" in pk_live_\*/)
+    expect(workflow).toMatch(/NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" in pk_live_\*/)
+    expect(workflow).toMatch(/NEXT_PUBLIC_MP_PUBLIC_KEY" in APP_USR-\*/)
   })
 
   test('the build refuses to run with a missing production value', () => {

@@ -7,8 +7,11 @@ name: arm64 image (Oracle VM)
 # The VM only ever PULLS `ghcr.io/danybgoode/miyagi-web:<sha>` — a rollback is a restart.
 #
 # Build args mirror cloudbuild.yaml EXACTLY (guarded by e2e/image-arm64-build-args.spec.ts):
-#   - the eight browser-public keys come from the `production` GitHub Environment's variables — NOT
-#     the repo-level variables of the same names, which hold CI values (localhost store URL, test keys);
+#   - the eight browser-public keys come from the `production` GitHub Environment as `PROD_<NAME>`. The
+#     PREFIX is load-bearing: an environment variable that is missing silently falls back to a REPO-level
+#     variable of the same name, and the repo-level `NEXT_PUBLIC_*` hold CI values (localhost store URL,
+#     pk_test keys) — so with plain names a missing production value would bake a test key into prod and
+#     the emptiness check below could never fire (PR #432 review). No repo-level PROD_* exists.
 #   - the routing literals are cloudbuild.yaml's own substitution defaults, copied below.
 # A missing production variable FAILS the build: a manual image build without NEXT_PUBLIC values
 # cannot boot (Clerk fail-fast at startup — LEARNINGS, gcp-account-migration (7)).
@@ -39,14 +42,14 @@ jobs:
 
       - name: Refuse to build without every production value
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_MEDUSA_MXN_REGION_ID: ${{ vars.NEXT_PUBLIC_MEDUSA_MXN_REGION_ID }}
-          NEXT_PUBLIC_MP_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_MP_PUBLIC_KEY }}
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.PROD_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${{ vars.PROD_NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_MEDUSA_MXN_REGION_ID: ${{ vars.PROD_NEXT_PUBLIC_MEDUSA_MXN_REGION_ID }}
+          NEXT_PUBLIC_MP_PUBLIC_KEY: ${{ vars.PROD_NEXT_PUBLIC_MP_PUBLIC_KEY }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.PROD_NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PROD_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.PROD_NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
         run: |
           missing=0
           for v in NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY \
@@ -55,8 +58,12 @@ jobs:
                    NEXT_PUBLIC_SUPABASE_ANON_KEY NEXT_PUBLIC_VAPID_PUBLIC_KEY; do
             if [ -z "${!v}" ]; then echo "::error::production environment variable $v is not set"; missing=1; fi
           done
-          # A test Clerk key in a production image signs everyone into the dev instance.
-          case "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" in pk_live_*) ;; *) echo "::error::NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not a pk_live_ key"; missing=1;; esac
+          # Test-mode keys in a production image: Clerk signs everyone into the dev instance, Stripe and
+          # Mercado Pago take no real payment. Each production key has a recognisable live prefix.
+          case "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" in pk_live_*) ;; *) echo "::error::Clerk key is not pk_live_"; missing=1;; esac
+          case "$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" in pk_live_*) ;; *) echo "::error::Stripe key is not pk_live_"; missing=1;; esac
+          case "$NEXT_PUBLIC_MP_PUBLIC_KEY" in APP_USR-*) ;; *) echo "::error::Mercado Pago key is not APP_USR-"; missing=1;; esac
+          case "$NEXT_PUBLIC_SUPABASE_URL" in https://*.supabase.co) ;; *) echo "::error::Supabase URL is not https://*.supabase.co"; missing=1;; esac
           exit $missing
 
       - uses: docker/setup-buildx-action@v3
@@ -83,14 +90,14 @@ jobs:
           cache-from: type=gha,scope=miyagi-web-arm64
           cache-to: type=gha,scope=miyagi-web-arm64,mode=max
           build-args: |
-            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-            NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY }}
-            NEXT_PUBLIC_MEDUSA_MXN_REGION_ID=${{ vars.NEXT_PUBLIC_MEDUSA_MXN_REGION_ID }}
-            NEXT_PUBLIC_MP_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_MP_PUBLIC_KEY }}
-            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
-            NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-            NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.PROD_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=${{ vars.PROD_NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_MEDUSA_MXN_REGION_ID=${{ vars.PROD_NEXT_PUBLIC_MEDUSA_MXN_REGION_ID }}
+            NEXT_PUBLIC_MP_PUBLIC_KEY=${{ vars.PROD_NEXT_PUBLIC_MP_PUBLIC_KEY }}
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ vars.PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ vars.PROD_NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.PROD_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.PROD_NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
             NEXT_PUBLIC_MEDUSA_STORE_URL=https://api.miyagisanchez.com
             NEXT_PUBLIC_SITE_URL=https://miyagisanchez.com
             NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
