@@ -16,8 +16,8 @@ name: arm64 image (Oracle VM)
 # A missing production variable FAILS the build: a manual image build without NEXT_PUBLIC values
 # cannot boot (Clerk fail-fast at startup — LEARNINGS, gcp-account-migration (7)).
 #
-# Cloud Build keeps deploying Cloud Run from the same push until the cutover (S2); this workflow
-# deploys nothing.
+# Since the 2026-10-16 cutover this is the ONLY production build (the Cloud Build trigger is deleted).
+# It deploys nothing: the VM pulls `:main` when `/opt/miyagi/infra/oci/update.sh` runs.
 
 on:
   push:

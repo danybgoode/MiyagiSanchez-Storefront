@@ -13,7 +13,7 @@ medusa-bonsai/
 └── apps/miyagisanchez/    ← Next.js 16 (UI layer + UCP/MCP endpoints + non-commerce APIs)
 ```
 
-**Workflow (gitflow)**: work on a **feature branch** (`feat/<epic-slug>`), commit per story, open a **PR** with `gh`, and **merge to `main`** when verified + approved. Merging to `main` is the deploy — **frontend → Cloud Build us-east4 → Cloud Run `miyagi-web`** behind Cloudflare (Vercel prod deploys disabled since `frontend-vercel-to-cloudrun` epic Sprint 4.5, 2026-07-10 — Vercel survives only as the per-PR preview + CI target); backend → Cloud Build us-east4 → Cloud Run `medusa-web`. Each frontend branch/PR still gets a **Vercel preview** to test before merge. Never commit feature work straight to `main`. Roll back a bad merge with `git revert` on `main`.
+**Workflow (gitflow)**: work on a **feature branch** (`feat/<epic-slug>`), commit per story, open a **PR** with `gh`, and **merge to `main`** when verified + approved. **Production runs on the Oracle VM `panfleto-prod`** behind Cloudflare (epic `miyagi-to-oracle-vm`, cut over 2026-10-16; the GCP Cloud Run/Cloud Build rail is **deleted**). Merging to `main` builds the arm64 image (`.github/workflows/image-arm64.yml` → `ghcr.io/danybgoode/miyagi-web:main`) but **deploys nothing by itself**: the deploy is `ssh ubuntu@159.54.158.4 /opt/miyagi/infra/oci/update.sh` once the image build is green (root repo `infra/oci/`; it resolves `:main` to a digest, and a `*_PIN` line in `.env` rolls back). The backend works the same way. `cloudbuild.yaml` stays only as the build-args source of truth that `e2e/image-arm64-build-args.spec.ts` checks. Vercel is only the per-PR preview and CI target. Each frontend branch/PR still gets a **Vercel preview** to test before merge. Never commit feature work straight to `main`. Roll back a bad merge with `git revert` on `main`.
 
 ## Start here (orientation for any agent)
 
@@ -21,7 +21,7 @@ Before planning or building, read these — they are the source of truth and cha
 - **`Roadmap/README.md`** (repo container root, one level above this app) — the product poster: every feature by domain, current status. Tracked in git (product source of truth) — present in every checkout and worktree.
 - **`Roadmap/WAYS-OF-WORKING.md`** — how we plan/build/ship: the cadence, gitflow, Definition of Done (story **and** epic), QA/smoke-test rules, the Playwright harness (`npm run test:e2e`). Follow it.
 - **`Roadmap/LEARNINGS.md`** — the distilled, cross-cutting wisdom from past epics' retrospectives (multi-agent + async-deploy coordination, tooling gotchas, what's worked). **Read it** — it's how a past retro reaches you instead of dying in its epic folder. You feed it at epic close (see the epic Definition of Done).
-- **Team memory** (`~/.claude/projects/.../memory/`, auto-loaded via `MEMORY.md`) — durable facts: deploy topology (incl. the **regional** us-east4 backend Cloud Build trigger), per-epic notes, gotchas.
+- **Team memory** (`~/.claude/projects/.../memory/`, auto-loaded via `MEMORY.md`) — durable facts: deploy topology (the Oracle VM rail), per-epic notes, gotchas.
 - Process: **plan first** (plan mode → user stories → Daniel approves) → branch + **scaffold the epic/sprint docs before code** → build one story → verify → **smoke-test** → PR → merge. At **epic close**, update `Roadmap/README.md` (the poster), write a `RETROSPECTIVE.md`, and **promote its durable learnings to `Roadmap/LEARNINGS.md`**.
 
 ---
