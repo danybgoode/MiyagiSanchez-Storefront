@@ -9,6 +9,7 @@ import { useSettingsSave } from './settings/_components/useSettingsSave'
 import { pushAnalyticsEvent } from '@/lib/analytics-events'
 import { pushGrowthEvent } from '@/lib/growth-events'
 import type { SetupStep } from '@/lib/setup-guide'
+import SetupGuideSatisfaction from './SetupGuideSatisfaction'
 
 /**
  * "Pon tu tienda en marcha" — seller-portal-setup-guide epic, B.2/B.3. Reads
@@ -23,16 +24,20 @@ import type { SetupStep } from '@/lib/setup-guide'
  * `router.refresh()` so the server recomputes `steps`/`initialDismissed`
  * from the source of truth rather than guessing at an optimistic update.
  *
- * Renders nothing once every step is done, or once dismissed. Fail-safe: an
+ * Renders nothing once dismissed. Once every step is done it asks, once, whether the guide helped
+ * (SetupGuideSatisfaction, golden-frijoles satisfied-ask), then renders nothing. Fail-safe: an
  * absent/malformed `guide_dismissed` flag reads as `false` (show the guide).
  */
 export default function SetupGuideCard({
   steps,
   initialDismissed,
+  initialSatisfactionAnswered = false,
   shopSlug,
 }: {
   steps: SetupStep[]
   initialDismissed: boolean
+  /** `metadata.settings.guide.satisfaction_answered`: the merchant already answered (or declined) the ask. */
+  initialSatisfactionAnswered?: boolean
   shopSlug: string
 }) {
   const { save } = useSettingsSave()
@@ -98,7 +103,9 @@ export default function SetupGuideCard({
     else pushAnalyticsEvent('guide_dismiss')
   }, [save])
 
-  if (dismissed || allDone) return null
+  if (dismissed) return null
+  // A merchant who hid the guide is never asked about it; one who finished it is asked once.
+  if (allDone) return initialSatisfactionAnswered ? null : <SetupGuideSatisfaction />
 
   return (
     <Card variant="panel" className="mb-8 p-5">

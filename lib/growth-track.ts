@@ -40,3 +40,31 @@ export function decideGrowthTrack(flagEnabled: boolean, input: GrowthTrackInput)
   if (!flagEnabled) return { forward: false, reason: 'flag_off' }
   return { forward: true, payload: input }
 }
+
+/**
+ * Golden Frijoles' standard satisfaction rating (golden-frijoles satisfied-ask): a 1–5 score, or "Ahora no". Only the
+ * features listed here can be rated, so a forged body cannot attach a rating to an arbitrary feature id in our event
+ * stream. The setup guide is the one surface that asks today (SetupGuideSatisfaction).
+ */
+export const SATISFACTION_FEATURES = ['setup_guide'] as const
+export type SatisfactionFeature = (typeof SATISFACTION_FEATURES)[number]
+export type SatisfactionAnswer = 1 | 2 | 3 | 4 | 5 | 'dismissed'
+
+export type SatisfactionDecision =
+  | { forward: true; userId: string; featureId: SatisfactionFeature; answer: SatisfactionAnswer }
+  | { forward: false; reason: 'flag_off' | 'unknown_feature' | 'invalid_answer' }
+
+/** Decide whether a satisfaction answer forwards to Golden Frijoles. Pure: the route owns the flag read and the send. */
+export function decideSatisfaction(
+  flagEnabled: boolean,
+  input: { userId: string; featureId: unknown; answer: unknown },
+): SatisfactionDecision {
+  const featureId = SATISFACTION_FEATURES.find((f) => f === input.featureId)
+  if (!featureId) return { forward: false, reason: 'unknown_feature' }
+  const answer = input.answer
+  const valid = answer === 'dismissed' || answer === 1 || answer === 2 || answer === 3 || answer === 4 || answer === 5
+  if (!valid) return { forward: false, reason: 'invalid_answer' }
+  // Validation BEFORE the flag: a malformed body is a 400 whether telemetry is on or not.
+  if (!flagEnabled) return { forward: false, reason: 'flag_off' }
+  return { forward: true, userId: input.userId, featureId, answer }
+}

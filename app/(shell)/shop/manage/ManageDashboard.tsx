@@ -48,6 +48,7 @@ export default async function ManageDashboard({
   pendingOrdersCount = 0,
   setupSteps,
   guideDismissed = false,
+  guideSatisfactionAnswered = false,
 }: {
   shop: Shop
   initialListings: ManagedListing[]
@@ -55,6 +56,7 @@ export default async function ManageDashboard({
   pendingOrdersCount?: number
   setupSteps: SetupStep[]
   guideDismissed?: boolean
+  guideSatisfactionAnswered?: boolean
 }) {
   // A SERVER component cannot consume React context, so it cannot use
   // `useSellerFormat()` — it resolves the same three facts through the same
@@ -117,7 +119,12 @@ export default async function ManageDashboard({
       />
 
       {/* ── Setup guide (renders nothing once dismissed or all 5 steps done) ──── */}
-      <SetupGuideCard steps={setupSteps} initialDismissed={guideDismissed} shopSlug={shop.slug} />
+      <SetupGuideCard
+        steps={setupSteps}
+        initialDismissed={guideDismissed}
+        initialSatisfactionAnswered={guideSatisfactionAnswered}
+        shopSlug={shop.slug}
+      />
 
       {/* ── Stats row ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
