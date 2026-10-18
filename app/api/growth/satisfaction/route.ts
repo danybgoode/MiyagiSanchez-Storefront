@@ -29,6 +29,13 @@ export async function POST(req: NextRequest) {
     if (decision.reason === 'flag_off') return NextResponse.json({ skipped: true }, { status: 200 })
     return NextResponse.json({ error: decision.reason }, { status: 400 })
   }
-  await sendGrowthSatisfaction(decision.userId, decision.featureId, decision.answer)
-  return NextResponse.json({ skipped: false }, { status: 202 })
+  // Report what happened: an unconfigured client or a refused send is a 502, never a "forwarded" 202 (Codex, #434).
+  // The card does not wait on this (it saves satisfaction_answered either way, so a merchant is never re-asked
+  // because telemetry was down), but the server log and any caller can tell a lost rating from a delivered one.
+  const forwarded = await sendGrowthSatisfaction(decision.userId, decision.featureId, decision.answer)
+  if (!forwarded) {
+    console.warn(`[growth/satisfaction] rating for ${decision.featureId} did not reach Golden Frijoles`)
+    return NextResponse.json({ skipped: false, forwarded: false }, { status: 502 })
+  }
+  return NextResponse.json({ skipped: false, forwarded: true }, { status: 202 })
 }
