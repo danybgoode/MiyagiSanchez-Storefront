@@ -133,6 +133,7 @@
       "callsites": [
         "app/(shell)/mx/vende/fundadoras/page.tsx:55",
         "app/api/growth/fundadoras/track/route.ts:68",
+        "app/api/growth/satisfaction/route.ts:30",
         "app/api/growth/track/route.ts:39",
         "app/api/vende/fundadoras/apply/route.ts:88",
         "lib/merchant-lifecycle-server.ts:261",

@@ -29,6 +29,7 @@
     "app/(shell)/shop/manage/SellerBreadcrumb.tsx",
     "app/(shell)/shop/manage/SellerNav.tsx",
     "app/(shell)/shop/manage/SetupGuideCard.tsx",
+    "app/(shell)/shop/manage/SetupGuideSatisfaction.tsx",
     "app/(shell)/shop/manage/_components/SellerShellChrome.tsx",
     "app/(shell)/shop/manage/analytics/AnalyticsClient.tsx",
     "app/(shell)/shop/manage/analytics/page.tsx",
@@ -761,6 +762,16 @@
         "s_dd680772877e1917",
         "s_d1cca38caed2a56e",
         "s_959a45d44e6fcf58"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/SetupGuideSatisfaction.tsx",
+      "keys": [
+        "s_6c64e278488d96d7",
+        "s_301e076f72111c5b",
+        "s_9fcaf9c04c05e25a",
+        "s_4300b19fee75d866",
+        "s_a81745a0c6dac89f"
       ]
     },
     {
@@ -4448,6 +4459,10 @@
       "source": "Dominio propio"
     },
     {
+      "key": "s_301e076f72111c5b",
+      "source": "Califica la guía del 1 al 5"
+    },
+    {
       "key": "s_30711f63ffa036ea",
       "source": "Cargando tu llave…"
     },
@@ -4934,6 +4949,10 @@
     {
       "key": "s_42ebcef5ce8209d5",
       "source": "Pre-configura el comportamiento de checkout y envíos según lo que vendes. Puedes ajustar cada opción individualmente más adelante."
+    },
+    {
+      "key": "s_4300b19fee75d866",
+      "source": "¡Gracias! Nos ayuda a mejorar la guía."
     },
     {
       "key": "s_4332f12393d2cb11",
@@ -6182,6 +6201,10 @@
     {
       "key": "s_6c251dc9087abdbf",
       "source": "/año"
+    },
+    {
+      "key": "s_6c64e278488d96d7",
+      "source": "Ahora no"
     },
     {
       "key": "s_6c9634c10c50c84b",
@@ -7752,6 +7775,10 @@
       "source": "Máx. caracteres"
     },
     {
+      "key": "s_9fcaf9c04c05e25a",
+      "source": "Tu tienda está lista"
+    },
+    {
       "key": "s_9fda1f3d9815fc4f",
       "source": "Publicar primer anuncio"
     },
@@ -8018,6 +8045,10 @@
     {
       "key": "s_a7fd788932072ffe",
       "source": "Colecciones (reemplaza las actuales)"
+    },
+    {
+      "key": "s_a81745a0c6dac89f",
+      "source": "¿Qué tanto te ayudó la guía a ponerla en marcha? 1 es nada, 5 es mucho."
     },
     {
       "key": "s_a81771ce9dcb6bd6",

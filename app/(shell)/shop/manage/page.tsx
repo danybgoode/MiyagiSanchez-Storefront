@@ -1,3 +1,4 @@
+import { satisfactionAnswered } from '@/lib/growth-track'
 import { redirect } from 'next/navigation'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
@@ -147,7 +148,7 @@ export default async function ManagePage() {
       ])
     : [{ count: 0 }, { count: 0 }, { data: null }, null]
 
-  const guideSettings = (guideShop?.metadata as { settings?: { guide?: { guide_dismissed?: boolean; share_done?: boolean } } } | null)?.settings?.guide
+  const guideSettings = (guideShop?.metadata as { settings?: { guide?: { guide_dismissed?: boolean; share_done?: boolean; satisfaction_answered?: boolean } } } | null)?.settings?.guide
   const setupSteps = guideShop
     ? personalizeSetupSteps(
         getSetupSteps({
@@ -160,6 +161,8 @@ export default async function ManagePage() {
     : []
   // Fail-safe: an absent/malformed flag reads as false — show the guide.
   const guideDismissed = !!guideSettings?.guide_dismissed
+  // The route's own rule (key present = answered), so the page can never show an ask the claim would refuse.
+  const guideSatisfactionAnswered = satisfactionAnswered(guideShop?.metadata)
 
   return (
     <ManageDashboard
@@ -174,6 +177,7 @@ export default async function ManagePage() {
       pendingOrdersCount={pendingOrdersCount ?? 0}
       setupSteps={setupSteps}
       guideDismissed={guideDismissed}
+      guideSatisfactionAnswered={guideSatisfactionAnswered}
     />
   )
 }

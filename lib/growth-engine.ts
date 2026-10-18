@@ -81,6 +81,29 @@ export async function sendGrowthEventWithResult(
 }
 
 /**
+ * A person's satisfaction answer, through the SDK's standard rating call (golden-frijoles satisfied-ask): the
+ * `satisfaction_rated` event with the score in `tags.score`, or `satisfaction_dismissed`. Returns whether it landed;
+ * never throws.
+ */
+export async function sendGrowthSatisfaction(
+  userId: string,
+  featureId: string,
+  answer: number | 'dismissed',
+): Promise<boolean> {
+  try {
+    const client = growthClient(userId)
+    if (!client) return false
+    const result =
+      answer === 'dismissed'
+        ? await client.dismissSatisfaction(featureId)
+        : await client.rateSatisfaction(featureId, answer)
+    return result.ok
+  } catch {
+    return false
+  }
+}
+
+/**
  * Sampled Golden flag-evaluation fact. The fixed synthetic service subject is deliberately
  * non-personal, and this promise is safe to fire-and-forget beside a flag decision.
  */
