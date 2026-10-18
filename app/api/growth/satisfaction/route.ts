@@ -10,7 +10,7 @@ import { sendGrowthSatisfaction } from '@/lib/growth-engine'
 // growth.telemetry_enabled, and only an allow-listed feature with a 1–5 score or "dismissed" is accepted
 // (lib/growth-track.ts → decideSatisfaction).
 //
-// "Asked once" is a SERVER fact here, not a client convention (pr-reviewer + Vibe, #434): the caller's own shop row
+// "Asked once" is a SERVER fact here, not a client convention (pr-reviewer + Vibe, PR 434): the caller's own shop row
 // is claimed with `metadata.settings.guide.satisfaction_answered` BEFORE anything is forwarded, by a conditional
 // update that only matches while the flag is unset — so a repeat POST, a double tap or a second tab gets 409 and
 // sends nothing, and a signed-in user with no shop cannot rate the setup guide at all. The claim is made even with
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   if (!decision.forward) return NextResponse.json({ skipped: true }, { status: 200 })
 
-  // Report what happened: an unconfigured client or a refused send is a 502, never a "forwarded" 202 (Codex, #434).
+  // Report what happened: an unconfigured client or a refused send is a 502, never a "forwarded" 202 (Codex, PR 434).
   const forwarded = await sendGrowthSatisfaction(decision.userId, decision.featureId, decision.answer)
   if (!forwarded) {
     console.warn(`[growth/satisfaction] rating for ${decision.featureId} did not reach Golden Frijoles`)

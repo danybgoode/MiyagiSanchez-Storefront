@@ -45,7 +45,7 @@ export default function SetupGuideCard({
 
   const doneCount = steps.filter((step) => step.done).length
   // An empty list is "the guide did not load", not "every step is done" (the page passes [] when the shop row is
-  // missing): without the length check it would ask a merchant to rate a guide they never saw (pr-reviewer, #434).
+  // missing): without the length check it would ask a merchant to rate a guide they never saw (pr-reviewer, PR 434).
   const loaded = steps.length > 0
   const allDone = loaded && doneCount === steps.length
   const visible = !dismissed && loaded && !allDone
