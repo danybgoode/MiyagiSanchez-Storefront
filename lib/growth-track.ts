@@ -68,3 +68,18 @@ export function decideSatisfaction(
   if (!flagEnabled) return { forward: false, reason: 'flag_off' }
   return { forward: true, userId: input.userId, featureId, answer }
 }
+
+type ShopMetadata = { settings?: { guide?: { satisfaction_answered?: unknown } & Record<string, unknown> } & Record<string, unknown> } & Record<string, unknown>
+
+/** Whether this shop's merchant already answered (or declined) the setup-guide ask. Malformed reads as "not yet". */
+export function satisfactionAnswered(metadata: unknown): boolean {
+  return (metadata as ShopMetadata | null)?.settings?.guide?.satisfaction_answered === true
+}
+
+/** The shop's metadata with `settings.guide.satisfaction_answered: true`, every other key kept. Pure. */
+export function withSatisfactionAnswered(metadata: unknown): Record<string, unknown> {
+  const meta = (metadata && typeof metadata === 'object' ? metadata : {}) as ShopMetadata
+  const settings = (meta.settings && typeof meta.settings === 'object' ? meta.settings : {}) as NonNullable<ShopMetadata['settings']>
+  const guide = (settings.guide && typeof settings.guide === 'object' ? settings.guide : {}) as Record<string, unknown>
+  return { ...meta, settings: { ...settings, guide: { ...guide, satisfaction_answered: true } } }
+}

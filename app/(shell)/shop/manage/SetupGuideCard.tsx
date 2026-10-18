@@ -44,8 +44,11 @@ export default function SetupGuideCard({
   const [dismissed, setDismissed] = useState(initialDismissed)
 
   const doneCount = steps.filter((step) => step.done).length
-  const allDone = doneCount === steps.length
-  const visible = !dismissed && !allDone
+  // An empty list is "the guide did not load", not "every step is done" (the page passes [] when the shop row is
+  // missing): without the length check it would ask a merchant to rate a guide they never saw (pr-reviewer, #434).
+  const loaded = steps.length > 0
+  const allDone = loaded && doneCount === steps.length
+  const visible = !dismissed && loaded && !allDone
   const openStep = steps.find((step) => step.open)
 
   // guide_view — once per mount while the card is actually on screen. Also forwarded
@@ -103,7 +106,7 @@ export default function SetupGuideCard({
     else pushAnalyticsEvent('guide_dismiss')
   }, [save])
 
-  if (dismissed) return null
+  if (dismissed || !loaded) return null
   // A merchant who hid the guide is never asked about it; one who finished it is asked once.
   if (allDone) return initialSatisfactionAnswered ? null : <SetupGuideSatisfaction />
 

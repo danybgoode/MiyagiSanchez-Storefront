@@ -188,8 +188,6 @@ interface ShopUpdatePayload {
     guide?: {
       guide_dismissed?: boolean
       share_done?: boolean
-      // golden-frijoles satisfied-ask: the merchant answered "¿Te ayudó la guía?" (or "Ahora no").
-      satisfaction_answered?: boolean
     }
   }
 }

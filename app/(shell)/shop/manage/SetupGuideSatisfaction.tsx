@@ -3,33 +3,30 @@
 import { useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { useSettingsSave } from './settings/_components/useSettingsSave'
 
 /**
  * golden-frijoles satisfied-ask — once the five setup steps are done, ask the merchant once whether the guide helped.
- * The answer goes to Golden Frijoles as its standard rating (POST /api/growth/satisfaction → `rateSatisfaction`), and
- * `metadata.settings.guide.satisfaction_answered` is saved through the same PATCH seam as `guide_dismissed`, so the
- * ask never comes back on another device. "Ahora no" counts as an answer: asked once, never nagged.
+ * The answer goes to POST /api/growth/satisfaction, which claims `metadata.settings.guide.satisfaction_answered` on the
+ * merchant's own shop and only then forwards it to Golden Frijoles as its standard rating (`rateSatisfaction`). The
+ * server owns "asked once": a repeat answers 409 and sends nothing. "Ahora no" counts as an answer.
  *
  * ⚠️ The in-flight lock is local state: a double tap must not send two ratings.
  */
 const SCORES = [1, 2, 3, 4, 5] as const
 
 export default function SetupGuideSatisfaction() {
-  const { save } = useSettingsSave()
   const [state, setState] = useState<'asking' | 'sending' | 'thanks' | 'gone'>('asking')
 
   async function answer(value: (typeof SCORES)[number] | 'dismissed') {
     if (state !== 'asking') return
     setState('sending')
-    // Telemetry is fire-and-forget (the route no-ops when growth.telemetry_enabled is off); the saved flag is what
-    // stops the ask, so it is the one we wait for.
-    fetch('/api/growth/satisfaction', {
+    // Whatever the outcome, the card leaves: asking again in the same view would read as the tap not working, and the
+    // server already decided whether this merchant can still be asked (the page reads its claim on the next load).
+    await fetch('/api/growth/satisfaction', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ featureId: 'setup_guide', answer: value }),
     }).catch(() => {})
-    await save({ settings: { guide: { satisfaction_answered: true } } })
     setState(value === 'dismissed' ? 'gone' : 'thanks')
   }
 

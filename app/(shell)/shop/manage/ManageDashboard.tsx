@@ -118,7 +118,7 @@ export default async function ManageDashboard({
         }
       />
 
-      {/* ── Setup guide (renders nothing once dismissed or all 5 steps done) ──── */}
+      {/* ── Setup guide (nothing once dismissed; once all 5 steps are done, asks once whether it helped) ── */}
       <SetupGuideCard
         steps={setupSteps}
         initialDismissed={guideDismissed}

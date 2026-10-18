@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { decideSatisfaction } from '../lib/growth-track'
+import { decideSatisfaction, satisfactionAnswered, withSatisfactionAnswered } from '../lib/growth-track'
 
 /**
  * golden-frijoles satisfied-ask — the setup guide's "¿Te ayudó…?" answer. The pure decision `app/api/growth/
@@ -46,6 +46,25 @@ test.describe('growth satisfaction · decideSatisfaction', () => {
         reason: 'invalid_answer',
       })
     }
+  })
+})
+
+test.describe('growth satisfaction · asked once (the shop row the route claims)', () => {
+  test('only a literal true means answered; anything else is "not yet"', () => {
+    expect(satisfactionAnswered({ settings: { guide: { satisfaction_answered: true } } })).toBe(true)
+    for (const meta of [null, undefined, {}, { settings: {} }, { settings: { guide: {} } },
+      { settings: { guide: { satisfaction_answered: 'true' } } }, { settings: { guide: { satisfaction_answered: 1 } } }])
+      expect(satisfactionAnswered(meta)).toBe(false)
+  })
+
+  test('the claim sets the flag and keeps every other key', () => {
+    const before = { stripe: { on: true }, settings: { hero: { title: 'x' }, guide: { guide_dismissed: false, share_done: true } } }
+    expect(withSatisfactionAnswered(before)).toEqual({
+      stripe: { on: true },
+      settings: { hero: { title: 'x' }, guide: { guide_dismissed: false, share_done: true, satisfaction_answered: true } },
+    })
+    expect(withSatisfactionAnswered(null)).toEqual({ settings: { guide: { satisfaction_answered: true } } })
+    expect(satisfactionAnswered(withSatisfactionAnswered(before))).toBe(true)
   })
 })
 
