@@ -1,3 +1,4 @@
+import { satisfactionAnswered } from '@/lib/growth-track'
 import { redirect } from 'next/navigation'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
@@ -160,7 +161,8 @@ export default async function ManagePage() {
     : []
   // Fail-safe: an absent/malformed flag reads as false — show the guide.
   const guideDismissed = !!guideSettings?.guide_dismissed
-  const guideSatisfactionAnswered = !!guideSettings?.satisfaction_answered
+  // The route's own rule (key present = answered), so the page can never show an ask the claim would refuse.
+  const guideSatisfactionAnswered = satisfactionAnswered(guideShop?.metadata)
 
   return (
     <ManageDashboard

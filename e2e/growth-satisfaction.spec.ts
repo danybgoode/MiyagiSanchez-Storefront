@@ -50,10 +50,11 @@ test.describe('growth satisfaction · decideSatisfaction', () => {
 })
 
 test.describe('growth satisfaction · asked once (the shop row the route claims)', () => {
-  test('only a literal true means answered; anything else is "not yet"', () => {
-    expect(satisfactionAnswered({ settings: { guide: { satisfaction_answered: true } } })).toBe(true)
+  test('answered = the key is present (the claim\'s IS NULL rule); absent or null is "not yet"', () => {
+    for (const value of [true, false, 'true', 1])
+      expect(satisfactionAnswered({ settings: { guide: { satisfaction_answered: value } } })).toBe(true)
     for (const meta of [null, undefined, {}, { settings: {} }, { settings: { guide: {} } },
-      { settings: { guide: { satisfaction_answered: 'true' } } }, { settings: { guide: { satisfaction_answered: 1 } } }])
+      { settings: { guide: { satisfaction_answered: null } } }])
       expect(satisfactionAnswered(meta)).toBe(false)
   })
 

@@ -71,9 +71,14 @@ export function decideSatisfaction(
 
 type ShopMetadata = { settings?: { guide?: { satisfaction_answered?: unknown } & Record<string, unknown> } & Record<string, unknown> } & Record<string, unknown>
 
-/** Whether this shop's merchant already answered (or declined) the setup-guide ask. Malformed reads as "not yet". */
+/**
+ * Whether this shop's merchant already answered (or declined) the setup-guide ask: the key is PRESENT, whatever its
+ * value. This is the same rule as the route's claim (`satisfaction_answered IS NULL` in SQL), so a stray `false` or
+ * `"true"` can never show an ask the claim then refuses with 409 (Codex, #434). It fails closed: asked never again.
+ */
 export function satisfactionAnswered(metadata: unknown): boolean {
-  return (metadata as ShopMetadata | null)?.settings?.guide?.satisfaction_answered === true
+  const value = (metadata as ShopMetadata | null)?.settings?.guide?.satisfaction_answered
+  return value !== undefined && value !== null
 }
 
 /** The shop's metadata with `settings.guide.satisfaction_answered: true`, every other key kept. Pure. */
