@@ -312,7 +312,7 @@ export function lifecycleIdempotencyKey(merchantId: string, event: MerchantLifec
 // ---------------------------------------------------------------------------
 
 /** The subset of a normalized Medusa order this decision reads. Everything optional:
- *  a backend older than medusa-bonsai-backend PR 109 sends no `payment_captured` at all. */
+ *  a backend older than MiyagiSanchez-Backend PR 109 sends no `payment_captured` at all. */
 export interface CapturedOrderLike {
   status?: unknown
   payment_captured?: unknown
@@ -354,7 +354,7 @@ const CAPTURED_ORDER_STATUSES = new Set([
  *     cancel/refund/return or an uncaptured MANUAL method, so a card order sitting at
  *     `payment_status: 'authorized'` normalises to 'paid'. Reading `status` alone would
  *     grant the write-once `first_sale` milestone off a fall-through default — the gap a
- *     fresh-reviewer pass found on PR 298 and medusa-bonsai-backend PR 109 closed.
+ *     fresh-reviewer pass found on PR 298 and MiyagiSanchez-Backend PR 109 closed.
  *
  *   `status` in the allow-list — did the sale STICK? A lifecycle fact. Necessary because
  *     `payment_captured` deliberately ignores returns and cancellations (a return is not
@@ -362,7 +362,7 @@ const CAPTURED_ORDER_STATUSES = new Set([
  *     `status: 'refunded'`, which the allow-list excludes.
  *
  * FAILS CLOSED on absence. An order without `payment_captured` — a backend older than
- * medusa-bonsai-backend PR 109, or a response we could not parse — does NOT count. The
+ * MiyagiSanchez-Backend PR 109, or a response we could not parse — does NOT count. The
  * milestone simply defers to a later sweep, which is recoverable; granting one wrongly
  * is not.
  */

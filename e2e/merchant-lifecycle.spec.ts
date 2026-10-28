@@ -347,7 +347,7 @@ test.describe('merchant lifecycle · isCapturedOrder (the first_sale gate)', () 
   })
 
   test('a MISSING payment_captured fails closed — an older backend must not grant it', () => {
-    // Deploy ordering: until medusa-bonsai-backend PR 109 rolled, the field was absent.
+    // Deploy ordering: until MiyagiSanchez-Backend PR 109 rolled, the field was absent.
     // Deferring the milestone is recoverable; granting it wrongly is not.
     expect(isCapturedOrder({ status: 'paid' })).toBe(false)
   })

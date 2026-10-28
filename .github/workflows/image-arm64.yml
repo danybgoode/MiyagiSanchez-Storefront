@@ -4,7 +4,9 @@ name: arm64 image (Oracle VM)
 #
 # Built HERE, on a native arm64 runner, because the VM has 2 shared cores and also runs panfleto: a
 # `next build` there would starve every tenant on the box, and a rollback would be another slow build.
-# The VM only ever PULLS `ghcr.io/danybgoode/miyagi-web:<sha>` — a rollback is a restart.
+# The VM only ever PULLS `ghcr.io/danybgoode/miyagisanchez-storefront:<sha>` — a rollback is a restart.
+# The image was `miyagi-web` until the 2026-10-28 rename; it is still pushed under that name too, for one
+# deploy, so a VM still on the old update.sh keeps working. Drop the old tags once the VM pulls the new name.
 #
 # Build args mirror cloudbuild.yaml EXACTLY (guarded by e2e/image-arm64-build-args.spec.ts):
 #   - the eight browser-public keys come from the `production` GitHub Environment as `PROD_<NAME>`. The
@@ -82,13 +84,15 @@ jobs:
           # The moving `:main` tag is what the VM's update.sh resolves, so ONLY a build of refs/heads/main may
           # move it — a manual dispatch from a feature branch gets its sha tag and nothing else.
           tags: |
+            ghcr.io/danybgoode/miyagisanchez-storefront:${{ github.sha }}
+            ${{ github.ref == 'refs/heads/main' && 'ghcr.io/danybgoode/miyagisanchez-storefront:main' || '' }}
             ghcr.io/danybgoode/miyagi-web:${{ github.sha }}
             ${{ github.ref == 'refs/heads/main' && 'ghcr.io/danybgoode/miyagi-web:main' || '' }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=miyagi-web-arm64
-          cache-to: type=gha,scope=miyagi-web-arm64,mode=max
+          cache-from: type=gha,scope=miyagisanchez-storefront-arm64
+          cache-to: type=gha,scope=miyagisanchez-storefront-arm64,mode=max
           build-args: |
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.PROD_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
             NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=${{ vars.PROD_NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY }}
