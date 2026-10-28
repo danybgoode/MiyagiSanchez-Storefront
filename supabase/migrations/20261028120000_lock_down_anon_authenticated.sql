@@ -53,3 +53,5 @@ GRANT EXECUTE ON FUNCTION public.reserve_shop_created_welcome(text, text) TO ser
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC, anon, authenticated;
+-- NOTE (as applied): the `FROM PUBLIC` part above is a no-op — PUBLIC's EXECUTE is a global default. Fixed by the
+-- global form in 20261028130000_lock_down_followup.sql. Left as applied so this file matches what ran.
