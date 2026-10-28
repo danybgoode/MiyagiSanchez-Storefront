@@ -202,9 +202,25 @@ const comparatorAnalyzeLimiter = () => {
   return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(8, '10 m'), prefix: 'rl:comparator_analyze' })
 }
 
+// Prompt-to-shop generation bursts (epic prompt-to-shop D5). Two buckets because one is not enough: per IP
+// catches a script cycling device cookies, per device catches one phone hammering «Otra versión». Both may fail
+// open like every limiter here — the HARD caps are the Supabase allowance and the daily budget, which fail closed.
+// The IP bucket is generous because a market stall's whole carrier NAT can share one address.
+const p2sGenerateIpLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(30, '1 h'), prefix: 'rl:p2s_generate_ip' })
+}
+
+const p2sGenerateDeviceLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(6, '10 m'), prefix: 'rl:p2s_generate_device' })
+}
+
 // ── Public helper ──────────────────────────────────────────────────────────────
 
-export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track'
+export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device'
 
 function limiterFor(key: LimitKey): Ratelimit | null {
   const getLimiter = key === 'offers'          ? offerLimiter
@@ -226,6 +242,8 @@ function limiterFor(key: LimitKey): Ratelimit | null {
     : key === 'relationship'   ? relationshipLimiter
     : key === 'fundadoras_apply' ? fundadorasApplyLimiter
     : key === 'fundadoras_track' ? fundadorasTrackLimiter
+    : key === 'p2s_generate_ip' ? p2sGenerateIpLimiter
+    : key === 'p2s_generate_device' ? p2sGenerateDeviceLimiter
     : supplyImportLimiter
   return getLimiter()
 }
