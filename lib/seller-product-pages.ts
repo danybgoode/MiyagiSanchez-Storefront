@@ -14,7 +14,7 @@ export const SELLER_PRODUCTS_PAGE_SIZE = 50
  * Paging stops here. NOT a per-seller bound: the backend route reads `take: 2000` across EVERY published product on
  * the platform and filters to the seller afterwards, so `count` is computed from that truncated set. Past 2000
  * published products platform-wide a shop can lose products while this reports `complete: true` — a backend defect
- * of the same kind as the 20-product one this file fixes, filed as a follow-up (share-kit README, D2).
+ * of the same kind as the 20-product one this file fixes, noted as a backend follow-up in the share-kit lock (README, D2).
  */
 export const SELLER_PRODUCTS_MAX = 2000
 

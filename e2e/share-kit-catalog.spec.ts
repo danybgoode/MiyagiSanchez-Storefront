@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { buildCatalogModel, catalogShortUrl, catalogUrl, orderMessage } from '../lib/share-kit/catalog'
 import { shopWhatsAppNumber, whatsappDigits } from '../lib/share-kit/whatsapp'
 import { readAllSellerProducts, SELLER_PRODUCTS_PAGE_SIZE } from '../lib/seller-product-pages'
@@ -186,5 +188,24 @@ test.describe('share kit · the catalog page server HTML (D8, D9)', () => {
   test('an unknown shop is a 404, not an empty catalog', async ({ request }) => {
     const res = await request.get('/mx/s/no-existe-esta-tienda-zz9/catalogo')
     expect(res.status()).toBe(404)
+  })
+})
+
+const ROOT = path.resolve(import.meta.dirname, '..')
+const read = (relative: string) => readFileSync(path.join(ROOT, relative), 'utf8')
+
+test.describe('share kit · the catalog tiles are for Mexico shops only (D5)', () => {
+  // A US shop shown a catalog link would share a page that 404s. Both hosts decide from the Medusa seller's market.
+  // Observed red by deleting each gate in turn (verifier round 2, PR 447).
+  test('Comparte passes a catalog link only for a Mexico shop', () => {
+    const page = read('app/(shell)/shop/manage/comparte/page.tsx')
+    expect(page).toMatch(/const isMexicoShop = readPublicSellerMarket\(medusaShop\)\?\.market_code === 'mx'/)
+    expect(page).toContain('catalogUrl={isMexicoShop ? catalogUrl(shop.slug) : null}')
+  })
+
+  test('the publish moment renders the catalog tile only for a Mexico shop', () => {
+    const moment = read('app/(shell)/p2s/_components/PublishedMoment.tsx')
+    expect(moment).toContain("{market === 'mx' && isShopSlug(shopSlug) ? (")
+    expect(read('app/(shell)/p2s/_components/KeptShop.tsx')).toContain('market={market}')
   })
 })
