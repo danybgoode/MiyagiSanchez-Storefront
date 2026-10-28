@@ -14,8 +14,10 @@
  * `lib/about-content.ts` itself never imports it.
  */
 import { getOverriddenDictionary } from './copy-overrides'
+import { getPricingCatalog } from './pricing-catalog-server'
 import {
   ABOUT_SECTION_IDS,
+  fillAboutSectionsPricing,
   type AboutLocale,
   type AboutPageCopy,
   type AboutSection,
@@ -46,10 +48,13 @@ export async function getOverriddenAboutSections(): Promise<AboutSection[]> {
     getOverriddenDictionary('es'),
     getOverriddenDictionary('en'),
   ])
-  return ABOUT_SECTION_IDS.map((id) => ({
+  const sections = ABOUT_SECTION_IDS.map((id) => ({
     id,
     stub: STUB_SECTION_IDS.has(id),
     es: esDict.acerca.sections[id],
     en: enDict.acerca.sections[id],
   }))
+  // The pricing section holds `{token}`s, never typed prices (pricing-page D7): fill them from the
+  // live catalog — including any admin override, which can use the same tokens.
+  return fillAboutSectionsPricing(sections, await getPricingCatalog())
 }

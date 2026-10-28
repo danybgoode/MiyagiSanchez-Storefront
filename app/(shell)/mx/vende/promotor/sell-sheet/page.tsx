@@ -3,6 +3,7 @@ import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { CUSTOM_DOMAIN_PRICE_MXN } from '@/lib/domain-pricing'
 import { SUBDOMAIN_PRICE_YEARLY_MXN } from '@/lib/subdomain-pricing'
 import { getPromoterSkuPrices } from '@/lib/promoter'
+import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 
 export const metadata: Metadata = {
   title: 'Manual del promotor',
@@ -84,7 +85,7 @@ export default async function PromoterSellSheetPage() {
         {p.glossary.map((g) => (
           <div key={g.title} className="ss-card">
             <h3>{g.title}</h3>
-            <p>{g.body}</p>
+            <p>{fillFixedPricingTokens(g.body, 'es')}</p>
           </div>
         ))}
       </div>
@@ -101,7 +102,7 @@ export default async function PromoterSellSheetPage() {
         {p.scripts.map((s) => (
           <div key={s.title} className="ss-card">
             <h3>{s.title}</h3>
-            <p>{s.body}</p>
+            <p>{fillFixedPricingTokens(s.body, 'es')}</p>
           </div>
         ))}
       </div>

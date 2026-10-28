@@ -31,6 +31,9 @@
  */
 
 import { SELLER_LANDING_PATHS } from './seller-acquisition'
+import { buildPricingCatalog, fillPricingTokens, type PricingCatalog } from './pricing-catalog'
+import { processorRatesFromDataset, type ComparatorDataset } from './cost-comparator-dataset'
+import comparatorDataset from './cost-comparator-dataset.json' with { type: 'json' }
 
 export type AboutLocale = 'es' | 'en'
 
@@ -79,6 +82,8 @@ export type AboutPageCopy = {
   secondaryCtaLabel: string
   /** Badge shown on stub sections. */
   stubBadge: string
+  /** The pricing section's link to /mx/precios (pricing-page D7). */
+  pricingLinkLabel: string
   /** Label for the language-toggle link. */
   langToggleLabel: string
   /**
@@ -118,6 +123,7 @@ export const ABOUT_PAGE: Record<AboutLocale, AboutPageCopy> = {
     primaryCtaLabel: 'Empieza gratis',
     secondaryCtaLabel: 'Para vendedores',
     stubBadge: 'Próximamente',
+    pricingLinkLabel: 'Ver todos los precios',
     langToggleLabel: 'English',
     contactPrompt: '¿Dudas? Escríbenos a',
     metaTitle: 'Acerca de miyagisanchez.com — qué es y por qué vender aquí',
@@ -131,6 +137,7 @@ export const ABOUT_PAGE: Record<AboutLocale, AboutPageCopy> = {
     primaryCtaLabel: 'Start free',
     secondaryCtaLabel: 'For sellers',
     stubBadge: 'Coming soon',
+    pricingLinkLabel: 'See every price',
     langToggleLabel: 'Español',
     contactPrompt: 'Questions? Write to us at',
     metaTitle: 'About miyagisanchez.com — what it is and why sell here',
@@ -139,7 +146,7 @@ export const ABOUT_PAGE: Record<AboutLocale, AboutPageCopy> = {
   },
 }
 
-export const ABOUT_SECTIONS: AboutSection[] = [
+const ABOUT_SECTION_TEMPLATES: AboutSection[] = [
   {
     id: 'what_is',
     stub: false,
@@ -255,22 +262,29 @@ export const ABOUT_SECTIONS: AboutSection[] = [
   {
     id: 'pricing',
     stub: false,
+    // Prices are `{token}`s filled from the pricing catalog (pricing-page D7) — the same templates
+    // as `locales/*.json → acerca.sections.pricing`, which is what the live surfaces render. The
+    // hand-typed copy this replaced had already drifted from the locales (`/s/` vs `/mx/s/`).
     es: {
       heading: 'Precios',
-      lead: 'Vender es gratis (0% de comisión). Los servicios premium opcionales son el subdominio propio y el dominio propio.',
+      lead: 'Vender es gratis (0% de comisión). Los extras son opcionales y todos tienen precio público en miyagisanchez.com/mx/precios.',
       body: [
         'Tu tienda siempre es gratis: tu URL en miyagisanchez.com/mx/s/tu-tienda no cuesta nada y nunca caduca, con 0% de comisión.',
-        'Subdominio propio: $199 MXN/año (~$17/mes) o $25 MXN/mes. Tu tienda como sitio independiente en tu-tienda.miyagisanchez.com (sin la barra de la plataforma). El plan anual sale más barato; el mensual es sin compromiso. Puedes cambiar entre mensual y anual cuando quieras, sin cargo doble. Se renueva solo; cancela cuando quieras y tu tienda sigue activa y gratis en tu URL miyagisanchez.com/mx/s/tu-tienda.',
-        'Dominio propio: $499 MXN/año (~$42/mes). Conecta tu propio dominio (tutienda.com) con SSL e infraestructura nuestra y sin miyagisanchez.com en la URL. Se renueva cada año; puedes cancelar cuando quieras y tu tienda sigue activa en tu URL gratis.',
+        'Subdominio propio: {subdomainPrice}. Tu tienda como sitio independiente en tu-tienda.miyagisanchez.com (sin la barra de la plataforma). El plan anual sale más barato; el mensual es sin compromiso. Puedes cambiar entre mensual y anual cuando quieras, sin cargo doble. Se renueva solo; cancela cuando quieras y tu tienda sigue activa y gratis en tu URL miyagisanchez.com/mx/s/tu-tienda.',
+        'Dominio propio: {customDomainPrice}. Conecta tu propio dominio (tutienda.com) con SSL e infraestructura nuestra y sin miyagisanchez.com en la URL. Se renueva cada año; puedes cancelar cuando quieras y tu tienda sigue activa en tu URL gratis.',
+        'Sincronizar con Mercado Libre: {mlSyncPrice}. Tu inventario sincronizado en los dos sentidos; conectar, importar y publicar siguen gratis. Anuncio impreso: {printAdPrice}. Migración con consultor: {migrationPrice}.',
+        'Tu pasarela de pago (Stripe o Mercado Pago) cobra su propia comisión, no nosotros, y el dinero llega directo a tu cuenta. Todos los precios, con sus fuentes: miyagisanchez.com/mx/precios.',
       ],
     },
     en: {
       heading: 'Pricing',
-      lead: 'Selling is free (0% commission). The optional premium services are a custom subdomain and a custom domain.',
+      lead: 'Selling is free (0% commission). The extras are optional and every one has a public price at miyagisanchez.com/mx/precios.',
       body: [
         'Your shop is always free: your URL at miyagisanchez.com/mx/s/your-shop costs nothing and never expires, with 0% commission.',
-        'Custom subdomain: $199 MXN/year (~$17/mo) or $25 MXN/mo. Your shop as a standalone site at your-shop.miyagisanchez.com (no platform bar). The yearly plan is cheaper; the monthly one has no commitment. You can switch between monthly and yearly anytime with no double charge. It renews automatically; cancel anytime and your shop stays live and free at your URL miyagisanchez.com/mx/s/your-shop.',
-        'Custom domain: $499 MXN/year (~$42/mo). Connect your own domain (yourshop.com) with SSL and our infrastructure, with no miyagisanchez.com in the URL. It renews yearly; you can cancel anytime and your shop stays live on your free URL.',
+        'Custom subdomain: {subdomainPrice}. Your shop as a standalone site at your-shop.miyagisanchez.com (no platform bar). The yearly plan is cheaper; the monthly one has no commitment. You can switch between monthly and yearly anytime with no double charge. It renews automatically; cancel anytime and your shop stays live and free at your URL miyagisanchez.com/mx/s/your-shop.',
+        'Custom domain: {customDomainPrice}. Connect your own domain (yourshop.com) with SSL and our infrastructure, with no miyagisanchez.com in the URL. It renews yearly; you can cancel anytime and your shop stays live on your free URL.',
+        'Mercado Libre sync: {mlSyncPrice}. Two-way inventory sync; connecting, importing and publishing stay free. Print ad: {printAdPrice}. Assisted migration: {migrationPrice}.',
+        'Your payment processor (Stripe or Mercado Pago) charges its own fee, not us, and the money goes straight to your account. Every price, with its sources: miyagisanchez.com/mx/precios.',
       ],
     },
   },
@@ -329,6 +343,33 @@ export const ABOUT_SECTIONS: AboutSection[] = [
     },
   },
 ]
+
+/**
+ * Fill the pricing section's `{token}`s from `catalog` (pricing-page D7). Every other section
+ * passes through untouched. Pure — the live read path (`about-content-overrides.ts`) calls it
+ * with the live catalog; the defaults below use a catalog with no admin prices set.
+ */
+export function fillAboutSectionsPricing(sections: readonly AboutSection[], catalog: PricingCatalog): AboutSection[] {
+  return sections.map((s) => {
+    if (s.id !== 'pricing') return s
+    const fill = (copy: AboutCopy, locale: AboutLocale): AboutCopy => ({
+      ...copy,
+      lead: copy.lead == null ? copy.lead : fillPricingTokens(copy.lead, catalog, locale),
+      body: copy.body.map((b) => fillPricingTokens(b, catalog, locale)),
+    })
+    return { ...s, es: fill(s.es, 'es'), en: fill(s.en, 'en') }
+  })
+}
+
+/** The catalog with no admin price set (print ad / migration read «Precio a cotizar») — the
+ * honest default for a module that cannot read the database. */
+export const DEFAULT_PRICING_CATALOG: PricingCatalog = buildPricingCatalog({
+  migrationPriceMxn: null,
+  printAdTiersCents: null,
+  processors: processorRatesFromDataset(comparatorDataset as ComparatorDataset),
+})
+
+export const ABOUT_SECTIONS: AboutSection[] = fillAboutSectionsPricing(ABOUT_SECTION_TEMPLATES, DEFAULT_PRICING_CATALOG)
 
 /** Look up a section by id. */
 export function getAboutSection(id: AboutSectionId): AboutSection {

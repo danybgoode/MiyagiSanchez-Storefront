@@ -169,6 +169,8 @@ export type SellerAcquisitionPageConfig = {
   aiChannel?: LandingAiChannel
   applyTeaser?: ApplyTeaser
   migrationCallout?: LandingCallout
+  /** «¿Cuánto cuesta?» → /mx/precios (pricing-page D10). In the page sections, never the hero. */
+  pricingCallout?: LandingCallout
   /**
    * The prompt-to-shop describe box (epic prompt-to-shop S2.2). Rendered right under the hero title so it sits
    * above the fold on a 375 px phone; only the anchor page passes one.
@@ -199,25 +201,28 @@ export function SellerAcquisitionPage({ config }: { config: SellerAcquisitionPag
       ) : (
         <SocialProofSection config={config} />
       )}
+      {config.pricingCallout ? (
+        <CalloutSection callout={config.pricingCallout} pageId={config.pageId} slug="pricing" />
+      ) : null}
       <FaqSection config={config} />
       {config.applyTeaser ? <ApplyTeaserSection teaser={config.applyTeaser} /> : null}
       {config.migrationCallout ? (
-        <MigrationCalloutSection callout={config.migrationCallout} pageId={config.pageId} />
+        <CalloutSection callout={config.migrationCallout} pageId={config.pageId} slug="migration" />
       ) : null}
       <ClosingCta config={config} />
     </main>
   )
 }
 
-function MigrationCalloutSection({ callout, pageId }: { callout: LandingCallout; pageId: string }) {
+function CalloutSection({ callout, pageId, slug }: { callout: LandingCallout; pageId: string; slug: string }) {
   return (
-    <section aria-labelledby={`${pageId}-migration-callout-title`} style={{ marginBottom: 'var(--s-10)' }}>
+    <section aria-labelledby={`${pageId}-${slug}-callout-title`} style={{ marginBottom: 'var(--s-10)' }}>
       <article
         className="card-panel"
         style={{ padding: 'var(--s-6)', display: 'flex', flexWrap: 'wrap', gap: 'var(--s-5)', alignItems: 'center', justifyContent: 'space-between' }}
       >
         <div style={{ maxWidth: 560 }}>
-          <h2 id={`${pageId}-migration-callout-title`} className="t-h3" style={{ letterSpacing: 0, marginBottom: 'var(--s-2)' }}>
+          <h2 id={`${pageId}-${slug}-callout-title`} className="t-h3" style={{ letterSpacing: 0, marginBottom: 'var(--s-2)' }}>
             {callout.title}
           </h2>
           <p className="t-lead" style={{ color: 'var(--fg-muted)' }}>{callout.body}</p>

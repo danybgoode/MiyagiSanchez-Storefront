@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { getComparatorDataset } from '@/lib/cost-comparator-data'
 import {
   shopifyRatesFromDataset,
@@ -105,6 +106,13 @@ export default async function ComparadorPage({ searchParams }: ComparadorPagePro
       <p className="t-caption" style={{ color: 'var(--fg-muted)', marginTop: 'var(--s-6)' }}>
         Comparación de referencia con tarifas públicas de cada plataforma — cada cifra es editable y muestra
         su fuente al pasar el cursor. Las tarifas cambian: pídele a tu IA que las confirme antes de decidir.
+      </p>
+
+      {/* pricing-page D10 — the back-link to the full Miyagi price list. */}
+      <p className="t-small" style={{ marginTop: 'var(--s-4)' }}>
+        <Link href="/mx/precios" data-testid="comparador-pricing-link" prefetch={false} style={{ color: 'var(--accent)' }}>
+          Ver precios de Miyagi Sánchez <i className="iconoir-arrow-right" aria-hidden="true" />
+        </Link>
       </p>
     </div>
   )

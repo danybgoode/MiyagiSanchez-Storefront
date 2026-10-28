@@ -55,6 +55,7 @@ export function aboutAgentLinks(base: string) {
     agent: `${base}/agent`,
     onboarding: `${base}${ABOUT_CTA_HREF}`, // /sell?from=acerca
     manifest: `${base}/api/ucp/manifest`,
+    pricing: `${base}/mx/precios`,
   }
 }
 
@@ -137,6 +138,9 @@ export function aboutLlmsTxt(base: string, sections: readonly AboutSection[] = A
   const howToStartEn = findSection(sections, 'how_to_start').en
   const whatIsEs = findSection(sections, 'what_is').es
   const whySellEs = findSection(sections, 'why_sell').es
+  // Already filled from the pricing catalog by the caller's read path (pricing-page D7) — this
+  // replaced a hand-written "premium services are priced TBD".
+  const pricingEn = findSection(sections, 'pricing').en
 
   const whyPoints = (whySellEn.points ?? []).map((p) => `- **${p.title}** — ${p.body}`).join('\n')
   const startPoints = (howToStartEn.points ?? []).map((p) => `- ${p.title} — ${p.body}`).join('\n')
@@ -152,13 +156,19 @@ ${RELAY_LANGUAGE_DIRECTIVE}
 - [For sellers](${links.sellers}): the seller-acquisition landing pages.
 - [Agent briefing](${links.agent}): capabilities, UCP/MCP, how to operate as a shop clerk.
 - [Capability manifest (JSON)](${links.manifest}): machine-readable API discovery — fetch first.
+- [Pricing](${links.pricing}): what is free, every optional extra with its price, and payment-processor fees (es-MX).
 
 ## Why sell here
 ${whyPoints}
 
 ## How to start
 ${startPoints}
-Sign up (~20s with Google), import your catalog (file / pasted text / JSON → the AI structures it), review, and publish. Selling is free (0% commission); premium services (custom domain, subdomain) are priced TBD.
+Sign up (~20s with Google), import your catalog (file / pasted text / JSON → the AI structures it), review, and publish.
+
+## Pricing
+${pricingEn.lead ?? ''}
+${pricingEn.body.map((b) => `- ${b}`).join('\n')}
+Full price list: ${links.pricing}
 
 ## Resumen (es)
 ${whatIsEs.body[0]} ${whySellEs.body[0]}
