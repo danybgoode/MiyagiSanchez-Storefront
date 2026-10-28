@@ -12,6 +12,8 @@ import { ticketQrPath, type EventTicket } from '@/lib/event-ticket-state'
 import { buildMerchantCloseReceipt, type CloseReceiptItem } from '@/lib/promoter-close-receipt'
 import { isRenderableArtworkUrl, isImageLikeArtworkUrl } from '@/lib/personalization'
 import { formatRentalBookingLines, type RentalBookingLike } from '@/lib/rental-booking'
+import { NUDGE_COPY, NUDGE_STEP_COPY } from '@/lib/prompt-to-shop/copy'
+import type { NudgeDay, NudgeStep } from '@/lib/prompt-to-shop/nudges'
 import {
   resolveFoundingOperatorInvitationOutcome,
   type FoundingOperatorInvitationOutcome,
@@ -491,6 +493,22 @@ export async function sendP2sDraftLink(ctx: { to: string; shopName: string; draf
     p(`Para enseñársela a alguien, comparte esta vista previa (solo se puede ver): <a href="${shareUrl}">${esc(shareUrl)}</a>`),
     p('Las tiendas en armado se guardan unos días. Si no pediste este correo, puedes ignorarlo.'),
   ].join(''))
+}
+
+/**
+ * Prompt-to-shop day 1/3/7 reminder (S5.4): the ONE step left, and a link back to the kept shop. Sent by the
+ * `p2s-nudges` cron through `dispatchToSeller` (group `onboarding`), so the merchant's channel choices hold. The
+ * idempotency key makes a retried send of the same milestone one email at Resend too.
+ */
+export async function sendP2sNudge(ctx: { to: string; shopName: string; step: NudgeStep; day: NudgeDay; draftId: string }): Promise<EmailSendResult> {
+  const shopName = plainLine(ctx.shopName) || 'Tu tienda'
+  const step = NUDGE_STEP_COPY[ctx.step]
+  return sendWithResult(ctx.to, NUDGE_COPY.subject(shopName, step.title), [
+    h1(NUDGE_COPY.heading(shopName)),
+    p(`<strong>${esc(step.title)}.</strong> ${esc(step.lead)}`),
+    cta(NUDGE_COPY.cta, `${SITE}/sell/armar`),
+    p(esc(NUDGE_COPY.footer)),
+  ].join(''), undefined, undefined, 'es', `p2s-nudge/${ctx.draftId}/${ctx.day}`)
 }
 
 /** General account welcome. Shop-specific language belongs to the claim receipt. */

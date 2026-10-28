@@ -11,7 +11,8 @@
 import type { IdentityBlock } from './blocks'
 import type { ClaimOutcome } from './claim'
 import type { BlockEvent } from './planner'
-import { ARMAR_COPY, CHECKLIST_COPY, KEEP_COPY, OWNER_COPY, PHOTO_COPY, SHAPING_COPY } from './copy'
+import { checkoutOptionsQuery, checkoutPreview, type CheckoutPreview } from '../checkout-options'
+import { ARMAR_COPY, CHECKLIST_COPY, KEEP_COPY, OWNER_COPY, PHOTO_COPY, PUBLISH_COPY, SHAPING_COPY } from './copy'
 import type { PhotoSuggestion } from './photo'
 
 const SAVE_FAILED = OWNER_COPY.saveFailed
@@ -257,7 +258,10 @@ export async function confirmPhotoRequest(body: ConfirmBody, deps: DraftRequestD
 }
 
 /** `PATCH /api/sell/shop` from the BROWSER (its own cookie) — the seam every settings section saves through. */
-export async function patchShop(payload: Record<string, unknown>, deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) }): Promise<{ ok: boolean; message: string }> {
+export async function patchShop(
+  payload: Record<string, unknown>,
+  deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) },
+): Promise<{ ok: boolean; message: string; synced: boolean }> {
   try {
     const res = await deps.fetch('/api/sell/shop', {
       method: 'PATCH',
@@ -265,9 +269,50 @@ export async function patchShop(payload: Record<string, unknown>, deps: DraftReq
       credentials: 'same-origin',
       body: JSON.stringify(payload),
     })
-    const data = (await res.json().catch(() => null)) as { error?: unknown } | null
-    return { ok: res.ok, message: res.ok ? CHECKLIST_COPY.saved : typeof data?.error === 'string' && data.error ? data.error : CHECKLIST_COPY.saveFailed }
+    const data = (await res.json().catch(() => null)) as { error?: unknown; storefront_synced?: unknown } | null
+    return {
+      ok: res.ok,
+      message: res.ok ? CHECKLIST_COPY.saved : typeof data?.error === 'string' && data.error ? data.error : CHECKLIST_COPY.saveFailed,
+      // `res.ok` only means the settings row was written. The PUBLIC shop — and checkout — read the Medusa seller, and
+      // that sync can fail on its own (the route says so with `storefront_synced: false`).
+      synced: res.ok && data?.storefront_synced !== false,
+    }
   } catch {
-    return { ok: false, message: CHECKLIST_COPY.saveFailed }
+    return { ok: false, message: CHECKLIST_COPY.saveFailed, synced: false }
+  }
+}
+
+/**
+ * What checkout offers a buyer of this shop, previewed (S5.1). The SAME public endpoint and query checkout itself
+ * sends; the projection is `checkoutPreview`. Anything but checkout's shape is `unavailable`, never "nothing".
+ */
+export async function fetchCheckoutPreview(
+  sellerSlug: string,
+  market: string,
+  deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) },
+): Promise<CheckoutPreview> {
+  try {
+    const res = await deps.fetch(`/api/checkout/options?${checkoutOptionsQuery(sellerSlug, market)}`, { cache: 'no-store' })
+    if (!res.ok) return { kind: 'unavailable' }
+    return checkoutPreview(await res.json().catch(() => null))
+  } catch {
+    return { kind: 'unavailable' }
+  }
+}
+
+export type PublishResponse = { ok: true; published: number; live: number; message: string } | { ok: false; message: string }
+
+/** «Publicar» (S5.2): `POST /api/p2s/publish`. */
+export async function publishShop(deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) }): Promise<PublishResponse> {
+  try {
+    const res = await deps.fetch('/api/p2s/publish', { method: 'POST', credentials: 'same-origin' })
+    const data = (await res.json().catch(() => null)) as { ok?: unknown; published?: unknown; live?: unknown; message?: unknown } | null
+    const message = typeof data?.message === 'string' && data.message ? data.message : PUBLISH_COPY.failed
+    if (res.ok && data?.ok === true && typeof data.live === 'number') {
+      return { ok: true, published: typeof data.published === 'number' ? data.published : 0, live: data.live, message }
+    }
+    return { ok: false, message }
+  } catch {
+    return { ok: false, message: PUBLISH_COPY.failed }
   }
 }

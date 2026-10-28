@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import type { ClaimOutcome } from '@/lib/prompt-to-shop/claim'
 import { claimDraft } from '@/lib/prompt-to-shop/client'
+import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 import { ARMAR_COPY } from '@/lib/prompt-to-shop/copy'
 
 /**
@@ -41,6 +42,8 @@ export default function ClaimRunner({ draftId, initial }: { draftId: string | nu
     started.current = attempt
     claimDraft(draftId).then((result) => {
       setOutcome(result)
+      // Funnel step 4 (S5.3): counted on the keep itself — the claim's answer — never on a later visit to the shop.
+      if (result.kind === 'kept') trackFunnel('p2s_kept', result.draftId, { resumed: result.resumed })
       // A keep whose colours and words did not save stays on this panel: the kept view draws them from the draft,
       // so it would show the merchant a shop the live one is not.
       if (result.kind === 'kept' && result.configApplied) router.refresh()

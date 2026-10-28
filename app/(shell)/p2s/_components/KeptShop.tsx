@@ -1,18 +1,22 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
-import { patchShop } from '@/lib/prompt-to-shop/client'
-import { ARMAR_COPY, CHECKLIST_COPY, CHECKLIST_LABELS, PHOTO_COPY } from '@/lib/prompt-to-shop/copy'
+import { patchShop, publishShop } from '@/lib/prompt-to-shop/client'
+import type { ChooserState } from '@/lib/prompt-to-shop/cobros'
+import { ARMAR_COPY, CHECKLIST_COPY, CHECKLIST_LABELS, PHOTO_COPY, PUBLISH_COPY } from '@/lib/prompt-to-shop/copy'
+import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 import type { PublishState } from '@/lib/prompt-to-shop/photo'
 import type { CanvasView, OwnProductCardView } from '@/lib/prompt-to-shop/view'
 import type { SetupStep, SetupStepId } from '@/lib/setup-guide'
 import type { GuideProgress } from '@/lib/setup-guide-source'
+import CobrosChooser from './CobrosChooser'
 import OwnerSheet from './OwnerSheet'
 import PhotoSheet from './PhotoSheet'
+import PublishedMoment from './PublishedMoment'
 import ShopCanvas from './ShopCanvas'
 
 /**
@@ -22,8 +26,14 @@ import ShopCanvas from './ShopCanvas'
  * The checklist IS `getSetupSteps` (D17), fed the same row and product count as Resumen through
  * `lib/setup-guide-source.ts`, so the % here is Resumen's %. Only the labels differ (Fotos, Cobros, Entregas).
  * Every item opens a sheet on the canvas — never a separate form page: Fotos is the photo → product flow, Perfil is
- * edited inline, Cobros and Entregas link to their settings (S5 replaces them), Comparte copies the shop's link.
- * «Publicar» is the canvas's action, not a % step: disabled with its reason until the shop has a product of its own.
+ * edited inline, Cobros and Entregas open the chooser (S5.1, also at `/sell/armar/cobros`), Comparte copies the
+ * shop's link. «Publicar» is the canvas's action, not a % step: disabled with its reason until the shop has a product
+ * of its own; tapping it publishes that shop's unpublished products (S5.2, `POST /api/p2s/publish`) and shows the
+ * shop as the marketplace shows it, with the shares.
+ *
+ * Funnel (S5.3): «real product added» and «payments connected» are counted from the STATE the page shows (a step
+ * done elsewhere counts too); «published» on the publish that succeeded; «kept» is counted by ClaimRunner on the keep.
+ * The once-guard persists in localStorage, so a later session — a nudge link, a new tab — does not count them again.
  */
 
 type SheetState = { kind: 'step'; id: SetupStepId } | { kind: 'photo'; replace: { index: number; title: string } | null } | null
@@ -37,6 +47,9 @@ export default function KeptShop({
   publish,
   photosLeft,
   profile,
+  market,
+  chooser,
+  correosAvailable,
 }: {
   view: CanvasView
   shopSlug: string | null
@@ -47,11 +60,43 @@ export default function KeptShop({
   publish: PublishState
   photosLeft: number | null
   profile: { name: string; description: string }
+  /** The shop's operating market, for checkout's preview query. */
+  market: string
+  /** The cobros / entregas switches as the shop row holds them. */
+  chooser: ChooserState
+  correosAvailable: boolean
 }) {
   const router = useRouter()
   const [sheet, setSheet] = useState<SheetState>(null)
   const close = useCallback(() => setSheet(null), [])
   const publicPath = shopSlug ? `/mx/s/${shopSlug}` : null
+  const [publishing, setPublishing] = useState<{ kind: 'idle' | 'busy' } | { kind: 'error'; message: string }>({ kind: 'idle' })
+  const [justPublished, setJustPublished] = useState(false)
+
+  const draftId = view.shop.id
+  const publishedCards = (ownCards ?? []).filter((c) => c.published)
+  const unpublished = (ownCards ?? []).filter((c) => !c.published).length
+  const pagosDone = steps.some((s) => s.id === 'pagos' && s.done)
+  // The moment shows after a publish, and on any later visit once everything the merchant made is public.
+  const showMoment = !!(shopSlug && publicPath && publishedCards.length > 0 && (justPublished || unpublished === 0))
+
+  useEffect(() => { if ((ownCards?.length ?? 0) > 0) trackFunnel('p2s_real_product_added', draftId) }, [draftId, ownCards])
+  useEffect(() => { if (pagosDone) trackFunnel('p2s_payments_connected', draftId) }, [draftId, pagosDone])
+
+  async function runPublish() {
+    if (publishing.kind === 'busy') return
+    setPublishing({ kind: 'busy' })
+    const result = await publishShop()
+    if (!result.ok) {
+      setPublishing({ kind: 'error', message: result.message })
+      return
+    }
+    setPublishing({ kind: 'idle' })
+    // Funnel step 7 (S5.3): counted on the publish that succeeded, not on a later visit that finds the shop live.
+    trackFunnel('p2s_published', draftId, { published: result.published, live: result.live })
+    setJustPublished(true)
+    router.refresh()
+  }
 
   const toolbar = (
     <div className="max-w-6xl mx-auto px-4 pt-3" data-testid="p2s-kept">
@@ -98,14 +143,21 @@ export default function KeptShop({
         </section>
 
         <div className="grid gap-1" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--s-3)' }}>
-          {publish.enabled ? (
+          {showMoment && shopSlug && publicPath ? (
+            <PublishedMoment shopName={view.name ?? profile.name} shopSlug={shopSlug} publicPath={publicPath} cards={publishedCards} onShared={() => router.refresh()} />
+          ) : null}
+          {publish.enabled && unpublished > 0 ? (
             <>
               <div>
-                <Link href={publish.href} prefetch={false} className="btn btn-primary" data-testid="p2s-publish">{PHOTO_COPY.publish}</Link>
+                <Button type="button" variant="primary" onClick={runPublish} disabled={publishing.kind === 'busy'} data-testid="p2s-publish">
+                  {publishing.kind === 'busy' ? PUBLISH_COPY.publishing : PHOTO_COPY.publish}
+                </Button>
               </div>
-              <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{PHOTO_COPY.publishReady}</p>
+              {publishing.kind === 'error' ? (
+                <Banner variant="warning">{publishing.message}</Banner>
+              ) : null}
             </>
-          ) : (
+          ) : publish.enabled ? null : (
             <>
               <div>
                 <Button type="button" variant="primary" disabled aria-describedby="p2s-publish-reason" data-testid="p2s-publish">{PHOTO_COPY.publish}</Button>
@@ -158,9 +210,20 @@ export default function KeptShop({
           onClose={close}
           testId={`p2s-sheet-${sheet.id}`}
         >
-          <div>
-            <Link href={stepById(sheet.id)?.ctaHref ?? '/shop/manage/settings'} prefetch={false} className="btn btn-primary">{CHECKLIST_COPY.goSettings}</Link>
-          </div>
+          {shopSlug ? (
+            <CobrosChooser
+              shopSlug={shopSlug}
+              market={market}
+              initial={chooser}
+              correosAvailable={correosAvailable}
+              draftId={draftId}
+              onSaved={() => router.refresh()}
+            />
+          ) : (
+            <div>
+              <Link href={stepById(sheet.id)?.ctaHref ?? '/shop/manage/settings'} prefetch={false} className="btn btn-primary">{CHECKLIST_COPY.goSettings}</Link>
+            </div>
+          )}
         </OwnerSheet>
       ) : null}
       {sheet?.kind === 'step' && sheet.id === 'comparte' ? (

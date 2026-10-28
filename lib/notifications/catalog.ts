@@ -105,6 +105,11 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     sender: 'sendP2sDraftLink', origin: 'app/api/p2s/link/[id]/route.ts',
   },
   {
+    key: 'shop.p2s_nudge', trigger: 'Quien se quedó con una tienda armada no la ha publicado: recordatorio el día 1, 3 y 7.',
+    from: 'platform', to: 'seller', channels: ['email', 'push', 'telegram'], domain: 'cuentas',
+    sender: 'sendP2sNudge', origin: 'lib/prompt-to-shop/nudges-server.ts', group: 'onboarding',
+  },
+  {
     key: 'shop.claimed_welcome', trigger: 'La tienda se vincula a una cuenta por primera vez.',
     from: 'platform', to: 'seller', channels: ['email'], domain: 'cuentas',
     sender: 'sendShopClaimedWelcome', origin: 'app/api/claim/complete/route.ts',

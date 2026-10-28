@@ -242,5 +242,101 @@ export const PHOTO_COPY = {
   publish: 'Publicar',
   publishNeedsProduct: 'Agrega al menos un producto tuyo',
   publishUnknown: 'No pudimos revisar tus productos ahora. Recarga la página.',
-  publishReady: 'Revisa tus productos y publícalos desde tu panel.',
+} as const
+
+// ── S5.1 · The cobros / entregas chooser ─────────────────────────────────────────────────────────────────────────
+
+export const COBROS_COPY = {
+  pageTitle: 'Cobros y entregas',
+  pageLead: 'Elige cómo te pagan y cómo entregas. Abajo ves lo que verá quien te compre.',
+  payTitle: 'Cómo te pagan',
+  deliverTitle: 'Cómo entregas',
+  on: 'Activo',
+  off: 'Sin activar',
+  mpName: 'Mercado Pago',
+  mpLead: 'Tarjeta, OXXO y meses sin intereses. El dinero llega a tu cuenta de Mercado Pago.',
+  mpConnect: 'Conectar Mercado Pago',
+  mpConnected: 'Conectado',
+  mpManage: 'Administrar',
+  speiName: 'Transferencia SPEI',
+  speiLead: 'Te pagan por transferencia a tu cuenta. Tú confirmas el pago antes de entregar.',
+  clabeLabel: 'CLABE interbancaria (18 dígitos)',
+  clabeCount: (n: number) => `${n} de 18 dígitos`,
+  bankLabel: 'Banco',
+  bankPick: 'Elige tu banco',
+  bankOther: 'Nombre de tu banco',
+  holderLabel: 'Titular de la cuenta',
+  speiSave: 'Guardar CLABE',
+  speiOff: 'Quitar SPEI',
+  cashName: 'Efectivo al entregar',
+  cashLead: 'Te pagan en efectivo cuando entregas en persona.',
+  cashNeedsHand: 'Se ofrece cuando entregas en persona.',
+  handName: 'Entrega acordada',
+  handLead: 'Quedas con quien te compra dónde y cuándo entregas en persona.',
+  correosName: 'Correos de México',
+  correosLead: 'Económico y lento (4 a 10 días), para piezas ligeras. Tú llevas el paquete a la oficina.',
+  correosUnavailable: 'Todavía no está disponible. Lo activamos en cuanto esté listo.',
+  correosNeedsOrigin: 'Para cotizarlo necesitamos la dirección desde donde envías.',
+  correosOrigin: 'Agregar mi dirección',
+  manualCarrierName: 'Envío por tu cuenta',
+  manualCarrierLead: 'Envías con tu paquetería y compartes la guía. Ya está incluido para tu tienda.',
+  turnOn: 'Activar',
+  turnOff: 'Desactivar',
+  saving: 'Guardando…',
+  saved: 'Guardado',
+  notSynced: 'Se guardó, pero tu tienda todavía no lo muestra. Inténtalo otra vez.',
+  previewTitle: 'Lo que verá quien te compre',
+  previewPay: 'Puede pagar con',
+  previewDeliver: 'Puede recibir con',
+  previewNoPay: 'Todavía nadie puede pagarte. Activa al menos una forma de cobro.',
+  previewNoDeliver: 'Todavía no hay forma de entrega. Activa al menos una.',
+  previewLoading: 'Revisando tu tienda…',
+  previewUnavailable: 'No pudimos revisar lo que verá quien te compre. Inténtalo en un momento.',
+  previewNoShop: 'Primero quédate con tu tienda.',
+  back: 'Volver a mi tienda',
+} as const
+
+// ── S5.2 · «Publicar» and the moment after ─────────────────────────────────────────────────────────────────────────
+
+export const PUBLISH_COPY = {
+  publishing: 'Publicando…',
+  done: (live: number) => (live === 1 ? 'Listo: tu producto ya está a la vista.' : `Listo: tus ${live} productos ya están a la vista.`),
+  partial: (ok: number, failed: number) => `Publicamos ${ok}. ${failed === 1 ? 'Uno no se pudo' : `${failed} no se pudieron`}: inténtalo otra vez.`,
+  needsProduct: 'Agrega al menos un producto tuyo',
+  noShop: 'Primero quédate con tu tienda.',
+  signedOut: 'Inicia sesión para publicar tu tienda.',
+  unavailable: 'No pudimos revisar tus productos ahora. Inténtalo en un momento.',
+  failed: 'No pudimos publicar ahora. Inténtalo otra vez.',
+  publishedTitle: 'Tu tienda ya está en el mercado',
+  publishedLead: 'Así te ven quienes buscan en Miyagi Sánchez.',
+  seeInMarket: 'Ver mi tienda',
+  shareTitle: 'Cuéntale a tus clientes',
+  whatsapp: 'WhatsApp',
+  story: 'Imagen para tu historia',
+  qr: 'Código QR',
+  shortLink: 'Enlace corto',
+  copied: 'Enlace copiado',
+  copyManual: 'Copia el enlace:',
+  shareText: (name: string) => `${name} en Miyagi Sánchez`,
+  noPrice: 'Precio por definir',
+} as const
+
+// ── S5.4 · The day 1/3/7 reminder ──────────────────────────────────────────────────────────────────────────────────
+
+/** The ONE next step a reminder names, in the canvas's own words (Fotos, Cobros, Entregas…). */
+export const NUDGE_STEP_COPY = {
+  perfil: { title: 'Completa tu perfil', lead: 'Un nombre y una descripción claros dan confianza a quien te compra.' },
+  catalogo: { title: 'Sube la foto de un producto', lead: 'Toma una foto de lo que vendes y llenamos la ficha por ti.' },
+  pagos: { title: 'Activa cómo te pagan', lead: 'Conecta Mercado Pago o agrega tu CLABE. Sin esto nadie puede pagarte.' },
+  envios: { title: 'Elige cómo entregas', lead: 'En persona o por paquetería: di cómo le llega a quien te compra.' },
+  comparte: { title: 'Comparte tu tienda', lead: 'Manda tu enlace a tus primeros compradores.' },
+  publicar: { title: 'Publica tu tienda', lead: 'Ya está todo. Un toque en «Publicar» y tu tienda queda a la vista.' },
+} as const
+
+export const NUDGE_COPY = {
+  subject: (shopName: string, stepTitle: string) => `${shopName}: te falta un paso — ${stepTitle.toLowerCase()}`,
+  heading: (shopName: string) => `${shopName} está casi lista`,
+  cta: 'Seguir armando mi tienda',
+  footer: 'Te escribimos porque empezaste a armar tu tienda. Puedes apagar estos recordatorios en Mi tienda → Configuración → Notificaciones.',
+  pushTitle: (shopName: string) => `${shopName}: te falta un paso`,
 } as const

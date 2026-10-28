@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { MAX_DESCRIPTION_CHARS } from '@/lib/prompt-to-shop/constants'
 import { characterCounter, DESCRIBE_COPY } from '@/lib/prompt-to-shop/copy'
+import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 import TurnstileWidget from '@/app/(shell)/p2s/_components/TurnstileWidget'
 
 // The taking-shape screen carries the whole canvas (theme, illustrations, stream reader). It is needed only after a
@@ -67,7 +68,10 @@ export default function DescribeBox({
       style={{ padding: 'var(--s-5)', display: 'grid', gap: 'var(--s-3)' }}
       onSubmit={(e) => {
         e.preventDefault()
-        if (ready && token) setShaping({ description: trimmed, token })
+        if (!ready || !token) return
+        // Funnel step 1 (S5.3). There is no draft yet, so it counts once per tab.
+        trackFunnel('p2s_describe_submitted', null, { chars: trimmed.length })
+        setShaping({ description: trimmed, token })
       }}
     >
       <label htmlFor={fieldId} className="t-h3" style={{ letterSpacing: 0 }}>

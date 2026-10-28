@@ -63,6 +63,7 @@ export const PASSTHROUGH_PREFIXES = new Set(['g', 'e', 'v', 's', 'l'])
 /** The short domain merchants should share (mschz.org/<prefix>/…). */
 export const SHORTLINK_ORIGIN = `https://${SHORTLINK_HOSTS[0]}`
 
+
 /**
  * Pure matcher for the known-prefix passthrough. Only fires for MULTI-segment
  * paths (single-segment stays on the flat resolver, unchanged) whose first

@@ -26,6 +26,10 @@ const SCREEN_FILES = [
   'app/(shell)/p2s/_components/OwnerSheet.tsx',
   'app/(shell)/p2s/_components/PhotoSheet.tsx',
   'app/(shell)/sell/armar/page.tsx',
+  // S5: the cobros / entregas chooser, its page, and the moment after «Publicar».
+  'app/(shell)/p2s/_components/CobrosChooser.tsx',
+  'app/(shell)/p2s/_components/PublishedMoment.tsx',
+  'app/(shell)/sell/armar/cobros/page.tsx',
   'lib/prompt-to-shop/copy.ts',
   'lib/prompt-to-shop/view.ts',
 ]
