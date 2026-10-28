@@ -24,6 +24,7 @@ const DIRECT_BUYER_DIRS = [
   'app/(shell)/acerca',
   'app/(shell)/faq',
   'app/(shell)/politicas',
+  'app/(shell)/catalogo',
   'app/(us-shell)/us',
 ] as const
 

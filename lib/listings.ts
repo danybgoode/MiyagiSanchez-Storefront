@@ -1,5 +1,7 @@
 import { unstable_cache } from 'next/cache'
 import type { Listing, Shop, SearchParams } from './types'
+import { formatPrice } from './format-price'
+import { readAllSellerProducts } from './seller-product-pages'
 import { CATEGORIES } from './types'
 import { CACHE } from './cache-policy'
 import { buildQuery, isPrintPlacementListing } from './listing-query'
@@ -569,11 +571,18 @@ interface SellerProduct {
 
 export const getShopListings = unstable_cache(
   async (sellerSlug: string): Promise<Listing[]> => {
-    const res = await medusaFetch(`/store/sellers/${sellerSlug}/products`, {
-      next: { revalidate: CACHE.LISTING, tags: ['listings'] },
-    } as RequestInit)
-    if (!res.ok) return []
-    const data = await res.json()
+    // Every page, not the backend's default first 20 (share-kit D2, `lib/seller-product-pages.ts`).
+    const read = await readAllSellerProducts<SellerProduct>(async (limit, offset) => {
+      const res = await medusaFetch(`/store/sellers/${sellerSlug}/products?limit=${limit}&offset=${offset}`, {
+        next: { revalidate: CACHE.LISTING, tags: ['listings'] },
+      } as RequestInit)
+      return res.ok ? res.json() : null
+    })
+    if (!read.ok) return []
+    if (!read.complete) {
+      console.error(`[listings] getShopListings(${sellerSlug}) read ${read.products.length} products, then a page failed — the catalog is partial`)
+    }
+    const data: { seller?: Shop; products: SellerProduct[] } = { seller: read.seller as Shop | undefined, products: read.products }
 
     // Map seller products to Listing shape. Print-ad placement products (sold
     // only through the dedicated print-edition flow) are excluded here — this
@@ -904,13 +913,7 @@ export async function getCategoryCounts(market?: unknown): Promise<CategoryCount
   return getCategoryCountsCached(decision.market.code)
 }
 
-export function formatPrice(listing: Listing, locale = 'es-MX'): string {
-  if (listing.price_cents == null) return locale === 'en-US' ? 'Ask for price' : 'Precio a consultar'
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: listing.currency ?? 'MXN',
-  }).format(listing.price_cents / 100)
-}
+export { formatPrice }
 
 export function conditionLabel(condition: Listing['condition'], language: 'es' | 'en' = 'es'): string {
   const map: Record<string, string> = language === 'en' ? {

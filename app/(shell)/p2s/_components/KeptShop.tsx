@@ -144,7 +144,7 @@ export default function KeptShop({
 
         <div className="grid gap-1" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--s-3)' }}>
           {showMoment && shopSlug && publicPath ? (
-            <PublishedMoment shopName={view.name ?? profile.name} shopSlug={shopSlug} publicPath={publicPath} cards={publishedCards} onShared={() => router.refresh()} />
+            <PublishedMoment shopName={view.name ?? profile.name} shopSlug={shopSlug} market={market} publicPath={publicPath} cards={publishedCards} onShared={() => router.refresh()} />
           ) : null}
           {publish.enabled && unpublished > 0 ? (
             <>

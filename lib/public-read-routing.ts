@@ -3,8 +3,10 @@ export type PublicReadCandidate =
   | { kind: 'listing'; listingId: string }
   | { kind: 'preview'; shopSlug: string }
 
-const MARKETPLACE_SHOP_TAILS = new Set([
+/** Exported so the renderer-parity spec iterates THIS set — a tail cached here with no dispatch case is a 404. */
+export const MARKETPLACE_SHOP_TAILS: ReadonlySet<string> = new Set([
   'acerca',
+  'catalogo',
   'colecciones',
   'eventos',
   'faq',

@@ -19,7 +19,9 @@ test.describe('buyer locale population · generated, never hand-counted', () => 
     // DIRECT_BUYER_DIRS to the owned-host root routes — which had never been
     // scanned at all, and were hiding a real bilingual leak on /acerca. The public-read
     // extraction added the two rich renderer files without changing the surfaces.
-    expect(population.direct.length).toBe(95)
+    // → 99: the share kit's catalog page (share-kit S1.2) — its four channel routes (/mx, /s, /us, owned host; the body counts as a rich renderer), the owned-host
+    // `/catalogo` root joining DIRECT_BUYER_DIRS beside `/tienda`.
+    expect(population.direct.length).toBe(99)
     expect(population.direct).toContain('app/(shell)/mx/l/page.tsx')
     expect(population.direct).toContain('app/(shell)/checkout/CheckoutExperience.tsx')
     expect(population.direct).toContain('app/(shell)/s/[slug]/tienda/page.tsx')
