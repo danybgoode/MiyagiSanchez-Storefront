@@ -64,12 +64,12 @@ test('a view token opens the shop read-only: no controls, and nothing in the res
   expect(res.blocks.identity?.name).toBe(identity.name)
 })
 
-test('the owner has the four controls; they are the ONLY controls that exist', async () => {
+test('the owner has the five controls; they are the ONLY controls that exist', async () => {
   const { reads } = db()
   const res = await resolveOwnerPage({ id: DRAFT, deviceCookie: DEVICE }, reads)
   expect(res.kind).toBe('ok')
   if (res.kind !== 'ok') return
-  expect(controlsFor(res.access)).toEqual(['rename', 'accent', 'version', 'share'])
+  expect(controlsFor(res.access)).toEqual(['rename', 'accent', 'version', 'share', 'keep'])
   expect(res.viewToken).toBe(TOKEN)
   expect(viewHref(res.viewToken)).toBe(`/p2s/v/${TOKEN}`)
 })

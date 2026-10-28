@@ -17,7 +17,9 @@ const meta = es.sellerAcquisition.anchor.metadata
 // `${PAGE_PATH}/opengraph-image` URL 404s: Next serves these at a content-hashed path
 // (e.g. `/mx/vende/opengraph-image-<hash>`), not the bare convention path.
 export const metadata: Metadata = {
-  title: meta.title,
+  // `absolute`: the title already ends in «— Miyagi Sánchez», and the root layout's `%s | Miyagi Sánchez` template
+  // would otherwise print the brand twice. The og/twitter titles below are not templated and keep it once.
+  title: { absolute: meta.title },
   description: meta.description,
   alternates: { canonical: `${BASE_URL}${PAGE_PATH}` },
   openGraph: {

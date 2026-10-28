@@ -97,3 +97,63 @@ export const GONE_COPY = {
   message: 'Las tiendas en armado se guardan unos días en el teléfono donde se empezaron. Puedes armar una nueva en segundos.',
   action: 'Armar una tienda nueva',
 } as const
+
+// ── «Quedármela» — the keep sheet over the canvas (S3.1) ─────────────────────────────────────────────────────────
+
+export const KEEP_COPY = {
+  keep: 'Quedármela',
+  sheetTitle: (name: string | null) => (name ? `Quédate con ${name}` : 'Quédate con tu tienda'),
+  sheetLead: 'Crea tu cuenta con Google o con tu correo. Al terminar, tu tienda ya es tuya.',
+  close: 'Cerrar',
+  haveAccount: '¿Ya tienes cuenta? Inicia sesión',
+  later: '¿Ahora no? Mándame el enlace',
+  emailLabel: 'Tu correo',
+  emailPlaceholder: 'tucorreo@ejemplo.com',
+  send: 'Mandar enlace',
+  sending: 'Mandando…',
+  mailHint: 'Te mandamos el enlace para volver a tu tienda. Para quedártela, ábrelo en este teléfono.',
+  /** Only for a request that died without the server saying why. */
+  mailFailed: 'No pudimos mandar el correo ahora. Revisa tu conexión e inténtalo de nuevo.',
+  waitShaping: 'Espera a que terminemos de armarla para quedártela.',
+} as const
+
+/** The server's answers to «Mándame el enlace». */
+export const MAIL_LINK_COPY = {
+  invalid: 'Revisa tu correo: parece que le falta algo.',
+  limited: 'Ya te mandamos varios enlaces. Inténtalo de nuevo en un rato.',
+  gone: 'Esta tienda en armado ya no está en este teléfono.',
+  failed: 'No pudimos mandar el correo ahora. Inténtalo de nuevo.',
+  sent: 'Listo. Revisa tu correo.',
+} as const
+
+// ── Keeping it: the claim and the owner's first look (S3.2, /sell/armar) ─────────────────────────────────────────
+
+/** Transient failures. Each says what is safe: nothing is lost, and trying again resumes where it stopped. */
+export const CLAIM_RETRY = {
+  lookup: 'No pudimos revisar tu cuenta ahora. Inténtalo de nuevo en un momento.',
+  shop: 'No pudimos crear tu tienda ahora. Inténtalo de nuevo: tu tienda sigue guardada.',
+  config: 'Tu tienda ya existe, pero no pudimos ponerle tus colores y textos. Inténtalo de nuevo.',
+  save: 'Tu tienda ya existe, pero no pudimos terminar de guardarla. Inténtalo de nuevo.',
+  draft: 'No pudimos abrir tu tienda en armado ahora. Inténtalo de nuevo en un momento.',
+} as const
+
+export const ARMAR_COPY = {
+  metaTitle: 'Tu tienda',
+  working: 'Guardando tu tienda…',
+  keptTitle: (name: string | null) => (name ? `¡Listo! ${name} ya es tuya` : '¡Listo! Tu tienda ya es tuya'),
+  keptLead: 'Ya tiene nombre, colores y textos. Los productos de ejemplo siguen aquí para guiarte: cámbialos por los tuyos.',
+  address: 'Tu dirección',
+  manage: 'Ir a mi panel',
+  viewShop: 'Ver mi tienda',
+  otherPhoneTitle: 'Esta tienda se armó en otro teléfono',
+  otherPhoneLead: 'Para quedártela, ábrela en el teléfono donde la armaste. O arma una nueva aquí en segundos.',
+  startNew: 'Armar una tienda nueva',
+  hasShopTitle: 'Ya tienes una tienda',
+  hasShopLead: 'Tu cuenta ya tiene una tienda, así que no la cambiamos por esta. Puedes seguir con la tuya.',
+  incompleteTitle: 'Tu tienda todavía se está armando',
+  incompleteLead: 'Espera a que tenga nombre y colores, y vuelve a tocar «Quedármela».',
+  backToShop: 'Volver a mi tienda',
+  retry: 'Intentar de nuevo',
+  /** Only for a request that died without the server saying why. */
+  failed: 'Se cortó la conexión mientras guardábamos tu tienda. Inténtalo de nuevo.',
+} as const

@@ -469,6 +469,23 @@ export async function sendShopCreatedWelcome(ctx: {
   ].join(''), undefined, undefined, 'es', `shop-created/${ctx.sellerId}`)
 }
 
+/**
+ * Prompt-to-shop «Mándame el enlace» (S3.1): a merchant's unfinished shop, mailed to themselves. es-MX only (the
+ * flow is). The owner link opens the canvas only on the phone that made it, so the email says that plainly instead
+ * of promising a link that will look broken on a laptop; the view-only link works anywhere.
+ */
+export async function sendP2sDraftLink(ctx: { to: string; shopName: string; draftId: string; sharePath: string }): Promise<EmailSendResult> {
+  const ownerUrl = `${SITE}/p2s/${encodeURIComponent(ctx.draftId)}`
+  const shareUrl = `${SITE}${ctx.sharePath}`
+  return sendWithResult(ctx.to, `Tu tienda ${ctx.shopName} te espera en Miyagi Sánchez`, [
+    h1(`${ctx.shopName} te espera`),
+    p('Ábrela en el teléfono donde la armaste: ahí puedes quedártela con un toque.'),
+    cta('Volver a mi tienda', ownerUrl),
+    p(`Para enseñársela a alguien, comparte esta vista previa (solo se puede ver): <a href="${shareUrl}">${esc(shareUrl)}</a>`),
+    p('Las tiendas en armado se guardan unos días. Si no pediste este correo, puedes ignorarlo.'),
+  ].join(''))
+}
+
 /** General account welcome. Shop-specific language belongs to the claim receipt. */
 export async function sendAccountWelcome(ctx: { to: string; clerkUserId: string }): Promise<EmailSendResult> {
   return sendWithResult(ctx.to, 'Bienvenido a Miyagi Sánchez / Welcome', [

@@ -128,8 +128,9 @@ export default function AgenteIntakeClient({ mlConnected }: { mlConnected: boole
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '24px 0 48px' }}>
-      <Link href="/sell/puertas" className="text-xs text-[var(--color-muted)] hover:text-[var(--color-foreground)] no-underline">
-        ← Elige tu camino
+      {/* Back to the first run: the three-doors chooser this used to return to left the main path (prompt-to-shop S3.3). */}
+      <Link href="/sell" className="text-xs text-[var(--color-muted)] hover:text-[var(--color-foreground)] no-underline">
+        ← Volver
       </Link>
       <h1 className="text-2xl font-bold leading-tight mt-2">Trae tu catálogo como lo tengas</h1>
       <p className="text-sm text-[var(--color-muted)] mt-1">

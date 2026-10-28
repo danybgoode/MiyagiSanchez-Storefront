@@ -18,6 +18,8 @@
  * deliberately, not fall in by accident.
  */
 
+// `/sell/bienvenida` and `/sell/puertas` only redirect to `/sell` since prompt-to-shop S3.3. They stay in the set so
+// the chrome decision for the one request that hits them does not change; nothing renders there any more.
 const ONBOARDING_PATHS = new Set(['/sell/bienvenida', '/sell/puertas', '/sell/agente'])
 
 export function isOnboardingPath(pathname: string): boolean {

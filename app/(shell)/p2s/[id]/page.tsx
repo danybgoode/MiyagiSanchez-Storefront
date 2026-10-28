@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
 import { notFound } from 'next/navigation'
 import { controlsFor, resolveOwnerPage, viewHref } from '@/lib/prompt-to-shop/access'
 import { P2S_LIMITS } from '@/lib/prompt-to-shop/allowance'
@@ -21,7 +22,8 @@ import OwnerCanvas from '../_components/OwnerCanvas'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Tu tienda en armado — Miyagi Sánchez',
+  // The root layout's template appends « | Miyagi Sánchez»; the brand is not repeated here.
+  title: 'Tu tienda en armado',
   robots: { index: false, follow: false },
 }
 
@@ -30,6 +32,8 @@ export default async function OwnerCanvasPage({ params }: { params: Promise<{ id
   const deviceCookie = (await cookies()).get(DEVICE_COOKIE)?.value
   const resolved = await resolveOwnerPage({ id, deviceCookie }, readDeps)
   if (resolved.kind === 'gone') notFound()
+  // Signed in already: «Quedármela» goes straight to the claim, with no sign-up sheet (S3.1).
+  const { userId } = await auth()
 
   return (
     <OwnerCanvas
@@ -41,6 +45,7 @@ export default async function OwnerCanvasPage({ params }: { params: Promise<{ id
       shareHref={viewHref(resolved.viewToken)}
       siteKey={process.env.TURNSTILE_SITE_KEY || null}
       controls={controlsFor(resolved.access)}
+      signedIn={!!userId}
     />
   )
 }

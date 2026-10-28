@@ -218,9 +218,18 @@ const p2sGenerateDeviceLimiter = () => {
   return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(6, '10 m'), prefix: 'rl:p2s_generate_device' })
 }
 
+// «Mándame el enlace» (prompt-to-shop S3.1): each request emails an address the requester typed. Five an hour per IP
+// bounds anyone using it to fill a stranger's inbox; a merchant needs one. Fails open like the rest — the draft
+// ownership check behind it does not.
+const p2sMailLinkLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 h'), prefix: 'rl:p2s_mail_link' })
+}
+
 // ── Public helper ──────────────────────────────────────────────────────────────
 
-export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device'
+export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_mail_link'
 
 function limiterFor(key: LimitKey): Ratelimit | null {
   const getLimiter = key === 'offers'          ? offerLimiter
@@ -244,6 +253,7 @@ function limiterFor(key: LimitKey): Ratelimit | null {
     : key === 'fundadoras_track' ? fundadorasTrackLimiter
     : key === 'p2s_generate_ip' ? p2sGenerateIpLimiter
     : key === 'p2s_generate_device' ? p2sGenerateDeviceLimiter
+    : key === 'p2s_mail_link' ? p2sMailLinkLimiter
     : supplyImportLimiter
   return getLimiter()
 }

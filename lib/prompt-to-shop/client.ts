@@ -9,8 +9,9 @@
  */
 
 import type { IdentityBlock } from './blocks'
+import type { ClaimOutcome } from './claim'
 import type { BlockEvent } from './planner'
-import { OWNER_COPY, SHAPING_COPY } from './copy'
+import { ARMAR_COPY, KEEP_COPY, OWNER_COPY, SHAPING_COPY } from './copy'
 
 const SAVE_FAILED = OWNER_COPY.saveFailed
 
@@ -137,4 +138,42 @@ export async function patchDraft(
   } catch {
     return { ok: false, status: 0, message: SAVE_FAILED }
   }
+}
+
+/** `POST /api/p2s/link/[id]` — «Mándame el enlace». `message` is the server's own text when it sent one. */
+export async function mailDraftLink(
+  draftId: string,
+  email: string,
+  deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) },
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await deps.fetch(`/api/p2s/link/${draftId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ email }),
+    })
+    const data = (await res.json().catch(() => null)) as { ok?: unknown; message?: unknown } | null
+    const message = typeof data?.message === 'string' && data.message ? data.message : KEEP_COPY.mailFailed
+    return { ok: res.ok && data?.ok === true, message }
+  } catch {
+    return { ok: false, message: KEEP_COPY.mailFailed }
+  }
+}
+
+const CLAIM_KINDS: ReadonlyArray<ClaimOutcome['kind']> = ['kept', 'other_phone', 'has_shop', 'incomplete', 'signed_out', 'retry']
+
+/** `POST /api/p2s/claim/[id]` — keep it. A dead connection is a `retry`, never a guess at the outcome. */
+export async function claimDraft(
+  draftId: string,
+  deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) },
+): Promise<ClaimOutcome> {
+  try {
+    const res = await deps.fetch(`/api/p2s/claim/${draftId}`, { method: 'POST', credentials: 'same-origin' })
+    const data = (await res.json().catch(() => null)) as { kind?: unknown } | null
+    if (data && CLAIM_KINDS.includes(data.kind as ClaimOutcome['kind'])) return data as ClaimOutcome
+  } catch {
+    // fall through
+  }
+  return { kind: 'retry', message: ARMAR_COPY.failed }
 }

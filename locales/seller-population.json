@@ -3,14 +3,13 @@
   "direct": [
     "app/(shell)/sell/(onboarding)/agente/AgenteIntakeClient.tsx",
     "app/(shell)/sell/(onboarding)/agente/page.tsx",
-    "app/(shell)/sell/(onboarding)/bienvenida/BienvenidaClient.tsx",
     "app/(shell)/sell/(onboarding)/bienvenida/page.tsx",
     "app/(shell)/sell/(onboarding)/layout.tsx",
-    "app/(shell)/sell/(onboarding)/puertas/PuertasClient.tsx",
     "app/(shell)/sell/(onboarding)/puertas/page.tsx",
     "app/(shell)/sell/AttrsSection.tsx",
     "app/(shell)/sell/InspectionReportField.tsx",
     "app/(shell)/sell/SellWizard.tsx",
+    "app/(shell)/sell/armar/page.tsx",
     "app/(shell)/sell/edit/[id]/EditForm.tsx",
     "app/(shell)/sell/edit/[id]/OpcionesSection.tsx",
     "app/(shell)/sell/edit/[id]/PersonalizationSection.tsx",
@@ -158,7 +157,7 @@
         "s_872e43d409e9f505",
         "s_6810803d092f3f5b",
         "s_3d4fdff25fb15885",
-        "s_f34755fd04c3da2f"
+        "s_8c0c8c68e7d08015"
       ]
     },
     {
@@ -168,51 +167,10 @@
       ]
     },
     {
-      "file": "app/(shell)/sell/(onboarding)/bienvenida/BienvenidaClient.tsx",
-      "keys": [
-        "s_16412d913e5dda6c",
-        "s_63e2bbaf1c924391",
-        "s_e2391f5bb88ed78d",
-        "s_3c8dc4dc7a83dd2d",
-        "s_f8320d7048d87951",
-        "s_2e9edadcd5601618",
-        "s_01f11df122d9d26a",
-        "s_1a299cb16cf23ab9",
-        "s_a0ad7a957eaf2983"
-      ]
-    },
-    {
-      "file": "app/(shell)/sell/(onboarding)/bienvenida/page.tsx",
-      "keys": [
-        "s_0c09f1fa8273a283"
-      ]
-    },
-    {
       "file": "app/(shell)/sell/(onboarding)/layout.tsx",
       "keys": [
         "s_4e27bb88c402d405",
         "s_60f80e121d2db2a8"
-      ]
-    },
-    {
-      "file": "app/(shell)/sell/(onboarding)/puertas/PuertasClient.tsx",
-      "keys": [
-        "s_f46b29c6510ed3dd",
-        "s_9c96dc096718263a",
-        "s_fe93b31f7ea92252",
-        "s_69b146b0acc51dda",
-        "s_253f4df840bfd96c",
-        "s_5fa7218b756e8f6d",
-        "s_4564eef75cbd763d",
-        "s_851248e53390cf6e",
-        "s_5520559f81a3ebbb",
-        "s_836d724d6d294c3c"
-      ]
-    },
-    {
-      "file": "app/(shell)/sell/(onboarding)/puertas/page.tsx",
-      "keys": [
-        "s_c5ebc0724150d467"
       ]
     },
     {
@@ -556,8 +514,8 @@
         "s_af1dc76965b004b4",
         "s_321ac03c9b5feecc",
         "s_095d56431946b163",
-        "s_7689cb849a11730f",
-        "s_e4a9efcc07867f69"
+        "s_935050ee59692e8e",
+        "s_b0cbdeea8c20b9ee"
       ]
     },
     {
@@ -3043,10 +3001,6 @@
       "source": "Precio en Mercado Libre ("
     },
     {
-      "key": "s_01f11df122d9d26a",
-      "source": "bienvenido"
-    },
-    {
       "key": "s_01f6e66f15929a4b",
       "source": "Este nombre aparecerá en tu perfil público y en cada anuncio."
     },
@@ -3305,10 +3259,6 @@
     {
       "key": "s_0c041d8b2ba4dfc2",
       "source": "Ir a pedidos →"
-    },
-    {
-      "key": "s_0c09f1fa8273a283",
-      "source": "Bienvenido — Miyagi Sánchez"
     },
     {
       "key": "s_0c89269b1d5c9f76",
@@ -3631,10 +3581,6 @@
       "source": "Toca cualquier cosa para editarla."
     },
     {
-      "key": "s_16412d913e5dda6c",
-      "source": ". Tu tienda está a unos minutos."
-    },
-    {
       "key": "s_164d1550a1b55ea6",
       "source": "¡Listo!"
     },
@@ -3745,10 +3691,6 @@
     {
       "key": "s_197c7a8551b91c79",
       "source": "Contenido"
-    },
-    {
-      "key": "s_1a299cb16cf23ab9",
-      "source": "¿Dónde vendes hoy?"
     },
     {
       "key": "s_1a57e970a047b153",
@@ -4127,10 +4069,6 @@
       "source": "Vencido"
     },
     {
-      "key": "s_253f4df840bfd96c",
-      "source": "Puedes cambiar de camino cuando quieras — nada se pierde."
-    },
-    {
       "key": "s_25f603e65e0c569e",
       "source": "tu dominio"
     },
@@ -4385,10 +4323,6 @@
     {
       "key": "s_2e822938392501e5",
       "source": "Conectar Mercado Libre"
-    },
-    {
-      "key": "s_2e9edadcd5601618",
-      "source": "Prefiero explorar por mi cuenta"
     },
     {
       "key": "s_2eba946b2e1ee4b6",
@@ -5031,10 +4965,6 @@
       "source": "Pago directo"
     },
     {
-      "key": "s_4564eef75cbd763d",
-      "source": "Sube un CSV o JSON con tus productos y los revisamos juntos antes de crear tu tienda."
-    },
-    {
       "key": "s_4569403333ead76c",
       "source": "Rotar llave"
     },
@@ -5471,10 +5401,6 @@
       "source": "Nueva categoría"
     },
     {
-      "key": "s_5520559f81a3ebbb",
-      "source": "Traer mi catálogo"
-    },
-    {
       "key": "s_553b66db113aca22",
       "source": "Tu muro está vacío"
     },
@@ -5781,10 +5707,6 @@
     {
       "key": "s_5fa13eea555ec5bc",
       "source": "Ej: Mensajero propio"
-    },
-    {
-      "key": "s_5fa7218b756e8f6d",
-      "source": "Recomendado"
     },
     {
       "key": "s_5fd42de4d3983dd2",
@@ -6113,10 +6035,6 @@
     {
       "key": "s_698e8361a88b6a50",
       "source": "Ya aplicado — reintentar"
-    },
-    {
-      "key": "s_69b146b0acc51dda",
-      "source": "Llena el formulario paso a paso — tú controlas cada campo desde el inicio."
     },
     {
       "key": "s_69bda4f56c1d52ee",
@@ -6535,10 +6453,6 @@
       "source": "Tu autorización dejó de ser válida (la revocaste o expiró), así que la sincronización está en pausa. Vuelve a conectar para reanudarla."
     },
     {
-      "key": "s_7689cb849a11730f",
-      "source": "Si tu IA generó un archivo de configuración, créala con catálogo en un solo paso — sin llenar el formulario."
-    },
-    {
       "key": "s_768bfc362d223d0c",
       "source": "Mercado Pago conectado"
     },
@@ -6919,10 +6833,6 @@
       "source": "No se pudo guardar."
     },
     {
-      "key": "s_836d724d6d294c3c",
-      "source": "¿Cómo quieres armar tu tienda?"
-    },
-    {
       "key": "s_83714b95fb337e07",
       "source": "Municipio"
     },
@@ -6969,10 +6879,6 @@
     {
       "key": "s_84f492dc54eb64e8",
       "source": "Clic en"
-    },
-    {
-      "key": "s_851248e53390cf6e",
-      "source": "Trae tu catálogo como lo tengas — un archivo, fotos, o el prompt para tu IA. Armamos el borrador completo. Nada se publica sin tu visto bueno."
     },
     {
       "key": "s_8554806a618e96b5",
@@ -7407,6 +7313,10 @@
       "source": "Indica un porcentaje distinto de 0 (ej. 10 o -10)."
     },
     {
+      "key": "s_935050ee59692e8e",
+      "source": "Súbelo y armamos tu tienda con tus productos en un solo paso. Antes de crear nada, te mostramos cómo quedó."
+    },
+    {
       "key": "s_9390298f3fb0c5b1",
       "source": "no"
     },
@@ -7691,10 +7601,6 @@
       "source": "Nombre (p. ej. Tamaño)"
     },
     {
-      "key": "s_9c96dc096718263a",
-      "source": "Elegir esta opción →"
-    },
-    {
       "key": "s_9ca5931c67dfc491",
       "source": "(aparece en el PDF)"
     },
@@ -7789,10 +7695,6 @@
     {
       "key": "s_a0609c627179d606",
       "source": "Tu anuncio se publicará de inmediato y será visible para todos los compradores."
-    },
-    {
-      "key": "s_a0ad7a957eaf2983",
-      "source": "¿Qué vendes?"
     },
     {
       "key": "s_a0f2467e1aacceb5",
@@ -8381,6 +8283,10 @@
     {
       "key": "s_b0c8e8d4cafead0c",
       "source": "Todo inventario"
+    },
+    {
+      "key": "s_b0cbdeea8c20b9ee",
+      "source": "¿Ya tienes tu catálogo en un archivo?"
     },
     {
       "key": "s_b1439e30496d1755",
@@ -9005,10 +8911,6 @@
     {
       "key": "s_c5e5391ae82cadf9",
       "source": "Enviar contraoferta"
-    },
-    {
-      "key": "s_c5ebc0724150d467",
-      "source": "Elige tu camino — Miyagi Sánchez"
     },
     {
       "key": "s_c646a84d3601595f",
@@ -9911,10 +9813,6 @@
       "source": "Sin daños"
     },
     {
-      "key": "s_e2391f5bb88ed78d",
-      "source": "Dos preguntas rápidas y opcionales — nos ayudan a preparar el resto para tu caso."
-    },
-    {
       "key": "s_e23ef18384739746",
       "source": "Ventana de despacho"
     },
@@ -9993,10 +9891,6 @@
     {
       "key": "s_e49528ca9c6e1228",
       "source": "tu obra publicada"
-    },
-    {
-      "key": "s_e4a9efcc07867f69",
-      "source": "¿Tu agente ya armó tu tienda? Pégala aquí."
     },
     {
       "key": "s_e4f216d074de601e",
@@ -10463,10 +10357,6 @@
       "source": "Pega el archivo de tu agente"
     },
     {
-      "key": "s_f34755fd04c3da2f",
-      "source": "← Elige tu camino"
-    },
-    {
       "key": "s_f387ed1c0c95ea05",
       "source": "Desactivar sincronización"
     },
@@ -10485,10 +10375,6 @@
     {
       "key": "s_f44cddb1bb0325b6",
       "source": "Próximamente"
-    },
-    {
-      "key": "s_f46b29c6510ed3dd",
-      "source": "Armar a mano"
     },
     {
       "key": "s_f47408490bf07811",
@@ -10569,10 +10455,6 @@
     {
       "key": "s_f7aa761caa6b3ddb",
       "source": "Enlace copiado"
-    },
-    {
-      "key": "s_f8320d7048d87951",
-      "source": "Hola,"
     },
     {
       "key": "s_f88ba99c9b342767",
@@ -10777,10 +10659,6 @@
     {
       "key": "s_fe8e869487bfa008",
       "source": "Verificación REPUVE"
-    },
-    {
-      "key": "s_fe93b31f7ea92252",
-      "source": "Empezar con mi agente"
     },
     {
       "key": "s_fe9877862e87e54a",
