@@ -77,7 +77,7 @@ export function favoriteConditionLabel(condition: string | null): string {
  * recruit-card-leak fix: it trusts `hasShop` and guarantees a shop owner is never shown
  * the "¿Vendes algo?" recruit card. The AUTHORITATIVE half is the backend — `hasShop`
  * itself must come from the canonical Medusa seller, not the best-effort Supabase mirror
- * (medusa-bonsai-backend #38); a wrong `hasShop=false` would still recruit and is fixed
+ * (MiyagiSanchez-Backend #38); a wrong `hasShop=false` would still recruit and is fixed
  * there, not here. Given a correct `hasShop`:
  *   - no shop            → `recruit`  ("¿Vendes algo?" / Abre tu tienda)
  *   - shop + stats       → `snapshot` ("Tu tienda esta semana")

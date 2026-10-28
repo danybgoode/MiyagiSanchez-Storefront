@@ -19,14 +19,14 @@
 | Admin UI | `https://api.miyagisanchez.com/app` | Enabled; `DISABLE_MEDUSA_ADMIN` env gates it |
 | Database | `DATABASE_URL` env var | Neon Postgres; all migrations applied |
 | Frontend | `https://miyagisanchez.com` | Vercel, auto-deploy from `main` only |
-| Backend repo | `https://github.com/danybgoode/medusa-bonsai-backend` | Push `main` → Cloud Build trigger |
+| Backend repo | `https://github.com/danybgoode/MiyagiSanchez-Backend` | Push `main` → Cloud Build trigger |
 
 **Seeded production data**:
 - Publishable key: `pk_bac9...` (set in `MEDUSA_PUBLISHABLE_KEY` on Vercel)
 - MXN is default store currency; Mexico region + stock location "México" exist
 - FulfillmentSet "Miyagi México" + 3 ShippingOptions seeded (post Section 3)
 
-**CI/CD**: Cloud Build `cloudbuild.yaml` — builds Docker image → pushes to Artifact Registry → deploys Cloud Run revision. Check build status: `gh api repos/danybgoode/medusa-bonsai-backend/commits/main/check-runs`.
+**CI/CD**: Cloud Build `cloudbuild.yaml` — builds Docker image → pushes to Artifact Registry → deploys Cloud Run revision. Check build status: `gh api repos/danybgoode/MiyagiSanchez-Backend/commits/main/check-runs`.
 
 **Webhooks**:
 - Frontend (`/api/webhooks/stripe`): handles `invoice.*`, `customer.subscription.*`, `payment_intent.*`

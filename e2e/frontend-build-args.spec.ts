@@ -15,7 +15,7 @@ import { join } from 'path'
  * `undefined` permanently.
  *
  * REPO BOUNDARY NOTE: `infra/gcp/deploy-frontend.sh` lives in a SEPARATE,
- * independently-hosted repo (danybgoode/miyagi-product-management) from this
+ * independently-hosted repo (danybgoode/MiyagiSanchez-Product) from this
  * one — neither repo's CI can see the other's files (no cross-repo PAT was
  * taken on for this hardening task). This spec is therefore anchored to the
  * SAME explicit `NEXT_PUBLIC_VARS` list as

@@ -1,54 +1,54 @@
-# miyagisanchezcommerce
+# MiyagiSanchez-Storefront
 
-The Next.js 16 frontend for [Miyagi Sánchez](https://miyagisanchez.com) — a multi-seller
-marketplace where anyone in Mexico can open a shop and sell with no commission, across the
-marketplace, their own domain, an embeddable widget, or to AI shopping agents. This repo is the
-**UI layer + UCP/MCP agent-commerce endpoints + non-commerce APIs**; all commerce data (products,
-orders, payments, fulfillment) lives in the Medusa backend and is read through the Medusa Store
-API — see [`AGENTS.md`](AGENTS.md) for the five rules that govern where things go in this repo.
+**[Miyagi Sánchez](https://miyagisanchez.com) is the marketplace where anyone in Mexico can open a shop
+in minutes and sell with no commission.** This repository is the storefront: everything buyers and
+sellers see and touch.
 
-This repo is part of a four-repo platform; the product roadmap and cross-repo practice live in the
-root docs repo, [`miyagi-product-management`](https://github.com/danybgoode/miyagi-product-management).
+## Open a shop by describing it
 
-## What this repo owns
+Tell us what you sell in one sentence — *"tamales oaxaqueños, pedidos por WhatsApp"* — and watch your
+shop take shape on your phone: a name, colours, a short story and example products, before you sign up
+for anything. Keep it with one tap, swap the examples for photos of your own products, choose how you
+get paid and how you deliver, and publish into a marketplace that already has buyers.
 
-- Every buyer- and seller-facing page (`app/`) — discovery, checkout hand-off, seller portal
-  (`/shop/manage`), the agentic/UCP-MCP surface (`/api/ucp/*`).
-- Non-commerce data: buyer–seller conversations, offers, favorites, supply-import staging — all in
-  Supabase, never Medusa (see `AGENTS.md` rule #2).
-- Clerk-backed auth, R2 file storage, Telegram admin notifications, Upstash rate limiting.
+## For sellers
 
-## Practice
+- **No commission.** Buyers pay you directly, into your own account: card, Mercado Pago, SPEI bank
+  transfer or cash.
+- **Sell anything.** Products, services, rentals, digital goods and event tickets.
+- **Photos become products.** Take a photo and the listing fills itself in — title, description,
+  category and a suggested price — ready for you to confirm.
+- **Negotiate and chat.** Buyers can make offers and message you; you accept, counter or decline.
+- **Deliver your way.** Hand delivery or pickup, Correos de México, or a carrier.
+- **One shop, everywhere.** Your shop lives on the marketplace, on your own domain, embedded in your
+  website, and where AI shopping assistants can find it.
+- **A dashboard that keeps up.** Orders, offers, analytics, coupons, subscriptions, and a setup guide
+  that always shows the next step.
 
-Follows the same gitflow, risk-tiered PR review, and deterministic-gate discipline as the rest of
-the platform — see [`Roadmap/WAYS-OF-WORKING.md`](https://github.com/danybgoode/miyagi-product-management/blob/main/Roadmap/WAYS-OF-WORKING.md)
-in the root repo. This repo's own deterministic gate is `tsc` + `next build` + the Playwright
-suite (`npm run test:e2e`) — see [`e2e/README.md`](e2e/README.md) for the harness.
+## For buyers
 
-## Deploy
+- Independent Mexican sellers in one place, with real photos and fair prices.
+- Make an offer instead of paying the sticker price.
+- Pay the way you already pay, and know exactly how delivery works before you buy.
+- Save favourites and keep up with the shops you love.
 
-Merging to `main` deploys: Cloud Build (us-east4) → Cloud Run `miyagi-web`, behind Cloudflare.
-Every PR still gets a Vercel preview for review before merge — Vercel no longer serves production.
+## Built for the way Mexico sells
 
-## Quickstart
+Most small merchants in Mexico sell through WhatsApp, Instagram or in person, from a phone. Miyagi
+Sánchez meets them there: Spanish first, phone first, and free to start. A US marketplace brings the
+same shops to buyers in the United States.
 
-```bash
-npm install
-npm run dev   # next dev --turbopack, :3001
-```
+## The Miyagi Sánchez repositories
 
-You'll need a `.env.local` with `MEDUSA_STORE_URL`, `MEDUSA_PUBLISHABLE_KEY`, Clerk, Supabase, and
-R2 keys — see the full list in `AGENTS.md`'s Quick-reference section.
+| Repository | What it is |
+|---|---|
+| **MiyagiSanchez-Storefront** (this one) | The marketplace, every shop and the seller dashboard |
+| [MiyagiSanchez-Backend](https://github.com/danybgoode/MiyagiSanchez-Backend) | The commerce engine behind them: catalog, orders and payments |
+| [MiyagiSanchez-Product](https://github.com/danybgoode/MiyagiSanchez-Product) | The product roadmap and how we build |
 
-The Medusa backend (`apps/backend` in the sibling repo) needs to be running on `:9000` for most
-pages to show real data.
+---
 
-Other scripts: `npm run build` (production build), `npm run lint` (ESLint), `npm run test:e2e`
-(Playwright, API-level, no browser), `npm run test:e2e:browser` (opt-in real-browser smoke).
+Visit **[miyagisanchez.com](https://miyagisanchez.com)** · Open your shop at
+**[miyagisanchez.com/mx/vende](https://miyagisanchez.com/mx/vende)**
 
-## Where things live
-
-- [`AGENTS.md`](AGENTS.md) — the five rules (Medusa owns commerce, Supabase is non-commerce only,
-  UCP/MCP-first, Clerk-only auth, es-MX-by-default) plus the doc-routing table into `.claude/context/`.
-- [`e2e/README.md`](e2e/README.md) — the Playwright harness (deterministic `api` gate + opt-in
-  `browser` smoke).
+*Contributing? Start with [`AGENTS.md`](AGENTS.md) · local setup: [`DEVELOPING.md`](DEVELOPING.md).*
