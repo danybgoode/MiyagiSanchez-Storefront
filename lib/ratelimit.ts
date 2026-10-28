@@ -235,9 +235,19 @@ const p2sMailLinkDeviceLimiter = () => {
   return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(3, '1 h'), prefix: 'rl:p2s_mail_link_device' })
 }
 
+// Prompt-to-shop photo → product (S4.2, D5). Each analysis is one paid Gemini vision call, and it runs BEFORE the
+// merchant confirms, so the monthly photo allowance (spent at confirm, fails closed) does not bound it. This burst
+// bucket does, per user: 12 analyses in 10 minutes covers a merchant photographing a shelf, retakes included. It fails
+// open like every limiter here; the hard monthly cap is the allowance row.
+const p2sPhotoLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(12, '10 m'), prefix: 'rl:p2s_photo' })
+}
+
 // ── Public helper ──────────────────────────────────────────────────────────────
 
-export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_mail_link' | 'p2s_mail_link_device'
+export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_mail_link' | 'p2s_mail_link_device' | 'p2s_photo'
 
 function limiterFor(key: LimitKey): Ratelimit | null {
   const getLimiter = key === 'offers'          ? offerLimiter
@@ -263,6 +273,7 @@ function limiterFor(key: LimitKey): Ratelimit | null {
     : key === 'p2s_generate_device' ? p2sGenerateDeviceLimiter
     : key === 'p2s_mail_link' ? p2sMailLinkLimiter
     : key === 'p2s_mail_link_device' ? p2sMailLinkDeviceLimiter
+    : key === 'p2s_photo' ? p2sPhotoLimiter
     : supplyImportLimiter
   return getLimiter()
 }

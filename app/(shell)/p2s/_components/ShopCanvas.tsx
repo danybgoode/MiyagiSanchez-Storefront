@@ -3,7 +3,8 @@ import { Banner } from '@/components/feedback/Banner'
 import { shopInitials, SHOP_INDEX_GRID_CLASS } from '@/lib/shop-presentation/chrome'
 import { CANVAS_COPY, FALLBACK_NOTE } from '@/lib/prompt-to-shop/copy'
 import type { BlockKey } from '@/lib/prompt-to-shop/blocks'
-import type { CanvasView, ExampleCardView } from '@/lib/prompt-to-shop/view'
+import type { CanvasView, ExampleCardView, OwnProductCardView } from '@/lib/prompt-to-shop/view'
+import { PHOTO_COPY } from '@/lib/prompt-to-shop/copy'
 import ExampleIllustration from './ExampleIllustration'
 
 /**
@@ -27,7 +28,7 @@ function Bar({ width, height = 14 }: { width: string; height?: number }) {
   return <span className={SKELETON} style={{ ...skeletonStyle, width, height }} aria-hidden="true" />
 }
 
-function ExampleCard({ card, accent, accentText }: { card: ExampleCardView; accent: string; accentText: string }) {
+function ExampleCard({ card, accent, accentText, action }: { card: ExampleCardView; accent: string; accentText: string; action?: React.ReactNode }) {
   return (
     <article
       data-testid="p2s-example-card"
@@ -54,6 +55,41 @@ function ExampleCard({ card, accent, accentText }: { card: ExampleCardView; acce
           {card.priceLabel}
           <span className="ml-1.5 text-[10px] font-medium" style={{ color: 'var(--shop-fg-muted, var(--fg-muted))' }}>{CANVAS_COPY.priceCaption}</span>
         </p>
+        {action ? <div className="mt-2">{action}</div> : null}
+      </div>
+    </article>
+  )
+}
+
+/** One of the merchant's OWN products (a real Medusa product, S4.2) — the photo is theirs, never generated. */
+function OwnProductCard({ card, accent }: { card: OwnProductCardView; accent: string }) {
+  return (
+    <article
+      data-testid="p2s-own-card"
+      className="relative overflow-hidden"
+      style={{
+        background: 'var(--shop-surface, var(--bg-elevated))',
+        border: '1px solid var(--shop-border, var(--border))',
+        borderRadius: 'var(--shop-radius, 0.75rem)',
+      }}
+    >
+      {card.published ? null : (
+        <span
+          className="absolute left-2 top-2 z-10 px-2 py-0.5 text-[10px] font-bold"
+          style={{ background: 'var(--bg)', color: 'var(--fg)', border: '1px solid var(--border)', borderRadius: 'var(--shop-radius, 999px)' }}
+        >
+          {PHOTO_COPY.unpublished}
+        </span>
+      )}
+      {card.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- same plain card image as ClosetListingCard on the live shop grid
+        <img src={card.imageUrl} alt={card.title} className="w-full h-36 object-cover" />
+      ) : (
+        <span className="block h-36" style={{ background: 'var(--shop-border, var(--border))' }} aria-hidden="true" />
+      )}
+      <div className="p-2.5">
+        <p className="text-xs font-medium line-clamp-2 leading-snug">{card.title}</p>
+        {card.priceLabel ? <p className="mt-1.5 text-sm font-bold" style={{ color: accent }}>{card.priceLabel}</p> : null}
       </div>
     </article>
   )
@@ -78,12 +114,19 @@ export default function ShopCanvas({
   view,
   mode,
   toolbar,
+  ownCards,
+  exampleAction,
 }: {
   view: CanvasView
   mode: CanvasMode
   /** Owner-only editing controls. The view-only page never passes one (D15). */
   toolbar?: React.ReactNode
+  /** The kept shop's real products (S4.2), shown before the examples. Owner mode only. */
+  ownCards?: OwnProductCardView[]
+  /** «Cambiar por mi foto» on each example (S4.3). Owner mode only. */
+  exampleAction?: (card: ExampleCardView) => React.ReactNode
 }) {
+  const owner = mode === 'owner'
   const waiting = (Object.keys(view.pending) as BlockKey[]).some((k) => view.pending[k])
   // «Otra versión» is the owner's next step, so a read-only visitor is not told to take it.
   const fallbackNotes = mode === 'viewer' ? [] : (Object.keys(view.fallback) as BlockKey[]).filter((k) => view.fallback[k])
@@ -157,8 +200,17 @@ export default function ShopCanvas({
           <h2 className="text-xl font-bold mb-1">{CANVAS_COPY.productsTitle}</h2>
           <p className="text-xs mb-4" style={{ color: 'var(--shop-fg-muted, var(--fg-muted))' }}>{CANVAS_COPY.exampleNote}</p>
           <div className={SHOP_INDEX_GRID_CLASS}>
+            {owner && ownCards ? ownCards.map((card) => <OwnProductCard key={card.id} card={card} accent={view.accent} />) : null}
             {view.cards
-              ? view.cards.map((card) => <ExampleCard key={card.key} card={card} accent={view.accent} accentText={view.accentTextColor} />)
+              ? view.cards.map((card) => (
+                  <ExampleCard
+                    key={card.key}
+                    card={card}
+                    accent={view.accent}
+                    accentText={view.accentTextColor}
+                    action={owner && exampleAction ? exampleAction(card) : undefined}
+                  />
+                ))
               : [0, 1, 2, 3].map((i) => <SkeletonCard key={i} />)}
           </div>
         </section>

@@ -41,14 +41,26 @@ async function modelEndpoint(): Promise<{ url: string; headers: Record<string, s
 }
 
 async function callGemini(req: ModelRequest): Promise<ModelResult> {
+  return callModelBody(req.body)
+}
+
+/** True when either credential is set. Without one, a model call can only fail. */
+export const MODEL_CONFIGURED = !!VERTEX_SA || !!process.env.GEMINI_API_KEY
+export const MODEL_VIA = VERTEX_SA ? 'vertex' : 'gemini_api'
+
+/**
+ * One `generateContent` call with any body (text blocks, or the S4.2 photo with `inlineData`), through the same
+ * credential choice and timeout as the generation blocks. Never throws.
+ */
+export async function callModelBody(body: object, timeoutMs: number = MODEL_TIMEOUT_MS): Promise<ModelResult> {
   try {
     const endpoint = await modelEndpoint()
     if (!endpoint) return { ok: false, error: 'vertex token refused' }
     const res = await fetch(endpoint.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...endpoint.headers },
-      body: JSON.stringify(req.body),
-      signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
@@ -137,7 +149,7 @@ export function draftsDeps(ip: string): DraftsDeps {
       if (error) console.error('[p2s] refund failed', error.message)
     },
     callModel: callGemini,
-    modelConfigured: !!VERTEX_SA || !!process.env.GEMINI_API_KEY,
+    modelConfigured: MODEL_CONFIGURED,
     newDeviceId: () => randomUUID(),
     log: (line) => console.info('[p2s]', JSON.stringify({ via: VERTEX_SA ? 'vertex' : 'gemini_api', ...line })),
   }

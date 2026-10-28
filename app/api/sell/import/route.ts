@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { validateRows, type CatalogImportRow } from '@/lib/catalog-import'
 import { ingestImageUrls } from '@/lib/image-ingest'
+import { buildCreateBody, createSellerProduct } from '@/lib/seller-product-create'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -32,35 +33,6 @@ type RowResult = {
 }
 
 const isStockable = (lt?: string) => (lt ?? 'product') === 'product'
-
-function buildCreateBody(row: CatalogImportRow, images: Array<{ url: string; alt?: string }>) {
-  const listingType = row.listing_type ?? 'product'
-  const priceCents = row.price != null ? Math.round(row.price * 100) : null
-  const location = [row.city?.trim(), row.state?.trim()].filter(Boolean).join(', ') || null
-  return {
-    title: row.title.trim(),
-    description: row.description?.trim() || null,
-    price_cents: priceCents,
-    currency: row.currency ?? 'MXN',
-    condition: listingType === 'product' ? (row.condition ?? null) : null,
-    listing_type: listingType,
-    category: row.category,
-    state: row.state || null,
-    municipio: row.city || null,
-    location,
-    quantity: isStockable(listingType) ? Math.max(1, Math.floor(row.quantity ?? 1)) : 1,
-    weight_grams: row.weight_grams ?? null,
-    images,
-    metadata: { external_id: row.external_id ?? null },
-    // Unit cost (COGS) in centavos → the created variant's private metadata
-    // (profit-analyzer S1 · US-1). Pesos → centavos, same convention as price.
-    ...(row.unit_cost != null ? { unit_cost_cents: Math.round(row.unit_cost * 100) } : {}),
-    // Autos vehicle specs + financing/trust (cars-vertical S2.3) — assembled
-    // by stageRow() into row.attrs, mirroring the backend's own non-empty
-    // guard (seller-product-create.ts only writes attrs when non-empty).
-    ...(row.attrs && Object.keys(row.attrs).length > 0 ? { attrs: row.attrs } : {}),
-  }
-}
 
 function buildUpdateBody(row: CatalogImportRow) {
   const listingType = row.listing_type ?? 'product'
@@ -157,19 +129,16 @@ export async function POST(req: NextRequest) {
       } else {
         // Pull remote images into our R2 asset pipeline (graceful per-image).
         const ingest = await ingestImageUrls(userId, s.row.images ?? [], s.row.title)
-        const res = await medusaFetch('/store/sellers/me/products', clerkJwt, {
-          method: 'POST',
-          body: JSON.stringify(buildCreateBody(s.row, ingest.images)),
-        })
-        const data = (await res.json().catch(() => ({}))) as { product_id?: string; message?: string }
-        if (!res.ok || !data.product_id) {
-          results.push({ line: s.line, title, status: 'failed', reason: data.message ?? `Error ${res.status} al crear.` })
+        // The shared create path (lib/seller-product-create.ts) — the photo → product confirm calls it too.
+        const created = await createSellerProduct(clerkJwt, buildCreateBody(s.row, ingest.images))
+        if (!created.ok) {
+          results.push({ line: s.line, title, status: 'failed', reason: created.message ?? `Error ${created.status} al crear.` })
           continue
         }
         // Track within this batch so a repeated external_id updates instead of duplicating.
-        if (extId) map.set(extId, data.product_id)
+        if (extId) map.set(extId, created.productId)
         results.push({
-          line: s.line, title, status: 'created', product_id: data.product_id,
+          line: s.line, title, status: 'created', product_id: created.productId,
           ...(ingest.failed > 0 ? { images_failed: ingest.failed } : {}),
         })
       }
