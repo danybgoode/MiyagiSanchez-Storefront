@@ -6,6 +6,7 @@ import {
   computeMercadoLibreCost,
   computeWooCommerceCost,
   computeTiendanubeCost,
+  computeT1Cost,
   computeMiyagiCost,
   computeSelectedAppsMonthlyMxn,
   applyLineOverrides,
@@ -14,12 +15,14 @@ import {
   type MercadoLibreRates,
   type WooCommerceRates,
   type TiendanubeRates,
+  type T1Rates,
   type MiyagiRates,
   type ShopifyTier,
   type MlBand,
   type MlPublicationType,
   type WooCommerceHostingTier,
   type TiendanubeTier,
+  type T1Tier,
   type PremiumAppOption,
   type StackedCost,
 } from '@/lib/cost-comparator'
@@ -51,6 +54,7 @@ const PLATFORM_LABELS: Record<CompetitorPlatform, string> = {
   mercadolibre: 'Mercado Libre',
   woocommerce: 'WooCommerce',
   tiendanube: 'Tiendanube',
+  t1: 'T1',
 }
 
 // "Basic" / "Grow" / "Advanced" are Shopify's own plan brand names (unchanged
@@ -81,6 +85,12 @@ const TN_TIER_LABELS: Record<TiendanubeTier, string> = {
   avanzado: 'Avanzado ($999 MXN/mes)',
 }
 
+// T1's free plan has no online store (pricing-page A1) — only the two plans that can sell.
+const T1_TIER_LABELS: Record<T1Tier, string> = {
+  basico: 'Básico ($399 MXN/mes)',
+  avanzado: 'Avanzado ($1,499 MXN/mes)',
+}
+
 // US-2.2 — the SAME shape lib/cost-comparator-url.ts's ComparadorState codec
 // builds/parses, so the page's SSR prefill and this component's "Copiar enlace"
 // share button can never drift on which fields exist.
@@ -92,6 +102,8 @@ export interface ComparadorInitial {
   wooTier: WooCommerceHostingTier
   tnTier: TiendanubeTier
   tnOwnGateway: boolean
+  t1Tier: T1Tier
+  t1Pagos: boolean
   volume: number
   aov: number
   selectedAppIds: string[]
@@ -104,6 +116,7 @@ export interface ComparadorRates {
   mercadolibre: MercadoLibreRates
   woocommerce: WooCommerceRates
   tiendanube: TiendanubeRates
+  t1: T1Rates
   miyagi: MiyagiRates
 }
 
@@ -203,6 +216,8 @@ export default function ComparadorTool({ rates, apps, fx, initial, dataset }: Co
   const [wooTier, setWooTier] = useState<WooCommerceHostingTier>(initial.wooTier)
   const [tnTier, setTnTier] = useState<TiendanubeTier>(initial.tnTier)
   const [tnOwnGateway, setTnOwnGateway] = useState(initial.tnOwnGateway)
+  const [t1Tier, setT1Tier] = useState<T1Tier>(initial.t1Tier)
+  const [t1Pagos, setT1Pagos] = useState(initial.t1Pagos)
   const [volume, setVolume] = useState(initial.volume)
   const [aov, setAov] = useState(initial.aov)
   const [selectedAppIds, setSelectedAppIds] = useState<string[]>(initial.selectedAppIds)
@@ -250,8 +265,9 @@ export default function ComparadorTool({ rates, apps, fx, initial, dataset }: Co
       case 'mercadolibre': return `${mlBand}-${mlPublicationType}`
       case 'woocommerce': return wooTier
       case 'tiendanube': return `${tnTier}-${tnOwnGateway ? 'own' : 'ext'}`
+      case 't1': return `${t1Tier}-${t1Pagos ? 'own' : 'ext'}`
     }
-  }, [platform, shopifyTier, mlBand, mlPublicationType, wooTier, tnTier, tnOwnGateway])
+  }, [platform, shopifyTier, mlBand, mlPublicationType, wooTier, tnTier, tnOwnGateway, t1Tier, t1Pagos])
 
   const baseCompetitorStack = useMemo<StackedCost>(() => {
     switch (platform) {
@@ -263,9 +279,11 @@ export default function ComparadorTool({ rates, apps, fx, initial, dataset }: Co
         return computeWooCommerceCost(inputs, wooTier, rates.woocommerce, appsMonthlyMxn)
       case 'tiendanube':
         return computeTiendanubeCost(inputs, tnTier, tnOwnGateway, rates.tiendanube, appsMonthlyMxn)
+      case 't1':
+        return computeT1Cost(inputs, t1Tier, t1Pagos, rates.t1, appsMonthlyMxn)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [platform, inputs.volumeMonthly, inputs.aovMxn, shopifyTier, mlBand, mlPublicationType, wooTier, tnTier, tnOwnGateway, appsMonthlyMxn, rates])
+  }, [platform, inputs.volumeMonthly, inputs.aovMxn, shopifyTier, mlBand, mlPublicationType, wooTier, tnTier, tnOwnGateway, t1Tier, t1Pagos, appsMonthlyMxn, rates])
 
   const baseMiyagiStack = useMemo<StackedCost>(
     () => computeMiyagiCost(inputs, miyagiSkus, rates.miyagi),
@@ -293,7 +311,6 @@ export default function ComparadorTool({ rates, apps, fx, initial, dataset }: Co
       if (lineOverrides[k] !== undefined) scoped[line.key] = lineOverrides[k]
     }
     return applyLineOverrides(baseMiyagiStack, scoped)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseMiyagiStack, lineOverrides])
 
   const maxMonthly = Math.max(competitorStack.monthlyTotalMxn, miyagiStack.monthlyTotalMxn, 1)
@@ -303,7 +320,7 @@ export default function ComparadorTool({ rates, apps, fx, initial, dataset }: Co
   // editable line's hover tooltip cites the figure that actually backs it right now
   // (e.g. Shopify's "payment" line cites the Basic-tier rate while Basic is picked,
   // the Advanced-tier rate once Advanced is picked).
-  const sourceCtx = { shopifyTier, mlBand, mlPublicationType, wooTier, tnTier, tnOwnGateway }
+  const sourceCtx = { shopifyTier, mlBand, mlPublicationType, wooTier, tnTier, tnOwnGateway, t1Tier, t1Pagos }
 
   // US-2.2 — "Copiar enlace": serializes the FULL current state (platform, its
   // own tier/band/type/hosting/gateway, volume, AOV, selected apps, Miyagi SKUs,
@@ -312,7 +329,7 @@ export default function ComparadorTool({ rates, apps, fx, initial, dataset }: Co
   // now — matching the "comparación exacta" claim in the caption below.
   const handleCopyLink = async () => {
     const params = buildComparadorShareParams({
-      platform, shopifyTier, mlBand, mlPublicationType, wooTier, tnTier, tnOwnGateway,
+      platform, shopifyTier, mlBand, mlPublicationType, wooTier, tnTier, tnOwnGateway, t1Tier, t1Pagos,
       volume, aov, selectedAppIds, miyagiSkus, lineOverrides,
     })
     const url = `${window.location.origin}/comparador?${params.toString()}`
@@ -415,6 +432,7 @@ export default function ComparadorTool({ rates, apps, fx, initial, dataset }: Co
       case 'mercadolibre': return `Mercado Libre (${ML_BAND_LABELS[mlBand]}, ${mlPublicationType === 'clasica' ? 'Clásica' : 'Premium'})`
       case 'woocommerce': return `WooCommerce (${WOO_TIER_LABELS[wooTier]})`
       case 'tiendanube': return `Tiendanube (${TN_TIER_LABELS[tnTier]}${tnOwnGateway ? '' : ', pasarela externa'})`
+      case 't1': return `T1 (${T1_TIER_LABELS[t1Tier]}${t1Pagos ? '' : ', pasarela externa'})`
     }
   })()
 
@@ -623,6 +641,26 @@ export default function ComparadorTool({ rates, apps, fx, initial, dataset }: Co
               <input type="checkbox" checked={tnOwnGateway} onChange={(e) => { setTnOwnGateway(e.target.checked); markInteracted() }} data-testid="comparador-tn-gateway-toggle" />
               <span className="t-small" style={{ color: 'var(--fg-muted)' }}>Usar Pago Nube (si no, pasarela externa)</span>
             </label>
+          </>
+        )}
+
+        {platform === 't1' && (
+          <>
+            <label style={{ display: 'grid', gap: 'var(--s-1)' }}>
+              <span className="t-small" style={{ color: 'var(--fg-muted)' }}>Plan de T1</span>
+              <select className="input" data-testid="comparador-t1-tier-select" value={t1Tier} onChange={(e) => { setT1Tier(e.target.value as T1Tier); markInteracted() }}>
+                {(Object.keys(T1_TIER_LABELS) as T1Tier[]).map((t) => (
+                  <option key={t} value={t}>{T1_TIER_LABELS[t]}</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--s-2)' }}>
+              <input type="checkbox" checked={t1Pagos} onChange={(e) => { setT1Pagos(e.target.checked); markInteracted() }} data-testid="comparador-t1-gateway-toggle" />
+              <span className="t-small" style={{ color: 'var(--fg-muted)' }}>Usar T1pagos (si no, pasarela externa)</span>
+            </label>
+            <p className="t-caption" data-testid="comparador-t1-free-note" style={{ color: 'var(--fg-muted)', margin: 0 }}>
+              El plan gratuito de T1 no incluye tienda en línea ni cobros propios, por eso no aparece aquí.
+            </p>
           </>
         )}
       </div>

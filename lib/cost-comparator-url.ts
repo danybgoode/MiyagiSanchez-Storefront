@@ -43,16 +43,19 @@ import type {
   MlPublicationType,
   WooCommerceHostingTier,
   TiendanubeTier,
+  T1Tier,
 } from './cost-comparator'
 
-export type CompetitorPlatform = 'shopify' | 'mercadolibre' | 'woocommerce' | 'tiendanube'
+export type CompetitorPlatform = 'shopify' | 'mercadolibre' | 'woocommerce' | 'tiendanube' | 't1'
 
-export const COMPARADOR_PLATFORMS: CompetitorPlatform[] = ['shopify', 'mercadolibre', 'woocommerce', 'tiendanube']
+export const COMPARADOR_PLATFORMS: CompetitorPlatform[] = ['shopify', 'mercadolibre', 'woocommerce', 'tiendanube', 't1']
 export const COMPARADOR_SHOPIFY_TIERS: ShopifyTier[] = ['basico', 'crecimiento', 'avanzado']
 export const COMPARADOR_ML_BANDS: MlBand[] = ['baja', 'media', 'alta']
 export const COMPARADOR_ML_TYPES: MlPublicationType[] = ['clasica', 'premium']
 export const COMPARADOR_WOO_TIERS: WooCommerceHostingTier[] = ['entrada', 'crecimiento']
 export const COMPARADOR_TN_TIERS: TiendanubeTier[] = ['gratis', 'basico', 'tiendanube', 'avanzado']
+// T1's free plan cannot sell online (pricing-page A1), so it is not a comparable tier.
+export const COMPARADOR_T1_TIERS: T1Tier[] = ['basico', 'avanzado']
 
 export interface ComparadorMiyagiSkus {
   subdomain: boolean
@@ -68,6 +71,9 @@ export interface ComparadorState {
   wooTier: WooCommerceHostingTier
   tnTier: TiendanubeTier
   tnOwnGateway: boolean
+  t1Tier: T1Tier
+  /** T1pagos (true) or an external provider with T1's own cut (false). */
+  t1Pagos: boolean
   volume: number
   aov: number
   selectedAppIds: string[]
@@ -155,6 +161,8 @@ export function parseComparadorState(sp: SearchParamsLike, validAppIds: readonly
     wooTier: platform === 'woocommerce' ? pick(sp.hosting, COMPARADOR_WOO_TIERS, 'entrada') : 'entrada',
     tnTier: platform === 'tiendanube' ? pick(sp.tier, COMPARADOR_TN_TIERS, 'basico') : 'basico',
     tnOwnGateway: platform === 'tiendanube' ? first(sp.gateway) !== 'external' : true,
+    t1Tier: platform === 't1' ? pick(sp.tier, COMPARADOR_T1_TIERS, 'basico') : 'basico',
+    t1Pagos: platform === 't1' ? first(sp.gateway) !== 'external' : true,
     volume: toNumber(sp.volume, 100),
     aov: toNumber(sp.aov, 500),
     selectedAppIds,
@@ -184,6 +192,9 @@ export function buildComparadorShareParams(state: ComparadorState): URLSearchPar
   } else if (state.platform === 'tiendanube') {
     params.set('tier', state.tnTier)
     if (!state.tnOwnGateway) params.set('gateway', 'external')
+  } else if (state.platform === 't1') {
+    params.set('tier', state.t1Tier)
+    if (!state.t1Pagos) params.set('gateway', 'external')
   }
 
   params.set('volume', String(state.volume))

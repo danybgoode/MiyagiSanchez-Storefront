@@ -44,7 +44,7 @@ test.describe('/mx/precios · server HTML', () => {
     expect(html).toContain('Mercado Pago')
     expect(html).toContain('SPEI')
     expect(html).toContain('más IVA')
-    expect(html).toContain('href="/comparador')
+    expect(html).toContain('href="/comparador?platform=t1&tier=basico"')
     expect(html).toContain('href="/mx/vende"')
     // No unfilled token reached the page.
     expect(html).not.toMatch(/\{(subdomain|customDomain|mlSync|printAd|migration)\w*\}/)

@@ -203,6 +203,59 @@ export function computeTiendanubeCost(
 }
 
 // ---------------------------------------------------------------------------
+// T1 — plan tiers; payments either through T1pagos (% + fixed) or an external
+// provider, where T1 takes its own cut (pricing-page A1/A2). Same shape as
+// Tiendanube's own-vs-external gateway. T1's free plan has no online store
+// («No se puede transaccionar»), so it is not a tier here — modelling it as a
+// $0 plan would flatter a plan that cannot sell.
+// ---------------------------------------------------------------------------
+
+export type T1Tier = 'basico' | 'avanzado'
+
+export interface T1Rates {
+  planMonthlyMxn: Record<T1Tier, number>
+  /** T1pagos card rate, % (flat across the paid tiers). */
+  t1PagosPct: number
+  t1PagosFixedMxn: number
+  /** T1's own cut, %, when the merchant uses an external payment provider. */
+  externalPct: Record<T1Tier, number>
+  /** That external provider's OWN processing fee — T1 charges its cut on top of it. The same
+   * public card rate Miyagi's column charges, so the two sides stay like for like. */
+  externalProcessorPct: number
+  externalProcessorFixedMxn: number
+}
+
+export function computeT1Cost(
+  inputs: ComparatorInputs,
+  tier: T1Tier,
+  useT1Pagos: boolean,
+  rates: T1Rates,
+  appsMonthlyMxn = 0,
+): StackedCost {
+  const revenue = revenueMxn(inputs)
+  const plan = { key: 'plan', label: 'Plan mensual', monthlyMxn: rates.planMonthlyMxn[tier] }
+  const apps = { key: 'apps', label: 'Apps premium', monthlyMxn: appsMonthlyMxn }
+  if (useT1Pagos) {
+    const paymentMxn = revenue * (rates.t1PagosPct / 100) + inputs.volumeMonthly * rates.t1PagosFixedMxn
+    return stack([plan, { key: 'payment', label: 'T1pagos', monthlyMxn: paymentMxn }, apps])
+  }
+  // External provider: T1's cut AND the provider's own fee. Leaving the second out made T1
+  // look ~$700/mo cheaper than Miyagi at 100 × $500 while Miyagi's side included processing.
+  return stack([
+    plan,
+    { key: 'payment', label: 'Comisión de T1 por pasarela externa', monthlyMxn: revenue * (rates.externalPct[tier] / 100) },
+    {
+      key: 'processor',
+      label: 'Tu pasarela externa (tarifa pública con tarjeta)',
+      monthlyMxn: revenue * (rates.externalProcessorPct / 100) + inputs.volumeMonthly * rates.externalProcessorFixedMxn,
+    },
+    apps,
+  ])
+}
+
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // Miyagi — 0% commission always. SKU costs only (subdomain / custom domain /
 // ML-sync, each opt-in), plus the SAME pass-through payment-processor rate a
 // self-hosted merchant would pay (Miyagi adds no markup on top of it) — this is

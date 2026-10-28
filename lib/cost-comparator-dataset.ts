@@ -33,6 +33,7 @@ import type {
   MercadoLibreRates,
   WooCommerceRates,
   TiendanubeRates,
+  T1Rates,
   MiyagiRates,
   PremiumAppOption,
   ShopifyTier,
@@ -40,6 +41,7 @@ import type {
   MlPublicationType,
   WooCommerceHostingTier,
   TiendanubeTier,
+  T1Tier,
 } from './cost-comparator'
 import type { ProcessorRate } from './pricing-catalog'
 
@@ -209,6 +211,23 @@ export function tiendanubeRatesFromDataset(dataset: ComparatorDataset): Tiendanu
   }
 }
 
+export function t1RatesFromDataset(dataset: ComparatorDataset): T1Rates {
+  return {
+    planMonthlyMxn: {
+      basico: value(dataset, 't1.plan.basico.monthlyMxn'),
+      avanzado: value(dataset, 't1.plan.avanzado.monthlyMxn'),
+    },
+    t1PagosPct: value(dataset, 't1.t1pagos.pct'),
+    t1PagosFixedMxn: value(dataset, 't1.t1pagos.fixedMxn'),
+    externalPct: {
+      basico: value(dataset, 't1.external.basico.pct'),
+      avanzado: value(dataset, 't1.external.avanzado.pct'),
+    },
+    externalProcessorPct: value(dataset, 'miyagi.payment.pct'),
+    externalProcessorFixedMxn: value(dataset, 'miyagi.payment.fixedMxn'),
+  }
+}
+
 export function miyagiRatesFromDataset(dataset: ComparatorDataset): MiyagiRates {
   return {
     subdomainMonthlyMxn: value(dataset, 'miyagi.sku.subdomain.monthlyMxn'),
@@ -272,7 +291,7 @@ export function fxUsdToMxnFromDataset(dataset: ComparatorDataset): number {
 // the same figure-key vocabulary `*RatesFromDataset` already knows.
 // ---------------------------------------------------------------------------
 
-export type ComparatorPlatform = 'shopify' | 'mercadolibre' | 'woocommerce' | 'tiendanube' | 'miyagi'
+export type ComparatorPlatform = 'shopify' | 'mercadolibre' | 'woocommerce' | 'tiendanube' | 't1' | 'miyagi'
 
 /** The tier/band selections in effect when a line was rendered — only the ones
  * relevant to the current platform need to be set. */
@@ -283,6 +302,8 @@ export interface LineSourceContext {
   wooTier?: WooCommerceHostingTier
   tnTier?: TiendanubeTier
   tnOwnGateway?: boolean
+  t1Tier?: T1Tier
+  t1Pagos?: boolean
 }
 
 /**
@@ -320,6 +341,13 @@ export function lineSourceFigureKey(
           ? `tiendanube.external.${ctx.tnTier}.pct`
           : `tiendanube.gateway.${ctx.tnTier}.pct`
       }
+      return null
+    case 't1':
+      if (lineKey === 'plan' && ctx.t1Tier) return `t1.plan.${ctx.t1Tier}.monthlyMxn`
+      if (lineKey === 'payment' && ctx.t1Tier) {
+        return ctx.t1Pagos === false ? `t1.external.${ctx.t1Tier}.pct` : 't1.t1pagos.pct'
+      }
+      if (lineKey === 'processor') return 'miyagi.payment.pct'
       return null
     case 'miyagi':
       if (lineKey === 'payment') return 'miyagi.payment.pct'
