@@ -63,14 +63,28 @@ export function claimDeps(userId: string, clerkJwt: string): ClaimDeps {
     ensureShop: (input) => ensureShop(userId, clerkJwt, input),
     applyConfig: (manifest) => applyStoreConfig(userId, clerkJwt, manifest),
     markSeller: async (draftId, user, sellerId) => {
+      // The 201 that precedes this proves the seller came from this draft, so the marker also re-asserts the claim
+      // if a racing tab released it in the meantime (that tab saw a 200 and could not tell whose seller it was).
       const { data, error } = await db
         .from('shop_drafts')
-        .update({ claimed_seller_id: sellerId, updated_at: new Date().toISOString() })
+        .update({ claimed_by: user, claimed_seller_id: sellerId, updated_at: new Date().toISOString() })
         .eq('id', draftId)
-        .eq('claimed_by', user)
+        .is('claimed_seller_id', null)
+        .or(`claimed_by.eq.${user},claimed_by.is.null`)
         .select('id')
       return !error && Array.isArray(data) && data.length === 1
     },
+    release: async (draftId, user) => {
+      const { data, error } = await db
+        .from('shop_drafts')
+        .update({ claimed_by: null, claimed_at: null, updated_at: new Date().toISOString() })
+        .eq('id', draftId)
+        .eq('claimed_by', user)
+        .is('claimed_seller_id', null)
+        .select('id')
+      return !error && Array.isArray(data) && data.length === 1
+    },
+    log: (line) => console.error('[p2s] claim', JSON.stringify(line)),
     // Same tags settings-import busts: the public shop must show the new name and colours on the next view.
     revalidate: () => {
       revalidateTag('shops', 'default')

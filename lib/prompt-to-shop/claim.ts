@@ -13,15 +13,19 @@
  *
  * Decisions this module encodes (each one spec-covered):
  *
- *   • A user who ALREADY has a shop does not get a draft poured over it. The seller lookup runs BEFORE the claim,
- *     and a present seller means no claim at all → «Ya tienes una tienda». An existing shop's config is never
- *     overwritten by a draft.
- *   • Because a claim only lands for a user with no shop, a draft claimed by THIS user and still missing
- *     `claimed_seller_id` is a half-finished keep (the shop create or the config apply failed, or the tab closed).
- *     Re-entering resumes it: `ensureShop` is idempotent (200 when the seller exists) and the profile patch is the
- *     same deep-merge every time, so finishing twice converges on one shop.
- *   • `claimed_seller_id` is written LAST, after the config applied. It is the "done" marker, so a reload of a
- *     finished keep re-applies nothing (the merchant's later edits in /shop/manage are never clobbered).
+ *   • A draft is poured ONLY into a seller that THIS keep created. Proof of that is `ensureShop` answering 201 in
+ *     this very call — nothing weaker. A present seller at the lookup means no claim at all; a 200 from
+ *     `ensureShop` (a shop made between the lookup and the create: another tab, the manual wizard, an agent) means
+ *     «Ya tienes una tienda», no config applied, and the claim RELEASED (one conditional write, read back) so the
+ *     draft is not stranded. An existing shop is never overwritten by a draft, however it came to exist.
+ *   • `claimed_seller_id` is written IMMEDIATELY after the 201, before the config. It means "this draft made this
+ *     seller", and it is final: a reload returns that shop and applies nothing again, so a merchant's later edits
+ *     in /shop/manage are never clobbered. If the config apply then fails, the keep is still done — the shop already
+ *     carries the draft's name, description and location from the create — and the outcome says
+ *     `configApplied: false` instead of pretending, or retrying onto a shop the merchant may already be editing.
+ *   • A draft claimed by THIS user with no `claimed_seller_id` is a keep that stopped before a seller existed (the
+ *     create failed, or the tab closed). Re-entering resumes it only while the lookup says the user has no shop,
+ *     and again applies only on a 201. A present seller there is `has_shop` + release, as above.
  *   • Anything else that cannot claim — another phone, another account, expired, missing, malformed — gets the SAME
  *     «Esta tienda se armó en otro teléfono» answer, so a stranger learns nothing about the id. That includes the
  *     right phone holding a draft another account already kept: the device proves it made the draft, not that it
@@ -70,14 +74,21 @@ export interface ClaimDeps {
   reread: (draftId: string) => Promise<ClaimRow | null>
   ensureShop: (input: ShopCreateInput) => Promise<EnsureShopResult>
   applyConfig: (manifest: StoreConfigManifest) => Promise<{ ok: boolean; error?: string }>
-  /** Conditional on id AND claimed_by, read back. True when it landed. */
+  /**
+   * "This draft made this seller". Conditional on id, an unset `claimed_seller_id`, and the draft being this user's
+   * or released (a racing tab may have released it a moment ago — the 201 is the stronger fact), read back.
+   */
   markSeller: (draftId: string, userId: string, sellerId: string) => Promise<boolean>
+  /** Give the draft back: `claimed_by = null` WHERE id AND claimed_by = user AND claimed_seller_id IS NULL, read back. */
+  release: (draftId: string, userId: string) => Promise<boolean>
+  log: (line: Record<string, unknown>) => void
   revalidate: () => void
   now: () => Date
 }
 
 export type ClaimOutcome =
-  | { kind: 'kept'; draftId: string; shopSlug: string; resumed: boolean }
+  /** `configApplied: false` — the shop exists from this draft, but its colours and words did not land. */
+  | { kind: 'kept'; draftId: string; shopSlug: string; resumed: boolean; configApplied: boolean }
   | { kind: 'other_phone' }
   | { kind: 'has_shop'; shopSlug: string }
   /** The draft is this phone's and unclaimed, but its name and colours have not landed yet. */
@@ -147,6 +158,11 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
       const verdict = classifyRow(current, { userId, deviceId, now: deps.now() })
       if (verdict === 'other_phone') return { kind: 'other_phone' }
       if (verdict === 'not_ready') return seller.state === 'present' ? { kind: 'has_shop', shopSlug: seller.seller.slug } : { kind: 'incomplete', draftId }
+      if (verdict === 'mine' && !current!.claimed_seller_id && seller.state === 'present') {
+        // A keep that stopped before its seller existed, and the user has a shop now that this draft did not make.
+        await release(deps, draftId, userId)
+        return { kind: 'has_shop', shopSlug: seller.seller.slug }
+      }
       if (verdict === 'claimable') {
         // Only reachable with a shop already present (an absent seller would have claimed it above, or lost a race
         // that the re-read then shows as claimed). The draft stays unclaimed and the existing shop untouched.
@@ -159,7 +175,7 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
       resumed = true
       if (row.claimed_seller_id) {
         // Finished earlier. Nothing is applied again.
-        if (seller.state === 'present') return { kind: 'kept', draftId, shopSlug: seller.seller.slug, resumed }
+        if (seller.state === 'present') return { kind: 'kept', draftId, shopSlug: seller.seller.slug, resumed, configApplied: true }
         // The seller it became is gone (paused and removed, or deleted). There is no shop to return to.
         return { kind: 'other_phone' }
       }
@@ -175,13 +191,24 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
 
   const shop = await deps.ensureShop(shopInputFrom(identity))
   if (!shop.ok) return { kind: 'retry', message: CLAIM_RETRY.shop }
+  if (shop.status !== 201) {
+    // The seller already existed: this keep did not make it, so the draft is not poured into it.
+    await release(deps, draftId, userId)
+    return { kind: 'has_shop', shopSlug: shop.shopSlug }
+  }
 
-  const applied = await deps.applyConfig(manifestFrom(identity, words))
-  if (!applied.ok) return { kind: 'retry', message: CLAIM_RETRY.config }
-
+  // 201: this call created the seller from this draft. Record that first; it is what makes a reload harmless.
   const marked = await deps.markSeller(draftId, userId, shop.sellerId).catch(() => false)
-  if (!marked) return { kind: 'retry', message: CLAIM_RETRY.save }
+  if (!marked) deps.log({ event: 'claim_mark_failed', draft: draftId, seller: shop.sellerId })
+
+  const applied = await deps.applyConfig(manifestFrom(identity, words)).catch(() => ({ ok: false }))
+  if (!applied.ok) deps.log({ event: 'claim_config_failed', draft: draftId, seller: shop.sellerId })
 
   deps.revalidate()
-  return { kind: 'kept', draftId, shopSlug: shop.shopSlug, resumed }
+  return { kind: 'kept', draftId, shopSlug: shop.shopSlug, resumed, configApplied: applied.ok }
+}
+
+async function release(deps: ClaimDeps, draftId: string, userId: string): Promise<void> {
+  const released = await deps.release(draftId, userId).catch(() => false)
+  if (!released) deps.log({ event: 'claim_release_failed', draft: draftId })
 }

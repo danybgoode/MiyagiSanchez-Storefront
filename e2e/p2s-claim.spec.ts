@@ -24,9 +24,11 @@ const words = fallbackWords(identity)
 
 type World = ReturnType<typeof world>
 
-function world(opts: { expired?: boolean; noIdentity?: boolean; claimedBy?: string; sellers?: Record<string, { id: string; slug: string }>; failApplyOnce?: boolean; failShopOnce?: boolean; failMarkOnce?: boolean; sellerLookup?: 'unavailable' } = {}) {
+function world(opts: { expired?: boolean; noIdentity?: boolean; claimedBy?: string; sellers?: Record<string, { id: string; slug: string }>; failApplyOnce?: boolean; failShopOnce?: boolean; failMarkOnce?: boolean; sellerLookup?: 'unavailable'; shopAppearsAt?: 'ensureShop' } = {}) {
   const trace: string[] = []
   const manifests: unknown[] = []
+  const logs: Array<Record<string, unknown>> = []
+  let appear = opts.shopAppearsAt === 'ensureShop'
   const row: ClaimRow & { catalog: unknown } = {
     id: DRAFT,
     device_id: DEVICE,
@@ -63,6 +65,8 @@ function world(opts: { expired?: boolean; noIdentity?: boolean; claimedBy?: stri
     ensureShop: async (input) => {
       trace.push('ensureShop')
       if (failShop) { failShop = false; return { ok: false, status: 500, error: 'down' } }
+      // A shop made between the lookup and the create (another tab, the wizard, an agent).
+      if (appear) { appear = false; sellers[userId] = { id: 'sel_elsewhere', slug: 'hecha-a-mano' } }
       const existing = sellers[userId]
       if (existing) return { ok: true, status: 200, shopSlug: existing.slug, sellerId: existing.id }
       const created = { id: `sel_${Object.keys(sellers).length + 1}`, slug: (input.name ?? 'tienda').toLowerCase().replace(/\s+/g, '-') }
@@ -79,14 +83,23 @@ function world(opts: { expired?: boolean; noIdentity?: boolean; claimedBy?: stri
     markSeller: async (id, user, sellerId) => {
       trace.push('markSeller')
       if (failMark) { failMark = false; return false }
-      if (id !== row.id || row.claimed_by !== user) return false
+      // The real WHERE: id, no seller yet, and the draft is this user's or released.
+      if (id !== row.id || row.claimed_seller_id !== null || (row.claimed_by !== user && row.claimed_by !== null)) return false
+      row.claimed_by = user
       row.claimed_seller_id = sellerId
       return true
     },
+    release: async (id, user) => {
+      trace.push('release')
+      if (id !== row.id || row.claimed_by !== user || row.claimed_seller_id !== null) return false
+      row.claimed_by = null
+      return true
+    },
+    log: (line) => { logs.push(line) },
     revalidate: () => { trace.push('revalidate') },
     now: () => NOW,
   })
-  return { trace, manifests, row, sellers, deps }
+  return { trace, manifests, logs, row, sellers, deps }
 }
 
 const keep = (w: World, who: { userId?: string | null; device?: string | null; draftId?: string } = {}) =>
@@ -95,11 +108,11 @@ const keep = (w: World, who: { userId?: string | null; device?: string | null; d
     w.deps(who.userId ?? USER),
   )
 
-test('one owner: seller looked up, then the claim, then the shop, the config and the done marker — in that order', async () => {
+test('one owner: seller looked up, then the claim, then the shop, the marker, then the config — in that order', async () => {
   const w = world()
   const res = await keep(w)
-  expect(res).toEqual({ kind: 'kept', draftId: DRAFT, shopSlug: identity.name.toLowerCase().replace(/\s+/g, '-'), resumed: false })
-  expect(w.trace).toEqual(['findSeller', 'claim', 'ensureShop', 'welcome', 'applyConfig', 'markSeller', 'revalidate'])
+  expect(res).toEqual({ kind: 'kept', draftId: DRAFT, shopSlug: identity.name.toLowerCase().replace(/\s+/g, '-'), resumed: false, configApplied: true })
+  expect(w.trace).toEqual(['findSeller', 'claim', 'ensureShop', 'welcome', 'markSeller', 'applyConfig', 'revalidate'])
   expect(w.row.claimed_by).toBe(USER)
   expect(w.row.claimed_seller_id).toBe('sel_1')
 })
@@ -119,16 +132,35 @@ test('a reload or a second tab returns the SAME shop: no second seller, no secon
   expect(w.trace.filter((e) => e === 'applyConfig')).toHaveLength(1)
 })
 
-test('two tabs racing: the loser resumes the winner’s keep and converges on one seller and one welcome', async () => {
+test('two tabs racing: one seller, one welcome, ONE config apply, and the draft ends marked with that seller', async () => {
   const w = world()
-  // Tab B claims first; tab A's claim then matches nothing and the re-read shows the draft is A's own user's.
   const [a, b] = await Promise.all([keep(w), keep(w)])
-  expect(a.kind).toBe('kept')
-  expect(b.kind).toBe('kept')
+  // One tab created the seller and kept it; the other either saw it finished or saw a 200 and applied nothing.
+  expect([a.kind, b.kind]).toContain('kept')
+  for (const res of [a, b]) expect(['kept', 'has_shop']).toContain(res.kind)
   expect(Object.keys(w.sellers)).toEqual([USER])
   expect(w.trace.filter((e) => e === 'welcome')).toHaveLength(1)
-  expect(w.trace.filter((e) => e === 'claim').length).toBeGreaterThanOrEqual(1)
-  expect(w.row.claimed_seller_id).toBe('sel_1')
+  expect(w.trace.filter((e) => e === 'applyConfig')).toHaveLength(1)
+  expect(w.row).toMatchObject({ claimed_by: USER, claimed_seller_id: 'sel_1' })
+})
+
+test('a shop that appears between the lookup and the create (ensureShop 200) gets NOTHING applied, and the claim is released', async () => {
+  const w = world({ shopAppearsAt: 'ensureShop' })
+  const res = await keep(w)
+  expect(res).toEqual({ kind: 'has_shop', shopSlug: 'hecha-a-mano' })
+  expect(w.trace).toEqual(['findSeller', 'claim', 'ensureShop', 'release'])
+  expect(w.manifests).toEqual([])
+  expect(w.row).toMatchObject({ claimed_by: null, claimed_seller_id: null })
+})
+
+test('resume with a shop that this draft did not make: zero apply, released, «Ya tienes una tienda»', async () => {
+  // The keep stopped before its seller existed; the user then built a shop by hand.
+  const w = world({ claimedBy: USER, sellers: { [USER]: { id: 'sel_hand', slug: 'a-mano' } } })
+  const res = await keep(w)
+  expect(res).toEqual({ kind: 'has_shop', shopSlug: 'a-mano' })
+  expect(w.trace).toEqual(['findSeller', 'reread', 'release'])
+  expect(w.manifests).toEqual([])
+  expect(w.row.claimed_by).toBeNull()
 })
 
 test('another phone holding the link is refused with ZERO apply calls', async () => {
@@ -204,31 +236,33 @@ test('partial failure: the shop create failed after the claim — the same user 
   expect(w.row.claimed_seller_id).toBeNull()
   const before = w.trace.length
   const res = await keep(w)
-  expect(res).toMatchObject({ kind: 'kept', resumed: true })
-  expect(w.trace.slice(before)).toEqual(['findSeller', 'claim', 'reread', 'ensureShop', 'welcome', 'applyConfig', 'markSeller', 'revalidate'])
+  expect(res).toMatchObject({ kind: 'kept', resumed: true, configApplied: true })
+  expect(w.trace.slice(before)).toEqual(['findSeller', 'claim', 'reread', 'ensureShop', 'welcome', 'markSeller', 'applyConfig', 'revalidate'])
   expect(w.trace.filter((e) => e === 'welcome')).toHaveLength(1)
 })
 
-test('partial failure: the config failed after the shop was created — the retry re-applies, with no second seller or welcome', async () => {
+test('the config failed after the 201: still kept (marker set, configApplied false), and a reload applies nothing again', async () => {
   const w = world({ failApplyOnce: true })
-  expect(await keep(w)).toEqual({ kind: 'retry', message: CLAIM_RETRY.config })
-  expect(w.row.claimed_seller_id).toBeNull()
+  expect(await keep(w)).toMatchObject({ kind: 'kept', resumed: false, configApplied: false })
+  expect(w.row.claimed_seller_id).toBe('sel_1')
+  expect(w.logs).toEqual([{ event: 'claim_config_failed', draft: DRAFT, seller: 'sel_1' }])
   const before = w.trace.length
   expect(await keep(w)).toMatchObject({ kind: 'kept', resumed: true })
-  // The seller exists now, so no claim; the re-read shows the half-finished keep is this user's, and it resumes.
-  expect(w.trace.slice(before)).toEqual(['findSeller', 'reread', 'ensureShop', 'applyConfig', 'markSeller', 'revalidate'])
-  expect(Object.keys(w.sellers)).toEqual([USER])
+  expect(w.trace.slice(before)).toEqual(['findSeller', 'reread'])
+  expect(w.trace.filter((e) => e === 'applyConfig')).toHaveLength(1)
   expect(w.trace.filter((e) => e === 'welcome')).toHaveLength(1)
 })
 
-test('partial failure: the done marker did not land — the retry finishes without a second seller', async () => {
+test('the marker did not land after the 201: the fresh shop still gets its config, and it is logged, not hidden', async () => {
   const w = world({ failMarkOnce: true })
-  expect(await keep(w)).toEqual({ kind: 'retry', message: CLAIM_RETRY.save })
-  expect(await keep(w)).toMatchObject({ kind: 'kept', resumed: true })
-  expect(w.row.claimed_seller_id).toBe('sel_1')
-  expect(w.trace.filter((e) => e === 'welcome')).toHaveLength(1)
-  // revalidate runs only once the keep is really done.
-  expect(w.trace.filter((e) => e === 'revalidate')).toHaveLength(1)
+  expect(await keep(w)).toMatchObject({ kind: 'kept', configApplied: true })
+  expect(w.logs).toEqual([{ event: 'claim_mark_failed', draft: DRAFT, seller: 'sel_1' }])
+  // Without the marker nothing proves the shop came from this draft, so a later visit applies nothing to it.
+  const before = w.trace.length
+  expect(await keep(w)).toEqual({ kind: 'has_shop', shopSlug: w.sellers[USER].slug })
+  expect(w.trace.slice(before)).toEqual(['findSeller', 'reread', 'release'])
+  expect(w.trace.filter((e) => e === 'applyConfig')).toHaveLength(1)
+  expect(Object.keys(w.sellers)).toEqual([USER])
 })
 
 test('examples never reach Medusa: the only apply is a profile manifest, and no product or import effect exists', async () => {
@@ -267,15 +301,17 @@ test('the keep module graph cannot reach a product path, and calls the shop logi
   expect(server).toContain("import { applyStoreConfig } from '@/lib/apply-config-manifest'")
 })
 
-test('the claim is ONE conditional write, read back; the done marker is conditional on the claimant', () => {
+test('the claim is ONE conditional write, read back; the marker and the release are conditional and read back', () => {
   const server = read('lib/prompt-to-shop/claim-server.ts')
   const claim = server.slice(server.indexOf('claim: async'), server.indexOf('reread:'))
   for (const clause of [".eq('id', draftId)", ".eq('device_id', deviceId)", ".is('claimed_by', null)", ".gt('expires_at', now)", ".not('identity', 'is', null)", '.select(CLAIM_COLUMNS)']) {
     expect(claim, clause).toContain(clause)
   }
   expect(claim).toContain('data.length === 1')
-  const mark = server.slice(server.indexOf('markSeller: async'), server.indexOf('revalidate:'))
-  for (const clause of [".eq('id', draftId)", ".eq('claimed_by', user)", ".select('id')"]) expect(mark, clause).toContain(clause)
+  const mark = server.slice(server.indexOf('markSeller: async'), server.indexOf('release: async'))
+  for (const clause of [".eq('id', draftId)", ".is('claimed_seller_id', null)", '.or(`claimed_by.eq.${user},claimed_by.is.null`)', ".select('id')"]) expect(mark, clause).toContain(clause)
+  const release = server.slice(server.indexOf('release: async'), server.indexOf('log:'))
+  for (const clause of ['claimed_by: null', 'claimed_at: null', ".eq('id', draftId)", ".eq('claimed_by', user)", ".is('claimed_seller_id', null)", ".select('id')", 'data.length === 1']) expect(release, clause).toContain(clause)
   expect(server).toContain("revalidateTag('shops', 'default')")
 })
 

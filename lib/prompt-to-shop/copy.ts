@@ -132,8 +132,6 @@ export const MAIL_LINK_COPY = {
 export const CLAIM_RETRY = {
   lookup: 'No pudimos revisar tu cuenta ahora. Inténtalo de nuevo en un momento.',
   shop: 'No pudimos crear tu tienda ahora. Inténtalo de nuevo: tu tienda sigue guardada.',
-  config: 'Tu tienda ya existe, pero no pudimos ponerle tus colores y textos. Inténtalo de nuevo.',
-  save: 'Tu tienda ya existe, pero no pudimos terminar de guardarla. Inténtalo de nuevo.',
   draft: 'No pudimos abrir tu tienda en armado ahora. Inténtalo de nuevo en un momento.',
 } as const
 
