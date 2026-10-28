@@ -1,6 +1,7 @@
-# Next.js 16 frontend — standalone production image for Cloud Run (us-east4).
-# Build context is apps/miyagisanchez (this directory), NOT the monorepo root:
-#   docker build -t <region>-docker.pkg.dev/<project>/miyagi-web/frontend:latest apps/miyagisanchez
+# MiyagiSanchez-Storefront (Next.js 16) — the standalone production image, built as
+# ghcr.io/danybgoode/miyagisanchez-storefront by .github/workflows/image-arm64.yml and run on the Oracle VM.
+# Build context is this directory (apps/miyagisanchez), NOT the monorepo root:
+#   docker build -t ghcr.io/danybgoode/miyagisanchez-storefront:local .
 #
 # `output: 'standalone'` (next.config.ts) traces the deps each route actually
 # needs into .next/standalone/node_modules. That trace does NOT reliably
