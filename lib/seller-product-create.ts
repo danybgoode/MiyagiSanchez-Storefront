@@ -65,11 +65,15 @@ export async function createSellerProduct(
   clerkJwt: string,
   body: ReturnType<typeof buildCreateBody>,
   deps: { fetch: typeof fetch } = { fetch: (...args) => fetch(...args) },
+  /** Optional abort bound. The importer passes none (unchanged); the photo confirm passes one so a stalled create
+   *  cannot hold its ledger entry past the takeover window. A timeout throws (AbortError) — the caller's failure. */
+  options: { timeoutMs?: number } = {},
 ): Promise<CreateProductResult> {
   const res = await deps.fetch(`${MEDUSA_BASE}/store/sellers/me/products`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-publishable-api-key': PUB_KEY, Authorization: `Bearer ${clerkJwt}` },
     body: JSON.stringify(body),
+    ...(options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
   })
   const data = (await res.json().catch(() => ({}))) as { product_id?: string; message?: string }
   if (!res.ok || !data.product_id) return { ok: false, status: res.status, message: data.message ?? null }

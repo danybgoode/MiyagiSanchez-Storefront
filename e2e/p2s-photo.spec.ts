@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { P2S_LIMITS, decidePhotoSpend, photosLeft, photosLeftCopy } from '../lib/prompt-to-shop/allowance'
 import { fallbackCatalog } from '../lib/prompt-to-shop/blocks'
 import { PHOTO_COPY } from '../lib/prompt-to-shop/copy'
@@ -212,10 +214,14 @@ test('analysis: no model credential or an unreadable image is the empty card, an
 
 const EXAMPLES = fallbackCatalog()
 
-function confirmWorld(opts: { owner?: OwnerLookup; used?: number; spendError?: boolean; spendThrows?: boolean; failCreate?: number; ledgerDown?: boolean; createLandsSilently?: boolean; failFinish?: number } = {}) {
+function confirmWorld(opts: { owner?: OwnerLookup; used?: number; spendError?: boolean; spendThrows?: boolean; failCreate?: number; ledgerDown?: boolean; createLandsSilently?: boolean; failFinish?: number; failMarkPaid?: number; stallFirstCreate?: boolean } = {}) {
   const trace: string[] = []
   const clock = { now: new Date('2026-10-28T12:00:00Z') }
   let failFinish = opts.failFinish ?? 0
+  let failMarkPaid = opts.failMarkPaid ?? 0
+  let stall = !!opts.stallFirstCreate
+  let releaseStall: () => void = () => {}
+  const stalled = new Promise<void>((resolve) => { releaseStall = resolve })
   const row: LedgerRow = { catalog: EXAMPLES.map((e) => ({ ...e })), block_status: { identity: 'ok', words: 'ok', catalog: 'ok' }, updated_at: 't0' }
   let version = 0
   let used = opts.used ?? 0
@@ -234,6 +240,9 @@ function confirmWorld(opts: { owner?: OwnerLookup; used?: number; spendError?: b
       trace.push(`mutate:${label}`)
       // A finish whose write never lands (lost every race, or the process died before it).
       if (label === 'finish' && failFinish > 0) { failFinish -= 1; return { ok: false as const } }
+      const before = readLedger(row.block_status)[NONCE]?.state
+      const after = m.write?.block_status ? readLedger(m.write.block_status)[NONCE]?.state : undefined
+      if (before === 'pending' && after === 'paid' && failMarkPaid > 0) { failMarkPaid -= 1; return { ok: false as const } }
       if (m.write) {
         if (m.write.block_status !== undefined) row.block_status = m.write.block_status
         if (m.write.catalog !== undefined) row.catalog = m.write.catalog
@@ -252,6 +261,7 @@ function confirmWorld(opts: { owner?: OwnerLookup; used?: number; spendError?: b
     findCreated: async (nonce) => { trace.push('findCreated'); return products.find((p) => p.nonce === nonce)?.id ?? null },
     createProduct: async (r, imageUrl, nonce) => {
       trace.push('createProduct')
+      if (stall) { stall = false; await stalled }
       const handle = `p2s-${nonce}`
       if (products.some((p) => p.handle === handle)) return { ok: false, message: 'handle exists' }
       if (failCreate > 0) {
@@ -265,16 +275,16 @@ function confirmWorld(opts: { owner?: OwnerLookup; used?: number; spendError?: b
     },
     now: () => clock.now,
   }
-  return { trace, deps, row, products, used: () => used, clock }
+  return { trace, deps, row, products, used: () => used, clock, releaseStall: () => releaseStall() }
 }
 
 const body = (extra: Record<string, unknown> = {}) => ({ nonce: NONCE, image_url: PHOTO, card: CARD, replace: { index: 1, title: EXAMPLES[1].title }, ...extra })
 
-test('one confirmation → one Medusa DRAFT product with the merchant photo, in the order validate → owner → reserve → spend → create → finish', async () => {
+test('one confirmation → one Medusa DRAFT product with the merchant photo, in the order validate → owner → reserve → spend → mark paid → create → finish', async () => {
   const w = confirmWorld()
   const out = await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
   expect(out).toEqual({ status: 200, body: { ok: true, product_id: 'prod_1', duplicate: false, example_removed: true, finished: true, photos_left: P2S_LIMITS.photosPerMonth - 1 } })
-  expect(w.trace).toEqual(['owner', 'mutate:reserved', 'spend', 'createProduct', 'mutate:finish'])
+  expect(w.trace).toEqual(['owner', 'mutate:reserved', 'spend', 'mutate:true', 'createProduct', 'mutate:finish'])
   expect(w.products).toHaveLength(1)
   expect(w.products[0]).toMatchObject({ status: 'draft', image: PHOTO, handle: `p2s-${NONCE}`, title: CARD.title })
   expect(w.used()).toBe(1)
@@ -386,7 +396,7 @@ test('a finish that does not land says so (finished:false), and the retry with t
   const w = confirmWorld({ failFinish: 1 })
   const first = await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
   expect(first).toMatchObject({ status: 200, body: { ok: true, product_id: 'prod_1', finished: false, example_removed: false } })
-  expect(readLedger(w.row.block_status)[NONCE]?.state).toBe('pending')
+  expect(readLedger(w.row.block_status)[NONCE]?.state).toBe('paid')
   // Immediately, not after a timeout: the product is found by its nonce and finished.
   const retry = await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
   expect(retry).toMatchObject({ status: 200, body: { product_id: 'prod_1', finished: true, example_removed: true } })
@@ -397,7 +407,7 @@ test('a finish that does not land says so (finished:false), and the retry with t
   expect((w.row.catalog as unknown[]).length).toBe(EXAMPLES.length - 1)
 })
 
-test('a FRESH pending entry with no product behind it is a live request: 409, nothing spent or created', async () => {
+test('a FRESH in-flight entry with no product behind it is a live request: 409, nothing spent or created', async () => {
   const w = confirmWorld({ failFinish: 1 })
   await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
   // Same entry, but the product is not there (say the create died): a fresh pending is a live request.
@@ -432,6 +442,55 @@ test('a stale pending whose product DID land is finished without spending again'
   expect(out).toMatchObject({ status: 200, body: { product_id: 'prod_9', finished: true, example_removed: true } })
   expect(w.trace).not.toContain('spend')
   expect(w.trace).not.toContain('createProduct')
+})
+
+test('the spend is recorded as PAID before the create starts', async () => {
+  const w = confirmWorld({ stallFirstCreate: true })
+  const a = confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
+  while (!w.trace.includes('createProduct')) await new Promise((r) => setTimeout(r, 0))
+  expect(readLedger(w.row.block_status)[NONCE]?.state).toBe('paid')
+  w.releaseStall()
+  expect((await a).status).toBe(200)
+})
+
+test('a create that stalls past the takeover window: the retry takes over WITHOUT spending — exactly one spend, one product', async () => {
+  const w = confirmWorld({ stallFirstCreate: true })
+  const a = confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
+  while (!w.trace.includes('createProduct')) await new Promise((r) => setTimeout(r, 0))
+  // A has spent and its create hangs. B arrives after the stale window.
+  w.clock.now = new Date(w.clock.now.getTime() + 61_000)
+  const b = await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
+  expect(b.status).toBe(200)
+  w.releaseStall()
+  await a
+  expect(w.trace.filter((t) => t === 'spend')).toHaveLength(1)
+  expect(w.used()).toBe(1)
+  expect(w.products).toHaveLength(1)
+  expect(readLedger(w.row.block_status)[NONCE]?.state).toBe('done')
+})
+
+test('a fresh in-flight PAID entry is a live request: a second tap gets 409 and spends nothing', async () => {
+  const w = confirmWorld({ stallFirstCreate: true })
+  const a = confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
+  while (!w.trace.includes('createProduct')) await new Promise((r) => setTimeout(r, 0))
+  const b = await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
+  expect(b.status).toBe(409)
+  w.releaseStall()
+  await a
+  expect(w.used()).toBe(1)
+  expect(w.products).toHaveLength(1)
+})
+
+test('if marking the spend paid fails (twice), NOTHING is created and the error is retryable', async () => {
+  const w = confirmWorld({ failMarkPaid: 2 })
+  const out = await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
+  expect(out.status).toBe(503)
+  expect(w.trace).not.toContain('createProduct')
+  expect(readLedger(w.row.block_status)[NONCE]?.state).toBe('pending')
+  // One failure is retried: the confirm goes through.
+  const once = confirmWorld({ failMarkPaid: 1 })
+  expect((await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, once.deps)).status).toBe(200)
+  expect(once.products).toHaveLength(1)
 })
 
 test('two different suggestions are two products and two photos', async () => {
@@ -475,4 +534,19 @@ test('the photo spend answer fails CLOSED on anything but a count in 1..cap', ()
   expect(photosLeft(null)).toBeNull()
   expect(photosLeft(25)).toBe(0)
   expect(P2S_LIMITS.photosPerMonth).toBe(20)
+})
+
+// ── The sheet (source: the file inputs have no pure seam) ────────────────────────────────────────────────────────
+
+test('both photo inputs clear themselves after a pick, so re-picking the same file after a failure fires again', () => {
+  const src = readFileSync(join(process.cwd(), 'app/(shell)/p2s/_components/PhotoSheet.tsx'), 'utf8')
+  const inputs = [...src.matchAll(/<input\b[^>]*type="file"[^>]*>/g)].map((m) => m[0])
+  expect(inputs).toHaveLength(2)
+  expect(inputs.some((i) => /capture="environment"/.test(i))).toBe(true)
+  for (const input of inputs) expect(input).toMatch(/onChange=\{pickFrom\}/)
+  const handler = src.slice(src.indexOf('function pickFrom('), src.indexOf('async function onFile('))
+  expect(handler).toMatch(/e\.target\.files\?\.\[0\]/)
+  expect(handler).toMatch(/e\.target\.value = ''/)
+  // The file is read BEFORE the input is cleared.
+  expect(handler.indexOf('files?.[0]')).toBeLessThan(handler.indexOf("value = ''"))
 })

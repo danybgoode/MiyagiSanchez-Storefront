@@ -14,7 +14,7 @@
  *     spending exactly one `photo` allowance (D4, fails CLOSED). The contract says "per confirmed suggestion", so the
  *     spend is here and not at analysis: a merchant who discards a bad suggestion does not lose a photo.
  *
- * Confirm order — validate → owner → reserve → spend → create → finish:
+ * Confirm order — validate → owner → reserve → spend → mark paid → create → finish:
  *
  *   validate  pure: the card, the nonce, and that the photo URL is OURS (R2 / Supabase storage, under this user).
  *   owner     the signed-in user's kept draft, and their Medusa seller is the one that draft became.
@@ -22,6 +22,8 @@
  *             so a double tap is one spend and one product: the second tap finds the nonce and creates nothing.
  *   spend     `spend_ai_allowance(user:<id>, 'photo', YYYY-MM, 20)`. Refused or errored → the reservation is
  *             released and NOTHING is created.
+ *   mark paid the spend is recorded on the nonce BEFORE the create, so a takeover can never spend it twice. If
+ *             that write does not land (retried once), nothing is created.
  *   create    one Medusa product, status `draft`, its image the merchant's own photo (never an AI image), with a
  *             handle derived from the nonce — Medusa handles are globally unique, so even a lost reservation cannot
  *             produce a second product.
@@ -286,12 +288,19 @@ export async function analyzePhoto(input: AnalyzeInput, deps: AnalyzeDeps): Prom
 export const PHOTO_LEDGER_KEY = 'photo_confirms'
 
 /**
- * `pending` — reserved, the spend/create is in flight (or died mid-way: the merchant re-analyses, which mints a new
- *             nonce; a stuck entry costs nothing).
- * `paid`    — the photo was spent but the product create failed; a retry with the SAME nonce skips the spend.
+ * `pending` — reserved, NOT known to be paid: the spend is in flight, or the request died inside it.
+ * `paid`    — the spend landed and was recorded BEFORE the create. The create is in flight (`idle` absent), or it
+ *             failed and nothing is in flight (`idle: true`). Never spent again for this nonce.
  * `done`    — the product exists; a repeat confirm returns it and creates nothing.
+ *
+ * Recording `paid` before the create is what makes a stale takeover safe: a `pending` that went stale means its
+ * spend never landed (or died inside the RPC — the accepted worst case, one lost photo), so a takeover that
+ * spends again cannot double-charge a request whose create is merely slow.
  */
-export type LedgerEntry = { state: 'pending' | 'paid'; at: string } | { state: 'done'; at: string; product_id: string }
+export type LedgerEntry =
+  | { state: 'pending'; at: string }
+  | { state: 'paid'; at: string; idle?: true }
+  | { state: 'done'; at: string; product_id: string }
 export type Ledger = Record<string, LedgerEntry>
 
 export function readLedger(blockStatus: unknown): Ledger {
@@ -301,7 +310,8 @@ export function readLedger(blockStatus: unknown): Ledger {
   for (const [nonce, e] of Object.entries(raw)) {
     if (!UUID.test(nonce) || !isObj(e) || typeof e.at !== 'string') continue
     if (e.state === 'done' && typeof e.product_id === 'string') out[nonce] = { state: 'done', at: e.at, product_id: e.product_id }
-    else if (e.state === 'pending' || e.state === 'paid') out[nonce] = { state: e.state, at: e.at }
+    else if (e.state === 'pending') out[nonce] = { state: 'pending', at: e.at }
+    else if (e.state === 'paid') out[nonce] = e.idle === true ? { state: 'paid', at: e.at, idle: true } : { state: 'paid', at: e.at }
   }
   return out
 }
@@ -320,11 +330,18 @@ export interface LedgerRow {
 /** A mutation either writes these columns, or answers without writing. */
 export type Mutation<T> = { write: Partial<Pick<LedgerRow, 'catalog' | 'block_status'>>; result: T } | { write: null; result: T }
 
-export type ReserveResult = { kind: 'reserved' } | { kind: 'resumed' } | { kind: 'existing'; entry: LedgerEntry }
+export type ReserveResult = { kind: 'reserved' } | { kind: 'existing'; entry: LedgerEntry }
+
+/** Client-side bound on the `spend_ai_allowance` call (photo-server.ts aborts it). */
+export const SPEND_TIMEOUT_MS = 10_000
+/** Client-side bound on the Medusa create (photo-server.ts passes it to `createSellerProduct`). */
+export const CREATE_TIMEOUT_MS = 20_000
 
 /**
- * How long a `pending` entry may sit before a retry may take it over. Longer than one confirm can take (a Medusa
- * create plus two ledger writes), so a live request is never taken over — only one that died.
+ * How long an in-flight entry may sit before a retry may take it over. It must exceed the longest a LIVE request
+ * can hold it: a `pending` lives through one spend (≤ SPEND_TIMEOUT_MS, then it errors and is released) and one
+ * ledger write; a `paid` (not idle) lives through one create (≤ CREATE_TIMEOUT_MS, then it is marked idle) plus
+ * the finish write. 60 s is three times the longer of the two, so only a request that DIED is taken over.
  */
 export const PENDING_STALE_MS = 60_000
 
@@ -333,24 +350,31 @@ export function isStale(entry: LedgerEntry, now: Date): boolean {
   return !Number.isFinite(at) || now.getTime() - at > PENDING_STALE_MS
 }
 
+/** May a retry take this entry over? A stale one (its request died), or an idle `paid` (its create failed). */
+export function isTakeable(entry: LedgerEntry, now: Date): boolean {
+  if (entry.state === 'done') return false
+  return (entry.state === 'paid' && entry.idle === true) || isStale(entry, now)
+}
+
 /**
- * Take over a STALE `pending` entry: re-stamp it, but only while it still carries the timestamp the caller saw, so
- * two retries racing for the same dead entry cannot both win (the loser sees a fresh `pending` and gets a 409).
+ * Take over an entry nobody is working on: re-stamp it IN ITS STATE (a `pending` stays unpaid, a `paid` stays paid
+ * and loses `idle`), but only while it still carries the timestamp the caller saw — two retries racing for the
+ * same entry cannot both win; the loser sees a fresh entry and gets a 409.
  */
 export function takeoverMutation(row: LedgerRow, nonce: string, seenAt: string, now: Date): Mutation<boolean> {
   const ledger = readLedger(row.block_status)
   const entry = ledger[nonce]
-  if (entry?.state !== 'pending' || entry.at !== seenAt || !isStale(entry, now)) return { write: null, result: false }
-  return { write: { block_status: withLedger(row.block_status, { ...ledger, [nonce]: { state: 'pending', at: now.toISOString() } }) }, result: true }
+  if (!entry || entry.state === 'done' || entry.at !== seenAt || !isTakeable(entry, now)) return { write: null, result: false }
+  const at = now.toISOString()
+  const next: LedgerEntry = entry.state === 'paid' ? { state: 'paid', at } : { state: 'pending', at }
+  return { write: { block_status: withLedger(row.block_status, { ...ledger, [nonce]: next }) }, result: true }
 }
 
-/** A new nonce → `pending`. A `paid` one → `pending` again, and the caller skips the spend. Anything else answers. */
+/** A new nonce → `pending`. An existing one is answered, never overwritten: the caller decides what it means. */
 export function reserveMutation(row: LedgerRow, nonce: string, now: Date): Mutation<ReserveResult> {
   const ledger = readLedger(row.block_status)
   const entry = ledger[nonce]
-  const at = now.toISOString()
-  if (!entry) return { write: { block_status: withLedger(row.block_status, { ...ledger, [nonce]: { state: 'pending', at } }) }, result: { kind: 'reserved' } }
-  if (entry.state === 'paid') return { write: { block_status: withLedger(row.block_status, { ...ledger, [nonce]: { state: 'pending', at } }) }, result: { kind: 'resumed' } }
+  if (!entry) return { write: { block_status: withLedger(row.block_status, { ...ledger, [nonce]: { state: 'pending', at: now.toISOString() } }) }, result: { kind: 'reserved' } }
   return { write: null, result: { kind: 'existing', entry } }
 }
 
@@ -363,11 +387,18 @@ export function releaseMutation(row: LedgerRow, nonce: string): Mutation<boolean
   return { write: { block_status: withLedger(row.block_status, rest) }, result: true }
 }
 
-/** The spend landed but the create did not: remember it was paid for. */
+/** The spend landed: record it BEFORE the create, so nothing can spend this nonce again. `pending` → `paid`. */
 export function markPaidMutation(row: LedgerRow, nonce: string, now: Date): Mutation<boolean> {
   const ledger = readLedger(row.block_status)
   if (ledger[nonce]?.state !== 'pending') return { write: null, result: false }
   return { write: { block_status: withLedger(row.block_status, { ...ledger, [nonce]: { state: 'paid', at: now.toISOString() } }) }, result: true }
+}
+
+/** The create failed (or timed out) and nothing is in flight: a retry may take the paid entry over at once. */
+export function markIdleMutation(row: LedgerRow, nonce: string, now: Date): Mutation<boolean> {
+  const ledger = readLedger(row.block_status)
+  if (ledger[nonce]?.state !== 'paid') return { write: null, result: false }
+  return { write: { block_status: withLedger(row.block_status, { ...ledger, [nonce]: { state: 'paid', at: now.toISOString(), idle: true } }) }, result: true }
 }
 
 /** Which example a confirm replaces: its position on the canvas AND its title, so a stale index removes nothing. */
@@ -460,30 +491,29 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
   const reserved = await deps.mutate(draftId, (r) => reserveMutation(r, nonce, deps.now()))
   if (!reserved.ok) return refuse(503, 'unavailable', PHOTO_COPY.unavailable)
   const res = reserved.result
-  // A `pending` nonce is either in flight (another tap) or a request that died — after the spend, after the create,
-  // or in a finish that did not land. The rule: the PRODUCT is the truth. Look for it by the nonce first; if it
-  // exists, finish it (mark done, remove the example) whatever the entry's age. If it does not, a fresh entry is a
-  // live request (409); a stale one is taken over and goes through the spend again — we cannot prove its spend
-  // landed, and re-spending can at worst cost the merchant one photo after a crash, where skipping it could hand
-  // out a free product. A `paid` entry is known paid and skips the spend.
+  // An existing nonce: the PRODUCT is the truth. Look for it by the nonce first; if it exists, finish it (mark done,
+  // remove the example) whatever the entry's state or age. If not: an entry someone is working on (fresh `pending`
+  // or fresh, non-idle `paid`) is a live request → 409. One nobody is working on is taken over: a `paid` one goes
+  // straight to the create (it is paid for), a stale `pending` one spends again — its spend never landed or died
+  // inside the RPC, and re-spending there costs at most one photo, where skipping it could hand out a free product.
   let mustSpend = res.kind === 'reserved'
   let left: number | null = null
   if (res.kind === 'existing') {
-    if (res.entry.state === 'done') {
-      return { status: 200, body: { ok: true, product_id: res.entry.product_id, duplicate: true, example_removed: false, finished: true, photos_left: null } }
+    const entry = res.entry
+    if (entry.state === 'done') {
+      return { status: 200, body: { ok: true, product_id: entry.product_id, duplicate: true, example_removed: false, finished: true, photos_left: null } }
     }
     const found = await deps.findCreated(nonce)
     if (found === 'unavailable') return refuse(503, 'unavailable', PHOTO_COPY.unavailable)
     if (found) return finish(found, true)
-    if (!isStale(res.entry, deps.now())) return refuse(409, 'in_progress', PHOTO_COPY.inProgress)
-    const seenAt = res.entry.at
-    const taken = await deps.mutate(draftId, (r) => takeoverMutation(r, nonce, seenAt, deps.now()))
+    if (!isTakeable(entry, deps.now())) return refuse(409, 'in_progress', PHOTO_COPY.inProgress)
+    const taken = await deps.mutate(draftId, (r) => takeoverMutation(r, nonce, entry.at, deps.now()))
     if (!taken.ok) return refuse(503, 'unavailable', PHOTO_COPY.unavailable)
     if (!taken.result) return refuse(409, 'in_progress', PHOTO_COPY.inProgress)
-    mustSpend = true
+    mustSpend = entry.state === 'pending'
   }
 
-  // spend — fails CLOSED. A resumed (`paid`) nonce already paid.
+  // spend — fails CLOSED. Then mark it paid BEFORE the create.
   if (mustSpend) {
     let rpc: { data: unknown; error: unknown }
     try {
@@ -500,17 +530,17 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
         : refuse(503, 'unavailable', PHOTO_COPY.unavailable)
     }
     left = decision.left
-  } else if (res.kind === 'resumed') {
-    // A retry of a paid nonce: the first create may have landed before its answer was lost.
-    const existing = await deps.findCreated(nonce)
-    if (existing === 'unavailable') {
-      await deps.mutate(draftId, (r) => markPaidMutation(r, nonce, deps.now()))
+    // Retried once. If it still does not land, NOTHING is created: the entry stays `pending`, a retry after it goes
+    // stale spends again — one lost photo at worst, never a create the ledger does not know was paid for.
+    let paid = await deps.mutate(draftId, (r) => markPaidMutation(r, nonce, deps.now()))
+    if (!paid.ok || !paid.result) paid = await deps.mutate(draftId, (r) => markPaidMutation(r, nonce, deps.now()))
+    if (!paid.ok || !paid.result) {
+      deps.log?.({ step: 'photo_mark_paid', ok: false, nonce })
       return refuse(503, 'unavailable', PHOTO_COPY.unavailable)
     }
-    if (existing) return finish(existing, true)
   }
 
-  // create — one Medusa draft product.
+  // create — one Medusa draft product (bounded by CREATE_TIMEOUT_MS in photo-server.ts).
   let created: { ok: true; productId: string } | { ok: false; message: string | null }
   try {
     created = await deps.createProduct(row, imageUrl, nonce)
@@ -518,7 +548,8 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
     created = { ok: false, message: null }
   }
   if (!created.ok) {
-    await deps.mutate(draftId, (r) => markPaidMutation(r, nonce, deps.now()))
+    // A timed-out create may still have landed; a retry's findCreated decides. Idle = a retry may go at once.
+    await deps.mutate(draftId, (r) => markIdleMutation(r, nonce, deps.now()))
     deps.log?.({ step: 'photo_create', ok: false, message: created.message })
     return refuse(502, 'create_failed', PHOTO_COPY.createFailed)
   }

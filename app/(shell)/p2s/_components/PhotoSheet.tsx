@@ -94,6 +94,16 @@ export default function PhotoSheet({
   }
   useEffect(() => () => { if (previewRef.current) URL.revokeObjectURL(previewRef.current) }, [])
 
+  /**
+   * Take the file, then clear the input: after a failed upload or analysis the sheet returns to «pick», and an
+   * input that still holds the same file fires no `change` when the merchant picks it again.
+   */
+  function pickFrom(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    void onFile(file)
+  }
+
   async function onFile(file: File | undefined) {
     if (!file) return
     setError(null)
@@ -151,8 +161,8 @@ export default function PhotoSheet({
 
       {phase.kind === 'pick' ? (
         <div className="grid gap-2">
-          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} onChange={(e) => onFile(e.target.files?.[0])} data-testid="p2s-photo-camera" />
-          <input ref={galleryRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} onChange={(e) => onFile(e.target.files?.[0])} data-testid="p2s-photo-gallery" />
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} onChange={pickFrom} data-testid="p2s-photo-camera" />
+          <input ref={galleryRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} onChange={pickFrom} data-testid="p2s-photo-gallery" />
           <Button type="button" variant="primary" size="lg" disabled={left === 0} onClick={() => cameraRef.current?.click()} style={{ width: '100%' }}>
             <i className="iconoir-camera" aria-hidden="true" /> {PHOTO_COPY.take}
           </Button>

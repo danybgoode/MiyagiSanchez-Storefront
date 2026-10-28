@@ -12,8 +12,10 @@ import { buildCreateBody, createSellerProduct } from '@/lib/seller-product-creat
 import { P2S_LIMITS, budgetPeriod, monthPeriod, photoAnalysisSubject, userSubject } from './allowance'
 import { findKeptDraft, lookupSeller } from './claim-server'
 import {
+  CREATE_TIMEOUT_MS,
   PHOTO_MAX_BYTES,
   PHOTO_MIME,
+  SPEND_TIMEOUT_MS,
   type AnalyzeDeps,
   type ConfirmDeps,
   type LedgerRow,
@@ -219,12 +221,15 @@ export function confirmDeps(userId: string, clerkJwt: string): ConfirmDeps {
     resolveOwner: () => resolvePhotoOwner(userId, clerkJwt),
     mutate: (draftId, fn) => mutateKept(userId, draftId, fn),
     spend: async () => {
+      // Bounded (SPEND_TIMEOUT_MS) so a `pending` entry can never outlive the takeover window while still live. An
+      // abort reads as an error → refused and released; if the RPC committed anyway, one photo is lost (the
+      // accepted worst case), never a double product.
       const { data, error } = await db.rpc('spend_ai_allowance', {
         p_subject: userSubject(userId),
         p_kind: 'photo',
         p_period: monthPeriod(new Date()),
         p_cap: P2S_LIMITS.photosPerMonth,
-      })
+      }).abortSignal(AbortSignal.timeout(SPEND_TIMEOUT_MS))
       return { data, error }
     },
     findCreated: (nonce) => findByNonce(clerkJwt, nonce),
@@ -237,6 +242,8 @@ export function confirmDeps(userId: string, clerkJwt: string): ConfirmDeps {
           handle: `p2s-${nonce}`,
           metadata: { p2s_nonce: nonce, created_via: 'p2s_photo' },
         }),
+        undefined,
+        { timeoutMs: CREATE_TIMEOUT_MS },
       ),
     log,
     now: () => new Date(),
