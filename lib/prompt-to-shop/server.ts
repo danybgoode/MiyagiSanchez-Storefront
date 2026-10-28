@@ -15,17 +15,36 @@ import { budgetPeriod, resolveDailyBudget } from './allowance'
 import type { DraftRef, DraftsDeps } from './handler'
 import type { ModelRequest, ModelResult } from './planner'
 import { verifyTurnstile } from './turnstile'
+import { parseServiceAccount, vertexGenerateUrl, vertexTokenSource } from './vertex'
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash'
 /** One block must not hold the narration hostage: a hung call becomes a failed attempt, then a fallback. */
 const MODEL_TIMEOUT_MS = 12_000
 
-async function callGemini(req: ModelRequest): Promise<ModelResult> {
+// Two ways to reach the same model. A service account (GOOGLE_VERTEX_SA_JSON, raw or base64 JSON) goes through
+// Vertex AI and bills that Cloud project — the account with credit. Otherwise GEMINI_API_KEY goes through the Gemini
+// API. Vertex wins when both are set. See vertex.ts for why a service account cannot use the Gemini API.
+const VERTEX_SA = parseServiceAccount(process.env.GOOGLE_VERTEX_SA_JSON)
+const VERTEX_LOCATION = process.env.GOOGLE_VERTEX_LOCATION || 'global'
+const vertexToken = VERTEX_SA ? vertexTokenSource(VERTEX_SA) : null
+
+async function modelEndpoint(): Promise<{ url: string; headers: Record<string, string> } | null> {
+  if (VERTEX_SA && vertexToken) {
+    const token = await vertexToken.get()
+    if (!token) return null
+    return { url: vertexGenerateUrl(VERTEX_SA.project_id, GEMINI_MODEL, VERTEX_LOCATION), headers: { Authorization: `Bearer ${token}` } }
+  }
   const key = process.env.GEMINI_API_KEY ?? ''
+  return { url: `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, headers: { 'x-goog-api-key': key } }
+}
+
+async function callGemini(req: ModelRequest): Promise<ModelResult> {
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const endpoint = await modelEndpoint()
+    if (!endpoint) return { ok: false, error: 'vertex token refused' }
+    const res = await fetch(endpoint.url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      headers: { 'Content-Type': 'application/json', ...endpoint.headers },
       body: JSON.stringify(req.body),
       signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
     })
@@ -116,8 +135,8 @@ export function draftsDeps(ip: string): DraftsDeps {
       if (error) console.error('[p2s] refund failed', error.message)
     },
     callModel: callGemini,
-    modelConfigured: !!process.env.GEMINI_API_KEY,
+    modelConfigured: !!VERTEX_SA || !!process.env.GEMINI_API_KEY,
     newDeviceId: () => randomUUID(),
-    log: (line) => console.info('[p2s]', JSON.stringify(line)),
+    log: (line) => console.info('[p2s]', JSON.stringify({ via: VERTEX_SA ? 'vertex' : 'gemini_api', ...line })),
   }
 }

@@ -66,7 +66,12 @@ export function buildBlockRequest(key: BlockKey, description: string, identity?:
       generationConfig: {
         // A little more variety for identity, where «Otra versión» should actually look different.
         temperature: key === 'identity' ? 0.9 : 0.6,
-        maxOutputTokens: key === 'catalog' ? 4096 : 1024,
+        // Thinking tokens count against maxOutputTokens. Measured live on gemini-3.5-flash (2026-10-28): with the
+        // default level, identity spent 980 tokens thinking inside a 1024 cap and stopped at MAX_TOKENS mid-JSON,
+        // so EVERY identity fell back. These blocks are short structured fills, not reasoning; minimal thinking
+        // returned valid JSON with no thinking tokens, and the headroom covers a verbose model either way.
+        thinkingConfig: { thinkingLevel: 'minimal' },
+        maxOutputTokens: key === 'catalog' ? 4096 : 2048,
         responseMimeType: 'application/json',
         responseSchema: RESPONSE_SCHEMAS[key],
       },
