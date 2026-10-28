@@ -58,7 +58,7 @@ export function parseServiceAccount(raw: string | undefined): ServiceAccount | n
           private_key: j.private_key,
           project_id: j.project_id,
           // Pinned, never read from the file: Google service accounts always use this endpoint, and honouring an
-          // arbitrary `token_uri` would send a signed assertion wherever the JSON points (agy security lens, #437).
+          // arbitrary `token_uri` would send a signed assertion wherever the JSON points (agy security lens, PR 437).
           token_uri: GOOGLE_TOKEN_URI,
         }
       }
