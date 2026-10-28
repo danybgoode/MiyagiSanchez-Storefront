@@ -73,6 +73,16 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Prompt-to-shop drafts (owner canvas and the view-only link) are somebody's unfinished shop: never cached by
+        // a CDN or a browser, never indexed. The pages say the same (force-dynamic, `robots`); this is the header
+        // twin, so the guarantee does not rest on a framework default. (epic prompt-to-shop S2.4/S2.5, D15.)
+        source: '/p2s/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'private, no-store' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
         // The full-shop embed surface must be framable by ANY site (it's the
         // whole point). frame-ancestors * is the modern directive; no global
         // X-Frame-Options is set, so nothing to override. (US-5.)

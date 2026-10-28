@@ -1,13 +1,20 @@
 'use client'
 
 import { useId, useState } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
-import { MAX_DESCRIPTION_CHARS } from '@/lib/prompt-to-shop/blocks'
+import { MAX_DESCRIPTION_CHARS } from '@/lib/prompt-to-shop/constants'
 import { characterCounter, DESCRIBE_COPY } from '@/lib/prompt-to-shop/copy'
-import TakingShape from '@/app/(shell)/p2s/_components/TakingShape'
 import TurnstileWidget from '@/app/(shell)/p2s/_components/TurnstileWidget'
+
+// The taking-shape screen carries the whole canvas (theme, illustrations, stream reader). It is needed only after a
+// tap, so it loads as its own chunk instead of weighing on the landing page; `warmShaping` fetches it the moment the
+// merchant starts typing, so the tap itself never waits on it.
+const loadShaping = () => import('@/app/(shell)/p2s/_components/TakingShape')
+const TakingShape = dynamic(loadShaping, { ssr: false })
+const warmShaping = () => { void loadShaping() }
 
 /**
  * The describe box — prompt-to-shop's front door (epic S2.2).
@@ -73,6 +80,7 @@ export default function DescribeBox({
         maxLength={MAX_DESCRIPTION_CHARS}
         value={text}
         placeholder={DESCRIBE_COPY.placeholder}
+        onFocus={warmShaping}
         onChange={(e) => setText(e.target.value)}
         style={{ resize: 'vertical', minHeight: 84 }}
       />
@@ -89,7 +97,7 @@ export default function DescribeBox({
               type="button"
               className="chip"
               data-testid={`p2s-example-${example.label.toLowerCase()}`}
-              onClick={() => setText(example.text)}
+              onClick={() => { warmShaping(); setText(example.text) }}
             >
               {example.label}
             </button>

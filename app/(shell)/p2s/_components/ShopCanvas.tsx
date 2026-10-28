@@ -91,7 +91,8 @@ export default function ShopCanvas({
   return (
     <ShopThemeShell theme={view.theme} accent={view.accent}>
       <div data-testid="p2s-canvas" data-canvas-mode={mode} aria-busy={mode === 'shaping' && waiting ? true : undefined} className="pb-12">
-        {toolbar}
+        {/* A viewer is never handed controls, even if a caller passes some (D15). */}
+        {mode === 'viewer' ? null : toolbar}
         {mode === 'viewer' ? (
           <div className="max-w-6xl mx-auto px-4 pt-3">
             <Banner variant="neutral">{CANVAS_COPY.viewerNote}</Banner>

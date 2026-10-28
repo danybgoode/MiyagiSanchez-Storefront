@@ -20,7 +20,7 @@ import {
   type BlockStatus,
   type IdentityBlock,
 } from './blocks'
-import { RESPONSE_SCHEMAS, catalogPrompt, identityPrompt, wordsPrompt } from './prompts'
+import { RESPONSE_SCHEMAS, catalogPrompt, identityPrompt, wordsPrompt, type Tone } from './prompts'
 
 export interface ModelRequest {
   block: BlockKey
@@ -53,11 +53,11 @@ export interface PlannerDeps {
 
 export const MAX_ATTEMPTS_PER_BLOCK = 2
 
-export function buildBlockRequest(key: BlockKey, description: string, identity?: IdentityBlock): ModelRequest {
+export function buildBlockRequest(key: BlockKey, description: string, identity?: IdentityBlock, tone?: Tone): ModelRequest {
   const id = identity ?? fallbackIdentity(description)
   const prompt =
     key === 'identity' ? identityPrompt(description)
-    : key === 'words' ? wordsPrompt(description, id)
+    : key === 'words' ? wordsPrompt(description, id, tone)
     : catalogPrompt(description, id)
   return {
     block: key,
@@ -91,9 +91,10 @@ export async function generateBlock<K extends BlockKey>(
   description: string,
   identity: IdentityBlock | undefined,
   deps: Pick<PlannerDeps, 'callModel' | 'log' | 'now'>,
+  tone?: Tone,
 ): Promise<BlockEvent<K>> {
   const now = deps.now ?? Date.now
-  const req = buildBlockRequest(key, description, identity)
+  const req = buildBlockRequest(key, description, identity, tone)
   for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_BLOCK; attempt++) {
     const started = now()
     let result: ModelResult
@@ -121,11 +122,11 @@ export type GenerationOutcome = { ok: true; events: BlockEvent[] } | { ok: false
  * land stops the run there: emitting a block the draft does not hold would show the merchant a shop that a reload
  * cannot bring back.
  */
-export async function generateDraft(description: string, deps: PlannerDeps): Promise<GenerationOutcome> {
+export async function generateDraft(description: string, deps: PlannerDeps, options: { tone?: Tone } = {}): Promise<GenerationOutcome> {
   const events: BlockEvent[] = []
   let identity: IdentityBlock | undefined
   for (const key of BLOCK_KEYS) {
-    const event = await generateBlock(key, description, identity, deps)
+    const event = await generateBlock(key, description, identity, deps, options.tone)
     if (key === 'identity') identity = event.data as IdentityBlock
     const saved = await deps.saveBlock(event)
     if (!saved) return { ok: false, reason: 'save_failed', failedBlock: key }

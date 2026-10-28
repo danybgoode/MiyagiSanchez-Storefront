@@ -8,8 +8,11 @@
  * No JSX and no copy beyond the stream-broke fallback, so this file is not part of the merchant-copy scan.
  */
 
+import type { IdentityBlock } from './blocks'
 import type { BlockEvent } from './planner'
-import { SHAPING_COPY } from './copy'
+import { OWNER_COPY, SHAPING_COPY } from './copy'
+
+const SAVE_FAILED = OWNER_COPY.saveFailed
 
 export type StreamFrame =
   | { event: 'block'; data: BlockEvent }
@@ -104,4 +107,34 @@ export async function runDraftRequest(
     return outcome ?? { kind: 'failed', message: SHAPING_COPY.broken }
   }
   return outcome ?? { kind: 'failed', message: SHAPING_COPY.broken }
+}
+
+export type PatchBody = { name?: string; accent_color?: string }
+
+export type PatchOutcome =
+  | { ok: true; identity: IdentityBlock }
+  /** `message` is the server's own merchant-facing text, verbatim. */
+  | { ok: false; status: number; message: string }
+
+/** `PATCH /api/p2s/drafts/[id]` — one autosave. Never throws: a dead connection is an outcome like any other. */
+export async function patchDraft(
+  draftId: string,
+  body: PatchBody,
+  deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) },
+): Promise<PatchOutcome> {
+  try {
+    const res = await deps.fetch(`/api/p2s/drafts/${draftId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body),
+    })
+    const data = (await res.json().catch(() => null)) as { ok?: unknown; identity?: unknown; error?: unknown } | null
+    if (res.ok && data?.ok === true && data.identity && typeof data.identity === 'object') {
+      return { ok: true, identity: data.identity as IdentityBlock }
+    }
+    return { ok: false, status: res.status, message: typeof data?.error === 'string' && data.error ? data.error : SAVE_FAILED }
+  } catch {
+    return { ok: false, status: 0, message: SAVE_FAILED }
+  }
 }

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { parseSseFrames, runDraftRequest } from '../lib/prompt-to-shop/client'
+import { parseSseFrames, patchDraft, runDraftRequest } from '../lib/prompt-to-shop/client'
 import { NARRATION, SHAPING_COPY } from '../lib/prompt-to-shop/copy'
 import { sseFrame } from '../lib/prompt-to-shop/handler'
 import type { BlockEvent } from '../lib/prompt-to-shop/planner'
@@ -109,4 +109,30 @@ test('the screen reads the stream itself (no EventSource), starts once, and ride
   expect(src).toContain('router.push(`/p2s/${outcome.draftId}`)')
   // A pending line renders before any block lands: the narration does not wait for the network.
   expect(src).toContain('`${line.label}…`')
+})
+
+test('an autosave is a same-origin JSON PATCH to the draft, and success hands back the stored identity', async () => {
+  let seen: { url: string; init: RequestInit } | null = null
+  const identity = { name: 'Nueva' }
+  const out = await patchDraft(DRAFT, { name: 'Nueva' }, {
+    fetch: async (url, init) => { seen = { url: String(url), init: init! }; return new Response(JSON.stringify({ ok: true, identity }), { status: 200 }) },
+  })
+  expect(out).toEqual({ ok: true, identity })
+  expect(seen!.url).toBe(`/api/p2s/drafts/${DRAFT}`)
+  expect(seen!.init.method).toBe('PATCH')
+  expect(seen!.init.credentials).toBe('same-origin')
+  expect(JSON.parse(String(seen!.init.body))).toEqual({ name: 'Nueva' })
+})
+
+test('a rejected or lost autosave is a failure carrying the server\'s own message — never a silent «Guardado»', async () => {
+  const conflict = 'Tu tienda cambió mientras guardábamos. Recarga la página para ver la última versión.'
+  const rejected = await patchDraft(DRAFT, { name: 'X' }, { fetch: async () => new Response(JSON.stringify({ error: conflict, code: 'conflict' }), { status: 409 }) })
+  expect(rejected).toEqual({ ok: false, status: 409, message: conflict })
+  // A 200 whose body does not confirm the save is not a save.
+  const unconfirmed = await patchDraft(DRAFT, { name: 'X' }, { fetch: async () => new Response('{}', { status: 200 }) })
+  expect(unconfirmed.ok).toBe(false)
+  const noOk = await patchDraft(DRAFT, { name: 'X' }, { fetch: async () => new Response(JSON.stringify({ identity: { name: 'X' } }), { status: 200 }) })
+  expect(noOk.ok).toBe(false)
+  const offline = await patchDraft(DRAFT, { name: 'X' }, { fetch: async () => { throw new TypeError('offline') } })
+  expect(offline).toMatchObject({ ok: false, status: 0 })
 })

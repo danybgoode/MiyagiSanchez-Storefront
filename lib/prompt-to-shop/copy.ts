@@ -7,7 +7,7 @@
  * `P2S_LIMITS` via `versionsLeftCopy`, never retyped here (D6).
  */
 
-import { MAX_DESCRIPTION_CHARS } from './blocks'
+import { MAX_DESCRIPTION_CHARS } from './constants'
 
 export const DESCRIBE_COPY = {
   label: 'Cuéntanos qué vendes',
@@ -65,4 +65,35 @@ export const CANVAS_COPY = {
   priceCaption: 'Precio sugerido',
   loading: 'Armando esta parte de tu tienda',
   viewerNote: 'Esta es una vista previa de una tienda en armado. Solo se puede ver.',
+} as const
+
+// ── The owner's canvas (S2.4) and the shared link (S2.5) ────────────────────────────────────────────────────────
+
+export const OWNER_COPY = {
+  nameLabel: 'Nombre de tu tienda',
+  accentLabel: 'Color',
+  accentOption: (position: number) => `Usar el color ${position}`,
+  saving: 'Guardando…',
+  saved: 'Guardado',
+  /** Used when a save fails without the server saying why (offline, a proxy error). */
+  saveFailed: 'No pudimos guardar ahora. Revisa tu conexión e inténtalo de nuevo.',
+  anotherVersion: 'Otra versión',
+  toneLabel: 'Tono',
+  toneSame: 'El mismo',
+  tones: [
+    { value: 'cercano', label: 'Cercano' },
+    { value: 'formal', label: 'Formal' },
+    { value: 'divertido', label: 'Divertido' },
+  ],
+  share: 'Compartir vista previa',
+  shareCopied: 'Enlace copiado',
+  shareHint: 'Quien tenga este enlace podrá ver tu tienda, pero no cambiarla.',
+  shareManual: 'Copia este enlace',
+  verifyNeeded: 'Espera un momento: estamos verificando que eres tú.',
+} as const
+
+export const GONE_COPY = {
+  title: 'Esta tienda en armado ya no está aquí',
+  message: 'Las tiendas en armado se guardan unos días en el teléfono donde se empezaron. Puedes armar una nueva en segundos.',
+  action: 'Armar una tienda nueva',
 } as const
