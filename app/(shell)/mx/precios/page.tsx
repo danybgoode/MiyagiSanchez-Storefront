@@ -11,11 +11,11 @@ import { PreciosTrackedLink, PreciosViewed } from './_components/PreciosTracking
  * `/mx/precios` — what selling on Miyagi Sánchez costs (epic 08 · pricing-page, S1.2; README D6).
  * Every number on this page comes from `lib/pricing-catalog.ts`; the copy holds none.
  *
- * `revalidate` is load-bearing: a page with no `revalidate` is served with a one-year
- * `s-maxage`, and the CDN once pinned `/` for 7.4 days that way. One hour lets an admin
- * price change (migration, an opened print edition) appear without a deploy.
+ * No `revalidate`: everything under `app/(shell)` renders per request (the shell reads
+ * headers and the Clerk session), so the page is served `no-store` and an admin price
+ * change shows on the next request. `e2e/revalidate-truth.spec.ts` rejects a `revalidate`
+ * this route group cannot honour — the lock's D6 assumed otherwise.
  */
-export const revalidate = 3600
 
 const BASE_URL = 'https://miyagisanchez.com'
 const PAGE_PATH = '/mx/precios'

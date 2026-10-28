@@ -26,13 +26,13 @@ test.describe('buyer locale population · generated, never hand-counted', () => 
     expect(population.direct).toContain('app/(shell)/eventos/page.tsx')
   })
 
-  test('the seller-acquisition family is the ONE named non-buyer subtree, and it is excluded', () => {
+  test('the seller-acquisition family and its pricing page are the named non-buyer subtrees, and they are excluded', () => {
     // `/mx/vende` moved to `/mx/vende`, which put the es-MX seller-acquisition pages
     // inside `app/(shell)/mx` — a buyer scan root. They are excluded by name, not by
     // accident, and this pins BOTH halves: the exclusion list stays a single entry, and
     // the population it produces contains none of those files. Widening the list to
     // silence a future violation now costs a visible edit here.
-    expect([...NON_BUYER_SUBTREES]).toEqual(['app/(shell)/mx/vende'])
+    expect([...NON_BUYER_SUBTREES]).toEqual(['app/(shell)/mx/vende', 'app/(shell)/mx/precios'])
 
     const population = deriveBuyerLocalePopulation(ROOT)
     expect(population.direct.filter((file) => file.startsWith('app/(shell)/mx/vende/'))).toEqual([])

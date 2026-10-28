@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { sellerTrustPrompt } from '../lib/seller-acquisition'
+import { fillFixedPricingTokens } from '../lib/pricing-catalog'
+import { SUBDOMAIN_PRICE_YEARLY_MXN } from '../lib/subdomain-pricing'
 import { buildPromoterPageConfig } from '../app/(shell)/mx/vende/_components/page-config'
 
 // Locked es-MX copy from COPY-BRIEF.md (Sprint 1, approved 2026-06-25). These guards keep the
@@ -138,7 +140,10 @@ test.describe('promoter landing · CTA + wording sweep (promoter-funnel-v2 S1 ·
   test('no stale "subdomain is free for everyone" claim remains in the glossary', () => {
     const subdomainEntry = promoterCopy.glossary.find((g: { title: string }) => g.title === 'Subdominio')
     expect(subdomainEntry.body).not.toContain('gratis para todos')
-    expect(subdomainEntry.body).toContain('$199')
+    // The price is a `{token}` since pricing-page D8 — assert on what the page renders, filled
+    // from the price module, so the check still proves a real price reaches the merchant.
+    expect(fillFixedPricingTokens(subdomainEntry.body, 'es')).toContain(`$${SUBDOMAIN_PRICE_YEARLY_MXN} MXN`)
+    expect(subdomainEntry.body).not.toMatch(/\$\d/)
     expect(subdomainEntry.body).toContain('GRATIS el primer año')
   })
 

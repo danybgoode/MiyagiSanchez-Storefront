@@ -192,9 +192,10 @@ const FREE_ITEMS: FreeItem[] = [
 function extraRows(input: PricingCatalogInput): ExtraRow[] {
   const printFrom =
     input.printAdTiersCents && input.printAdTiersCents.length > 0
-      ? Math.min(...input.printAdTiersCents.filter((c) => Number.isFinite(c) && c > 0)) / 100
+      ? Math.min(...input.printAdTiersCents.filter((c) => Number.isFinite(c) && c >= 100)) / 100
       : null
-  // An open edition whose tiers are all 0/invalid makes Math.min() Infinity — treat as unset.
+  // Sub-peso tiers are dropped (they would round to a rendered «$0»); an open edition whose
+  // tiers are all 0/invalid makes Math.min() Infinity — treat as unset.
   const printFromMxn = printFrom != null && Number.isFinite(printFrom) ? printFrom : null
   const migration =
     input.migrationPriceMxn != null && Number.isFinite(input.migrationPriceMxn) && input.migrationPriceMxn > 0
