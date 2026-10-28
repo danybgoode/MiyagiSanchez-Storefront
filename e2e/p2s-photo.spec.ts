@@ -550,3 +550,10 @@ test('both photo inputs clear themselves after a pick, so re-picking the same fi
   // The file is read BEFORE the input is cleared.
   expect(handler.indexOf('files?.[0]')).toBeLessThan(handler.indexOf("value = ''"))
 })
+
+test('the photo preview is drawn from the File onto a canvas: no object URL, no <img src> from the page', () => {
+  const src = readFileSync(join(process.cwd(), 'app/(shell)/p2s/_components/PhotoSheet.tsx'), 'utf8')
+  expect(src).toContain('<FilePreview file={phase.preview} />')
+  expect(src).toContain('createImageBitmap(file)')
+  expect(src).not.toMatch(/createObjectURL|<img\b/)
+})

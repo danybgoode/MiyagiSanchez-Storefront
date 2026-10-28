@@ -26,8 +26,8 @@ import OwnerSheet from './OwnerSheet'
 
 type Phase =
   | { kind: 'pick' }
-  | { kind: 'busy'; label: string; preview: string | null }
-  | { kind: 'card'; imageUrl: string; preview: string; nonce: string; note: string | null }
+  | { kind: 'busy'; label: string; preview: File }
+  | { kind: 'card'; imageUrl: string; preview: File; nonce: string; note: string | null }
   | { kind: 'added' }
 
 const MAX_DIM = 1600
@@ -55,10 +55,28 @@ async function shrink(file: File): Promise<File> {
 }
 
 /**
- * Only an object URL this sheet minted is ever rendered: the preview is the merchant's own file, read locally. The
- * check also keeps any other string (a server value, a `javascript:` URL) out of the `src`.
+ * The merchant's own photo, drawn from the File onto a canvas. No URL is minted and no string from the page reaches
+ * an `src`, so there is nothing to revoke, nothing to hotlink and nothing a scanner can read as markup.
  */
-const isLocalPreview = (src: string | null): src is string => typeof src === 'string' && src.startsWith('blob:')
+function FilePreview({ file }: { file: File }) {
+  const ref = useRef<HTMLCanvasElement | null>(null)
+  useEffect(() => {
+    let bitmap: ImageBitmap | null = null
+    let cancelled = false
+    if (typeof window === 'undefined' || !window.createImageBitmap) return
+    createImageBitmap(file).then((b) => {
+      bitmap = b
+      const canvas = ref.current
+      if (cancelled || !canvas) return
+      const ratio = Math.min(1, 800 / Math.max(b.width, b.height))
+      canvas.width = Math.round(b.width * ratio)
+      canvas.height = Math.round(b.height * ratio)
+      canvas.getContext('2d')?.drawImage(b, 0, 0, canvas.width, canvas.height)
+    }).catch(() => {})
+    return () => { cancelled = true; bitmap?.close() }
+  }, [file])
+  return <canvas ref={ref} aria-hidden="true" className="w-full rounded object-cover" style={{ maxHeight: 220 }} />
+}
 
 const emptyCard = (): PhotoSuggestion => ({ title: '', description: '', category: 'otros', price: 0 })
 
@@ -85,14 +103,6 @@ export default function PhotoSheet({
   const galleryRef = useRef<HTMLInputElement | null>(null)
   // A ref, not state: two taps inside one render must both see that a confirm is already in flight.
   const inFlight = useRef(false)
-  // The one object URL alive at a time. Replaced or dropped → revoked, so a sheet used for ten photos holds one.
-  const previewRef = useRef<string | null>(null)
-  function setPreview(file: File | null): string | null {
-    if (previewRef.current) URL.revokeObjectURL(previewRef.current)
-    previewRef.current = file ? URL.createObjectURL(file) : null
-    return previewRef.current
-  }
-  useEffect(() => () => { if (previewRef.current) URL.revokeObjectURL(previewRef.current) }, [])
 
   /**
    * Take the file, then clear the input: after a failed upload or analysis the sheet returns to «pick», and an
@@ -107,12 +117,11 @@ export default function PhotoSheet({
   async function onFile(file: File | undefined) {
     if (!file) return
     setError(null)
-    const preview = setPreview(file)
+    const preview = file
     setPhase({ kind: 'busy', label: PHOTO_COPY.uploading, preview })
     const uploaded = await uploadPhoto(await shrink(file))
     if (!uploaded.ok) {
       setError(uploaded.message)
-      setPreview(null)
       setPhase({ kind: 'pick' })
       return
     }
@@ -120,13 +129,12 @@ export default function PhotoSheet({
     const read = await analyzePhotoRequest(uploaded.url)
     if (!read.ok) {
       setError(read.message)
-      setPreview(null)
       setPhase({ kind: 'pick' })
       return
     }
     if (read.photosLeft !== null) setLeft(read.photosLeft)
     setCard(read.suggestion ?? emptyCard())
-    setPhase({ kind: 'card', imageUrl: uploaded.url, preview: preview ?? '', nonce: crypto.randomUUID(), note: read.suggestion ? null : read.message })
+    setPhase({ kind: 'card', imageUrl: uploaded.url, preview, nonce: crypto.randomUUID(), note: read.suggestion ? null : read.message })
   }
 
   async function confirm() {
@@ -142,7 +150,6 @@ export default function PhotoSheet({
     setConfirming(false)
     if (result.ok) {
       if (result.photosLeft !== null) setLeft(result.photosLeft)
-      setPreview(null)
       setPhase({ kind: 'added' })
       onAdded()
       return
@@ -174,10 +181,7 @@ export default function PhotoSheet({
 
       {phase.kind === 'busy' ? (
         <div className="grid gap-3" aria-busy="true">
-          {isLocalPreview(phase.preview) ? (
-            // eslint-disable-next-line @next/next/no-img-element -- a local blob: preview of the merchant's own file; the image loader cannot fetch it
-            <img src={phase.preview} alt="" className="w-full rounded object-cover" style={{ maxHeight: 220 }} />
-          ) : null}
+          <FilePreview file={phase.preview} />
           <p className="t-small" style={{ margin: 0 }} role="status" aria-live="polite">{phase.label}</p>
           <div className="grid gap-2" aria-hidden="true">
             <span className="block h-4 rounded animate-pulse motion-reduce:animate-none" style={{ background: 'var(--border)', width: '70%' }} />
@@ -189,10 +193,7 @@ export default function PhotoSheet({
 
       {phase.kind === 'card' ? (
         <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void confirm() }} data-testid="p2s-photo-card">
-          {isLocalPreview(phase.preview) ? (
-            // eslint-disable-next-line @next/next/no-img-element -- a local blob: preview of the merchant's own file; the image loader cannot fetch it
-            <img src={phase.preview} alt="" className="w-full rounded object-cover" style={{ maxHeight: 220 }} />
-          ) : null}
+          <FilePreview file={phase.preview} />
           {phase.note ? <Banner variant="info">{phase.note}</Banner> : null}
           <label className="grid gap-1 t-small">
             <span style={{ fontWeight: 600 }}>{PHOTO_COPY.titleLabel}</span>
