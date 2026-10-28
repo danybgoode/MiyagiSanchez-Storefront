@@ -113,3 +113,9 @@ test('not found, not yours and expired all end at ONE friendly page, never a 500
   expect(gone).toContain('GONE_COPY.action')
   expect(gone).toContain('href="/mx/vende"')
 })
+
+test('a re-run that fails re-reads the draft instead of restoring blocks the server already cleared', () => {
+  const owner = readFileSync(join(process.cwd(), 'app/(shell)/p2s/_components/OwnerCanvas.tsx'), 'utf8')
+  const onBack = owner.slice(owner.indexOf('onBack={'), owner.indexOf('onDone={'))
+  expect(onBack).toContain('router.refresh()')
+})

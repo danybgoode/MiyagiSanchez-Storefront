@@ -133,7 +133,8 @@ export default async function SellPage({
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Prompt-to-shop S2.2: a signed-in merchant with no shop starts by describing. The manual wizard stays right
           below (its own anchor), and the three-doors redirect above is untouched — S3.3 removes it. */}
-      {!existingShop && (
+      {/* es-MX only (AGENTS rule 5): generation is an MX-shaped shop in Spanish, so a US signup keeps today's flow. */}
+      {!existingShop && signupMarket !== 'us' && (
         <div className="mb-6">
           <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref="#armar-a-mano" />
         </div>

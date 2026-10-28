@@ -73,11 +73,16 @@ test('/mx/vende mounts the box with a runtime site key; the pitch still carries 
 
 test('/sell shows the same box to a signed-in merchant with no shop, and keeps its redirects', () => {
   const sell = read('app/(shell)/sell/page.tsx')
-  expect(sell).toMatch(/\{!existingShop && \(\s*<div className="mb-6">\s*<DescribeBox/)
+  expect(sell).toMatch(/\{!existingShop && signupMarket !== 'us' && \(\s*<div className="mb-6">\s*<DescribeBox/)
   expect(sell).toContain('id="armar-a-mano"')
   expect(sell).toContain('manualHref="#armar-a-mano"')
   // Untouched by this story (S3.3 removes the second one): the signed-out hop and the three-doors branch.
   expect(sell).toContain('redirect(sellerLandingRedirectPath(signupMarket, params))')
   expect(sell).toContain("redirect('/sell/bienvenida')")
   expect(sell).toContain("isEnabled('onboarding.three_doors_enabled')")
+})
+
+test('/sell keeps the box off a US signup: generation is an es-MX shop (AGENTS rule 5)', () => {
+  const sell = read('app/(shell)/sell/page.tsx')
+  expect(sell).toMatch(/!existingShop && signupMarket !== 'us' && \(\s*<div className="mb-6">\s*<DescribeBox/)
 })

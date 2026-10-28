@@ -107,7 +107,14 @@ export default function OwnerCanvas({
         draftId={draftId}
         turnstileToken={rerun.token}
         tone={rerun.tone || undefined}
-        onBack={() => { setRerun(null); setToken(null); setResetKey((k) => k + 1) }}
+        onBack={() => {
+          setRerun(null)
+          setToken(null)
+          setResetKey((k) => k + 1)
+          // A re-run that got past the spend has already cleared the draft's blocks server-side (startVersion), so the
+          // blocks held here are no longer what a reload would show. Re-read the truth instead of restoring them.
+          router.refresh()
+        }}
         onDone={({ versionsLeft: left }) => {
           setVersionsLeft(left)
           setRerun(null)
