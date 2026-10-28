@@ -97,6 +97,9 @@ export const guardExcludedFiles = new Set([
   // Printable migration runbook (epic 03 · platform-migrations S3) — same print
   // surface + injected <style> idiom as the sell-sheet above, same rationale.
   'app/(shell)/mx/vende/promotor/migracion/page.tsx',
+  // The shop catalog print page (share-kit S2.2) — headless Chromium prints it to a PDF; same print surface + injected
+  // <style> idiom as the two above, and its colours are the paper's, not the theme's.
+  'app/(shell)/mx/s/[slug]/catalogo/imprimir/page.tsx',
   'lib/email.ts',
   'lib/design-token-audit.ts',
   'lib/platform-theme.ts',

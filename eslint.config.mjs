@@ -13,6 +13,12 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // `services/print-pdf` is its own CommonJS Node service with its own package.json and image (share-kit D12), not
+  // part of the Next app — `require` is its module system there.
+  {
+    files: ["services/**/*.js"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ]);
 
 export default eslintConfig;

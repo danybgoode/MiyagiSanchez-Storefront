@@ -1,65 +1,39 @@
-# print-pdf — deploy runbook
+# print-pdf — runbook
 
-Standalone Cloud Run service that renders the printed-edition `/print` route to a
-print-ready PDF via headless Chromium. **Isolated from the Medusa commerce backend.**
+Headless Chromium that turns one of our print pages into a PDF. It runs as a container beside the app on the Oracle VM
+(`panfleto-prod`) since share-kit S2.1. Before that it was a Cloud Run service, deleted with GCP on 2026-10-16, and every
+PDF download answered 503 from then until S2.1 shipped.
 
 ## What talks to what
 ```
-Builder "⬇ Descargar PDF"
-  → GET /api/admin/print/editions/[id]/pdf   (Vercel, secret-gated)
-  → POST {url} to PRINT_PDF_URL/pdf          (this Cloud Run service, x-internal-secret)
-  → Chromium loads SITE_URL/admin/print/[id]/print?secret=ADMIN_SECRET
-  → page.pdf({ preferCSSPageSize, printBackground }) → PDF streamed back to the browser
+Seller «Descargar» / admin «Descargar PDF»
+  → GET /api/catalogo/<slug>/pdf  ·  /api/admin/print/editions/<id>/pdf  ·  /api/admin/print/rate-card/pdf
+  → lib/print-pdf-client.ts renderPrintPdf(url)
+  → POST http://print-pdf:8080/pdf  { url }   x-internal-secret: PRINT_PDF_SECRET   (compose network only)
+  → Chromium loads https://miyagisanchez.com/<print page> — and nothing off the allow-list (guard.js)
+  → page.pdf({ preferCSSPageSize, printBackground }) → bytes back to the route
 ```
 
-## One-time deploy (region us-east4, project = the existing GCP project)
+## Where it is configured
+- **Image:** `ghcr.io/danybgoode/miyagisanchez-print-pdf:<sha>`, built by `.github/workflows/image-arm64.yml` (job
+  `print-pdf`) when this directory changes on `main`.
+- **Container:** root repo `infra/oci/docker-compose.yml` (service `print-pdf`). It sits on the `miyagi` network
+  only, with no published port, `mem_limit 768m` and `cpus 0.2`. `infra/oci/update.sh` pins it by digest like the
+  other two images; roll back with `PRINT_PDF_IMAGE_PIN=…:<sha>` in `infra/oci/.env`.
+- **Env, renderer side (`infra/oci/print.env`, 0600):** `PRINT_PDF_SECRET`; `PRINT_PDF_ASSET_ORIGINS` (the public R2
+  origin, `R2_PUBLIC_URL`'s scheme and host, so print-edition ad photos and QR codes load).
+  `PRINT_PDF_ALLOWED_ORIGINS` defaults to `https://miyagisanchez.com`.
+- **Env, app side (`infra/oci/web.env`):** `PRINT_PDF_URL=http://print-pdf:8080` and the same `PRINT_PDF_SECRET`.
 
+## The rules it enforces (`guard.js`, tested by `node --test guard.test.js`, run in CI)
+- The secret is compared in constant time. An unset secret refuses every call.
+- The page URL must be on an allowed origin (403 otherwise, before Chromium starts). Every request the page makes,
+  including each redirect hop, is checked too. Asset origins may serve images, fonts, stylesheets and media only.
+- One render at a time, up to 4 waiting. The next caller gets 503 `busy`. Each render has a 45 s budget.
+
+## Checking it on the VM
 ```bash
-PROJECT=$(gcloud config get-value project)
-REGION=us-east4
-REPO=print            # Artifact Registry repo (create once)
-SECRET=$(openssl rand -hex 24)   # PRINT_PDF_SECRET — share with Vercel (below)
-
-# 1. Artifact Registry repo (skip if it exists)
-gcloud artifacts repositories create $REPO --repository-format=docker --location=$REGION 2>/dev/null || true
-
-# 2. Build + push the image (build context = this directory)
-IMAGE=$REGION-docker.pkg.dev/$PROJECT/$REPO/print-pdf:latest
-gcloud builds submit apps/miyagisanchez/services/print-pdf --tag $IMAGE
-
-# 3. Deploy to Cloud Run (1 vCPU / 1Gi is plenty; min-instances 0 = scale to zero)
-gcloud run deploy print-pdf \
-  --image $IMAGE --region $REGION \
-  --allow-unauthenticated \
-  --memory 1Gi --cpu 1 --timeout 120 --concurrency 2 \
-  --set-env-vars PRINT_PDF_SECRET=$SECRET
-
-echo "PRINT_PDF_SECRET=$SECRET"
-gcloud run services describe print-pdf --region $REGION --format='value(status.url)'   # = PRINT_PDF_URL
-```
-
-> `--allow-unauthenticated` is safe: the route itself is gated by `x-internal-secret`
-> (`PRINT_PDF_SECRET`). Tighten to IAM-only + an ID token later if desired.
-
-## Vercel env (production)
-- `PRINT_PDF_URL` = the Cloud Run service URL from step 3
-- `PRINT_PDF_SECRET` = the `$SECRET` from step 3
-- (`ADMIN_SECRET` + `NEXT_PUBLIC_SITE_URL` already set)
-
-Until both are set, the builder's "⬇ Descargar PDF" returns a clear 503 ("Servicio
-PDF no configurado") — the rest of the builder is unaffected.
-
-## Redeploy after code changes
-```bash
-gcloud builds submit apps/miyagisanchez/services/print-pdf --tag $IMAGE
-gcloud run deploy print-pdf --image $IMAGE --region $REGION
-```
-
-## Local smoke test
-```bash
-docker build -t print-pdf apps/miyagisanchez/services/print-pdf
-docker run -e PRINT_PDF_SECRET=dev -p 8088:8080 print-pdf
-curl -s -X POST localhost:8088/pdf -H 'x-internal-secret: dev' \
-  -H 'content-type: application/json' -d '{"url":"https://example.com"}' -o out.pdf
-file out.pdf   # → PDF document
+docker compose -f /opt/miyagi/infra/oci/docker-compose.yml logs --tail 50 print-pdf   # "[print-pdf] rendered …"
+docker compose -f /opt/miyagi/infra/oci/docker-compose.yml exec web \
+  node -e "fetch('http://print-pdf:8080/health').then(r=>r.text()).then(console.log)"
 ```

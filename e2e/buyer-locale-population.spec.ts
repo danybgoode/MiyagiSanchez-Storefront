@@ -21,7 +21,8 @@ test.describe('buyer locale population · generated, never hand-counted', () => 
     // extraction added the two rich renderer files without changing the surfaces.
     // → 99: the share kit's catalog page (share-kit S1.2) — its four channel routes (/mx, /s, /us, owned host; the body counts as a rich renderer), the owned-host
     // `/catalogo` root joining DIRECT_BUYER_DIRS beside `/tienda`.
-    expect(population.direct.length).toBe(99)
+    // → 101: its print page (share-kit S2.2), /mx and the /us 404 mirror.
+    expect(population.direct.length).toBe(101)
     expect(population.direct).toContain('app/(shell)/mx/l/page.tsx')
     expect(population.direct).toContain('app/(shell)/checkout/CheckoutExperience.tsx')
     expect(population.direct).toContain('app/(shell)/s/[slug]/tienda/page.tsx')

@@ -1,9 +1,14 @@
 /**
- * Shared client for the standalone Cloud Run PDF renderer (US-5b): headless
- * Chromium loads one of our `/…/print` render pages and streams back a
+ * Shared client for the PDF renderer (US-5b; since share-kit S2.1 a container
+ * beside the app on the Oracle VM at `PRINT_PDF_URL=http://print-pdf:8080`):
+ * headless Chromium loads one of our print pages and streams back a
  * print-ready PDF. Every `/api/.../pdf` route proxies through this one
  * function so the env-var / error-shape contract never drifts between
- * callers (the edition PDF export, and Sprint 5's rate-card PDF).
+ * callers (the edition PDF, the rate card, the shop catalog).
+ *
+ * The renderer itself refuses any URL off its allow-list (403), and answers
+ * 503 `busy` when its one-at-a-time queue is full — both surface here as a
+ * failed render, never a hang: the call is bounded by RENDER_CLIENT_TIMEOUT_MS.
  */
 import 'server-only'
 
@@ -14,6 +19,9 @@ export interface RenderPrintPdfResult {
   buffer?: ArrayBuffer
   error?: string
 }
+
+/** Just above the renderer's own 45 s budget, and inside the 60 s the calling routes allow. */
+const RENDER_CLIENT_TIMEOUT_MS = 55_000
 
 export async function renderPrintPdf(printUrl: string): Promise<RenderPrintPdfResult> {
   const service = process.env.PRINT_PDF_URL
@@ -28,6 +36,8 @@ export async function renderPrintPdf(printUrl: string): Promise<RenderPrintPdfRe
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-internal-secret': secret },
       body: JSON.stringify({ url: printUrl }),
+      signal: AbortSignal.timeout(RENDER_CLIENT_TIMEOUT_MS),
+      cache: 'no-store',
     })
   } catch (e) {
     return { ok: false, status: 502, error: `No se pudo contactar el servicio PDF: ${(e as Error).message}` }

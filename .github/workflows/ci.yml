@@ -43,6 +43,10 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Lint changed files
         run: npm run lint:changed
+      # The PDF renderer's allow-list, secret and queue (share-kit D14). Its guard needs only node:crypto, so this
+      # runs without the service's own install — and it is the only gate that service has.
+      - name: PDF renderer guard (node --test)
+        run: node --test services/print-pdf/guard.test.js
 
   typecheck-build:
     name: Type-check + build

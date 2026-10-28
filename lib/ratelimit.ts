@@ -245,9 +245,25 @@ const p2sPhotoLimiter = () => {
   return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(12, '10 m'), prefix: 'rl:p2s_photo' })
 }
 
+// Share kit catalog PDF (share-kit D16). Charged on a cache MISS only — a cached PDF costs one R2 read, a miss costs a
+// headless-Chromium render on the VM. Per shop: a merchant editing and re-downloading all afternoon still fits 6 an
+// hour. Per IP: one visitor cannot walk the shop list rendering every catalog. Both fail open like every limiter here;
+// the renderer's own one-at-a-time queue (services/print-pdf, D14) is the hard bound.
+const catalogPdfShopLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(6, '1 h'), prefix: 'rl:catalog_pdf_shop' })
+}
+
+const catalogPdfIpLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:catalog_pdf_ip' })
+}
+
 // ── Public helper ──────────────────────────────────────────────────────────────
 
-export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_mail_link' | 'p2s_mail_link_device' | 'p2s_photo'
+export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_mail_link' | 'p2s_mail_link_device' | 'p2s_photo' | 'catalog_pdf_shop' | 'catalog_pdf_ip'
 
 function limiterFor(key: LimitKey): Ratelimit | null {
   const getLimiter = key === 'offers'          ? offerLimiter
@@ -274,6 +290,8 @@ function limiterFor(key: LimitKey): Ratelimit | null {
     : key === 'p2s_mail_link' ? p2sMailLinkLimiter
     : key === 'p2s_mail_link_device' ? p2sMailLinkDeviceLimiter
     : key === 'p2s_photo' ? p2sPhotoLimiter
+    : key === 'catalog_pdf_shop' ? catalogPdfShopLimiter
+    : key === 'catalog_pdf_ip' ? catalogPdfIpLimiter
     : supplyImportLimiter
   return getLimiter()
 }

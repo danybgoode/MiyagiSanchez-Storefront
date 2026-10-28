@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { getShopListings } from '@/lib/listings'
-import { readPublicSellerMarket } from '@/lib/owned-market'
 import r2ImageLoader from '@/lib/image-loader'
 import { listingHref } from '@/lib/shop-presentation/chrome'
-import { buildCatalogModel, type CatalogModel } from '@/lib/share-kit/catalog'
+import type { CatalogModel } from '@/lib/share-kit/catalog'
+import { catalogFor } from '@/lib/share-kit/catalog-server'
+
+export { catalogFor }
 import type { ShopPresentationContext } from '@/lib/shop-presentation/context'
 import ShopThemeShell from './ShopThemeShell'
 
@@ -24,13 +25,6 @@ export const CATALOG_COPY = {
   empty: 'Esta tienda todavía no tiene productos publicados.',
   emptyLink: 'Ver la tienda',
 } as const
-
-/** The model for a resolved shop context, or null when the shop has no catalog (not a Mexico shop, D5). */
-export async function catalogFor(ctx: ShopPresentationContext): Promise<CatalogModel | null> {
-  if (readPublicSellerMarket(ctx.shop)?.market_code !== 'mx') return null
-  const listings = await getShopListings(ctx.shop.slug)
-  return buildCatalogModel({ shop: ctx.shop, listings })
-}
 
 export function catalogMetadata(ctx: ShopPresentationContext | null, model: CatalogModel | null): Metadata {
   if (!ctx || !model) return { title: 'Página no encontrada' }
