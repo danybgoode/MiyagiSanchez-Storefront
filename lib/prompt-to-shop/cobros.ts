@@ -45,12 +45,16 @@ export interface ChooserState {
 export function readChooserState(settings: CobrosSettings | null | undefined): ChooserState {
   const s = settings ?? {}
   const bt = s.checkout?.bank_transfer ?? {}
-  const clabe = normalizeClabeInput(typeof bt.clabe === 'string' ? bt.clabe : '')
+  const stored = typeof bt.clabe === 'string' ? bt.clabe : ''
+  // Checkout's own test (`sellerHasSpei`): ALL the stored digits, exactly 18. Slicing first would call a 19-digit
+  // value complete here while checkout refuses it.
+  const storedDigits = stored.replace(/\D/g, '')
+  const clabe = normalizeClabeInput(stored)
   const origin = s.shipping?.origin_address ?? {}
   return {
     // The same "connected" the cobros wizard and the setup guide read.
     mercadopago: s.mercadopago?.connected === true,
-    spei: bt.enabled !== false && clabeComplete(clabe),
+    spei: bt.enabled !== false && clabeComplete(storedDigits),
     clabe,
     bankName: typeof bt.bank_name === 'string' ? bt.bank_name : '',
     accountHolder: typeof bt.account_holder === 'string' ? bt.account_holder : '',

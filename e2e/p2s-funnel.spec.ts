@@ -3,8 +3,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { P2S_FUNNEL_EVENTS, SESSION_SCOPE, fireFunnelOnce, funnelKey, type FunnelDeps, type FunnelStorage } from '../lib/prompt-to-shop/funnel'
 
-// Prompt-to-shop S5.3 — the seven funnel steps, each counted ONCE per draft (the describe submit once per tab).
-// The guard is structural: an in-memory set for the page and sessionStorage for the tab, the key recorded BEFORE
+// Prompt-to-shop S5.3 — the seven funnel steps, each counted ONCE per draft (the describe submit once per page).
+// The guard is structural: an in-memory set for the page and localStorage for the device, the key recorded BEFORE
 // the push. The specs drive the real function with an injected storage and pusher, and record the order.
 
 const ROOT = process.cwd()
@@ -48,7 +48,7 @@ test('every step fires once per draft, however many times it is reached — key 
   }
 })
 
-test('a reload (a fresh page, the same tab) does not count again; a second draft is a second funnel', () => {
+test('a reload (a fresh page, the same storage) does not count again; a second draft is a second funnel', () => {
   const trace: string[] = []
   const storage = memoryStorage(trace)
   expect(fireFunnelOnce('p2s_kept', DRAFT, {}, deps(trace, storage))).toBe(true)
@@ -56,6 +56,34 @@ test('a reload (a fresh page, the same tab) does not count again; a second draft
   expect(fireFunnelOnce('p2s_kept', DRAFT, {}, deps(trace, storage))).toBe(false)
   expect(fireFunnelOnce('p2s_kept', OTHER, {}, deps(trace, storage))).toBe(true)
   expect(trace.filter((t) => t.startsWith('push:'))).toEqual(['push:p2s_kept', 'push:p2s_kept'])
+})
+
+test('a NEW SESSION (fresh memory, the same localStorage) does not re-fire — what a nudge link opens', () => {
+  const trace: string[] = []
+  const storage = memoryStorage(trace) // the device's localStorage: it outlives tabs and sessions
+  for (const event of ['p2s_kept', 'p2s_real_product_added', 'p2s_payments_connected', 'p2s_published'] as const) {
+    expect(fireFunnelOnce(event, DRAFT, {}, deps(trace, storage, new Set())), event).toBe(true)
+    // Day 3: the merchant taps the reminder, a new tab opens the kept shop, every state-observing effect runs again.
+    expect(fireFunnelOnce(event, DRAFT, {}, deps(trace, storage, new Set())), event).toBe(false)
+  }
+  expect(trace.filter((t) => t.startsWith('push:'))).toHaveLength(4)
+  // The browser binding persists in localStorage — not sessionStorage, which a new session does not share.
+  const funnel = readFileSync(join(ROOT, 'lib/prompt-to-shop/funnel.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+  expect(funnel).toContain('window.localStorage')
+  expect(funnel).not.toContain('sessionStorage')
+})
+
+test('«kept» and «published» are counted on their transitions, not on a visit', () => {
+  const kept = readFileSync(join(ROOT, 'app/(shell)/p2s/_components/KeptShop.tsx'), 'utf8')
+  const claim = readFileSync(join(ROOT, 'app/(shell)/p2s/_components/ClaimRunner.tsx'), 'utf8')
+  // The keep: the claim's own answer.
+  expect(claim).toMatch(/if \(result\.kind === 'kept'\) trackFunnel\('p2s_kept', result\.draftId/)
+  expect(kept).not.toContain("trackFunnel('p2s_kept'")
+  // The publish: only inside the handler, after a successful answer.
+  const run = kept.slice(kept.indexOf('async function runPublish()'), kept.indexOf('setJustPublished(true)'))
+  expect(run).toContain('if (!result.ok) {')
+  expect(run).toContain("trackFunnel('p2s_published', draftId")
+  expect(kept.split("trackFunnel('p2s_published'").length - 1).toBe(1)
 })
 
 test('with storage blocked or throwing, the page still counts each step once', () => {
@@ -69,7 +97,7 @@ test('with storage blocked or throwing, the page still counts each step once', (
   expect(trace).toEqual(['push:p2s_published'])
 })
 
-test('the step before a draft exists is tab-scoped and carries no draft id', () => {
+test('the step before a draft exists is page-scoped and carries no draft id', () => {
   const pushed: Array<[string, Record<string, unknown>]> = []
   const d: FunnelDeps = { seen: new Set(), storage: null, push: (n, p) => { pushed.push([n, p]) } }
   fireFunnelOnce('p2s_describe_submitted', SESSION_SCOPE, { chars: 40 }, d)

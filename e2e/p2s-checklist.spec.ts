@@ -89,7 +89,7 @@ test('«Publicar» is disabled with its reason until one real product exists, an
   expect(publishState(0)).toEqual({ enabled: false, reason: 'Agrega al menos un producto tuyo' })
   expect(PHOTO_COPY.publishNeedsProduct).toBe('Agrega al menos un producto tuyo')
   expect(publishState(null)).toEqual({ enabled: false, reason: PHOTO_COPY.publishUnknown })
-  expect(publishState(1)).toEqual({ enabled: true, href: '/shop/manage/catalogo' })
+  expect(publishState(1)).toEqual({ enabled: true })
   // Examples never count: the page feeds publishState the Medusa product list, not the draft's catalog.
   expect(read(ARMAR)).toMatch(/publishState\(own \? own\.length : null\)/)
 })

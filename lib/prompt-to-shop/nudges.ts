@@ -25,6 +25,7 @@
  * on later still finds the milestone unspent.
  */
 
+import { timingSafeEqual } from 'node:crypto'
 import { CHANNELS, isChannelEnabled, resolvePrefs, type PrefRow } from '../notifications/preferences'
 import type { SetupStep, SetupStepId } from '../setup-guide'
 
@@ -151,25 +152,38 @@ export interface NudgeCronDeps {
   claim: (draftId: string, day: NudgeDay, at: string) => Promise<boolean>
   send: (n: { draftId: string; clerkUserId: string; day: NudgeDay; step: NudgeStep; shopName: string }) => Promise<void>
   now: () => Date
+  log: (line: Record<string, unknown>) => void
 }
 
 export type NudgeCronBody =
-  | { ok: true; candidates: number; sent: number; lost: number; skipped: Partial<Record<SkipReason, number>> }
+  | { ok: true; candidates: number; sent: number; lost: number; failed: number; skipped: Partial<Record<SkipReason, number>> }
   | { ok: false; error: 'unauthorized' | 'unavailable' }
+
+/**
+ * The cron secret, compared in constant time. Header ONLY: a `?secret=` query string is written into every access
+ * log on the way in, so this route never reads one (the VM's `miyagi-cron@.service` sends the header). An unset or
+ * empty `CRON_SECRET` refuses everything; unequal lengths refuse before the comparison, which needs equal buffers.
+ */
+export function cronSecretMatches(header: string | null, expected: string | undefined): boolean {
+  if (!expected || !header) return false
+  const a = Buffer.from(header, 'utf8')
+  const b = Buffer.from(expected, 'utf8')
+  return a.length === b.length && timingSafeEqual(a, b)
+}
 
 /**
  * Order: authorise → read → decide → for each send, claim THEN send. Nothing is read before the secret is checked,
  * and nothing is sent that was not claimed first.
  *
- * Auth is the existing cron rule, copied from `app/api/cron/order-autoconfirm`: the `x-cron-secret` header (or the
- * `?secret=` query) must equal `CRON_SECRET`. An unset `CRON_SECRET` refuses everything.
+ * A send that throws is caught for THAT candidate, logged and counted as `failed`, and the run carries on: one bad
+ * address must not cost every later merchant their reminder. The claim is deliberately NOT released on failure —
+ * never-twice beats at-least-once for a reminder, and a release that raced a retried run could send it twice.
  */
 export async function runNudgeCron(
-  input: { secretHeader: string | null; secretQuery: string | null; cronSecret: string | undefined },
+  input: { secretHeader: string | null; cronSecret: string | undefined },
   deps: NudgeCronDeps,
 ): Promise<{ status: number; body: NudgeCronBody }> {
-  const secret = input.secretHeader ?? input.secretQuery
-  if (!input.cronSecret || secret !== input.cronSecret) return { status: 401, body: { ok: false, error: 'unauthorized' } }
+  if (!cronSecretMatches(input.secretHeader, input.cronSecret)) return { status: 401, body: { ok: false, error: 'unauthorized' } }
 
   const now = deps.now()
   const candidates = await deps.loadCandidates(now)
@@ -179,6 +193,7 @@ export async function runNudgeCron(
   const skipped: Partial<Record<SkipReason, number>> = {}
   let sent = 0
   let lost = 0
+  let failed = 0
   for (const d of selectNudges(now, candidates)) {
     if ('skip' in d) {
       skipped[d.skip] = (skipped[d.skip] ?? 0) + 1
@@ -188,8 +203,13 @@ export async function runNudgeCron(
       lost++
       continue
     }
-    await deps.send({ draftId: d.draftId, ...d.send })
-    sent++
+    try {
+      await deps.send({ draftId: d.draftId, ...d.send })
+      sent++
+    } catch (e) {
+      failed++
+      deps.log({ step: 'nudge_failed', draft_id: d.draftId, day: d.send.day, error: e instanceof Error ? e.message : String(e) })
+    }
   }
-  return { status: 200, body: { ok: true, candidates: candidates.length, sent, lost, skipped } }
+  return { status: 200, body: { ok: true, candidates: candidates.length, sent, lost, failed, skipped } }
 }

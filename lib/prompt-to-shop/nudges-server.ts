@@ -12,6 +12,7 @@ import { db } from '@/lib/supabase'
 import { sendP2sNudge } from '@/lib/email'
 import { dispatchToSeller } from '@/lib/notifications/dispatch'
 import { DELETED_STATUS } from '@/lib/listing-lifecycle'
+import { isShopSlug } from '@/lib/share-link'
 import { GUIDE_SHOP_COLUMNS, guideProductCount, guideStepsFor, type GuideShopRow } from '@/lib/setup-guide-source'
 import type { PrefRow } from '@/lib/notifications/preferences'
 import { NUDGE_COPY, NUDGE_STEP_COPY } from './copy'
@@ -24,6 +25,8 @@ const DAY_MS = 24 * 60 * 60 * 1000
 /** One run's ceiling. A daily cron over a seven-day window; far above today's volume, and bounded. */
 const BATCH = 200
 const CLAIM_ATTEMPTS = 3
+/** Candidates read in parallel at a time. */
+export const CANDIDATE_CHUNK = 10
 
 interface DraftRow {
   id: string
@@ -38,6 +41,8 @@ type ShopRow = GuideShopRow & { id: string; slug: string }
 /** The seller's products by slug, drafts included. `null` = could not read. */
 async function listProductsInternal(slug: string): Promise<Array<{ id: string; status: string }> | null> {
   if (!INTERNAL_SECRET) return null
+  // Defence in depth: the slug is also encoded below, but a value that is not a shop slug never reaches the backend.
+  if (!isShopSlug(slug)) return null
   try {
     const res = await fetch(`${MEDUSA_BASE}/internal/seller-products?seller_slug=${encodeURIComponent(slug)}`, {
       headers: { 'x-internal-secret': INTERNAL_SECRET },
@@ -112,7 +117,13 @@ async function loadCandidates(now: Date): Promise<NudgeCandidate[] | null> {
     .limit(BATCH)
   if (error) return null
   const rows = (data as DraftRow[] | null) ?? []
-  return Promise.all(rows.map(candidateFor))
+  // Bounded concurrency: each candidate costs up to four reads (shop, prefs, products, deleted ids), so the batch runs
+  // CANDIDATE_CHUNK at a time rather than all 200 at once against Supabase and the backend.
+  const out: NudgeCandidate[] = []
+  for (let i = 0; i < rows.length; i += CANDIDATE_CHUNK) {
+    out.push(...(await Promise.all(rows.slice(i, i + CANDIDATE_CHUNK).map(candidateFor))))
+  }
+  return out
 }
 
 /**
@@ -162,6 +173,7 @@ export function nudgeCronDeps(): NudgeCronDeps {
       console.info('[p2s]', JSON.stringify({ step: 'nudge', draft_id: draftId, day, next: step }))
     },
     now: () => new Date(),
+    log: (line) => console.error('[p2s]', JSON.stringify(line)),
   }
 }
 

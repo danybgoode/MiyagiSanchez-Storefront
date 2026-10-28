@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { checkoutOptionsQuery, checkoutPreview, type CheckoutOptions } from '../lib/checkout-options'
-import { clabeComplete, normalizeClabeInput } from '../lib/clabe'
+import { clabeComplete, initialBankPick, normalizeClabeInput, pickBank } from '../lib/clabe'
 import { fetchCheckoutPreview } from '../lib/prompt-to-shop/client'
 import { MP_CONNECT_HREF, cashPatch, correosPatch, handDeliveryPatch, readChooserState, speiOffPatch, speiPatch } from '../lib/prompt-to-shop/cobros'
 
@@ -154,4 +154,24 @@ test('the switches start from what the shop row holds', () => {
   // A CLABE that is not 18 digits is not SPEI on, and a switched-off SPEI is off.
   expect(readChooserState({ checkout: { bank_transfer: { clabe: '123' } } }).spei).toBe(false)
   expect(readChooserState({ checkout: { bank_transfer: { enabled: false, clabe: '012180001234567890' } } }).spei).toBe(false)
+})
+
+test('a CLABE is SPEI-on only when ALL its stored digits are 18 — checkout\'s test, not a sliced one', () => {
+  expect(readChooserState({ checkout: { bank_transfer: { clabe: '0121800012345678901' } } }).spei).toBe(false)
+  expect(readChooserState({ checkout: { bank_transfer: { clabe: '012 180 001 234 567 890' } } }).spei).toBe(true)
+})
+
+test('«Otro» opens a free-text bank and is never stored as a name; a custom bank reopens as «Otro» with its name', () => {
+  expect(initialBankPick('BBVA')).toEqual({ isOther: false, name: 'BBVA' })
+  expect(initialBankPick('Caja Popular Mexicana')).toEqual({ isOther: true, name: 'Caja Popular Mexicana' })
+  expect(initialBankPick('Otro')).toEqual({ isOther: true, name: '' })
+  expect(initialBankPick(null)).toEqual({ isOther: false, name: '' })
+  expect(pickBank('Otro')).toEqual({ isOther: true, name: '' })
+  expect(pickBank('Nu')).toEqual({ isOther: false, name: 'Nu' })
+  // Both surfaces use the one rule, and the chooser has the free-text field.
+  expect(read('app/(shell)/shop/manage/settings/_sections/Pagos.tsx')).toContain('initialBankPick(bt?.bank_name)')
+  const chooser = read('app/(shell)/p2s/_components/CobrosChooser.tsx')
+  expect(chooser).toContain('initialBankPick(initial.bankName)')
+  expect(chooser).toContain('setBank(pickBank(e.target.value))')
+  expect(chooser).toContain('data-testid="p2s-bank-other"')
 })

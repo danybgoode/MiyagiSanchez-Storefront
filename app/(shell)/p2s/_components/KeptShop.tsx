@@ -31,8 +31,9 @@ import ShopCanvas from './ShopCanvas'
  * of its own; tapping it publishes that shop's unpublished products (S5.2, `POST /api/p2s/publish`) and shows the
  * shop as the marketplace shows it, with the shares.
  *
- * Funnel (S5.3): kept, real product added, payments connected and published are counted here, once per draft, from
- * the STATE the page shows — not from a tap — so a refresh, a second tab or a step done elsewhere counts the same.
+ * Funnel (S5.3): «real product added» and «payments connected» are counted from the STATE the page shows (a step
+ * done elsewhere counts too); «published» on the publish that succeeded; «kept» is counted by ClaimRunner on the keep.
+ * The once-guard persists in localStorage, so a later session — a nudge link, a new tab — does not count them again.
  */
 
 type SheetState = { kind: 'step'; id: SetupStepId } | { kind: 'photo'; replace: { index: number; title: string } | null } | null
@@ -79,10 +80,8 @@ export default function KeptShop({
   // The moment shows after a publish, and on any later visit once everything the merchant made is public.
   const showMoment = !!(shopSlug && publicPath && publishedCards.length > 0 && (justPublished || unpublished === 0))
 
-  useEffect(() => { trackFunnel('p2s_kept', draftId) }, [draftId])
   useEffect(() => { if ((ownCards?.length ?? 0) > 0) trackFunnel('p2s_real_product_added', draftId) }, [draftId, ownCards])
   useEffect(() => { if (pagosDone) trackFunnel('p2s_payments_connected', draftId) }, [draftId, pagosDone])
-  useEffect(() => { if (publishedCards.length > 0) trackFunnel('p2s_published', draftId, { live: publishedCards.length }) }, [draftId, publishedCards.length])
 
   async function runPublish() {
     if (publishing.kind === 'busy') return
@@ -93,6 +92,8 @@ export default function KeptShop({
       return
     }
     setPublishing({ kind: 'idle' })
+    // Funnel step 7 (S5.3): counted on the publish that succeeded, not on a later visit that finds the shop live.
+    trackFunnel('p2s_published', draftId, { published: result.published, live: result.live })
     setJustPublished(true)
     router.refresh()
   }

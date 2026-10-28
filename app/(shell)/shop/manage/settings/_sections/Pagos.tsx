@@ -30,7 +30,7 @@ import { CopyPromptButton } from '../_components/CopyPromptButton'
 import type { ShopStripe, CheckoutSettings } from '@/lib/shop-settings/types'
 
 // The CLABE rule and the bank list live in `lib/clabe.ts`, shared with the prompt-to-shop cobros chooser.
-import { CLABE_LENGTH, MX_BANKS, clabeComplete, normalizeClabeInput } from '@/lib/clabe'
+import { CLABE_LENGTH, MX_BANKS, OTHER_BANK, clabeComplete, initialBankPick, normalizeClabeInput, pickBank } from '@/lib/clabe'
 
 const ESCROW_OPTIONS: { key: 'off' | 'optional' | 'required'; label: string; desc: string; color: string }[] = [
   { key: 'off',      label: 'Desactivado',  desc: 'Sin Compra Protegida. El comprador paga directo al vendedor.',    color: 'border-[var(--neutral)] bg-[var(--neutral-soft)]' },
@@ -78,9 +78,10 @@ export default function Pagos({
   const bt = initial.checkout?.bank_transfer ?? ({} as NonNullable<CheckoutSettings['bank_transfer']> & {})
   const [bankTransferEnabled, setBankTransferEnabled] = useState(bt?.enabled ?? false)
   const [clabe, setClabe]               = useState(bt?.clabe ?? '')
-  const [bankName, setBankName]         = useState(bt?.bank_name ?? '')
+  const bankPick = initialBankPick(bt?.bank_name)
+  const [bankName, setBankName]         = useState(bankPick.name)
   const [accountHolder, setAccountHolder] = useState(bt?.account_holder ?? '')
-  const [bankIsOther, setBankIsOther]   = useState(!!bt?.bank_name && !(MX_BANKS as readonly string[]).includes(bt.bank_name))
+  const [bankIsOther, setBankIsOther]   = useState(bankPick.isOther)
   // Both are on `CheckoutSettings` now, so this reads the real type — the
   // hand-written cast that used to stand in here is gone, and with it its
   // guess that `phone` was a plain `string` (it is nullable, and production
@@ -427,11 +428,10 @@ export default function Pagos({
               <div>
                 <label className="block text-sm font-medium mb-1">Banco</label>
                 <select
-                  value={bankIsOther ? 'Otro' : bankName}
+                  value={bankIsOther ? OTHER_BANK : bankName}
                   onChange={e => {
-                    const v = e.target.value
-                    if (v === 'Otro') { setBankIsOther(true); setBankName('') }
-                    else { setBankIsOther(false); setBankName(v) }
+                    const next = pickBank(e.target.value)
+                    setBankIsOther(next.isOther); setBankName(next.name)
                     mark()
                   }}
                   className="w-full border border-[var(--color-border)] rounded-[var(--r-sm)] px-3 py-2 text-sm bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"

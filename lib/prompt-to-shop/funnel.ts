@@ -8,10 +8,13 @@
  *
  *   1. an in-memory set, for the life of the page — React's dev double-mount, a re-render with the same state, two
  *      components observing the same step: none of them can fire twice, storage or no storage;
- *   2. sessionStorage, for the tab — a reload, or a server refresh that remounts the canvas, does not re-count.
+ *   2. localStorage, for the browser — a reload, a new tab, a new session (exactly what a nudge link opens) does not
+ *      re-count a step that already fired on this device. sessionStorage was not enough: the kept-shop page observes
+ *      its steps from state, so every new session re-fired them.
  *
  * Keyed per step AND per draft (`p2s:<event>:<draft>`), so a second shop is a second funnel. The one step that
- * happens before a draft exists — the describe box submit — is keyed to the tab (`session`).
+ * happens before a draft exists — the describe box submit — has no draft to key on: it is scoped to the page
+ * (`session`, the in-memory layer only), so a merchant who describes again on a later visit counts again.
  *
  * The decision is pure: storage and the pusher are injected, so the spec drives the real function.
  */
@@ -40,7 +43,7 @@ export interface FunnelStorage {
 export interface FunnelDeps {
   /** Page-lifetime memory. Shared by every caller on the page (module scope in the browser). */
   seen: Set<string>
-  /** sessionStorage, or null when there is none (SSR, a blocked or throwing storage). */
+  /** localStorage, or null when there is none (SSR, a blocked or throwing storage). */
   storage: FunnelStorage | null
   push: (name: string, params: Record<string, unknown>) => void
 }
@@ -83,7 +86,7 @@ const PAGE_SEEN = new Set<string>()
 function browserStorage(): FunnelStorage | null {
   if (typeof window === 'undefined') return null
   try {
-    const s = window.sessionStorage
+    const s = window.localStorage
     return { get: (k) => s.getItem(k), set: (k, v) => s.setItem(k, v) }
   } catch {
     return null
@@ -95,7 +98,8 @@ export function trackFunnel(event: FunnelEvent, scope: string | null, params: Re
   if (typeof window === 'undefined') return false
   return fireFunnelOnce(event, scope ?? SESSION_SCOPE, params, {
     seen: PAGE_SEEN,
-    storage: browserStorage(),
+    // The pre-draft step is page-scoped: persisting a key that names no draft would count it once per browser, ever.
+    storage: scope ? browserStorage() : null,
     push: (name, p) => pushAnalyticsEvent(name, p),
   })
 }

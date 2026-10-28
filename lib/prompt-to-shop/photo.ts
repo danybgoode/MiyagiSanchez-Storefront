@@ -570,7 +570,7 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
 
 // ── «Publicar» (S4.3) ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type PublishState = { enabled: true; href: string } | { enabled: false; reason: string }
+export type PublishState = { enabled: true } | { enabled: false; reason: string }
 
 /**
  * «Publicar» is the canvas's action, not a % step (D17). Disabled until the shop has one product of the merchant's
@@ -579,5 +579,6 @@ export type PublishState = { enabled: true; href: string } | { enabled: false; r
 export function publishState(realProducts: number | null): PublishState {
   if (realProducts === null) return { enabled: false, reason: PHOTO_COPY.publishUnknown }
   if (realProducts < 1) return { enabled: false, reason: PHOTO_COPY.publishNeedsProduct }
-  return { enabled: true, href: '/shop/manage/catalogo' }
+  // Enabled publishes in place (`POST /api/p2s/publish`, S5.2); there is no page to send the merchant to.
+  return { enabled: true }
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
-import { CLABE_LENGTH, MX_BANKS, clabeComplete, normalizeClabeInput } from '@/lib/clabe'
+import { CLABE_LENGTH, MX_BANKS, OTHER_BANK, clabeComplete, initialBankPick, normalizeClabeInput, pickBank } from '@/lib/clabe'
 import type { CheckoutPreview } from '@/lib/checkout-options'
 import { fetchCheckoutPreview, patchShop } from '@/lib/prompt-to-shop/client'
 import { MP_CONNECT_HREF, cashPatch, correosPatch, handDeliveryPatch, speiOffPatch, speiPatch, type ChooserState, type SettingsPatch } from '@/lib/prompt-to-shop/cobros'
@@ -45,7 +45,8 @@ export default function CobrosChooser({
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
   const [preview, setPreview] = useState<CheckoutPreview | 'loading'>('loading')
   const [clabe, setClabe] = useState(initial.clabe)
-  const [bankName, setBankName] = useState(initial.bankName)
+  const [bank, setBank] = useState(() => initialBankPick(initial.bankName))
+  const bankName = bank.name
   const [holder, setHolder] = useState(initial.accountHolder)
 
   const refreshPreview = useCallback(async () => {
@@ -53,9 +54,12 @@ export default function CobrosChooser({
     setPreview(await fetchCheckoutPreview(shopSlug, market))
   }, [shopSlug, market])
 
+  // The first read: `'loading'` is already the initial state, so the effect only fetches and sets the answer.
   useEffect(() => {
-    void refreshPreview()
-  }, [refreshPreview])
+    let cancelled = false
+    void fetchCheckoutPreview(shopSlug, market).then((p) => { if (!cancelled) setPreview(p) })
+    return () => { cancelled = true }
+  }, [shopSlug, market])
 
   // «Payments connected» is what checkout says, not what was tapped: one payment method a buyer can really use.
   useEffect(() => {
@@ -132,10 +136,13 @@ export default function CobrosChooser({
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="grid gap-1 t-small">
                 <span style={{ fontWeight: 600 }}>{COBROS_COPY.bankLabel}</span>
-                <select className="input" value={bankName} onChange={(e) => setBankName(e.target.value)}>
+                <select className="input" value={bank.isOther ? OTHER_BANK : bank.name} onChange={(e) => setBank(pickBank(e.target.value))}>
                   <option value="">{COBROS_COPY.bankPick}</option>
                   {MX_BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
+                {bank.isOther ? (
+                  <input className="input" value={bank.name} maxLength={80} placeholder={COBROS_COPY.bankOther} onChange={(e) => setBank({ isOther: true, name: e.target.value })} data-testid="p2s-bank-other" />
+                ) : null}
               </label>
               <label className="grid gap-1 t-small">
                 <span style={{ fontWeight: 600 }}>{COBROS_COPY.holderLabel}</span>
@@ -155,7 +162,9 @@ export default function CobrosChooser({
           </form>
         </Choice>
 
-        <Choice mark={<i className="iconoir-cash" aria-hidden="true" style={{ fontSize: 22 }} />} name={COBROS_COPY.cashName} lead={COBROS_COPY.cashLead} on={state.cash && state.handDelivery} testId="p2s-choice-cash">
+        <Choice mark={<i className="iconoir-cash" aria-hidden="true" style={{ fontSize: 22 }} />} name={COBROS_COPY.cashName} lead={COBROS_COPY.cashLead} on={state.cash} testId="p2s-choice-cash">
+          {/* The header and the button both show the merchant's own switch. Whether a buyer is OFFERED cash also needs
+              hand delivery (checkout's rule); the note says so, and the preview below shows the real outcome. */}
           {!state.handDelivery ? <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COBROS_COPY.cashNeedsHand}</p> : null}
           <Toggle on={state.cash} busy={busy === 'cash'} disabled={!!busy} onToggle={(v) => void save('cash', cashPatch(v), { cash: v })} />
         </Choice>

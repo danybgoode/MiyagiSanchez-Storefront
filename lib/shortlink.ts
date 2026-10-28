@@ -63,14 +63,6 @@ export const PASSTHROUGH_PREFIXES = new Set(['g', 'e', 'v', 's', 'l'])
 /** The short domain merchants should share (mschz.org/<prefix>/…). */
 export const SHORTLINK_ORIGIN = `https://${SHORTLINK_HOSTS[0]}`
 
-/**
- * A shop's short branded link: `mschz.org/<slug>`. The short-link host resolves a single segment to a live shop slug
- * FIRST (then a retired alias, then a product short slug/code), so a shop's own slug is its shortest stable link.
- * Used by the shares after «Publicar» (prompt-to-shop S5.2) and its QR code.
- */
-export function shopShortLink(slug: string): string {
-  return `${SHORTLINK_ORIGIN}/${encodeURIComponent(slug)}`
-}
 
 /**
  * Pure matcher for the known-prefix passthrough. Only fires for MULTI-segment

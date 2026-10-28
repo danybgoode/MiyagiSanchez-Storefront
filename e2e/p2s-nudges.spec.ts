@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { EVENT_GROUP, EVENT_GROUPS, GROUP_COPY, BUYER_EVENT_GROUPS, type PrefRow } from '../lib/notifications/preferences'
 import { COMMUNICATION_CATALOG } from '../lib/notifications/catalog'
 import {
+  cronSecretMatches,
   dueDay,
   nextNudgeStep,
   runNudgeCron,
@@ -121,38 +122,50 @@ test('the record merges into block_status: S4\'s photo confirms and the block st
 
 // ── The cron ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
-function cron(candidates: NudgeCandidate[] | null, claimOk: (id: string) => boolean = () => true) {
+function cron(candidates: NudgeCandidate[] | null, claimOk: (id: string) => boolean = () => true, sendThrows: (id: string) => boolean = () => false) {
   const trace: string[] = []
   const deps: NudgeCronDeps = {
     loadCandidates: async () => { trace.push('load'); return candidates },
     claim: async (id, day) => { trace.push(`claim:${id}:${day}`); return claimOk(id) },
-    send: async (n) => { trace.push(`send:${n.draftId}:${n.day}:${n.step}`) },
+    send: async (n) => {
+      trace.push(`send:${n.draftId}:${n.day}:${n.step}`)
+      if (sendThrows(n.draftId)) throw new Error('resend 500')
+    },
     now: () => NOW,
+    log: (line) => { trace.push(`log:${String(line.step)}:${String(line.draft_id)}`) },
   }
   return { trace, deps }
 }
-const AUTH = { secretHeader: 's3cret', secretQuery: null, cronSecret: 's3cret' }
+const AUTH = { secretHeader: 's3cret', cronSecret: 's3cret' }
 
-test('the cron refuses without the secret, before reading anything', async () => {
+test('the cron refuses without the secret in the HEADER, before reading anything', async () => {
   for (const input of [
-    { secretHeader: null, secretQuery: null, cronSecret: 's3cret' },
-    { secretHeader: 'wrong', secretQuery: null, cronSecret: 's3cret' },
-    { secretHeader: null, secretQuery: 'wrong', cronSecret: 's3cret' },
-    // An unset CRON_SECRET refuses everything, a missing header included.
-    { secretHeader: null, secretQuery: null, cronSecret: undefined },
-    { secretHeader: '', secretQuery: null, cronSecret: '' },
+    { secretHeader: null, cronSecret: 's3cret' },
+    { secretHeader: 'wrong', cronSecret: 's3cret' },
+    { secretHeader: 's3cre', cronSecret: 's3cret' },
+    { secretHeader: 's3cret ', cronSecret: 's3cret' },
+    // An unset or empty CRON_SECRET refuses everything, a missing header included.
+    { secretHeader: null, cronSecret: undefined },
+    { secretHeader: '', cronSecret: '' },
   ]) {
     const { trace, deps } = cron([candidate()])
     expect(await runNudgeCron(input, deps)).toEqual({ status: 401, body: { ok: false, error: 'unauthorized' } })
     expect(trace).toEqual([])
   }
-  // The query form the other cron routes accept is accepted too.
-  const { deps } = cron([])
-  expect((await runNudgeCron({ secretHeader: null, secretQuery: 's3cret', cronSecret: 's3cret' }, deps)).status).toBe(200)
-  // The route hands the header and the env secret to it, exactly.
-  const route = readFileSync(join(ROOT, 'app/api/cron/p2s-nudges/route.ts'), 'utf8')
+  expect(cronSecretMatches('s3cret', 's3cret')).toBe(true)
+  expect(cronSecretMatches('ß3cret', 's3cret')).toBe(false)
+})
+
+test('a ?secret= query alone is refused: the route reads the header only, compared in constant time', async () => {
+  // The route passes the header and nothing else: a request carrying only `?secret=` arrives as no header at all.
+  const { trace, deps } = cron([candidate()])
+  expect(await runNudgeCron({ secretHeader: null, cronSecret: 's3cret' }, deps)).toEqual({ status: 401, body: { ok: false, error: 'unauthorized' } })
+  expect(trace).toEqual([])
+  const route = readFileSync(join(ROOT, 'app/api/cron/p2s-nudges/route.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
   expect(route).toContain("req.headers.get('x-cron-secret')")
   expect(route).toContain('process.env.CRON_SECRET')
+  expect(route).not.toContain('searchParams')
+  expect(readFileSync(join(ROOT, 'lib/prompt-to-shop/nudges.ts'), 'utf8')).toContain('timingSafeEqual(a, b)')
 })
 
 test('order: read → decide → claim THEN send; a lost claim sends nothing', async () => {
@@ -162,7 +175,32 @@ test('order: read → decide → claim THEN send; a lost claim sends nothing', a
   )
   const r = await runNudgeCron(AUTH, deps)
   expect(trace).toEqual(['load', 'claim:a:1', 'send:a:1:catalogo', 'claim:c:1', 'claim:d:3', 'send:d:3:catalogo'])
-  expect(r).toEqual({ status: 200, body: { ok: true, candidates: 4, sent: 2, lost: 1, skipped: { published: 1 } } })
+  expect(r).toEqual({ status: 200, body: { ok: true, candidates: 4, sent: 2, lost: 1, failed: 0, skipped: { published: 1 } } })
+})
+
+test('a send that throws costs only that candidate: it is logged, counted, left claimed, and the next one still goes', async () => {
+  const { trace, deps } = cron([candidate({ draftId: 'a' }), candidate({ draftId: 'b' }), candidate({ draftId: 'c' })], () => true, (id) => id === 'b')
+  const r = await runNudgeCron(AUTH, deps)
+  expect(trace).toEqual(['load', 'claim:a:1', 'send:a:1:catalogo', 'claim:b:1', 'send:b:1:catalogo', 'log:nudge_failed:b', 'claim:c:1', 'send:c:1:catalogo'])
+  expect(r).toEqual({ status: 200, body: { ok: true, candidates: 3, sent: 2, lost: 0, failed: 1, skipped: {} } })
+  // Never released: there is no un-claim effect anywhere in the run.
+  expect(trace.some((t) => /release|unclaim/.test(t))).toBe(false)
+})
+
+test('the claim is the conditional, read-back write: keeper, updated_at and the row it changed', () => {
+  // Source-level pin (as S3's claim spec does for its conditional write): the I/O guard that makes "never twice"
+  // true cannot be weakened without this failing.
+  const src = readFileSync(join(ROOT, 'lib/prompt-to-shop/nudges-server.ts'), 'utf8')
+  const body = src.slice(src.indexOf('async function claim('), src.indexOf('export function nudgeCronDeps'))
+  expect(body.length).toBeGreaterThan(200)
+  const write = body.slice(body.indexOf(".update({ block_status: next"))
+  expect(write).toMatch(/^\.update\(\{ block_status: next, updated_at: stamp \}\)\s*\.eq\('id', draftId\)\s*\.eq\('claimed_by', row\.claimed_by\)\s*\.eq\('updated_at', row\.updated_at\)\s*\.select\('id'\)/)
+  expect(body).toContain('withNudge(row.block_status, day, at)')
+  expect(body).toContain('written.length === 1')
+  // …and the batch reads candidates a bounded chunk at a time.
+  expect(src).toContain('export const CANDIDATE_CHUNK = 10')
+  expect(src).toContain('rows.slice(i, i + CANDIDATE_CHUNK).map(candidateFor)')
+  expect(src).not.toContain('Promise.all(rows.map(candidateFor))')
 })
 
 test('a run that could not read answers 503, never an empty success', async () => {

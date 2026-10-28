@@ -3,7 +3,7 @@
  *
  * Called daily by the Oracle VM's systemd timer `miyagi-cron-p2s-nudges.timer` (root repo,
  * `infra/oci/systemd/`), through `miyagi-cron@p2s-nudges.service`. Protected by the `x-cron-secret` header
- * against `CRON_SECRET` — the same rule every cron route here uses (`order-autoconfirm`).
+ * against `CRON_SECRET`, compared in constant time. Unlike the older cron routes, a `?secret=` query is NOT accepted.
  *
  * The order (authorise → read → decide → claim → send) and every rule live in `lib/prompt-to-shop/nudges.ts`.
  * A failed read answers 503, never an empty 200: the timer's log must show a run that could not look, not a run that
@@ -19,8 +19,8 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   const result = await runNudgeCron(
     {
+      // Header only — never `?secret=` (a query string lands in access logs). See `cronSecretMatches`.
       secretHeader: req.headers.get('x-cron-secret'),
-      secretQuery: req.nextUrl.searchParams.get('secret'),
       cronSecret: process.env.CRON_SECRET,
     },
     nudgeCronDeps(),

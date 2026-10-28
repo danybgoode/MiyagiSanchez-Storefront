@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import QRCode from 'qrcode'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
-import { shopShortLink } from '@/lib/shortlink'
+import { shopQrPlan } from '@/lib/share-link'
 
 /**
  * GET /api/sell/shop/qr — a PNG QR code for the current seller's own shop (prompt-to-shop S5.2, the shares after
@@ -26,9 +26,11 @@ export async function GET() {
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
-  if (!shop?.slug) return NextResponse.json({ error: 'Tienda no encontrada.' }, { status: 404 })
+  // Validated before it reaches the QR or a header: a slug outside the shop-slug charset is not encoded at all.
+  const plan = shopQrPlan(shop?.slug)
+  if (!plan) return NextResponse.json({ error: 'Tienda no encontrada.' }, { status: 404 })
 
-  const png = await QRCode.toBuffer(shopShortLink(shop.slug), {
+  const png = await QRCode.toBuffer(plan.url, {
     errorCorrectionLevel: 'H', type: 'png', margin: 2, scale: 10,
     color: { dark: '#000000ff', light: '#ffffffff' },
   })
@@ -36,7 +38,7 @@ export async function GET() {
   return new NextResponse(new Uint8Array(png), {
     headers: {
       'Content-Type': 'image/png',
-      'Content-Disposition': `attachment; filename="${shop.slug}-qr.png"`,
+      'Content-Disposition': `attachment; filename="${plan.filename}"`,
       'Cache-Control': 'no-store',
     },
   })

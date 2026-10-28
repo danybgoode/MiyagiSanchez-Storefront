@@ -27,3 +27,22 @@ export function normalizeClabeInput(raw: string): string {
 export function clabeComplete(clabe: string): boolean {
   return clabe.length === CLABE_LENGTH
 }
+
+/** The picker's «other bank» entry. Choosing it opens a free-text field; it is never stored as a bank name. */
+export const OTHER_BANK = 'Otro'
+
+/**
+ * How a stored bank name opens the picker: a listed bank selects itself; a name not on the list (or a legacy literal
+ * «Otro») selects «Otro» with the name in the free-text field. Pagos and the cobros chooser share it.
+ */
+export function initialBankPick(stored: string | null | undefined): { isOther: boolean; name: string } {
+  const name = (stored ?? '').trim()
+  if (!name) return { isOther: false, name: '' }
+  if (name === OTHER_BANK) return { isOther: true, name: '' }
+  return (MX_BANKS as readonly string[]).includes(name) ? { isOther: false, name } : { isOther: true, name }
+}
+
+/** A choice in the picker: «Otro» clears the name for the free-text field; anything else IS the name. */
+export function pickBank(choice: string): { isOther: boolean; name: string } {
+  return choice === OTHER_BANK ? { isOther: true, name: '' } : { isOther: false, name: choice }
+}

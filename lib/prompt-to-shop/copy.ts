@@ -242,7 +242,6 @@ export const PHOTO_COPY = {
   publish: 'Publicar',
   publishNeedsProduct: 'Agrega al menos un producto tuyo',
   publishUnknown: 'No pudimos revisar tus productos ahora. Recarga la página.',
-  publishReady: 'Revisa tus productos y publícalos desde tu panel.',
 } as const
 
 // ── S5.1 · The cobros / entregas chooser ─────────────────────────────────────────────────────────────────────────
@@ -265,6 +264,7 @@ export const COBROS_COPY = {
   clabeCount: (n: number) => `${n} de 18 dígitos`,
   bankLabel: 'Banco',
   bankPick: 'Elige tu banco',
+  bankOther: 'Nombre de tu banco',
   holderLabel: 'Titular de la cuenta',
   speiSave: 'Guardar CLABE',
   speiOff: 'Quitar SPEI',
