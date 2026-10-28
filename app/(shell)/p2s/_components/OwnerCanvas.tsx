@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { versionsLeftCopy } from '@/lib/prompt-to-shop/allowance'
 import { patchDraft } from '@/lib/prompt-to-shop/client'
-import { OWNER_COPY } from '@/lib/prompt-to-shop/copy'
+import { DESCRIBE_COPY, OWNER_COPY } from '@/lib/prompt-to-shop/copy'
 import { draftView, type DraftBlocks } from '@/lib/prompt-to-shop/view'
 import type { CanvasControl } from '@/lib/prompt-to-shop/access'
 import ShopCanvas from './ShopCanvas'
@@ -117,9 +117,9 @@ export default function OwnerCanvas({
         }}
         onDone={({ versionsLeft: left }) => {
           setVersionsLeft(left)
-          setRerun(null)
-          setToken(null)
-          // The server page re-reads the draft, and its `key` (updated_at) remounts this component on the new blocks.
+          // TakingShape stays mounted, showing the new shop, until the server page re-reads the draft and its `key`
+          // (updated_at) remounts this component on the new blocks. Unmounting it here would flash the OLD shop for
+          // the length of the round-trip, and an edit in that window would 409 against a draft it no longer matches.
           router.refresh()
         }}
       />
@@ -195,6 +195,9 @@ export default function OwnerCanvas({
                 </div>
                 {siteKey ? <TurnstileWidget siteKey={siteKey} onToken={setToken} resetKey={resetKey} /> : null}
                 {!token && siteKey ? <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{OWNER_COPY.verifyNeeded}</p> : null}
+                {/* No site key means verification can never happen: say so, as the describe box does, rather than leave a
+                    button that is disabled for no visible reason. */}
+                {siteKey ? null : <Banner variant="warning">{DESCRIBE_COPY.unverifiable}</Banner>}
                 <div>
                   <Button
                     type="button"

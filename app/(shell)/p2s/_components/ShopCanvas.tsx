@@ -99,7 +99,7 @@ export default function ShopCanvas({
           </div>
         ) : null}
 
-        {view.pending.words ? null : (
+        {view.pending.words || !view.announcement?.trim() ? null : (
           <p
             className="text-center text-xs font-semibold px-4 py-2"
             style={{ background: view.accent, color: view.accentTextColor }}

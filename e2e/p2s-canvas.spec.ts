@@ -119,3 +119,20 @@ test('a re-run that fails re-reads the draft instead of restoring blocks the ser
   const onBack = owner.slice(owner.indexOf('onBack={'), owner.indexOf('onDone={'))
   expect(onBack).toContain('router.refresh()')
 })
+
+test('a finished re-run keeps the new shop on screen until the server remount, never the old one', () => {
+  const owner = readFileSync(join(process.cwd(), 'app/(shell)/p2s/_components/OwnerCanvas.tsx'), 'utf8')
+  const onDone = owner.slice(owner.indexOf('onDone={'), owner.indexOf('/>', owner.indexOf('onDone={')))
+  expect(onDone).toContain('router.refresh()')
+  expect(onDone).not.toContain('setRerun(null)')
+})
+
+test('with no site key the owner is told why «Otra versión» cannot run, not left with a dead button', () => {
+  const owner = readFileSync(join(process.cwd(), 'app/(shell)/p2s/_components/OwnerCanvas.tsx'), 'utf8')
+  expect(owner).toContain('{siteKey ? null : <Banner variant="warning">{DESCRIBE_COPY.unverifiable}</Banner>}')
+})
+
+test('an empty announcement draws no empty coloured bar', () => {
+  const canvas = readFileSync(join(process.cwd(), 'app/(shell)/p2s/_components/ShopCanvas.tsx'), 'utf8')
+  expect(canvas).toContain('{view.pending.words || !view.announcement?.trim() ? null : (')
+})
