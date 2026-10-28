@@ -163,8 +163,7 @@ export function validateCatalog(value: unknown): BlockParse<'catalog'> {
 }
 
 export function markExample(row: CatalogImportRow): ExampleRow {
-  const { images: _images, ...rest } = row
-  return { ...rest, images: [], example: true, illustration: illustrationFor(row.category) }
+  return { ...row, images: [], example: true, illustration: illustrationFor(row.category) }
 }
 
 export function illustrationFor(category: unknown): IllustrationKey {

@@ -3,8 +3,9 @@
 -- HOW THIS GETS APPLIED: by the orchestrator, through Supabase MCP `apply_migration`, BEFORE the PR merges
 -- (merging deploys code that reads these tables). Never `supabase db push`: local files are unrecorded remotely,
 -- so a push would replay all of them. MCP records its own timestamp as the version, so realign
--- `supabase_migrations.schema_migrations` to this filename afterwards, then verify live: both tables, both
--- functions, RLS on, and anon/authenticated holding no grants.
+-- `supabase_migrations.schema_migrations` to this filename afterwards, then verify live: both tables, all four
+-- functions, RLS on, and anon/authenticated holding no table grants AND no function EXECUTE
+-- (`has_function_privilege('anon', …, 'execute')` must be false for every function below).
 --
 -- Non-commerce staging (AGENTS rule 2, like supply_batches). Nothing here is a product, a seller or an order: the
 -- examples in `catalog` never reach Medusa, and a draft becomes a shop only through the S3.2 claim.
@@ -66,7 +67,10 @@ BEGIN
   RETURNING a.count INTO new_count;
   RETURN new_count;
 END $$;
-REVOKE ALL ON FUNCTION public.spend_ai_allowance(text, text, text, integer) FROM PUBLIC;
+-- Supabase's default privileges grant EXECUTE on new public functions to anon and authenticated DIRECTLY, so
+-- revoking PUBLIC alone leaves them callable with the browser's anon key — which would let anyone spend the daily
+-- budget to zero without Turnstile. Name both roles. (Verified on a local PG with Supabase's default privileges.)
+REVOKE ALL ON FUNCTION public.spend_ai_allowance(text, text, text, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.spend_ai_allowance(text, text, text, integer) TO service_role;
 
 -- One generation spends a device version AND a unit of the global daily budget, or neither (D4). The function body
@@ -90,5 +94,45 @@ BEGIN
   END IF;
   RETURN jsonb_build_object('ok', true, 'reason', null, 'versions_used', versions);
 END $$;
-REVOKE ALL ON FUNCTION public.spend_p2s_generation(text, integer, text, integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.spend_p2s_generation(text, integer, text, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.spend_p2s_generation(text, integer, text, integer) TO service_role;
+
+-- Give one generation back when the draft write after a successful spend fails (the merchant saw an error and got
+-- no shop, so they must not pay for it). Decrements both counters, never below zero.
+CREATE OR REPLACE FUNCTION public.refund_p2s_generation(p_device text, p_budget_period text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  UPDATE public.ai_allowance SET count = count - 1, updated_at = now()
+    WHERE subject = p_device AND kind = 'version' AND period = 'all' AND count > 0;
+  UPDATE public.ai_allowance SET count = count - 1, updated_at = now()
+    WHERE subject = 'global' AND kind = 'daily_budget' AND period = p_budget_period AND count > 0;
+END $$;
+REVOKE ALL ON FUNCTION public.refund_p2s_generation(text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.refund_p2s_generation(text, text) TO service_role;
+
+-- Save one generated block as ONE statement. Two things a read-then-write in the app could not guarantee:
+--   * block_status is merged in place (`||`), so two blocks saving at once cannot erase each other's status;
+--   * the write lands only while p_version is still the draft's current version, so a superseded run (a double
+--     tap on «Otra versión») stops instead of mixing its blocks into the newer version.
+-- Returns true only when a row was written.
+CREATE OR REPLACE FUNCTION public.save_p2s_block(
+  p_draft uuid, p_device uuid, p_version integer, p_key text, p_data jsonb, p_status text
+) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE hit uuid;
+BEGIN
+  IF p_key NOT IN ('identity', 'words', 'catalog') OR p_status NOT IN ('ok', 'fallback') THEN
+    RAISE EXCEPTION 'save_p2s_block: bad key/status (%, %)', p_key, p_status;
+  END IF;
+  UPDATE public.shop_drafts SET
+      identity = CASE WHEN p_key = 'identity' THEN p_data ELSE identity END,
+      words    = CASE WHEN p_key = 'words'    THEN p_data ELSE words END,
+      catalog  = CASE WHEN p_key = 'catalog'  THEN p_data ELSE catalog END,
+      block_status = block_status || jsonb_build_object(p_key, p_status),
+      updated_at = now()
+    WHERE id = p_draft AND device_id = p_device AND versions_used = p_version
+      AND claimed_by IS NULL AND expires_at > now()
+    RETURNING id INTO hit;
+  RETURN hit IS NOT NULL;
+END $$;
+REVOKE ALL ON FUNCTION public.save_p2s_block(uuid, uuid, integer, text, jsonb, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.save_p2s_block(uuid, uuid, integer, text, jsonb, text) TO service_role;

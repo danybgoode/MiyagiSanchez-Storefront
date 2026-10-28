@@ -30,7 +30,8 @@ function fakes(over: Partial<DraftsDeps> & { spendAnswer?: Spend; turnstileOk?: 
     findOwnedDraft: async (id) => { trace.push('find'); return id === DRAFT ? { id: DRAFT, description: DESCRIPTION } : null },
     createDraft: async () => { trace.push('create'); return { id: DRAFT, description: DESCRIPTION } },
     startVersion: async () => { trace.push('version'); return true },
-    saveBlock: async (_id, _dev, e: BlockEvent) => { trace.push(`save:${e.key}`); return true },
+    saveBlock: async (_id, _dev, version, e: BlockEvent) => { trace.push(`save:${e.key}@${version}`); return true },
+    refund: async () => { trace.push('refund') },
     callModel: async (req) => { trace.push(`model:${req.block}`); return { ok: true, text: goodText[req.block] } },
     modelConfigured: true,
     newDeviceId: () => DEVICE,
@@ -59,7 +60,7 @@ test('a new draft streams exactly three blocks and done, each saved before it is
   expect(events[3].data).toEqual({ draft_id: DRAFT, versions_left: 2 })
   expect(trace).toEqual([
     'turnstile', 'burst', 'spend', 'create',
-    'model:identity', 'save:identity', 'model:words', 'save:words', 'model:catalog', 'save:catalog',
+    'model:identity', 'save:identity@1', 'model:words', 'save:words@1', 'model:catalog', 'save:catalog@1',
   ])
 })
 
@@ -130,9 +131,58 @@ test('a forged or malformed cookie is replaced, never trusted', async () => {
 })
 
 test('a failed save ends the stream with an error, not a done', async () => {
-  const { deps } = fakes({ saveBlock: async (_i, _d, e) => e.key === 'identity' })
+  const { deps } = fakes({ saveBlock: async (_i, _d, _v, e) => e.key === 'identity' })
   const events = await drain(await handleCreateDraft({ body, deviceCookie: DEVICE }, deps))
   expect(events.map((e) => e.event)).toEqual(['block', 'error'])
+})
+
+test('a draft write that fails AFTER the spend refunds it, and never reaches the model', async () => {
+  const create = fakes({ createDraft: async () => null })
+  const created = await handleCreateDraft({ body, deviceCookie: DEVICE }, create.deps)
+  expect(created).toMatchObject({ kind: 'refuse', status: 503, error: 'unavailable' })
+  expect(create.trace).toEqual(['turnstile', 'burst', 'spend', 'refund'])
+
+  const rerun = fakes({ startVersion: async () => false })
+  await handleCreateDraft({ body: { draft_id: DRAFT, turnstile_token: 'tok' }, deviceCookie: DEVICE }, rerun.deps)
+  expect(rerun.trace).toEqual(['turnstile', 'burst', 'find', 'spend', 'refund'])
+})
+
+test('a refused request never refunds what it never spent', async () => {
+  const { deps, trace } = fakes({ spendAnswer: { data: { ok: false, reason: 'allowance', versions_used: 3 }, error: null } })
+  await handleCreateDraft({ body, deviceCookie: DEVICE }, deps)
+  expect(trace).not.toContain('refund')
+})
+
+test('a phone that hangs up mid-stream still gets every block saved', async () => {
+  const { deps, trace } = fakes()
+  const result = await handleCreateDraft({ body, deviceCookie: DEVICE }, deps)
+  if (result.kind !== 'stream') throw new Error('expected a stream')
+  let sent = 0
+  // After the first frame the controller is closed: every later send throws, as ReadableStream does.
+  await expect(result.run(() => { if (sent++ > 0) throw new TypeError('Invalid state: Controller is already closed') })).resolves.toBeUndefined()
+  expect(trace.filter((t) => t.startsWith('save:'))).toEqual(['save:identity@1', 'save:words@1', 'save:catalog@1'])
+})
+
+test('a re-run saves under ITS version, so a superseded run cannot write into the newer one', async () => {
+  const { deps, trace } = fakes({ spendAnswer: { data: { ok: true, reason: null, versions_used: 3 }, error: null } })
+  await drain(await handleCreateDraft({ body: { draft_id: DRAFT, turnstile_token: 'tok' }, deviceCookie: DEVICE }, deps))
+  expect(trace.filter((t) => t.startsWith('save:'))).toEqual(['save:identity@3', 'save:words@3', 'save:catalog@3'])
+})
+
+test('every function in the migration is revoked from anon and authenticated, not only PUBLIC', () => {
+  // Supabase grants EXECUTE on new public functions to anon/authenticated directly; revoking PUBLIC leaves the
+  // budget spendable with the browser's anon key. Found by the S1 verifier on a local PG.
+  const sql = readFileSync(join(process.cwd(), 'supabase', 'migrations', '20261027120000_prompt_to_shop_drafts.sql'), 'utf8')
+  const fns = [...sql.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)\(/g)].map((m) => m[1])
+  expect(fns.sort()).toEqual(['refund_p2s_generation', 'save_p2s_block', 'spend_ai_allowance', 'spend_p2s_generation'])
+  for (const fn of fns) {
+    expect(sql, fn).toMatch(new RegExp(`REVOKE ALL ON FUNCTION public\\.${fn}\\([^)]*\\) FROM PUBLIC, anon, authenticated;`))
+    expect(sql, fn).toMatch(new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${fn}\\([^)]*\\) TO service_role;`))
+  }
+  for (const table of ['shop_drafts', 'ai_allowance']) {
+    expect(sql).toContain(`ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY;`)
+    expect(sql).toContain(`REVOKE ALL ON public.${table} FROM anon, authenticated;`)
+  }
 })
 
 test('body rules: 1–500 characters, a uuid draft id, one of the two', () => {

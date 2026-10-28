@@ -46,7 +46,10 @@ export interface DraftsDeps {
   createDraft: (deviceId: string, description: string, versionsUsed: number) => Promise<DraftRef | null>
   /** Start a new version on an owned draft. Resolves false when no row was updated. */
   startVersion: (draft: DraftRef, deviceId: string, description: string, versionsUsed: number) => Promise<boolean>
-  saveBlock: (draftId: string, deviceId: string, event: BlockEvent) => Promise<boolean>
+  /** Save one block, only while `version` is still the draft's current one (a superseded run stops). */
+  saveBlock: (draftId: string, deviceId: string, version: number, event: BlockEvent) => Promise<boolean>
+  /** Give a spent generation back. Best effort: a failed refund is logged, never surfaced. */
+  refund: (args: { subject: string }) => Promise<void>
   callModel: (req: ModelRequest) => Promise<ModelResult>
   modelConfigured: boolean
   newDeviceId: () => string
@@ -129,27 +132,41 @@ export async function handleCreateDraft(
     return withDevice(refuse(503, 'unavailable'))
   }
 
+  // The spend is claimed; if the draft write after it fails, the merchant got nothing, so they pay nothing.
+  const refundAndRefuse = async () => {
+    await deps.refund({ subject: deviceSubject(deviceId) }).catch(() => {})
+    deps.log?.({ event: 'refunded', reason: 'draft_write_failed' })
+    return withDevice(refuse(503, 'unavailable'))
+  }
   const description = parsed.description ?? draft?.description ?? ''
   if (draft) {
-    if (!(await deps.startVersion(draft, deviceId, description, spend.versionsUsed))) {
-      return withDevice(refuse(503, 'unavailable'))
-    }
+    if (!(await deps.startVersion(draft, deviceId, description, spend.versionsUsed))) return refundAndRefuse()
   } else {
     draft = await deps.createDraft(deviceId, description, spend.versionsUsed)
-    if (!draft) return withDevice(refuse(503, 'unavailable'))
+    if (!draft) return refundAndRefuse()
   }
 
   const draftId = draft.id
+  const version = spend.versionsUsed
   const versionsLeft = spend.versionsLeft
   return withDevice({
     kind: 'stream',
     draftId,
     versionsLeft,
-    run: async (send) => {
+    run: async (rawSend) => {
+      // The phone may hang up mid-stream. Sending then throws, and that must not abort generation: the blocks are
+      // already paid for, and saving them is what lets a reload bring the shop back.
+      const send = (event: string, data: unknown) => {
+        try {
+          rawSend(event, data)
+        } catch {
+          // client gone — keep generating and saving
+        }
+      }
       try {
         const outcome = await generateDraft(description, {
           callModel: deps.callModel,
-          saveBlock: (event) => deps.saveBlock(draftId, deviceId, event),
+          saveBlock: (event) => deps.saveBlock(draftId, deviceId, version, event),
           emit: (event) => send('block', event),
           log: (line) => deps.log?.({ event: 'block', draft_id: draftId, ...line }),
         })

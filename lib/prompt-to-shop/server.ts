@@ -98,20 +98,17 @@ export function draftsDeps(ip: string): DraftsDeps {
         .select('id')
       return !error && Array.isArray(data) && data.length === 1
     },
-    saveBlock: async (draftId, deviceId, event) => {
-      // block_status is rewritten from the current row so one block's status never erases another's.
-      const { data: row, error: readError } = await db
-        .from('shop_drafts').select('block_status').eq('id', draftId).eq('device_id', deviceId).maybeSingle()
-      if (readError || !row) return false
-      const blockStatus = { ...((row as { block_status?: Record<string, string> }).block_status ?? {}), [event.key]: event.status }
-      const { data, error } = await db
-        .from('shop_drafts')
-        .update({ [event.key]: event.data, block_status: blockStatus, updated_at: new Date().toISOString() })
-        .eq('id', draftId)
-        .eq('device_id', deviceId)
-        .is('claimed_by', null)
-        .select('id')
-      return !error && Array.isArray(data) && data.length === 1
+    saveBlock: async (draftId, deviceId, version, event) => {
+      // One statement in Postgres (`save_p2s_block`): the status merge is atomic and a superseded version stops.
+      const { data, error } = await db.rpc('save_p2s_block', {
+        p_draft: draftId, p_device: deviceId, p_version: version,
+        p_key: event.key, p_data: event.data, p_status: event.status,
+      })
+      return !error && data === true
+    },
+    refund: async ({ subject }) => {
+      const { error } = await db.rpc('refund_p2s_generation', { p_device: subject, p_budget_period: budgetPeriod(new Date()) })
+      if (error) console.error('[p2s] refund failed', error.message)
     },
     callModel: callGemini,
     modelConfigured: !!process.env.GEMINI_API_KEY,
