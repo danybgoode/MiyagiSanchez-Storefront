@@ -209,6 +209,18 @@ export const allowedLiteralRules: AllowedLiteralRule[] = [
     contains: "accent_color: '#1d6f42'",
     reason: 'Storefront-as-Code example manifest needs a concrete persisted accent default',
   },
+  {
+    path: 'lib/prompt-to-shop/blocks.ts',
+    literal: '#ffffff',
+    contains: "const PAGE_WHITE = '#ffffff'",
+    reason: 'Prompt-to-shop measures a generated accent against the white page it renders on (a contrast input, never painted)',
+  },
+  ...['#1f6f5c', '#8a3b12', '#2f4b8a', '#6b2f6b'].map((literal) => ({
+    path: 'lib/prompt-to-shop/blocks.ts',
+    literal,
+    contains: 'const FALLBACK_ACCENTS',
+    reason: 'Prompt-to-shop fallback accents are persisted shop data (accent_color), like the example manifest above',
+  })),
 ]
 
 // Two deliberately-styled dark "terminal" code/DNS-record previews (seller-portal-rails-
