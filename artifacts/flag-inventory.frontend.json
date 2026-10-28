@@ -552,6 +552,8 @@
       "criticality": "high",
       "enforcement": "both",
       "callsites": [
+        "app/(shell)/sell/armar/cobros/page.tsx:37",
+        "app/(shell)/sell/armar/page.tsx:69",
         "app/(shell)/shop/manage/settings/[section]/page.tsx:97"
       ]
     },

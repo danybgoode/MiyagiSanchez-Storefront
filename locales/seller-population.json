@@ -9,6 +9,7 @@
     "app/(shell)/sell/AttrsSection.tsx",
     "app/(shell)/sell/InspectionReportField.tsx",
     "app/(shell)/sell/SellWizard.tsx",
+    "app/(shell)/sell/armar/cobros/page.tsx",
     "app/(shell)/sell/armar/page.tsx",
     "app/(shell)/sell/edit/[id]/EditForm.tsx",
     "app/(shell)/sell/edit/[id]/OpcionesSection.tsx",

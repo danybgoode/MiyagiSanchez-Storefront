@@ -136,6 +136,8 @@ const DRAFT_READERS = new Set([
   'lib/prompt-to-shop/server.ts',
   'lib/prompt-to-shop/claim-server.ts',
   'lib/prompt-to-shop/photo-server.ts',
+  // S5.4: the nudge cron reads kept drafts and records which reminders went (`block_status.nudges`).
+  'lib/prompt-to-shop/nudges-server.ts',
 ])
 
 test('no marketplace, search or sitemap module reads shop_drafts — and only the prompt-to-shop rail does at all', () => {

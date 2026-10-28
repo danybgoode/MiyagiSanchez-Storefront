@@ -3,10 +3,12 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import ClaimRunner from '@/app/(shell)/p2s/_components/ClaimRunner'
 import KeptShop from '@/app/(shell)/p2s/_components/KeptShop'
+import { isEnabled } from '@/lib/flags'
 import { getMySeller } from '@/lib/get-my-seller'
 import { filterOutDeleted } from '@/lib/listing-lifecycle'
 import { photosLeft } from '@/lib/prompt-to-shop/allowance'
 import { findKeptDraft } from '@/lib/prompt-to-shop/claim-server'
+import { readChooserState, type CobrosSettings } from '@/lib/prompt-to-shop/cobros'
 import { ARMAR_COPY } from '@/lib/prompt-to-shop/copy'
 import { publishState } from '@/lib/prompt-to-shop/photo'
 import { listOwnProducts, photosUsedThisMonth } from '@/lib/prompt-to-shop/photo-server'
@@ -59,11 +61,12 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
   if (kept?.sellerId) {
     const { getToken } = await auth()
     const clerkJwt = await getToken()
-    const [seller, guideShop, listings, used] = await Promise.all([
+    const [seller, guideShop, listings, used, correosAvailable] = await Promise.all([
       getMySeller(),
       fetchGuideShop(userId),
       clerkJwt ? listOwnProducts(clerkJwt) : Promise.resolve(null),
       photosUsedThisMonth(userId),
+      isEnabled('shipping.correos_enabled'),
     ])
     const deletedIds = guideShop?.id ? await fetchDeletedListingIds(guideShop.id) : new Set<string>()
     // Resumen counts an unreadable product list as none for the checklist; so does this, for the same %. «Publicar»
@@ -80,6 +83,9 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
         publish={publishState(own ? own.length : null)}
         photosLeft={photosLeft(used)}
         profile={{ name: guideShop?.name ?? kept.blocks.identity?.name ?? '', description: guideShop?.description ?? '' }}
+        market={seller?.market ?? 'mx'}
+        chooser={readChooserState((guideShop?.metadata as { settings?: CobrosSettings } | null)?.settings)}
+        correosAvailable={correosAvailable}
       />
     )
   }

@@ -29,11 +29,8 @@ import { ToggleSwitch } from '../_components/ToggleSwitch'
 import { CopyPromptButton } from '../_components/CopyPromptButton'
 import type { ShopStripe, CheckoutSettings } from '@/lib/shop-settings/types'
 
-const MX_BANKS = [
-  'BBVA', 'Banorte', 'Santander', 'Citibanamex', 'HSBC', 'Scotiabank',
-  'Banco Azteca', 'Inbursa', 'BanCoppel', 'Afirme', 'Banregio', 'BanBajío',
-  'Nu', 'Hey Banco', 'Klar', 'Mercado Pago', 'Otro',
-]
+// The CLABE rule and the bank list live in `lib/clabe.ts`, shared with the prompt-to-shop cobros chooser.
+import { CLABE_LENGTH, MX_BANKS, clabeComplete, normalizeClabeInput } from '@/lib/clabe'
 
 const ESCROW_OPTIONS: { key: 'off' | 'optional' | 'required'; label: string; desc: string; color: string }[] = [
   { key: 'off',      label: 'Desactivado',  desc: 'Sin Compra Protegida. El comprador paga directo al vendedor.',    color: 'border-[var(--neutral)] bg-[var(--neutral-soft)]' },
@@ -83,7 +80,7 @@ export default function Pagos({
   const [clabe, setClabe]               = useState(bt?.clabe ?? '')
   const [bankName, setBankName]         = useState(bt?.bank_name ?? '')
   const [accountHolder, setAccountHolder] = useState(bt?.account_holder ?? '')
-  const [bankIsOther, setBankIsOther]   = useState(!!bt?.bank_name && !MX_BANKS.includes(bt.bank_name))
+  const [bankIsOther, setBankIsOther]   = useState(!!bt?.bank_name && !(MX_BANKS as readonly string[]).includes(bt.bank_name))
   // Both are on `CheckoutSettings` now, so this reads the real type — the
   // hand-written cast that used to stand in here is gone, and with it its
   // guess that `phone` was a plain `string` (it is nullable, and production
@@ -417,13 +414,13 @@ export default function Pagos({
               </label>
               <input
                 value={clabe}
-                onChange={e => { setClabe(e.target.value.replace(/\D/g, '').slice(0, 18)); mark() }}
-                maxLength={18}
+                onChange={e => { setClabe(normalizeClabeInput(e.target.value)); mark() }}
+                maxLength={CLABE_LENGTH}
                 placeholder="18 dígitos"
                 className="w-full border border-[var(--color-border)] rounded-[var(--r-sm)] px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
               />
-              {clabe && clabe.length !== 18 && (
-                <p className="text-[var(--warning)] text-xs mt-1"><i className="iconoir-warning-triangle" aria-hidden /> La CLABE debe tener exactamente 18 dígitos ({clabe.length}/18)</p>
+              {clabe && !clabeComplete(clabe) && (
+                <p className="text-[var(--warning)] text-xs mt-1"><i className="iconoir-warning-triangle" aria-hidden /> La CLABE debe tener exactamente 18 dígitos ({clabe.length}/{CLABE_LENGTH})</p>
               )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -461,7 +458,7 @@ export default function Pagos({
                 />
               </div>
             </div>
-            {clabe && clabe.length === 18 ? (
+            {clabe && clabeComplete(clabe) ? (
               <div className="bg-[var(--info-soft)] border border-[var(--info)] rounded-[var(--r-md)] px-3 py-2.5 text-xs text-[var(--info)] space-y-1">
                 <p className="font-semibold">Vista previa — lo que verá el comprador:</p>
                 <div className="bg-[var(--bg-elevated)] border border-[var(--info)] rounded-[var(--r-sm)] px-3 py-2 space-y-0.5 font-mono">

@@ -7,7 +7,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import CheckoutPayButton from '@/app/components/CheckoutPayButton'
 import type { CartItem } from '@/app/components/CartContext'
-import type { CheckoutFulfillmentMethod, CheckoutProvider, ManualSubType, CheckoutShippingAddress, CheckoutShippingQuote } from '@/lib/cart'
+import type { CheckoutFulfillmentMethod, CheckoutProvider, CheckoutShippingAddress, CheckoutShippingQuote } from '@/lib/cart'
+import type { CheckoutOptions } from '@/lib/checkout-options'
 import { type PersonalizationPayload, type PersonalizationField, readStashedPersonalization } from '@/lib/personalization'
 import PersonalizationEcho from '@/app/components/PersonalizationEcho'
 import { shouldOfferCoordinatedFallback, pickManualPaymentId, isCoordDeliverySelected } from '@/lib/checkout-fallback'
@@ -16,26 +17,8 @@ import { computeCheckoutTotal } from '@/lib/checkout-total'
 import { PICKUP_WINDOWS } from '@/lib/pickup-appointment'
 import type { MarketCode } from '@/lib/markets'
 
-// ── Shapes returned by /api/checkout/options (Medusa source of truth) ────────
-type PickupSpot = { id: string; name?: string; address?: string; hours?: string; scheduling_url?: string; notes?: string }
-type DeliveryMethod = {
-  id: CheckoutFulfillmentMethod
-  label: string
-  note: string
-  requires_address?: boolean
-  requires_pickup_spot?: boolean
-  pickup_spots?: PickupSpot[]
-}
-type ManualSubOption = { type: ManualSubType; label: string; note: string; requires_pickup?: boolean }
-type PaymentMethod = { id: CheckoutProvider; kind: 'online' | 'manual'; label: string; note: string; instant: boolean; protected?: boolean; sub_options?: ManualSubOption[] }
-type CheckoutOptions = {
-  payment_methods: PaymentMethod[]
-  payment_default: CheckoutProvider | null
-  delivery_methods: DeliveryMethod[]
-  delivery_default: CheckoutFulfillmentMethod | null
-  only_coordinated: boolean
-  preparation: string | null
-}
+// The /api/checkout/options response shapes live in lib/checkout-options.ts, shared with the prompt-to-shop
+// checkout preview (S5.1) so the preview and this page can never read different shapes.
 
 type ShippingRate = {
   id: string

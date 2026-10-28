@@ -12,7 +12,10 @@
  * today's behaviour with no backfill.
  */
 
-export const EVENT_GROUPS = ['orders', 'offers', 'payments', 'returns', 'mensajes'] as const
+// `onboarding` (prompt-to-shop S5.4, D19): the day 1/3/7 reminders to finish a shop. A SELLER group — it is about the
+// merchant's own shop — so it sits here and never in `BUYER_EVENT_GROUPS`. `notification_preferences.event_group` has
+// no CHECK constraint (verified live before S5), so a new group needs no migration.
+export const EVENT_GROUPS = ['orders', 'offers', 'payments', 'returns', 'mensajes', 'onboarding'] as const
 export type EventGroup = (typeof EVENT_GROUPS)[number]
 
 export const CHANNELS = ['email', 'push', 'telegram'] as const
@@ -48,6 +51,8 @@ export const EVENT_GROUP = {
   ml_order_shipped: 'orders',
   ml_order_delivered: 'orders',
   ml_order_cancelled: 'orders',
+  // Platform-triggered, never the seller's own click: the cron sends it to a merchant who stopped half way.
+  p2s_nudge: 'onboarding',
 } as const satisfies Record<string, EventGroup>
 export type SellerEventKind = keyof typeof EVENT_GROUP
 
@@ -158,6 +163,7 @@ export const GROUP_COPY: Record<EventGroup, { label: string; summary: string }> 
   payments: { label: 'Pagos',        summary: 'Cuando el comprador avisa que ya pagó.' },
   returns:  { label: 'Devoluciones', summary: 'Cuando un comprador solicita una devolución.' },
   mensajes: { label: 'Mensajes',     summary: 'Cuando alguien te escribe sobre un anuncio.' },
+  onboarding: { label: 'Arma tu tienda', summary: 'Un recordatorio del paso que te falta para publicar tu tienda.' },
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

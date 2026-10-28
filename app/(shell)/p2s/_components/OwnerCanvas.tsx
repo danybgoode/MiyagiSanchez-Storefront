@@ -7,6 +7,7 @@ import { Banner } from '@/components/feedback/Banner'
 import { versionsLeftCopy } from '@/lib/prompt-to-shop/allowance'
 import { patchDraft } from '@/lib/prompt-to-shop/client'
 import { DESCRIBE_COPY, OWNER_COPY } from '@/lib/prompt-to-shop/copy'
+import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 import { draftView, type DraftBlocks } from '@/lib/prompt-to-shop/view'
 import type { CanvasControl } from '@/lib/prompt-to-shop/access'
 import KeepSheet from './KeepSheet'
@@ -60,6 +61,10 @@ export default function OwnerCanvas({
   const savedName = useRef(initial.identity?.name ?? '')
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+
+  // Funnel step 2 (S5.3): the owner saw their whole shop — every block landed. Once per draft.
+  const allLanded = !!(initial.identity && initial.words && initial.catalog)
+  useEffect(() => { if (allLanded) trackFunnel('p2s_preview_rendered', draftId) }, [allLanded, draftId])
 
   const can = (c: CanvasControl) => controls.includes(c)
 
@@ -207,7 +212,12 @@ export default function OwnerCanvas({
                     type="button"
                     variant="secondary"
                     disabled={!token}
-                    onClick={() => { if (token) setRerun({ token, tone }) }}
+                    onClick={() => {
+                      if (!token) return
+                      // Funnel step 3 (S5.3): the first «Otra versión» on this draft.
+                      trackFunnel('p2s_version_requested', draftId, { tone: tone || null })
+                      setRerun({ token, tone })
+                    }}
                     data-testid="p2s-another-version"
                   >
                     {OWNER_COPY.anotherVersion}

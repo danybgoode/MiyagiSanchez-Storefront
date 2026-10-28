@@ -24,11 +24,17 @@ const CLIENT_FILES = [
   'app/(shell)/p2s/_components/KeptShop.tsx',
   'app/(shell)/p2s/_components/OwnerSheet.tsx',
   'app/(shell)/p2s/_components/PhotoSheet.tsx',
+  'app/(shell)/p2s/_components/CobrosChooser.tsx',
+  'app/(shell)/p2s/_components/PublishedMoment.tsx',
   'lib/prompt-to-shop/client.ts',
   'lib/prompt-to-shop/copy.ts',
   'lib/prompt-to-shop/view.ts',
   'lib/prompt-to-shop/illustrations.ts',
   'lib/prompt-to-shop/constants.ts',
+  'lib/prompt-to-shop/cobros.ts',
+  'lib/prompt-to-shop/funnel.ts',
+  'lib/checkout-options.ts',
+  'lib/clabe.ts',
 ]
 
 /** Modules that must never be a VALUE import of a browser module. Type imports are erased and are fine. */

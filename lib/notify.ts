@@ -47,7 +47,8 @@ export type NotifyEvent = {
   // overdue. Additive only: `public/sw.js` never switches on `kind` (it only
   // reads `title`/`body`/`url`/`tag` generically), so this widening is a
   // zero-blast-radius change to every existing caller.
-  kind: 'new_message' | 'offer' | 'order' | 'portfolio_reminder'
+  // 'onboarding_nudge' (prompt-to-shop S5.4): the day 1/3/7 reminder to finish a shop. Additive, like the one above.
+  kind: 'new_message' | 'offer' | 'order' | 'portfolio_reminder' | 'onboarding_nudge'
   title: string
   body: string
   url: string
