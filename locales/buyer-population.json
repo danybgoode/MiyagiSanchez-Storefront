@@ -115,6 +115,7 @@
     "app/(shell)/_shop-sections/CollectionsIndexBody.tsx",
     "app/(shell)/_shop-sections/EventsIndexBody.tsx",
     "app/(shell)/_shop-sections/ShopIndexBody.tsx",
+    "app/(shell)/_shop-sections/ShopIndexGrid.tsx",
     "app/(shell)/_shop-sections/ShopSectionNav.tsx",
     "app/(shell)/_shop-sections/ShopThemeShell.tsx",
     "app/(shell)/_wall/WallEntryCard.tsx",
@@ -337,6 +338,7 @@
     ],
     "noLiteralUiCopy": [
       "app/(mx-site)/layout.tsx",
+      "app/(shell)/_shop-sections/ShopIndexGrid.tsx",
       "app/(shell)/account/favorites/page.tsx",
       "app/(shell)/account/notificaciones/BuyerNotificationPreferences.tsx",
       "app/(shell)/account/notificaciones/page.tsx",
