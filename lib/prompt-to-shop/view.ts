@@ -43,7 +43,10 @@ export interface CanvasView {
   theme: ResolvedTheme
   accent: string
   accentTextColor: string
-  /** The swatches the picker shows: the current accent first, then the three stored alternates (S2.4). */
+  /**
+   * The swatches the picker shows: the current accent plus the three stored alternates, SORTED. Picking one swaps it
+   * with the old accent in storage (PATCH), so the set never changes and a stable order keeps the picker from jumping.
+   */
   accentAlternates: string[]
   name: string | null
   tagline: string | null
@@ -110,7 +113,7 @@ export function draftView(draftId: string, draft: DraftBlocks): CanvasView {
     theme: resolveTheme(settings),
     accent,
     accentTextColor: readableTextOn(identity?.accent_color),
-    accentAlternates: identity ? [identity.accent_color, ...identity.accent_alternates] : [],
+    accentAlternates: identity ? [identity.accent_color, ...identity.accent_alternates].sort() : [],
     name: identity?.name ?? null,
     tagline: identity?.tagline ?? null,
     description: identity?.description ?? null,

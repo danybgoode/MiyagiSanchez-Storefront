@@ -2,7 +2,7 @@ import type { Listing } from '@/lib/types'
 import { formatPrice } from '@/lib/listings'
 import { hasExcerpt } from '@/lib/excerpt'
 import ClosetListingCard from '@/app/(shell)/s/[slug]/ClosetListingCard'
-import { listingHref } from '@/lib/shop-presentation/chrome'
+import { listingHref, SHOP_INDEX_GRID_CLASS } from '@/lib/shop-presentation/chrome'
 
 /**
  * The shop index's product grid, presentational (prompt-to-shop D14).
@@ -11,9 +11,6 @@ import { listingHref } from '@/lib/shop-presentation/chrome'
  * the listings as props so a surface that has no Medusa shop behind it (the prompt-to-shop canvas) can reuse the
  * grid's geometry instead of forking a second one that drifts. This component itself fetches nothing.
  */
-
-/** The grid's layout, exported so the draft canvas lays its EJEMPLO cards out on the very same columns. */
-export const SHOP_INDEX_GRID_CLASS = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3'
 
 export default function ShopIndexGrid({
   listings,

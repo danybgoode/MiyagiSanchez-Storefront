@@ -45,7 +45,10 @@ test('words and identity map to the shell props', () => {
     about: 'Somos una familia poblana.', announcement: 'Pedidos con un día de anticipación.',
   })
   expect(view.shop).toMatchObject({ id: DRAFT, name: 'Tamales La Abuela', location: 'Puebla, Puebla', logo_url: null, metadata: null })
-  expect(view.accentAlternates).toEqual(['#8a3b12', '#1f6f5c', '#2f4b8a', '#6b2f6b'])
+  expect(view.accentAlternates).toEqual(['#1f6f5c', '#2f4b8a', '#6b2f6b', '#8a3b12'])
+  // Picking one swaps it into storage, so the set is stable and so is the order.
+  const swapped = draftView(DRAFT, { ...full, identity: { ...identity, accent_color: '#1f6f5c', accent_alternates: ['#8a3b12', '#2f4b8a', '#6b2f6b'] } })
+  expect(swapped.accentAlternates).toEqual(view.accentAlternates)
 })
 
 test('example cards carry EJEMPLO, an illustration, and an es-MX suggested price', () => {
