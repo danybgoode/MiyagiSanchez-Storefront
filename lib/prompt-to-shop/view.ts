@@ -29,6 +29,8 @@ export interface DraftBlocks {
 
 export interface ExampleCardView {
   key: string
+  /** Position in the draft's `catalog` — with the title, what «Cambiar por mi foto» says it replaces (S4.3). */
+  index: number
   title: string
   description: string
   /** Formatted es-MX, e.g. «$1,850» — a SUGGESTED price, labelled as such by the canvas. */
@@ -73,6 +75,7 @@ export function formatSuggestedPrice(price: number, currency: string | undefined
 export function exampleCards(rows: ExampleRow[]): ExampleCardView[] {
   return rows.map((row, i) => ({
     key: `example-${i}`,
+    index: i,
     title: row.title,
     description: row.description ?? '',
     priceLabel: formatSuggestedPrice(row.price ?? 0, row.currency),
@@ -128,4 +131,24 @@ export function draftView(draftId: string, draft: DraftBlocks): CanvasView {
       catalog: !!catalog && status.catalog === 'fallback',
     },
   }
+}
+
+/** One of the merchant's OWN products on the kept-shop canvas (S4.2/S4.3): a real Medusa product, never an example. */
+export interface OwnProductCardView {
+  id: string
+  title: string
+  priceLabel: string | null
+  imageUrl: string | null
+  published: boolean
+}
+
+export function ownProductCards(listings: Array<{ id: string; title: string; price_cents: number | null; currency: string | null; status: string; images?: Array<{ url: string }> }>): OwnProductCardView[] {
+  return listings.map((l) => ({
+    id: l.id,
+    title: l.title,
+    priceLabel: typeof l.price_cents === 'number' ? formatSuggestedPrice(l.price_cents / 100, l.currency ?? undefined) : null,
+    imageUrl: l.images?.[0]?.url ?? null,
+    // The seller listing projects Medusa `published` as `active` (backend `_utils/listing.ts`).
+    published: l.status === 'active',
+  }))
 }

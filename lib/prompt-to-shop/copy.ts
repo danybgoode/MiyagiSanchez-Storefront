@@ -159,3 +159,86 @@ export const ARMAR_COPY = {
   /** Only for a request that died without the server saying why. */
   failed: 'Se cortó la conexión mientras guardábamos tu tienda. Inténtalo de nuevo.',
 } as const
+
+// ── Make it yours: the checklist, photo → product and «Publicar» (S4, /sell/armar) ───────────────────────────────
+//
+// «borrador» is a banned word on these screens (p2s-copy.spec.ts), so a Medusa draft product reads «Sin publicar».
+
+/**
+ * The canvas names for `getSetupSteps`' five ids (D17). The steps and their `done` are getSetupSteps', unchanged;
+ * only the label differs, so the % is Resumen's.
+ */
+export const CHECKLIST_LABELS = {
+  perfil: 'Perfil',
+  catalogo: 'Fotos',
+  pagos: 'Cobros',
+  envios: 'Entregas',
+  comparte: 'Comparte',
+} as const
+
+export const CHECKLIST_COPY = {
+  title: 'Tu tienda',
+  progress: (done: number, total: number, percent: number) => `${done} de ${total} · ${percent}%`,
+  done: 'Listo',
+  todo: 'Pendiente',
+  open: 'Abrir',
+  close: 'Cerrar',
+  noGuide: 'No pudimos cargar tus pasos ahora. Recarga la página en un momento.',
+  perfilTitle: 'Tu perfil',
+  perfilLead: 'Un nombre y una descripción claros dan confianza a quien te compra.',
+  nameLabel: 'Nombre de tu tienda',
+  descriptionLabel: 'Descripción',
+  save: 'Guardar',
+  saving: 'Guardando…',
+  saved: 'Guardado',
+  saveFailed: 'No pudimos guardar ahora. Inténtalo de nuevo.',
+  cobrosTitle: 'Cobros',
+  cobrosLead: 'Conecta cómo te pagan: Mercado Pago o transferencia bancaria. Sin esto nadie puede pagarte.',
+  entregasTitle: 'Entregas',
+  entregasLead: 'Di cómo entregas: en persona, por paquetería o para recoger.',
+  goSettings: 'Configurar ahora',
+  comparteTitle: 'Comparte tu tienda',
+  comparteLead: 'Manda tu enlace a tus primeros compradores.',
+  copyLink: 'Copiar enlace',
+  copied: 'Enlace copiado',
+  copyManual: 'Copia el enlace:',
+  fotosTitle: 'Tus fotos',
+  fotosLead: 'Toma o elige una foto de lo que vendes y llenamos la ficha por ti.',
+} as const
+
+export const PHOTO_COPY = {
+  // The sheet
+  take: 'Tomar foto',
+  pick: 'Elegir de mi galería',
+  replace: 'Cambiar por mi foto',
+  uploading: 'Subiendo tu foto…',
+  reading: 'Viendo tu foto…',
+  titleLabel: 'Nombre',
+  descriptionLabel: 'Descripción',
+  categoryLabel: 'Categoría',
+  priceLabel: 'Precio (MXN)',
+  priceHint: 'Es una sugerencia: pon el precio que tú quieras.',
+  confirm: 'Confirmar y agregar',
+  confirming: 'Agregando…',
+  added: 'Listo, ya está en tu tienda (sin publicar).',
+  another: 'Agregar otra foto',
+  unpublished: 'Sin publicar',
+  yourProducts: 'Tus productos',
+  // The server's answers (shown verbatim)
+  fillYourself: 'No pudimos leer bien esta foto. Llena la ficha tú y la agregamos.',
+  badPhoto: 'Esa foto no la subiste aquí. Tómala o elígela de nuevo.',
+  noShop: 'Primero quédate con tu tienda para agregar productos.',
+  signedOut: 'Inicia sesión para agregar productos a tu tienda.',
+  unavailable: 'No pudimos guardar ahora. Inténtalo de nuevo en un momento: no se gastó ninguna foto.',
+  rateLimited: 'Vas muy rápido. Espera unos minutos y vuelve a intentarlo.',
+  invalid: 'Algo no llegó bien. Vuelve a intentarlo.',
+  invalidCard: 'Revisa la ficha: el nombre necesita al menos 5 letras y el precio debe ser mayor que cero.',
+  inProgress: 'Ya estamos agregando este producto. Espera un momento.',
+  createFailed: 'No pudimos agregar el producto ahora. Toca «Confirmar» otra vez: esta foto ya está pagada y no se cobra de nuevo.',
+  uploadFailed: 'No pudimos subir tu foto. Revisa tu conexión e inténtalo de nuevo.',
+  // «Publicar» (S4.3)
+  publish: 'Publicar',
+  publishNeedsProduct: 'Agrega al menos un producto tuyo',
+  publishUnknown: 'No pudimos revisar tus productos ahora. Recarga la página.',
+  publishReady: 'Revisa tus productos y publícalos desde tu panel.',
+} as const

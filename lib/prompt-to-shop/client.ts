@@ -11,7 +11,8 @@
 import type { IdentityBlock } from './blocks'
 import type { ClaimOutcome } from './claim'
 import type { BlockEvent } from './planner'
-import { ARMAR_COPY, KEEP_COPY, OWNER_COPY, SHAPING_COPY } from './copy'
+import { ARMAR_COPY, CHECKLIST_COPY, KEEP_COPY, OWNER_COPY, PHOTO_COPY, SHAPING_COPY } from './copy'
+import type { PhotoSuggestion } from './photo'
 
 const SAVE_FAILED = OWNER_COPY.saveFailed
 
@@ -176,4 +177,95 @@ export async function claimDraft(
     // fall through
   }
   return { kind: 'retry', message: ARMAR_COPY.failed }
+}
+
+// ── Make it yours (S4) ───────────────────────────────────────────────────────────────────────────────────────────
+
+/** `POST /api/sell/upload` — the merchant's photo to our own storage. The URL it returns is the only one the photo
+ *  routes accept. */
+export async function uploadPhoto(file: File, deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) }): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await deps.fetch('/api/sell/upload', { method: 'POST', body: form, credentials: 'same-origin' })
+    const data = (await res.json().catch(() => null)) as { url?: unknown; error?: unknown } | null
+    if (res.ok && typeof data?.url === 'string') return { ok: true, url: data.url }
+    return { ok: false, message: typeof data?.error === 'string' && data.error ? data.error : PHOTO_COPY.uploadFailed }
+  } catch {
+    return { ok: false, message: PHOTO_COPY.uploadFailed }
+  }
+}
+
+export type AnalyzeResult =
+  | { ok: true; suggestion: PhotoSuggestion | null; message: string | null; photosLeft: number | null }
+  | { ok: false; message: string; code: string | null }
+
+/** `POST /api/p2s/photo`. A refusal's `error` is merchant-facing and shown verbatim. */
+export async function analyzePhotoRequest(imageUrl: string, deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) }): Promise<AnalyzeResult> {
+  try {
+    const res = await deps.fetch('/api/p2s/photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ image_url: imageUrl }),
+    })
+    const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    if (res.ok && data?.ok === true) {
+      return {
+        ok: true,
+        suggestion: (data.suggestion as PhotoSuggestion | null) ?? null,
+        message: typeof data.message === 'string' ? data.message : null,
+        photosLeft: typeof data.photos_left === 'number' ? data.photos_left : null,
+      }
+    }
+    return { ok: false, message: typeof data?.error === 'string' && data.error ? data.error : PHOTO_COPY.fillYourself, code: typeof data?.code === 'string' ? data.code : null }
+  } catch {
+    return { ok: false, message: PHOTO_COPY.uploadFailed, code: null }
+  }
+}
+
+export interface ConfirmBody {
+  nonce: string
+  image_url: string
+  card: PhotoSuggestion
+  replace?: { index: number; title: string } | null
+}
+
+export type ConfirmResult =
+  | { ok: true; productId: string; duplicate: boolean; photosLeft: number | null }
+  | { ok: false; status: number; message: string; code: string | null }
+
+/** `POST /api/p2s/photo/confirm`. A dead connection is a failure the merchant retries with the SAME nonce. */
+export async function confirmPhotoRequest(body: ConfirmBody, deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) }): Promise<ConfirmResult> {
+  try {
+    const res = await deps.fetch('/api/p2s/photo/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body),
+    })
+    const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    if (res.ok && data?.ok === true && typeof data.product_id === 'string') {
+      return { ok: true, productId: data.product_id, duplicate: data.duplicate === true, photosLeft: typeof data.photos_left === 'number' ? data.photos_left : null }
+    }
+    return { ok: false, status: res.status, message: typeof data?.error === 'string' && data.error ? data.error : PHOTO_COPY.createFailed, code: typeof data?.code === 'string' ? data.code : null }
+  } catch {
+    return { ok: false, status: 0, message: PHOTO_COPY.createFailed, code: null }
+  }
+}
+
+/** `PATCH /api/sell/shop` from the BROWSER (its own cookie) — the seam every settings section saves through. */
+export async function patchShop(payload: Record<string, unknown>, deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) }): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await deps.fetch('/api/sell/shop', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    })
+    const data = (await res.json().catch(() => null)) as { error?: unknown } | null
+    return { ok: res.ok, message: res.ok ? CHECKLIST_COPY.saved : typeof data?.error === 'string' && data.error ? data.error : CHECKLIST_COPY.saveFailed }
+  } catch {
+    return { ok: false, message: CHECKLIST_COPY.saveFailed }
+  }
 }

@@ -85,3 +85,38 @@ export function versionsLeftCopy(left: number): string {
   if (left <= 0) return 'Ya no te quedan versiones'
   return left === 1 ? 'Te queda 1 versión' : `Te quedan ${left} versiones`
 }
+
+// ── Photo → product (epic S4.2) ──────────────────────────────────────────────────────────────────────────────────
+
+export type PhotoSpendDecision =
+  | { ok: true; used: number; left: number }
+  | { ok: false; reason: 'allowance' | 'unavailable' }
+
+/**
+ * Read the `spend_ai_allowance(user:<id>, 'photo', YYYY-MM, cap)` answer. That function returns the NEW count, or
+ * `NULL` at the cap (D4). Fails CLOSED (D5): an RPC error, or any answer that is not an integer in 1..cap, is
+ * `unavailable` — never a spend. A `null` with no error is the one answer that means "the cap is reached".
+ */
+export function decidePhotoSpend(rpc: { data: unknown; error: unknown }, cap: number = P2S_LIMITS.photosPerMonth): PhotoSpendDecision {
+  if (rpc.error) return { ok: false, reason: 'unavailable' }
+  if (rpc.data === null) return { ok: false, reason: 'allowance' }
+  const used = rpc.data
+  if (typeof used !== 'number' || !Number.isInteger(used) || used < 1 || used > cap) return { ok: false, reason: 'unavailable' }
+  return { ok: true, used, left: cap - used }
+}
+
+/**
+ * Photos left this month from a READ of the ledger (not a spend). Three states: a number, or `null` when the read
+ * failed — "could not check" is not "20 left" and not "0 left".
+ */
+export function photosLeft(count: number | null | undefined, cap: number = P2S_LIMITS.photosPerMonth): number | null {
+  if (count === null || count === undefined) return null
+  if (!Number.isInteger(count) || count < 0) return null
+  return Math.max(0, cap - count)
+}
+
+/** «Te quedan 0 fotos este mes; vuelven el 1» at zero (the sprint's own words), singular at one. */
+export function photosLeftCopy(left: number): string {
+  if (left <= 0) return 'Te quedan 0 fotos este mes; vuelven el 1'
+  return left === 1 ? 'Te queda 1 foto este mes' : `Te quedan ${left} fotos este mes`
+}

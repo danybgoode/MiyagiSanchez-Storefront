@@ -23,6 +23,8 @@ const SCREEN_FILES = [
   'app/(shell)/p2s/_components/KeepSheet.tsx',
   'app/(shell)/p2s/_components/ClaimRunner.tsx',
   'app/(shell)/p2s/_components/KeptShop.tsx',
+  'app/(shell)/p2s/_components/OwnerSheet.tsx',
+  'app/(shell)/p2s/_components/PhotoSheet.tsx',
   'app/(shell)/sell/armar/page.tsx',
   'lib/prompt-to-shop/copy.ts',
   'lib/prompt-to-shop/view.ts',

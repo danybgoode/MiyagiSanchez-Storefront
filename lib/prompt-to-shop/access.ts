@@ -76,8 +76,10 @@ export function coerceBlocks(row: Pick<SharedDraftRow, 'identity' | 'words' | 'c
       ? (i as unknown as IdentityBlock)
       : null
   const words = isObj(w) && str(w.announcement) && str(w.headline) && str(w.about) ? (w as unknown as WordsBlock) : null
+  // An EMPTY array is a landed catalog with no examples left: on a kept shop the merchant replaced every one of them
+  // (S4.3). Generation never writes one (validateCatalog needs 4), so `[]` cannot hide a block still shaping.
   const catalog =
-    Array.isArray(c) && c.length > 0 && c.every((r) => isObj(r) && str(r.title) && typeof r.price === 'number' && str(r.illustration))
+    Array.isArray(c) && c.every((r) => isObj(r) && str(r.title) && typeof r.price === 'number' && str(r.illustration))
       ? (c as unknown as ExampleRow[])
       : null
   const status = isObj(row.block_status) ? row.block_status : {}

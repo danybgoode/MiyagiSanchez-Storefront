@@ -4,9 +4,15 @@ import { redirect } from 'next/navigation'
 import ClaimRunner from '@/app/(shell)/p2s/_components/ClaimRunner'
 import KeptShop from '@/app/(shell)/p2s/_components/KeptShop'
 import { getMySeller } from '@/lib/get-my-seller'
+import { filterOutDeleted } from '@/lib/listing-lifecycle'
+import { photosLeft } from '@/lib/prompt-to-shop/allowance'
 import { findKeptDraft } from '@/lib/prompt-to-shop/claim-server'
 import { ARMAR_COPY } from '@/lib/prompt-to-shop/copy'
-import { draftView } from '@/lib/prompt-to-shop/view'
+import { publishState } from '@/lib/prompt-to-shop/photo'
+import { listOwnProducts, photosUsedThisMonth } from '@/lib/prompt-to-shop/photo-server'
+import { draftView, ownProductCards } from '@/lib/prompt-to-shop/view'
+import { guideProductCount, guideProgress, guideStepsFor } from '@/lib/setup-guide-source'
+import { fetchDeletedListingIds, fetchGuideShop } from '@/lib/setup-guide-server'
 
 /**
  * `/sell/armar` — where «Quedármela» lands (epic prompt-to-shop S3.1/S3.2).
@@ -17,6 +23,10 @@ import { draftView } from '@/lib/prompt-to-shop/view'
  *   • otherwise → `ClaimRunner`, which runs the claim through `POST /api/p2s/claim/[id]` and shows the
  *     answer. That includes a keep this user started and that stopped half way: the claim resumes it.
  *   • no `?draft=` and nothing kept → `/sell`.
+ *
+ * The kept shop (S4) carries the checklist — `guideStepsFor` + `guideProductCount` over `fetchGuideShop`, the SAME
+ * calls Resumen makes, so the % is Resumen's (D17) — the merchant's own products, the photos left this month and
+ * «Publicar»'s state. A product list that could not be read is `null`, never "no products".
  *
  * No copy lives in this file (it is inside the seller-copy population scan); it comes from `copy.ts`.
  */
@@ -47,8 +57,31 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
     return <ClaimRunner draftId={draftId} />
   }
   if (kept?.sellerId) {
-    const seller = await getMySeller()
-    return <KeptShop view={draftView(kept.id, kept.blocks)} shopSlug={seller?.slug ?? null} />
+    const { getToken } = await auth()
+    const clerkJwt = await getToken()
+    const [seller, guideShop, listings, used] = await Promise.all([
+      getMySeller(),
+      fetchGuideShop(userId),
+      clerkJwt ? listOwnProducts(clerkJwt) : Promise.resolve(null),
+      photosUsedThisMonth(userId),
+    ])
+    const deletedIds = guideShop?.id ? await fetchDeletedListingIds(guideShop.id) : new Set<string>()
+    // Resumen counts an unreadable product list as none for the checklist; so does this, for the same %. «Publicar»
+    // does not: it says it could not check.
+    const steps = guideStepsFor(guideShop, guideProductCount(listings ?? [], deletedIds))
+    const own = listings ? filterOutDeleted(listings, deletedIds) : null
+    return (
+      <KeptShop
+        view={draftView(kept.id, kept.blocks)}
+        shopSlug={seller?.slug ?? null}
+        steps={steps}
+        progress={guideProgress(steps)}
+        ownCards={own ? ownProductCards(own) : null}
+        publish={publishState(own ? own.length : null)}
+        photosLeft={photosLeft(used)}
+        profile={{ name: guideShop?.name ?? kept.blocks.identity?.name ?? '', description: guideShop?.description ?? '' }}
+      />
+    )
   }
   if (kept) return <ClaimRunner draftId={kept.id} />
   if (!draftId) redirect('/sell')

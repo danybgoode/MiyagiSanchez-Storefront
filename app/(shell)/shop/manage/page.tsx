@@ -3,9 +3,11 @@ import { redirect } from 'next/navigation'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
 import { ensureSupabaseShopMirror, syncSupabaseListingMirror, type MedusaSellerForMirror } from '@/lib/provisioning'
-import { filterOutDeleted, DELETED_STATUS } from '@/lib/listing-lifecycle'
+import { filterOutDeleted } from '@/lib/listing-lifecycle'
 import ManageDashboard from './ManageDashboard'
-import { getSetupSteps, personalizeSetupSteps, type ShopRow } from '@/lib/setup-guide'
+import { personalizeSetupSteps } from '@/lib/setup-guide'
+import { guideProductCount, guideStepsFor } from '@/lib/setup-guide-source'
+import { fetchDeletedListingIds, fetchGuideShop } from '@/lib/setup-guide-server'
 import { getTenantIntake } from '@/lib/tenant-intake'
 
 export const metadata = {
@@ -69,19 +71,8 @@ export default async function ManagePage() {
   // clobber that 'deleted' back to 'draft' (which would resurrect it in the edit
   // guard). Once soft-delete deploys, Medusa omits the product → this set is
   // empty → no-op. (LEARNINGS → frontend degrades gracefully in the lag window.)
-  let deletedIds = new Set<string>()
-  if (shopMirror?.id) {
-    const { data: deletedRows } = await db
-      .from('marketplace_listings')
-      .select('medusa_product_id')
-      .eq('shop_id', shopMirror.id)
-      .eq('status', DELETED_STATUS)
-    deletedIds = new Set(
-      (deletedRows ?? [])
-        .map((row) => row.medusa_product_id as string | null)
-        .filter((id): id is string => !!id),
-    )
-  }
+  // The same read the owner canvas (/sell/armar) uses, so both count the same products (lib/setup-guide-server.ts).
+  const deletedIds = shopMirror?.id ? await fetchDeletedListingIds(shopMirror.id) : new Set<string>()
 
   const listings = filterOutDeleted(
     (productsData.listings ?? []).map((listing) => ({
@@ -137,27 +128,16 @@ export default async function ManagePage() {
           .select('id', { count: 'exact', head: true })
           .eq('shop_id', shopMirror.id)
           .in('status', ['paid', 'processing']),
-        db
-          .from('marketplace_shops')
-          .select('name, description, metadata, mp_enabled, custom_domain, ucp_webhook_url')
-          .eq('clerk_user_id', user.id)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle(),
+        fetchGuideShop(user.id).then((data) => ({ data: data ?? null })),
         getTenantIntake(user.id),
       ])
     : [{ count: 0 }, { count: 0 }, { data: null }, null]
 
   const guideSettings = (guideShop?.metadata as { settings?: { guide?: { guide_dismissed?: boolean; share_done?: boolean; satisfaction_answered?: boolean } } } | null)?.settings?.guide
+  // `guideStepsFor` + `guideProductCount` are the SAME calls the owner canvas makes (prompt-to-shop D17): the two
+  // surfaces show one percentage for one shop. `personalizeSetupSteps` only reorders, so it cannot change it.
   const setupSteps = guideShop
-    ? personalizeSetupSteps(
-        getSetupSteps({
-          shop: guideShop as ShopRow,
-          productCount: listings.length,
-          shareDone: !!guideSettings?.share_done,
-        }),
-        intake,
-      )
+    ? personalizeSetupSteps(guideStepsFor(guideShop, guideProductCount(listings, deletedIds)), intake)
     : []
   // Fail-safe: an absent/malformed flag reads as false — show the guide.
   const guideDismissed = !!guideSettings?.guide_dismissed
