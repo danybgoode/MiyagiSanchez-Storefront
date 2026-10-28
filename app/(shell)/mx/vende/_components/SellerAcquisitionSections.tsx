@@ -169,6 +169,11 @@ export type SellerAcquisitionPageConfig = {
   aiChannel?: LandingAiChannel
   applyTeaser?: ApplyTeaser
   migrationCallout?: LandingCallout
+  /**
+   * The prompt-to-shop describe box (epic prompt-to-shop S2.2). Rendered right under the hero title so it sits
+   * above the fold on a 375 px phone; only the anchor page passes one.
+   */
+  describe?: React.ReactNode
 }
 
 export function SellerAcquisitionPage({ config }: { config: SellerAcquisitionPageConfig }) {
@@ -245,7 +250,10 @@ function LandingHero({ config }: { config: SellerAcquisitionPageConfig }) {
   const values: HeroValue[] = config.heroValues ?? config.heroStats
 
   return (
-    <section aria-labelledby={`${config.pageId}-hero-title`} className={styles.hero}>
+    <section
+      aria-labelledby={`${config.pageId}-hero-title`}
+      className={config.describe ? `${styles.hero} ${styles.heroWithDescribe}` : styles.hero}
+    >
       <h1
         id={`${config.pageId}-hero-title`}
         className={`t-h1 ${styles.title}`}
@@ -259,6 +267,8 @@ function LandingHero({ config }: { config: SellerAcquisitionPageConfig }) {
       >
         {config.title}
       </h1>
+
+      {config.describe ? <div className={styles.describe}>{config.describe}</div> : null}
 
       <p className={`t-lead ${styles.lead}`} style={{ maxWidth: 660, margin: 0 }}>
         {config.lead}

@@ -4,6 +4,7 @@ import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { sellerPersonaCtaHref } from '@/lib/seller-acquisition'
 import { SellerAcquisitionPage } from './_components/SellerAcquisitionSections'
 import { buildAnchorPageConfig } from './_components/page-config'
+import DescribeBox from './_components/DescribeBox'
 
 const BASE_URL = 'https://miyagisanchez.com'
 const PAGE_PATH = '/mx/vende'
@@ -68,7 +69,14 @@ export default async function VendePage({ searchParams }: VendePageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <SellerAcquisitionPage config={config} />
+      <SellerAcquisitionPage
+        config={{
+          ...config,
+          // Prompt-to-shop S2.2: the describe box is the hero's first action. The site key is a RUNTIME env read
+          // here (D8), not NEXT_PUBLIC, so this page must stay dynamic — it is, through `searchParams`.
+          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell'} />,
+        }}
+      />
     </>
   )
 }

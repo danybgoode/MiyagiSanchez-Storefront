@@ -11,7 +11,7 @@ test.describe('seller acquisition · anchor page', () => {
     expect(res?.ok()).toBeTruthy()
 
     await expect(
-      page.getByRole('heading', { name: /Vende lo que sea en México/i }),
+      page.getByRole('heading', { name: /Describe tu negocio/i }),
     ).toBeVisible()
     await expect(page.getByText(/pídele a Claude, Gemini o ChatGPT/i)).toBeVisible()
     await expect(page.getByTestId('vende-router-creadores')).toBeVisible()
