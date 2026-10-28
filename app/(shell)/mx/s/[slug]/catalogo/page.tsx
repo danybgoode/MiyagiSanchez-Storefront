@@ -5,7 +5,6 @@ import type { Metadata } from 'next'
 
 /** The shop's catalog page under the `/mx` market prefix — the link the merchant shares (share-kit S1.2, D8). */
 
-export const revalidate = 120
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params

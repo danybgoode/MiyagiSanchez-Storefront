@@ -8,7 +8,6 @@ import type { Metadata } from 'next'
  * lands. Same body and resolver as the `/mx` form, exactly like `/tienda`.
  */
 
-export const revalidate = 120
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params

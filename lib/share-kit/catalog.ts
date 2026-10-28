@@ -95,9 +95,12 @@ export function buildCatalogModel({ shop, listings }: { shop: CatalogShopInput; 
   const settings = ((shop.metadata ?? {}) as { settings?: { theme?: { accent_color?: string | null } } }).settings
   const accent = settings?.theme?.accent_color ?? null
 
+  const seen = new Set<string>()
   const items = listings
     // D7: a listing that is not this shop's never reaches its catalog, whatever the seam above returned.
     .filter((listing) => listing.shop?.slug === shop.slug)
+    // Pages of the seam are cached separately, so a product can appear on two of them (verifier, PR 447): once.
+    .filter((listing) => (seen.has(listing.id) ? false : (seen.add(listing.id), true)))
     .map((listing): CatalogItem => {
       const shortUrl = `${SHORTLINK_ORIGIN}/l/${listing.id}`
       const url = listingTarget(listing.id)

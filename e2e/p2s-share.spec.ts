@@ -30,7 +30,7 @@ test('the QR plan encodes the short link and names the file from the VALIDATED s
 
 test('the QR route refuses before encoding, and its header carries only the plan\'s filename', () => {
   const route = read('app/api/sell/shop/qr/route.ts')
-  const plan = route.indexOf('const plan = shopQrPlan(shop?.slug)')
+  const plan = route.indexOf('const plan = shopQrPlan(shop?.slug, ')
   const refuse = route.indexOf("if (!plan) return NextResponse.json({ error: 'Tienda no encontrada.' }, { status: 404 })")
   const encode = route.indexOf('QRCode.toBuffer(plan.url')
   expect(plan).toBeGreaterThan(0)

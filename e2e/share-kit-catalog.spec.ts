@@ -60,6 +60,14 @@ test.describe('share kit · the catalog model (D6, D7)', () => {
     expect(model.items.map((i) => i.id)).toEqual(['prod_a1', 'prod_a2'])
   })
 
+  test('a product that two cached pages both returned appears once', () => {
+    const model = buildCatalogModel({
+      shop: shop('tienda-a'),
+      listings: [listing('prod_a1', 'tienda-a'), listing('prod_a1', 'tienda-a'), listing('prod_a2', 'tienda-a')],
+    })
+    expect(model.items.map((i) => i.id)).toEqual(['prod_a1', 'prod_a2'])
+  })
+
   test('a claimed shop with WhatsApp on gets «Pedir por WhatsApp» naming the product and its link', () => {
     const model = buildCatalogModel({ shop: shop('tienda-a', WHATSAPP_ON), listings: [listing('prod_a1', 'tienda-a')] })
     const item = model.items[0]
@@ -146,11 +154,17 @@ test.describe('share kit · the catalog QR (D10)', () => {
   })
 })
 
+/**
+ * A live Mexico shop, discovered from the public catalog (never a pinned fixture — those rot). `/api/ucp/catalog`
+ * answers `{ items: [{ shop: { slug } }], market_code }` and defaults to the Mexico market; a first version of this
+ * read `products[].seller.slug`, a shape the route does not have, so it skipped every run (verifier, PR 447).
+ */
 async function anyPublicShopSlug(request: import('@playwright/test').APIRequestContext): Promise<string | null> {
   const res = await request.get('/api/ucp/catalog?limit=20')
   if (!res.ok()) return null
-  const data = await res.json() as { products?: Array<{ seller?: { slug?: string } }> }
-  return data.products?.find((p) => p.seller?.slug)?.seller?.slug ?? null
+  const data = await res.json() as { market_code?: string; items?: Array<{ shop?: { slug?: string } | null }> }
+  if (data.market_code && data.market_code !== 'mx') return null
+  return data.items?.find((item) => item.shop?.slug)?.shop?.slug ?? null
 }
 
 test.describe('share kit · the catalog page server HTML (D8, D9)', () => {
