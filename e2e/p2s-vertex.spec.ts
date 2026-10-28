@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { createVerify, generateKeyPairSync } from 'node:crypto'
-import { parseServiceAccount, signedAssertion, vertexGenerateUrl, vertexTokenSource } from '../lib/prompt-to-shop/vertex'
+import { parseServiceAccount, signedAssertion, TOKEN_TIMEOUT_MS, vertexGenerateUrl, vertexTokenSource } from '../lib/prompt-to-shop/vertex'
 import { buildBlockRequest } from '../lib/prompt-to-shop/planner'
 
 // Prompt-to-shop — Gemini through Vertex with a service account. A throwaway key is minted per run, so the
@@ -53,6 +53,34 @@ test('one token serves concurrent blocks, is reused, and is refreshed before it 
   now += 400 // inside the 5-minute refresh margin
   expect(await src.get()).toBe('tok-2')
   expect(exchanges).toBe(2)
+})
+
+test('a hung token exchange gives up within its deadline, and the next call can try again', async () => {
+  const sa = parseServiceAccount(JSON.stringify(SA))!
+  let calls = 0
+  // Honours the abort signal the way real fetch does; otherwise never answers.
+  const hanging = ((_url: string, init?: RequestInit) => {
+    calls++
+    return new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('aborted'))))
+  }) as unknown as typeof fetch
+  const src = vertexTokenSource(sa, { fetch: hanging, nowS: () => 1 })
+  const started = Date.now()
+  expect(await Promise.all([src.get(), src.get()])).toEqual([null, null])
+  expect(Date.now() - started).toBeLessThan(TOKEN_TIMEOUT_MS + 1_500)
+  expect(calls).toBe(1)
+  await new Promise((r) => setTimeout(r, 0))
+  await src.get()
+  expect(calls).toBe(2)
+})
+
+test('a malformed key never reaches Google and never sticks', async () => {
+  const sa = { ...parseServiceAccount(JSON.stringify(SA))!, private_key: '-----BEGIN PRIVATE KEY-----\ngarbage\n-----END PRIVATE KEY-----' }
+  let calls = 0
+  const src = vertexTokenSource(sa, { fetch: (async () => { calls++; return new Response('{}') }) as unknown as typeof fetch, nowS: () => 1 })
+  expect(await src.get()).toBeNull()
+  await new Promise((r) => setTimeout(r, 0))
+  expect(await src.get()).toBeNull()
+  expect(calls).toBe(0)
 })
 
 test('a refused or broken token exchange is null, never a token', async () => {

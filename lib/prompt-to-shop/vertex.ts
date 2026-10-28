@@ -21,6 +21,12 @@ export interface ServiceAccount {
 const SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
 /** Google issues 1-hour tokens; refresh with margin so a long generation never starts on a dying token. */
 const REFRESH_MARGIN_S = 300
+/**
+ * The token exchange gets its own deadline. The model call's timeout starts only AFTER a token is in hand, and the
+ * exchange is shared by every caller waiting on it, so one stalled oauth2 response would otherwise hang every
+ * generation in the process for minutes — far past the 20 s narration budget.
+ */
+export const TOKEN_TIMEOUT_MS = 5_000
 
 /**
  * The env holds the JSON either raw or base64-encoded (env files are line-based, and a private key is not).
@@ -86,13 +92,15 @@ export function vertexTokenSource(
   return {
     get: async () => {
       if (cached && deps.nowS() < cached.expiresAt - REFRESH_MARGIN_S) return cached.token
-      // Three blocks start close together: share one exchange instead of minting three tokens.
-      inflight ??= (async () => {
+      // Concurrent REQUESTS (several merchants at once) share one exchange instead of minting a token each.
+      if (inflight) return inflight
+      const exchange = (async () => {
         try {
           const now = deps.nowS()
           const res = await deps.fetch(sa.token_uri, {
             method: 'POST',
             body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: signedAssertion(sa, now) }),
+            signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
           })
           if (!res.ok) return null
           const j = (await res.json()) as { access_token?: unknown; expires_in?: unknown }
@@ -102,11 +110,13 @@ export function vertexTokenSource(
           return cached.token
         } catch {
           return null
-        } finally {
-          inflight = null
         }
       })()
-      return inflight
+      // Cleared on settle, not in a `finally` inside the exchange: a synchronous throw (a bad PEM) would run that
+      // `finally` before this assignment and leave a settled promise stuck here for good.
+      inflight = exchange
+      void exchange.then(() => { if (inflight === exchange) inflight = null })
+      return exchange
     },
   }
 }
