@@ -5,8 +5,7 @@ name: arm64 image (Oracle VM)
 # Built HERE, on a native arm64 runner, because the VM has 2 shared cores and also runs panfleto: a
 # `next build` there would starve every tenant on the box, and a rollback would be another slow build.
 # The VM only ever PULLS `ghcr.io/danybgoode/miyagisanchez-storefront:<sha>` — a rollback is a restart.
-# The image was `miyagi-web` until the 2026-10-28 rename; it is still pushed under that name too, for one
-# deploy, so a VM still on the old update.sh keeps working. Drop the old tags once the VM pulls the new name.
+# (The image was `miyagi-web` until the 2026-10-28 rename.)
 #
 # Build args mirror cloudbuild.yaml EXACTLY (guarded by e2e/image-arm64-build-args.spec.ts):
 #   - the eight browser-public keys come from the `production` GitHub Environment as `PROD_<NAME>`. The
@@ -86,8 +85,6 @@ jobs:
           tags: |
             ghcr.io/danybgoode/miyagisanchez-storefront:${{ github.sha }}
             ${{ github.ref == 'refs/heads/main' && 'ghcr.io/danybgoode/miyagisanchez-storefront:main' || '' }}
-            ghcr.io/danybgoode/miyagi-web:${{ github.sha }}
-            ${{ github.ref == 'refs/heads/main' && 'ghcr.io/danybgoode/miyagi-web:main' || '' }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
