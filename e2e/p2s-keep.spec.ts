@@ -153,3 +153,10 @@ test('a shop name is one line: control characters and line breaks are refused, a
   expect(sender).toContain("const shopName = plainLine(ctx.shopName) || 'Tu tienda'")
   expect(sender).not.toContain('ctx.shopName}')
 })
+
+test('a keep whose colours and words did not save says so, and is not refreshed into a view that claims they landed', () => {
+  const runner = read('app/(shell)/p2s/_components/ClaimRunner.tsx')
+  expect(runner).toContain("result.kind === 'kept' && result.configApplied) router.refresh()")
+  expect(runner).toContain("outcome?.kind === 'kept' && !outcome.configApplied")
+  expect(runner).toContain('ARMAR_COPY.configFailedLead')
+})

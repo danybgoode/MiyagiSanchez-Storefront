@@ -140,6 +140,10 @@ export const ARMAR_COPY = {
   working: 'Guardando tu tienda…',
   keptTitle: (name: string | null) => (name ? `¡Listo! ${name} ya es tuya` : '¡Listo! Tu tienda ya es tuya'),
   keptLead: 'Ya tiene nombre, colores y textos. Los productos de ejemplo siguen aquí para guiarte: cámbialos por los tuyos.',
+  /** The shop exists but its colours and words did not save (`configApplied: false`): say so, never claim they landed. */
+  configFailedTitle: (name: string | null) => (name ? `${name} ya es tuya` : 'Tu tienda ya es tuya'),
+  configFailedLead: 'Tu tienda ya existe con su nombre, pero no pudimos guardar sus colores y textos. Ponlos desde tu panel, en Configuración.',
+  settings: 'Ir a Configuración',
   address: 'Tu dirección',
   manage: 'Ir a mi panel',
   viewShop: 'Ver mi tienda',

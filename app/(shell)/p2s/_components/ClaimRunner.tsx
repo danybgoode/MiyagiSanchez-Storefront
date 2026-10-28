@@ -41,10 +41,22 @@ export default function ClaimRunner({ draftId, initial }: { draftId: string | nu
     started.current = attempt
     claimDraft(draftId).then((result) => {
       setOutcome(result)
-      if (result.kind === 'kept') router.refresh()
+      // A keep whose colours and words did not save stays on this panel: the kept view draws them from the draft,
+      // so it would show the merchant a shop the live one is not.
+      if (result.kind === 'kept' && result.configApplied) router.refresh()
     })
   }, [draftId, attempt, initial, router])
 
+  if (outcome?.kind === 'kept' && !outcome.configApplied) {
+    return (
+      <Panel title={ARMAR_COPY.configFailedTitle(null)} lead={ARMAR_COPY.configFailedLead}>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/shop/manage/settings" prefetch={false} className="btn btn-primary">{ARMAR_COPY.settings}</Link>
+          <Link href="/shop/manage" prefetch={false} className="btn btn-secondary">{ARMAR_COPY.manage}</Link>
+        </div>
+      </Panel>
+    )
+  }
   if (!outcome || outcome.kind === 'kept') {
     return (
       <Panel title={ARMAR_COPY.working} lead={ARMAR_COPY.keptLead}>
