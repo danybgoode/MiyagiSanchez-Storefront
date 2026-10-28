@@ -21,6 +21,7 @@ import {
 } from '@/lib/promoter-earnings'
 import { buildSkuPriceTable, computeBundleRow, type PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { SUBDOMAIN_PRICE_YEARLY_MXN } from '@/lib/subdomain-pricing'
+import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 import type { SellerAcquisitionPageConfig, LandingCallout } from './SellerAcquisitionSections'
 
 type QueryParams = Record<string, string | string[] | undefined | null>
@@ -75,6 +76,12 @@ export function buildAnchorPageConfig(
     aiChannel: copy.aiChannel,
     // Anchor replaces its social-proof stats block with the premium-features grid.
     premiumFeatures: page.premiumFeatures,
+    // pricing-page D10 — a link to /mx/precios in the sections, never the hero (prompt-to-shop owns it).
+    pricingCallout: {
+      title: copy.shared.pricingCallout.title,
+      body: copy.shared.pricingCallout.body,
+      cta: { label: copy.shared.pricingCallout.ctaLabel, href: '/mx/precios', testId: 'vende-pricing-callout' },
+    },
     personaRouter: {
       title: page.routerTitle,
       lead: page.routerLead,
@@ -408,7 +415,9 @@ export function buildPromoterPageConfig(
     // The glossary maps onto proof points (icon/title/body), with the computed regular/promoter
     // price + commission appended per SKU (US-1.4) — degrades to the plain glossary body until a
     // rate is configured.
-    proofPoints: page.glossary.map((point, i) => {
+    proofPoints: page.glossary.map((raw, i) => {
+      // The glossary's prices are `{token}`s (pricing-page D8) — filled from the price modules here.
+      const point = { ...raw, body: fillFixedPricingTokens(raw.body, 'es') }
       const sku = GLOSSARY_SKU_ORDER[i]
       if (sku === 'subdomain') return point
       const earnings = earningsTable.find((r) => r.sku === sku)

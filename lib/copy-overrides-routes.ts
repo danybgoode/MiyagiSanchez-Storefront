@@ -241,6 +241,7 @@ const SIMPLE_NAMESPACE_ROUTES: Record<string, RouteInfo | null> = {
   home: { label: 'Inicio', path: '/mx' },
   terms: { label: 'Términos', path: '/terminos' },
   acerca: { label: 'Acerca (plataforma)', path: '/acerca' },
+  precios: { label: 'Precios', path: '/mx/precios' },
   // Site-wide mechanics rendered in the shell on every page — a KNOWN
   // no-single-page case (site config), not "unrecognized".
   platformTheme: { label: 'Tema de la plataforma', path: '(config. de toda la plataforma)' },

@@ -59,7 +59,8 @@
       "agentApi": "Agent API",
       "about": "Acerca de",
       "terms": "Términos",
-      "contact": "Contacto"
+      "contact": "Contacto",
+      "pricing": "Precios"
     }
   },
   "buyerCopy": {
@@ -1192,6 +1193,11 @@
         "title": "¿Vienes de otra plataforma?",
         "body": "Si ya tienes tu catálogo armado en Shopify, Tiendanube, WooCommerce o Big Cartel, tráelo a Miyagi Sánchez sin volver a capturarlo — guía paso a paso por plataforma.",
         "ctaLabel": "Ver cómo migrar"
+      },
+      "pricingCallout": {
+        "title": "¿Cuánto cuesta?",
+        "body": "Vender es gratis, con 0% de comisión. Los extras son opcionales y todos tienen su precio publicado.",
+        "ctaLabel": "Ver precios"
       }
     },
     "aiChannel": {
@@ -2348,12 +2354,12 @@
         {
           "icon": "iconoir-globe",
           "title": "Dominio propio",
-          "body": "Su tienda en sutienda.mx en lugar de una dirección prestada: su marca, su tráfico directo y un nombre que un agente de IA puede citar. $499 MXN al año, pago único."
+          "body": "Su tienda en sutienda.mx en lugar de una dirección prestada: su marca, su tráfico directo y un nombre que un agente de IA puede citar. {customDomainYearly}, se renueva cada año."
         },
         {
           "icon": "iconoir-internet",
           "title": "Subdominio",
-          "body": "sutienda.miyagisanchez.com sin comprar ningún dominio. $199 MXN al año, y GRATIS el primer año con tu código de promotor: es el sí más fácil de tu maletín."
+          "body": "sutienda.miyagisanchez.com sin comprar ningún dominio. {subdomainYearly}, y GRATIS el primer año con tu código de promotor: es el sí más fácil de tu maletín."
         },
         {
           "icon": "iconoir-journal",
@@ -2451,11 +2457,11 @@
       "scripts": [
         {
           "title": "Dominio propio",
-          "body": "«Tu tienda puede vivir en tunombre.mx en lugar de una liga larga. Se ve como el negocio que ya eres y te encuentran directo. Son $499 al año, pago único, y con mi código te lo dejo activado hoy.»"
+          "body": "«Tu tienda puede vivir en tunombre.mx en lugar de una liga larga. Se ve como el negocio que ya eres y te encuentran directo. Son {customDomainYearly} y con mi código te lo dejo activado hoy.»"
         },
         {
           "title": "Subdominio",
-          "body": "«Puedes tener tu propia dirección, tunombre.miyagisanchez.com, sin comprar dominio. Son $199 al año y con mi código el primer año va GRATIS. Te lo activo ahorita.»"
+          "body": "«Puedes tener tu propia dirección, tunombre.miyagisanchez.com, sin comprar dominio. Son {subdomainYearly} y con mi código el primer año va GRATIS. Te lo activo ahorita.»"
         },
         {
           "title": "Anuncio impreso",
@@ -3182,6 +3188,7 @@
       "primaryCtaLabel": "Empieza gratis",
       "secondaryCtaLabel": "Para vendedores",
       "stubBadge": "Próximamente",
+      "pricingLinkLabel": "Ver todos los precios",
       "langToggleLabel": "English",
       "metaTitle": "Acerca de miyagisanchez.com — qué es y por qué vender aquí",
       "metaDescription": "Qué es miyagisanchez.com, por qué vender, cómo empezar y cuánto cuesta. Marketplace nativo para agentes, hecho para México. 0% de comisión.",
@@ -3275,11 +3282,13 @@
       },
       "pricing": {
         "heading": "Precios",
-        "lead": "Vender es gratis (0% de comisión). Los servicios premium opcionales son el subdominio propio y el dominio propio.",
+        "lead": "Vender es gratis (0% de comisión). Los extras son opcionales y todos tienen precio público en miyagisanchez.com/mx/precios.",
         "body": [
-          "Tu tienda siempre es gratis: tu URL en miyagisanchez.com/s/tu-tienda no cuesta nada y nunca caduca, con 0% de comisión.",
-          "Subdominio propio: $199 MXN/año (~$17/mes) o $25 MXN/mes. Tu tienda como sitio independiente en tu-tienda.miyagisanchez.com (sin la barra de la plataforma). El plan anual sale más barato; el mensual es sin compromiso. Puedes cambiar entre mensual y anual cuando quieras, sin cargo doble. Se renueva solo; cancela cuando quieras y tu tienda sigue activa y gratis en tu URL miyagisanchez.com/s/tu-tienda.",
-          "Dominio propio: $499 MXN/año (~$42/mes). Conecta tu propio dominio (tutienda.com) con SSL e infraestructura nuestra y sin miyagisanchez.com en la URL. Se renueva cada año; puedes cancelar cuando quieras y tu tienda sigue activa en tu URL gratis."
+          "Tu tienda siempre es gratis: tu URL en miyagisanchez.com/mx/s/tu-tienda no cuesta nada y nunca caduca, con 0% de comisión.",
+          "Subdominio propio: {subdomainPrice}. Tu tienda como sitio independiente en tu-tienda.miyagisanchez.com (sin la barra de la plataforma). El plan anual sale más barato; el mensual es sin compromiso. Puedes cambiar entre mensual y anual cuando quieras, sin cargo doble. Se renueva solo; cancela cuando quieras y tu tienda sigue activa y gratis en tu URL miyagisanchez.com/mx/s/tu-tienda.",
+          "Dominio propio: {customDomainPrice}. Conecta tu propio dominio (tutienda.com) con SSL e infraestructura nuestra y sin miyagisanchez.com en la URL. Se renueva cada año; puedes cancelar cuando quieras y tu tienda sigue activa en tu URL gratis.",
+          "Sincronizar con Mercado Libre: {mlSyncPrice}. Tu inventario sincronizado en los dos sentidos; conectar, importar y publicar siguen gratis. Anuncio impreso: {printAdPrice}. Migración con consultor: {migrationPrice}.",
+          "Tu pasarela de pago (Stripe o Mercado Pago) cobra su propia comisión, no nosotros, y el dinero llega directo a tu cuenta. Todos los precios, con sus fuentes: miyagisanchez.com/mx/precios."
         ]
       },
       "founder": {
@@ -3321,6 +3330,56 @@
           "Nosotros ponemos los rieles; tú te enfocas en lo creativo y la estrategia. La misión es democratizar las mejores prácticas del comercio — confianza, negociación de ofertas y compra con IA — para que cualquiera venda con la calidad de los grandes, sin costo."
         ]
       }
+    }
+  },
+  "precios": {
+    "metadata": {
+      "title": "Precios — vender es gratis | Miyagi Sánchez",
+      "description": "0% de comisión de la plataforma. Lo que es gratis para siempre, los extras opcionales con su precio real y lo que cobra tu pasarela de pago (no nosotros).",
+      "ogAlt": "Precios de Miyagi Sánchez: vender es gratis, 0% de comisión"
+    },
+    "eyebrow": "Precios",
+    "heroTitle": "Vender es gratis. Pagas solo lo que tú eliges.",
+    "heroLead": "0% de comisión de la plataforma. Tu dinero llega directo a tu cuenta.",
+    "primaryCta": "Empieza gratis",
+    "free": {
+      "title": "Gratis, siempre",
+      "lead": "Todo esto viene con tu tienda, sin plan y sin fecha de caducidad."
+    },
+    "extras": {
+      "title": "Extras opcionales",
+      "lead": "Los activas solo si te sirven. Cancela cuando quieras y tu tienda sigue activa y gratis.",
+      "fixedBadge": "Precio fijo",
+      "quotedBadge": "Se cotiza",
+      "quotedCta": "Escríbenos"
+    },
+    "processors": {
+      "title": "Lo que cobra tu pasarela (no nosotros)",
+      "lead": "Sin comisión no significa tarjetas gratis: tu pasarela de pago cobra su tarifa por cada venta. Esa tarifa es suya, no nuestra, y el dinero llega directo a tu cuenta.",
+      "sourceLabel": "Fuente",
+      "verifiedLabel": "verificado el"
+    },
+    "compare": {
+      "title": "¿Y contra T1 y los demás?",
+      "body": "Pon tus ventas y tu ticket promedio y mira, línea por línea, cuánto pagarías aquí y en Shopify, Mercado Libre, Tiendanube o WooCommerce.",
+      "cta": "Compara con tus números"
+    },
+    "faq": {
+      "title": "Preguntas frecuentes",
+      "items": [
+        {
+          "q": "¿Hay planes o mensualidades?",
+          "a": "No. Vender es gratis y no hay un plan que pagar. Solo pagas los extras que tú actives."
+        },
+        {
+          "q": "¿Qué pasa si cancelo un extra?",
+          "a": "Tu tienda sigue activa y gratis en tu URL de miyagisanchez.com. Solo dejas de tener ese extra."
+        },
+        {
+          "q": "¿Por qué no cobran comisión?",
+          "a": "Construimos sobre infraestructura abierta y con costos mínimos, y ganamos con los extras opcionales, no con un porcentaje de tus ventas."
+        }
+      ]
     }
   },
   "sellerCopy": {

@@ -236,6 +236,18 @@
       "verifiedAt": "2026-07-17",
       "label": "Miyagi — procesamiento de pago, cargo fijo por transacción (MXN)"
     },
+    "processor.mercadopago.pct": {
+      "value": 3.49,
+      "source": "https://www.mercadopago.com.mx/recibe-al-instante",
+      "verifiedAt": "2026-10-28",
+      "label": "Mercado Pago México — cobro en línea con dinero al instante, % por venta (+ IVA)"
+    },
+    "processor.mercadopago.fixedMxn": {
+      "value": 4,
+      "source": "https://www.mercadopago.com.mx/recibe-al-instante",
+      "verifiedAt": "2026-10-28",
+      "label": "Mercado Pago México — cargo fijo por venta, MXN (+ IVA)"
+    },
     "apps.liveChat.competitorMonthlyUsd": {
       "value": 29,
       "source": "https://apps.shopify.com/tidio-chat",

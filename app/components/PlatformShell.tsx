@@ -334,6 +334,10 @@ export default async function PlatformShell({
           <Link href={browsePath} style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none' }} className="hover:text-[var(--fg)]">{copy.footer.listings}</Link>
           <Link href="/vecindario" style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none' }} className="hover:text-[var(--fg)]">{copy.footer.neighborhood}</Link>
           <Link href={sellerLanding} style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none' }} className="hover:text-[var(--fg)]">{copy.footer.sellFree}</Link>
+          {/* /mx/precios is es-MX and MX-priced (pricing-page D10) — a /us visitor gets no link to it. */}
+          {market === 'mx' ? (
+            <Link href="/mx/precios" data-testid="footer-pricing" style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none' }} className="hover:text-[var(--fg)]">{copy.footer.pricing}</Link>
+          ) : null}
           <AuthShow when="signed-out">
             <Link href="/sign-up" data-testid="footer-signup" style={{ fontSize: 12, color: 'var(--fg-muted)', textDecoration: 'none' }} className="hover:text-[var(--fg)]">{copy.footer.createAccount}</Link>
           </AuthShow>

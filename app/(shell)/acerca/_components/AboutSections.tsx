@@ -91,6 +91,7 @@ export function AboutPage({
             section={section}
             locale={locale}
             stubBadge={page.stubBadge}
+            pricingLinkLabel={page.pricingLinkLabel}
           />
         ))}
       </div>
@@ -104,10 +105,12 @@ function AboutSectionBlock({
   section,
   locale,
   stubBadge,
+  pricingLinkLabel,
 }: {
   section: AboutSection
   locale: AboutLocale
   stubBadge: string
+  pricingLinkLabel: string
 }) {
   const copy = aboutCopy(section, locale)
   const titleId = `acerca-${section.id}-title`
@@ -131,6 +134,13 @@ function AboutSectionBlock({
             {paragraph}
           </p>
         ))}
+        {section.id === 'pricing' ? (
+          // pricing-page D7 — every price, with its source, lives on /mx/precios.
+          <Link href="/mx/precios" className="btn btn-secondary" data-testid="acerca-pricing-link" prefetch={false}>
+            {pricingLinkLabel}
+            <i className="iconoir-arrow-right" aria-hidden="true" />
+          </Link>
+        ) : null}
       </div>
 
       {copy.points?.length ? (

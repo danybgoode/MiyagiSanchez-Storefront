@@ -43,11 +43,16 @@ const DIRECT_BUYER_DIRS = [
  * path, with this reason, rather than allowed to show up as 35 new violations that
  * the next person silences by extracting copy nobody asked to translate.
  *
+ * `app/(shell)/mx/precios` (pricing-page, 2026-10-28) is the same kind of page: what SELLING
+ * costs, written for a merchant comparing platforms, es-MX and MX-priced by design. A buyer
+ * never needs it, and its prices are MXN facts, not presentation to localize.
+ *
  * Named as a prefix list and asserted in `e2e/buyer-locale-population.spec.ts`, so
  * adding a second exclusion is a visible decision instead of a quiet widening.
  */
 export const NON_BUYER_SUBTREES = [
   'app/(shell)/mx/vende',
+  'app/(shell)/mx/precios',
 ] as const
 
 const BUYER_ENTRYPOINTS = [

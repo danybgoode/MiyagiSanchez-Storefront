@@ -59,7 +59,8 @@
       "agentApi": "Agent API",
       "about": "About",
       "terms": "Terms",
-      "contact": "Contact"
+      "contact": "Contact",
+      "pricing": "Pricing"
     }
   },
   "buyerCopy": {
@@ -1328,7 +1329,12 @@
           "title": "What if it is not for me?",
           "body": "Ask your own AI to read the page and compare the offer with what you pay today. If it is not a fit, do not use it. Opening your shop costs nothing and does not lock you in."
         }
-      ]
+      ],
+      "pricingCallout": {
+        "title": "What does it cost?",
+        "body": "Selling is free, with 0% commission. The extras are optional and every one has a published price.",
+        "ctaLabel": "See pricing"
+      }
     },
     "aiChannel": {
       "eyebrow": "A channel others do not have",
@@ -2484,12 +2490,12 @@
         {
           "icon": "iconoir-globe",
           "title": "Own domain",
-          "body": "Their store at theirshop.mx instead of a borrowed address: their brand, their direct traffic, and a name an AI agent can cite. $499 MXN a year, paid once."
+          "body": "Their store at theirshop.mx instead of a borrowed address: their brand, their direct traffic, and a name an AI agent can cite. {customDomainYearly}, renewed yearly."
         },
         {
           "icon": "iconoir-internet",
           "title": "Subdomain",
-          "body": "theirshop.miyagisanchez.com without buying a domain at all. $199 MXN a year, and FREE the first year with your promoter code: the cheapest yes in your bag."
+          "body": "theirshop.miyagisanchez.com without buying a domain at all. {subdomainYearly}, and FREE the first year with your promoter code: the cheapest yes in your bag."
         },
         {
           "icon": "iconoir-journal",
@@ -2587,11 +2593,11 @@
       "scripts": [
         {
           "title": "Own domain",
-          "body": "\"Your store can live at yourname.mx instead of a long link. It looks like the business you already are, and people find you directly. It is $499 a year, paid once, and with my code I switch it on today.\""
+          "body": "\"Your store can live at yourname.mx instead of a long link. It looks like the business you already are, and people find you directly. It is {customDomainYearly}, and with my code I switch it on today.\""
         },
         {
           "title": "Subdomain",
-          "body": "\"You can have your own address, yourname.miyagisanchez.com, without buying a domain. It is $199 a year, and with my code the first year is FREE. I can switch it on right now.\""
+          "body": "\"You can have your own address, yourname.miyagisanchez.com, without buying a domain. It is {subdomainYearly}, and with my code the first year is FREE. I can switch it on right now.\""
         },
         {
           "title": "Print ad",
@@ -3182,6 +3188,7 @@
       "primaryCtaLabel": "Start free",
       "secondaryCtaLabel": "For sellers",
       "stubBadge": "Coming soon",
+      "pricingLinkLabel": "See every price",
       "langToggleLabel": "Español",
       "metaTitle": "About miyagisanchez.com — what it is and why sell here",
       "metaDescription": "What miyagisanchez.com is, why sell, how to start, and what it costs. An agent-native marketplace for Mexico. 0% commission.",
@@ -3275,11 +3282,13 @@
       },
       "pricing": {
         "heading": "Pricing",
-        "lead": "Selling is free (0% commission). The optional premium services are a custom subdomain and a custom domain.",
+        "lead": "Selling is free (0% commission). The extras are optional and every one has a public price at miyagisanchez.com/mx/precios.",
         "body": [
-          "Your shop is always free: your URL at miyagisanchez.com/s/your-shop costs nothing and never expires, with 0% commission.",
-          "Custom subdomain: $199 MXN/year (~$17/mo) or $25 MXN/mo. Your shop as a standalone site at your-shop.miyagisanchez.com (no platform bar). The yearly plan is cheaper; the monthly one has no commitment. You can switch between monthly and yearly anytime with no double charge. It renews automatically; cancel anytime and your shop stays live and free at your URL miyagisanchez.com/s/your-shop.",
-          "Custom domain: $499 MXN/year (~$42/mo). Connect your own domain (yourshop.com) with SSL and our infrastructure, with no miyagisanchez.com in the URL. It renews yearly; you can cancel anytime and your shop stays live on your free URL."
+          "Your shop is always free: your URL at miyagisanchez.com/mx/s/your-shop costs nothing and never expires, with 0% commission.",
+          "Custom subdomain: {subdomainPrice}. Your shop as a standalone site at your-shop.miyagisanchez.com (no platform bar). The yearly plan is cheaper; the monthly one has no commitment. You can switch between monthly and yearly anytime with no double charge. It renews automatically; cancel anytime and your shop stays live and free at your URL miyagisanchez.com/mx/s/your-shop.",
+          "Custom domain: {customDomainPrice}. Connect your own domain (yourshop.com) with SSL and our infrastructure, with no miyagisanchez.com in the URL. It renews yearly; you can cancel anytime and your shop stays live on your free URL.",
+          "Mercado Libre sync: {mlSyncPrice}. Two-way inventory sync; connecting, importing and publishing stay free. Print ad: {printAdPrice}. Assisted migration: {migrationPrice}.",
+          "Your payment processor (Stripe or Mercado Pago) charges its own fee, not us, and the money goes straight to your account. Every price, with its sources: miyagisanchez.com/mx/precios."
         ]
       },
       "founder": {
@@ -3321,6 +3330,56 @@
           "We provide the rails; you focus on the creative and the strategy. The mission is to democratize commerce best practices — trust, offer negotiation, and AI-native shopping — so anyone can sell at the quality of the giants, at no cost."
         ]
       }
+    }
+  },
+  "precios": {
+    "metadata": {
+      "title": "Pricing — selling is free | Miyagi Sánchez",
+      "description": "0% platform commission. What stays free forever, the optional extras with their real prices, and what your payment processor (not us) charges.",
+      "ogAlt": "Miyagi Sánchez pricing: selling is free, 0% commission"
+    },
+    "eyebrow": "Pricing",
+    "heroTitle": "Selling is free. You pay only for what you choose.",
+    "heroLead": "0% platform commission. Your money goes straight to your account.",
+    "primaryCta": "Start free",
+    "free": {
+      "title": "Free, always",
+      "lead": "All of this comes with your shop, with no plan and no expiry date."
+    },
+    "extras": {
+      "title": "Optional extras",
+      "lead": "Turn them on only if they help. Cancel anytime and your shop stays live and free.",
+      "fixedBadge": "Fixed price",
+      "quotedBadge": "On request",
+      "quotedCta": "Write to us"
+    },
+    "processors": {
+      "title": "What your payment processor charges (not us)",
+      "lead": "No commission does not mean free card payments: your processor charges its fee on each sale. That fee is theirs, not ours, and the money goes straight to your account.",
+      "sourceLabel": "Source",
+      "verifiedLabel": "verified on"
+    },
+    "compare": {
+      "title": "How does it compare with T1 and the rest?",
+      "body": "Enter your sales and average ticket and see, line by line, what you would pay here and on Shopify, Mercado Libre, Tiendanube or WooCommerce.",
+      "cta": "Compare with your numbers"
+    },
+    "faq": {
+      "title": "Frequently asked questions",
+      "items": [
+        {
+          "q": "Are there plans or monthly fees?",
+          "a": "No. Selling is free and there is no plan to pay for. You pay only for the extras you turn on."
+        },
+        {
+          "q": "What happens if I cancel an extra?",
+          "a": "Your shop stays live and free at your miyagisanchez.com URL. You just stop having that extra."
+        },
+        {
+          "q": "Why no commission?",
+          "a": "We build on open infrastructure with minimal costs, and we earn from the optional extras, not from a share of your sales."
+        }
+      ]
     }
   },
   "sellerCopy": {

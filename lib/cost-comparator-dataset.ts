@@ -41,6 +41,7 @@ import type {
   WooCommerceHostingTier,
   TiendanubeTier,
 } from './cost-comparator'
+import type { ProcessorRate } from './pricing-catalog'
 
 export const COMPARATOR_NAMESPACE = 'comparator'
 
@@ -215,6 +216,21 @@ export function miyagiRatesFromDataset(dataset: ComparatorDataset): MiyagiRates 
     mlSyncMonthlyMxn: value(dataset, 'miyagi.sku.mlSync.monthlyMxn'),
     paymentPct: value(dataset, 'miyagi.payment.pct'),
     paymentFixedMxn: value(dataset, 'miyagi.payment.fixedMxn'),
+  }
+}
+
+function sourcedRate(dataset: ComparatorDataset, pctKey: string, fixedKey: string): ProcessorRate {
+  const pct = dataset.figures[pctKey]
+  if (!pct) throw new Error(`cost-comparator dataset: missing figure "${pctKey}"`)
+  return { pct: pct.value, fixedMxn: value(dataset, fixedKey), source: pct.source, verifiedAt: pct.verifiedAt }
+}
+
+/** The processor rates `/mx/precios` shows (pricing-page D5) — Stripe is the same figure the
+ * comparador's Miyagi column already charges, so the page and the comparador cannot disagree. */
+export function processorRatesFromDataset(dataset: ComparatorDataset): { stripe: ProcessorRate; mercadopago: ProcessorRate } {
+  return {
+    stripe: sourcedRate(dataset, 'miyagi.payment.pct', 'miyagi.payment.fixedMxn'),
+    mercadopago: sourcedRate(dataset, 'processor.mercadopago.pct', 'processor.mercadopago.fixedMxn'),
   }
 }
 

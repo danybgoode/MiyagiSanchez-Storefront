@@ -18,6 +18,7 @@ export const PLATFORM_SITEMAP_ENTRIES = [
   { path: '/mx/vende/servicios', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/mx/vende/autos', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/mx/vende/migracion', changeFrequency: 'weekly', priority: 0.8 },
+  { path: '/mx/precios', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/mx/vende/migracion/shopify', changeFrequency: 'weekly', priority: 0.7 },
   { path: '/mx/vende/migracion/tiendanube', changeFrequency: 'weekly', priority: 0.7 },
   { path: '/mx/vende/migracion/woocommerce', changeFrequency: 'weekly', priority: 0.7 },
