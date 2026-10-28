@@ -21,6 +21,8 @@ test('a service account parses from raw or base64 JSON, and nothing partial pass
   expect(parseServiceAccount(JSON.stringify({ ...SA, private_key: 'x' }))).toBeNull()
   expect(parseServiceAccount(JSON.stringify({ ...SA, project_id: '' }))).toBeNull()
   expect(parseServiceAccount(JSON.stringify({ ...SA, token_uri: undefined }))?.token_uri).toBe('https://oauth2.googleapis.com/token')
+  // The token endpoint is pinned: a JSON pointing elsewhere still exchanges with Google only.
+  expect(parseServiceAccount(JSON.stringify({ ...SA, token_uri: 'http://169.254.169.254/latest' }))?.token_uri).toBe('https://oauth2.googleapis.com/token')
 })
 
 test('the Vertex URL targets the project and model', () => {

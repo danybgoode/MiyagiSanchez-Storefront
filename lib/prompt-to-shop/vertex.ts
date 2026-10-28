@@ -19,6 +19,7 @@ export interface ServiceAccount {
 }
 
 const SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
+export const GOOGLE_TOKEN_URI = 'https://oauth2.googleapis.com/token'
 /** Google issues 1-hour tokens; refresh with margin so a long generation never starts on a dying token. */
 const REFRESH_MARGIN_S = 300
 /**
@@ -56,7 +57,9 @@ export function parseServiceAccount(raw: string | undefined): ServiceAccount | n
           client_email: j.client_email,
           private_key: j.private_key,
           project_id: j.project_id,
-          token_uri: typeof j.token_uri === 'string' && j.token_uri ? j.token_uri : 'https://oauth2.googleapis.com/token',
+          // Pinned, never read from the file: Google service accounts always use this endpoint, and honouring an
+          // arbitrary `token_uri` would send a signed assertion wherever the JSON points (agy security lens, #437).
+          token_uri: GOOGLE_TOKEN_URI,
         }
       }
     } catch {
