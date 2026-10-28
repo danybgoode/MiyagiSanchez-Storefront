@@ -223,6 +223,8 @@ export function t1RatesFromDataset(dataset: ComparatorDataset): T1Rates {
       basico: value(dataset, 't1.external.basico.pct'),
       avanzado: value(dataset, 't1.external.avanzado.pct'),
     },
+    externalProcessorPct: value(dataset, 'miyagi.payment.pct'),
+    externalProcessorFixedMxn: value(dataset, 'miyagi.payment.fixedMxn'),
   }
 }
 
@@ -345,6 +347,7 @@ export function lineSourceFigureKey(
       if (lineKey === 'payment' && ctx.t1Tier) {
         return ctx.t1Pagos === false ? `t1.external.${ctx.t1Tier}.pct` : 't1.t1pagos.pct'
       }
+      if (lineKey === 'processor') return 'miyagi.payment.pct'
       return null
     case 'miyagi':
       if (lineKey === 'payment') return 'miyagi.payment.pct'

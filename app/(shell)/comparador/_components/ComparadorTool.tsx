@@ -311,7 +311,6 @@ export default function ComparadorTool({ rates, apps, fx, initial, dataset }: Co
       if (lineOverrides[k] !== undefined) scoped[line.key] = lineOverrides[k]
     }
     return applyLineOverrides(baseMiyagiStack, scoped)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseMiyagiStack, lineOverrides])
 
   const maxMonthly = Math.max(competitorStack.monthlyTotalMxn, miyagiStack.monthlyTotalMxn, 1)

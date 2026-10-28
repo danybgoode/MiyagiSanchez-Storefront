@@ -203,12 +203,6 @@ export function computeTiendanubeCost(
 }
 
 // ---------------------------------------------------------------------------
-// Miyagi — 0% commission always. SKU costs only (subdomain / custom domain /
-// ML-sync, each opt-in), plus the SAME pass-through payment-processor rate a
-// self-hosted merchant would pay (Miyagi adds no markup on top of it) — this is
-// what makes the Miyagi bar apples-to-apples with the others rather than a bare
-// $0 that hides the one real cost every platform shares (card processing).
-// ---------------------------------------------------------------------------
 // T1 — plan tiers; payments either through T1pagos (% + fixed) or an external
 // provider, where T1 takes its own cut (pricing-page A1/A2). Same shape as
 // Tiendanube's own-vs-external gateway. T1's free plan has no online store
@@ -225,6 +219,10 @@ export interface T1Rates {
   t1PagosFixedMxn: number
   /** T1's own cut, %, when the merchant uses an external payment provider. */
   externalPct: Record<T1Tier, number>
+  /** That external provider's OWN processing fee — T1 charges its cut on top of it. The same
+   * public card rate Miyagi's column charges, so the two sides stay like for like. */
+  externalProcessorPct: number
+  externalProcessorFixedMxn: number
 }
 
 export function computeT1Cost(
@@ -235,16 +233,34 @@ export function computeT1Cost(
   appsMonthlyMxn = 0,
 ): StackedCost {
   const revenue = revenueMxn(inputs)
-  const paymentMxn = useT1Pagos
-    ? revenue * (rates.t1PagosPct / 100) + inputs.volumeMonthly * rates.t1PagosFixedMxn
-    : revenue * (rates.externalPct[tier] / 100)
+  const plan = { key: 'plan', label: 'Plan mensual', monthlyMxn: rates.planMonthlyMxn[tier] }
+  const apps = { key: 'apps', label: 'Apps premium', monthlyMxn: appsMonthlyMxn }
+  if (useT1Pagos) {
+    const paymentMxn = revenue * (rates.t1PagosPct / 100) + inputs.volumeMonthly * rates.t1PagosFixedMxn
+    return stack([plan, { key: 'payment', label: 'T1pagos', monthlyMxn: paymentMxn }, apps])
+  }
+  // External provider: T1's cut AND the provider's own fee. Leaving the second out made T1
+  // look ~$700/mo cheaper than Miyagi at 100 × $500 while Miyagi's side included processing.
   return stack([
-    { key: 'plan', label: 'Plan mensual', monthlyMxn: rates.planMonthlyMxn[tier] },
-    { key: 'payment', label: useT1Pagos ? 'T1pagos' : 'Comisión de T1 por pasarela externa', monthlyMxn: paymentMxn },
-    { key: 'apps', label: 'Apps premium', monthlyMxn: appsMonthlyMxn },
+    plan,
+    { key: 'payment', label: 'Comisión de T1 por pasarela externa', monthlyMxn: revenue * (rates.externalPct[tier] / 100) },
+    {
+      key: 'processor',
+      label: 'Tu pasarela externa (tarifa pública con tarjeta)',
+      monthlyMxn: revenue * (rates.externalProcessorPct / 100) + inputs.volumeMonthly * rates.externalProcessorFixedMxn,
+    },
+    apps,
   ])
 }
 
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Miyagi — 0% commission always. SKU costs only (subdomain / custom domain /
+// ML-sync, each opt-in), plus the SAME pass-through payment-processor rate a
+// self-hosted merchant would pay (Miyagi adds no markup on top of it) — this is
+// what makes the Miyagi bar apples-to-apples with the others rather than a bare
+// $0 that hides the one real cost every platform shares (card processing).
 // ---------------------------------------------------------------------------
 
 export interface MiyagiSkuSelections {

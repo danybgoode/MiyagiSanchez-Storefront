@@ -33,7 +33,8 @@
 import type { CompetitorPlatform } from './cost-comparator-url'
 import { buildParityReport, type ParityReport } from './migration-parity'
 
-export type DetectedPlatform = CompetitorPlatform | null
+// T1 is pickable but not detectable: no verified T1 storefront marker (pricing-page D14).
+export type DetectedPlatform = Exclude<CompetitorPlatform, 't1'> | null
 
 export interface ShopInventoryEstimate {
   /** Rough count of distinct catalog/product signals found on the page (JSON-LD

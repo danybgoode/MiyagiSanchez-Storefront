@@ -14,6 +14,8 @@ const RATES: T1Rates = {
   t1PagosPct: 3.5,
   t1PagosFixedMxn: 1,
   externalPct: { basico: 2, avanzado: 1 },
+  externalProcessorPct: 3.6,
+  externalProcessorFixedMxn: 3,
 }
 const INPUTS = { volumeMonthly: 100, aovMxn: 500 }
 
@@ -26,10 +28,14 @@ test.describe('computeT1Cost', () => {
     expect(r.annualTotalMxn).toBe(26988)
   })
 
-  test('external provider: T1 takes its own cut by tier, no fixed fee', () => {
-    expect(computeT1Cost(INPUTS, 'basico', false, RATES).lines.find((l) => l.key === 'payment')?.monthlyMxn).toBe(1000)
-    expect(computeT1Cost(INPUTS, 'avanzado', false, RATES).lines.find((l) => l.key === 'payment')?.monthlyMxn).toBe(500)
-    expect(computeT1Cost(INPUTS, 'avanzado', false, RATES).monthlyTotalMxn).toBe(1999)
+  test("external provider: T1's own cut by tier PLUS the provider's own processing fee", () => {
+    const basico = computeT1Cost(INPUTS, 'basico', false, RATES)
+    expect(basico.lines.find((l) => l.key === 'payment')?.monthlyMxn).toBe(1000)
+    // 50,000 × 3.6% = 1,800 + 100 × $3 = 2,100 — the same card rate Miyagi's column charges.
+    expect(basico.lines.find((l) => l.key === 'processor')?.monthlyMxn).toBe(2100)
+    expect(basico.monthlyTotalMxn).toBe(3499)
+    expect(computeT1Cost(INPUTS, 'avanzado', false, RATES).monthlyTotalMxn).toBe(4099)
+    expect(lineSourceFigureKey('t1', 'processor', { t1Tier: 'basico', t1Pagos: false })).toBe('miyagi.payment.pct')
   })
 
   test('apps carry through; zero volume costs only the plan', () => {
