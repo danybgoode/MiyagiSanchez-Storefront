@@ -15,18 +15,18 @@
 
 | Service | URL | Notes |
 |---|---|---|
-| Medusa API | `https://api.miyagisanchez.com` | GCP Cloud Run, us-east4; ~18min Cloud Build on `main` push |
+| Medusa API | `https://api.miyagisanchez.com` | MiyagiSanchez-Backend on the Oracle VM behind Cloudflare; deployed by `update.sh` |
 | Admin UI | `https://api.miyagisanchez.com/app` | Enabled; `DISABLE_MEDUSA_ADMIN` env gates it |
-| Database | `DATABASE_URL` env var | Neon Postgres; all migrations applied |
-| Frontend | `https://miyagisanchez.com` | Vercel, auto-deploy from `main` only |
-| Backend repo | `https://github.com/danybgoode/MiyagiSanchez-Backend` | Push `main` → Cloud Build trigger |
+| Database | `DATABASE_URL` env var | Postgres 17 on the Oracle VM (`panfleto-prod`); Medusa migrates on boot |
+| Frontend | `https://miyagisanchez.com` | MiyagiSanchez-Storefront on the Oracle VM behind Cloudflare (Vercel serves PR previews only) |
+| Backend repo | `https://github.com/danybgoode/MiyagiSanchez-Backend` | Push `main` → arm64 image `ghcr.io/danybgoode/miyagisanchez-backend:main`; `update.sh` on the VM deploys it |
 
 **Seeded production data**:
-- Publishable key: `pk_bac9...` (set in `MEDUSA_PUBLISHABLE_KEY` on Vercel)
+- Publishable key: `pk_bac9...` (set in `MEDUSA_PUBLISHABLE_KEY` in the VM's web.env)
 - MXN is default store currency; Mexico region + stock location "México" exist
 - FulfillmentSet "Miyagi México" + 3 ShippingOptions seeded (post Section 3)
 
-**CI/CD**: Cloud Build `cloudbuild.yaml` — builds Docker image → pushes to Artifact Registry → deploys Cloud Run revision. Check build status: `gh api repos/danybgoode/MiyagiSanchez-Backend/commits/main/check-runs`.
+**CI/CD**: a merge to `main` builds `ghcr.io/danybgoode/miyagisanchez-backend:main` (`.github/workflows/image-arm64.yml`). It deploys nothing: `ssh -i ~/.ssh/panfleto_oci ubuntu@159.54.158.4 /opt/miyagi/infra/oci/update.sh` does (MiyagiSanchez-Product `infra/oci/`). The Cloud Build / Cloud Run rail was deleted 2026-10-16. Check the image build: `gh run list --repo danybgoode/MiyagiSanchez-Backend --workflow image-arm64.yml`.
 
 **Webhooks**:
 - Frontend (`/api/webhooks/stripe`): handles `invoice.*`, `customer.subscription.*`, `payment_intent.*`
@@ -196,8 +196,8 @@ MercadoPago webhooks: `POST /api/webhooks/mercadopago` (frontend) and Medusa's b
 
 ## Medusa Admin Dashboard
 
-**Current status: ENABLED at `https://api.miyagisanchez.com/app`** (Cloud Run has sufficient memory).
+**Current status: ENABLED at `https://api.miyagisanchez.com/app`** (the VM container has sufficient memory).
 
 Gate: `medusa-config.ts` has `admin: { disable: process.env.DISABLE_MEDUSA_ADMIN === 'true' }`. Set `DISABLE_MEDUSA_ADMIN=true` in Cloud Run env to turn it off.
 
-Admin user: `daniel@despachobonsai.com` (created in prod Neon DB). If you need to create a new admin user, use a Cloud Run Job (no shell on Cloud Run) — clone the medusa-web image + secrets + VPC connector `medusa-conn` and run `medusa user -e email@x.com -p password`.
+Admin user: `daniel@despachobonsai.com` (created in the production database). If you need to create a new admin user, use a Cloud Run Job (no shell on Cloud Run) — clone the medusa-web image + secrets + VPC connector `medusa-conn` and run `medusa user -e email@x.com -p password`.
