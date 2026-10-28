@@ -19,6 +19,9 @@ const CLIENT_FILES = [
   'app/(shell)/p2s/_components/ShopCanvas.tsx',
   'app/(shell)/p2s/_components/ExampleIllustration.tsx',
   'app/(shell)/p2s/_components/TurnstileWidget.tsx',
+  'app/(shell)/p2s/_components/KeepSheet.tsx',
+  'app/(shell)/p2s/_components/ClaimRunner.tsx',
+  'app/(shell)/p2s/_components/KeptShop.tsx',
   'lib/prompt-to-shop/client.ts',
   'lib/prompt-to-shop/copy.ts',
   'lib/prompt-to-shop/view.ts',
@@ -27,7 +30,7 @@ const CLIENT_FILES = [
 ]
 
 /** Modules that must never be a VALUE import of a browser module. Type imports are erased and are fine. */
-const HEAVY = /(^|\/)(blocks|handler|planner|prompts|edit|access|server|read|turnstile|vertex)$|catalog-import|settings-import|lib\/medusa|lib\/supabase|server-only|@medusajs|@clerk\/nextjs\/server/
+const HEAVY = /(^|\/)(blocks|handler|planner|prompts|edit|access|server|read|turnstile|vertex|claim|claim-server|mail-link)$|catalog-import|settings-import|lib\/medusa|lib\/supabase|server-only|@medusajs|@clerk\/nextjs\/server/
 
 function valueImports(src: string): string[] {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '')

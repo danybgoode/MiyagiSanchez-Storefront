@@ -56,7 +56,8 @@ export interface ShopCreateInput {
 }
 
 export type EnsureShopResult =
-  | { ok: true; status: 200 | 201; shopSlug: string }
+  // `sellerId` is additive (prompt-to-shop S3.2): the draft claim records which seller it became.
+  | { ok: true; status: 200 | 201; shopSlug: string; sellerId: string }
   | { ok: false; status: number; error: string; field?: string }
 
 export async function ensureShop(userId: string, clerkJwt: string, body: ShopCreateInput = {}): Promise<EnsureShopResult> {
@@ -73,7 +74,7 @@ export async function ensureShop(userId: string, clerkJwt: string, body: ShopCre
     await retryShopCreatedWelcome(seller).catch((error) => {
       console.error('[ensure-shop] shop welcome retry failed:', seller.id, error)
     })
-    return { ok: true, status: 200, shopSlug: seller.slug }
+    return { ok: true, status: 200, shopSlug: seller.slug, sellerId: seller.id }
   }
   if (existingRes.status !== 404) {
     const errBody = await existingRes.json().catch(() => ({})) as { message?: string }
@@ -140,5 +141,5 @@ export async function ensureShop(userId: string, clerkJwt: string, body: ShopCre
     console.error('[ensure-shop] shop welcome failed:', seller.id, error)
   })
 
-  return { ok: true, status: 201, shopSlug: seller.slug }
+  return { ok: true, status: 201, shopSlug: seller.slug, sellerId: seller.id }
 }

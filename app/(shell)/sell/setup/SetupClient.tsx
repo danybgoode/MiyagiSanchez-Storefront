@@ -695,6 +695,10 @@ export default function SetupClient() {
           Si tu agente de IA ya generó tu archivo de configuración, pégalo abajo y creamos tu tienda y tu
           catálogo en un solo paso. ¿Aún no lo tienes? Copia el prompt y dáselo a tu agente.
         </p>
+        {/* The drop-anything intake lost its only way in when the three-doors chooser left (prompt-to-shop S3.3). */}
+        <Link href="/sell/agente" className="inline-block text-xs text-[var(--color-accent)] hover:underline mt-2">
+          ¿Tu catálogo está en un CSV o en Mercado Libre? Tráelo como lo tengas →
+        </Link>
       </div>
 
       {/* Apply (paste/upload → staging → confirm → land-in-shop) */}

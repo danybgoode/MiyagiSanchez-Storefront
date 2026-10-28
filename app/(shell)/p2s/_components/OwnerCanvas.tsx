@@ -9,6 +9,7 @@ import { patchDraft } from '@/lib/prompt-to-shop/client'
 import { DESCRIBE_COPY, OWNER_COPY } from '@/lib/prompt-to-shop/copy'
 import { draftView, type DraftBlocks } from '@/lib/prompt-to-shop/view'
 import type { CanvasControl } from '@/lib/prompt-to-shop/access'
+import KeepSheet from './KeepSheet'
 import ShopCanvas from './ShopCanvas'
 import TakingShape from './TakingShape'
 import TurnstileWidget from './TurnstileWidget'
@@ -32,6 +33,7 @@ export default function OwnerCanvas({
   shareHref,
   siteKey,
   controls,
+  signedIn,
 }: {
   draftId: string
   initial: DraftBlocks
@@ -40,6 +42,8 @@ export default function OwnerCanvas({
   shareHref: string
   siteKey: string | null
   controls: CanvasControl[]
+  /** From the server's `auth()`: a signed-in owner keeps the draft with one tap, no sheet (S3.1). */
+  signedIn: boolean
 }) {
   const router = useRouter()
   const [blocks, setBlocks] = useState(initial)
@@ -236,5 +240,11 @@ export default function OwnerCanvas({
     </div>
   ) : null
 
-  return <ShopCanvas view={view} mode="owner" toolbar={toolbar} />
+  const landed = !view.pending.identity && !view.pending.words && !view.pending.catalog
+  return (
+    <>
+      <ShopCanvas view={view} mode="owner" toolbar={toolbar} />
+      {can('keep') ? <KeepSheet draftId={draftId} shopName={view.name} signedIn={signedIn} ready={landed} /> : null}
+    </>
+  )
 }

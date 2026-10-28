@@ -1,22 +1,10 @@
 import { redirect } from 'next/navigation'
-import { currentUser } from '@clerk/nextjs/server'
-import BienvenidaClient from './BienvenidaClient'
-
-export const metadata = {
-  title: 'Bienvenido — Miyagi Sánchez',
-}
 
 /**
- * S1 Bienvenida (onboarding three-doors, Sprint 1 · Story 1.1). Reachable
- * directly (Daniel/QA can open the URL) regardless of the
- * `onboarding.three_doors_enabled` flag — the flag only gates whether
- * `/sell` *auto-redirects* here, not whether the page itself renders; the
- * flag-off case simply means fewer people arrive organically. Signed-out
- * visitors go to sign-in first, same as every other `/sell*` surface.
+ * `/sell/bienvenida` left the main path (epic prompt-to-shop S3.3). The first run is now `/sell`'s describe box: a
+ * merchant sees their shop before any intake question. The address stays alive as a redirect so an old link, an
+ * email or a bookmark still lands somewhere useful.
  */
-export default async function BienvenidaPage() {
-  const user = await currentUser()
-  if (!user) redirect('/sign-in')
-
-  return <BienvenidaClient firstName={user.firstName ?? null} />
+export default function BienvenidaPage() {
+  redirect('/sell')
 }

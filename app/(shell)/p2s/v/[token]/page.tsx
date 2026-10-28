@@ -17,7 +17,7 @@ import ShopCanvas from '../../_components/ShopCanvas'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Vista previa de una tienda — Miyagi Sánchez',
+  title: 'Vista previa de una tienda',
   robots: { index: false, follow: false },
 }
 

@@ -8,14 +8,13 @@ import SellerCopyBoundary from '@/app/components/SellerCopyBoundary'
 import { getDictionary } from '@/lib/dictionary'
 import { getMySeller } from '@/lib/get-my-seller'
 import { isEnabled } from '@/lib/flags'
-import { getTenantIntake } from '@/lib/tenant-intake'
 import { resolveSellerSignupMarket } from '@/lib/seller-signup-market'
 import { SELLER_LOCALE_COOKIE, resolveSellerLocale, sellerCopyBoundaryNeeded } from '@/lib/seller-locale'
 import { sellerLandingRedirectPath } from '@/lib/seller-acquisition'
 
-// First-run, agent-native path (Onboarding 0, Sprint 2). Offered to signed-in
-// users who don't have a shop yet; the manual <SellWizard> stays as the no-agent
-// fallback right below it.
+// The file import (Onboarding 0, Sprint 2), offered to signed-in users who don't have a shop yet. Since
+// prompt-to-shop S3.3 it is the "I already have a catalog" door next to the describe box, named the way the box
+// names it; the manual <SellWizard> stays as «Armar a mano» right below.
 function AgentSetupNudge() {
   return (
     <Link
@@ -23,14 +22,14 @@ function AgentSetupNudge() {
       className="block no-underline rounded-[var(--r-lg)] border border-[var(--color-border)] bg-[var(--surface-muted)] p-4 mb-5 hover:border-[var(--color-accent)] transition-colors"
     >
       <div className="flex items-start gap-3">
-        <i className="iconoir-sparks text-2xl leading-none" aria-hidden />
+        <i className="iconoir-page text-2xl leading-none" aria-hidden />
         <div>
           <p className="font-semibold text-[var(--fg)] text-sm">
-            ¿Tu agente ya armó tu tienda? Pégala aquí.
+            ¿Ya tienes tu catálogo en un archivo?
           </p>
           <p className="text-xs text-[var(--color-muted)] mt-0.5">
-            Si tu IA generó un archivo de configuración, créala con catálogo en un solo paso —
-            sin llenar el formulario. <span className="text-[var(--color-accent)] font-medium">Abrir →</span>
+            Súbelo y armamos tu tienda con tus productos en un solo paso. Antes de crear nada, te mostramos cómo quedó.{' '}
+            <span className="text-[var(--color-accent)] font-medium">Abrir →</span>
           </p>
         </div>
       </div>
@@ -114,25 +113,13 @@ export default async function SellPage({
   // server-evaluated pattern as arrangedOnlyEnabled above.
   const ownedShopOnlyEnabled = await isEnabled('catalog.owned_shop_only_enabled')
 
-  // Onboarding three-doors first-run entry (Sprint 1 · Story 1.1). A fresh,
-  // shop-less merchant who hasn't already started (no tenant_intake row) and
-  // hasn't deliberately opted out this session (the ghost CTA's skip
-  // signal) gets redirected into S1 Bienvenida instead of today's
-  // SellWizard entry. Flag OFF (the default) or any shop/intake/skip signal
-  // present ⇒ this is a no-op, unchanged behavior.
-  if (!existingShop) {
-    const cookieStore = await cookies()
-    const skipped = cookieStore.get('onboarding_skip')?.value === '1'
-    if (!skipped && (await isEnabled('onboarding.three_doors_enabled'))) {
-      const intake = await getTenantIntake(user.id)
-      if (!intake) redirect('/sell/bienvenida')
-    }
-  }
+  // The three-doors first run (`/sell/bienvenida` → `/sell/puertas`) no longer interrupts here (prompt-to-shop
+  // S3.3): a merchant with no shop starts with the describe box below. Both old routes redirect back to `/sell`.
 
   const content = (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      {/* Prompt-to-shop S2.2: a signed-in merchant with no shop starts by describing. The manual wizard stays right
-          below (its own anchor), and the three-doors redirect above is untouched — S3.3 removes it. */}
+      {/* Prompt-to-shop S2.2/S3.3: a signed-in merchant with no shop starts by describing. The file import stays one
+          tap away (the nudge below) and the manual wizard right below that, under its own anchor. */}
       {/* es-MX only (AGENTS rule 5): generation is an MX-shaped shop in Spanish, so a US signup keeps today's flow. */}
       {!existingShop && signupMarket !== 'us' && (
         <div className="mb-6">

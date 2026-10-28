@@ -100,6 +100,11 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     sender: 'sendShopClaimLink', origin: 'app/api/claim/send/route.ts',
   },
   {
+    key: 'shop.p2s_draft_link', trigger: 'Quien armó una tienda describiéndola pide que le mandemos el enlace por correo.',
+    from: 'platform', to: 'seller', channels: ['email'], domain: 'cuentas',
+    sender: 'sendP2sDraftLink', origin: 'app/api/p2s/link/[id]/route.ts',
+  },
+  {
     key: 'shop.claimed_welcome', trigger: 'La tienda se vincula a una cuenta por primera vez.',
     from: 'platform', to: 'seller', channels: ['email'], domain: 'cuentas',
     sender: 'sendShopClaimedWelcome', origin: 'app/api/claim/complete/route.ts',

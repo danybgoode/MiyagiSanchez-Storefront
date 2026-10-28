@@ -20,13 +20,16 @@ import type { DraftBlocks } from './view'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export type CanvasControl = 'rename' | 'accent' | 'version' | 'share'
+export type CanvasControl = 'rename' | 'accent' | 'version' | 'share' | 'keep'
 
 export type DraftAccess = { kind: 'owner'; draftId: string } | { kind: 'viewer' }
 
-/** What each way in may do. A viewer's list is empty, and the canvas renders exactly this list and nothing else. */
+/**
+ * What each way in may do. A viewer's list is empty, and the canvas renders exactly this list and nothing else.
+ * `keep` (S3.1) is «Quedármela» and «Mándame el enlace»: a viewer can neither claim a draft nor mail its links.
+ */
 export function controlsFor(access: DraftAccess): CanvasControl[] {
-  return access.kind === 'owner' ? ['rename', 'accent', 'version', 'share'] : []
+  return access.kind === 'owner' ? ['rename', 'accent', 'version', 'share', 'keep'] : []
 }
 
 /** A row as the owner route reads it. The share token rides along ONLY so the owner can copy the link. */
@@ -125,4 +128,12 @@ export async function resolveViewerPage(input: { token: string }, deps: Pick<Rea
 /** The link «Compartir vista previa» copies. */
 export function viewHref(viewToken: string): string {
   return `/p2s/v/${viewToken}`
+}
+
+/**
+ * The same link for an owner resolution, so a caller that mails it to the owner (S3.1 «Mándame el enlace») never
+ * handles the token itself and stays outside the view-token allow-list (`e2e/p2s-view-token.spec.ts`).
+ */
+export function shareHrefFor(resolution: Extract<OwnerResolution, { kind: 'ok' }>): string {
+  return viewHref(resolution.viewToken)
 }

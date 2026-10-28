@@ -66,6 +66,7 @@ const offerCtx = (to: string) => ({
  */
 export const COMMUNICATION_FIXTURES: Record<string, CommunicationFixture> = {
   'account.welcome': (to) => email.sendAccountWelcome({ to, clerkUserId: 'sample_user' }),
+  'shop.p2s_draft_link': (to) => email.sendP2sDraftLink({ to, shopName: SHOP, draftId: '00000000-0000-4000-8000-000000000000', sharePath: '/p2s/v/00000000-0000-4000-8000-000000000001' }),
   'shop.claim_link_requested': (to) => email.sendShopClaimLink({ to, shopName: SHOP, claimUrl: 'https://miyagisanchez.com/claim?token=sample', market: 'mx' }),
   'shop.claimed_welcome': (to) => email.sendShopClaimedWelcome({ to, shopName: SHOP, shopSlug: 'tienda-de-muestra', market: 'mx', sellerId: 'sample_seller' }),
   'shop.created_welcome.mx': (to) => email.sendShopCreatedWelcome({ to, shopName: SHOP, shopSlug: 'tienda-de-muestra', market: 'mx', sellerId: 'sample_created_mx' }),
