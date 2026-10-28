@@ -16,9 +16,11 @@
 import { normalizedClaimEmail } from '../claim-invitation'
 import { resolveOwnerPage, shareHrefFor, type ReadDeps } from './access'
 import { MAIL_LINK_COPY } from './copy'
+import { readDeviceId } from './handler'
 
 export interface MailLinkDeps {
-  allowed: () => Promise<boolean>
+  /** Burst limits: per IP, and per device when there is one (null = no valid device cookie). */
+  allowed: (deviceId: string | null) => Promise<boolean>
   findOwned: ReadDeps['findOwned']
   send: (ctx: { to: string; shopName: string; draftId: string; sharePath: string }) => Promise<boolean>
 }
@@ -38,7 +40,7 @@ export async function handleMailLink(
   const to = normalizedClaimEmail(raw)
   if (!to) return refuse(400, 'invalid')
 
-  if (!(await deps.allowed())) return refuse(429, 'limited')
+  if (!(await deps.allowed(readDeviceId(input.deviceCookie)))) return refuse(429, 'limited')
 
   const owned = await resolveOwnerPage({ id: input.draftId, deviceCookie: input.deviceCookie }, deps)
   if (owned.kind === 'gone') return refuse(404, 'gone')

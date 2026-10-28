@@ -56,6 +56,8 @@ test('/sell keeps the file import and the manual wizard one tap from the describ
   expect(sell).toContain('{!existingShop && <AgentSetupNudge />}')
   expect(sell).toContain('<SellWizard')
   expect(sell).not.toMatch(/getTenantIntake|onboarding_skip|three_doors_enabled/)
+  // The drop-anything intake keeps a way in: the file import page links it.
+  expect(read('app/(shell)/sell/setup/SetupClient.tsx')).toContain('<Link href="/sell/agente"')
   // The file import's back link returns to the first run, not to the chooser that left.
   expect(read('app/(shell)/sell/(onboarding)/agente/AgenteIntakeClient.tsx')).toContain('<Link href="/sell"')
 })

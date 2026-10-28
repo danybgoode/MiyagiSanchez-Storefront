@@ -643,6 +643,7 @@
         "s_31b314ee34890424",
         "s_41444d7493205e02",
         "s_0834dc32ee5b0ad5",
+        "s_588020a65eabf83e",
         "s_7c8125ede1cb553e",
         "s_eaecf0d52b3bc73d",
         "s_4ce1354ff9567c31",
@@ -5487,6 +5488,10 @@
     {
       "key": "s_57fb63109d5f6b20",
       "source": "Esta tienda es \"muy personalizada\"."
+    },
+    {
+      "key": "s_588020a65eabf83e",
+      "source": "¿Tu catálogo está en un CSV o en Mercado Libre? Tráelo como lo tengas →"
     },
     {
       "key": "s_58c605f58fd9878d",

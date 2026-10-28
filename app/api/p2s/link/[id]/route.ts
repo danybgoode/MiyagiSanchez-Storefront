@@ -32,7 +32,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const result = await handleMailLink(
     { draftId: id, body, deviceCookie: req.cookies.get(DEVICE_COOKIE)?.value },
     {
-      allowed: async () => (await checkRateLimit('p2s_mail_link', ip)).allowed,
+      allowed: async (deviceId) => {
+        const [byIp, byDevice] = await Promise.all([
+          checkRateLimit('p2s_mail_link', ip),
+          deviceId ? checkRateLimit('p2s_mail_link_device', deviceId) : Promise.resolve({ allowed: true as const }),
+        ])
+        return byIp.allowed && byDevice.allowed
+      },
       findOwned: readDeps.findOwned,
       send: async (mail) => {
         const sent = await sendP2sDraftLink(mail)

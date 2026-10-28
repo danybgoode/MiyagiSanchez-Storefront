@@ -25,7 +25,9 @@
  *     `configApplied: false` instead of pretending, or retrying onto a shop the merchant may already be editing.
  *   • A draft claimed by THIS user with no `claimed_seller_id` is a keep that stopped before a seller existed (the
  *     create failed, or the tab closed). Re-entering resumes it only while the lookup says the user has no shop,
- *     and again applies only on a 201. A present seller there is `has_shop` + release, as above.
+ *     and again applies only on a 201. A present seller there is `has_shop` + release, as above — whether the user
+ *     built that shop by hand after a failed keep, or it came from ANOTHER draft they kept since (revisiting draft X
+ *     after draft Y became the shop). Only this call's 201 ever proves a seller came from this draft.
  *   • Anything else that cannot claim — another phone, another account, expired, missing, malformed — gets the SAME
  *     «Esta tienda se armó en otro teléfono» answer, so a stranger learns nothing about the id. That includes the
  *     right phone holding a draft another account already kept: the device proves it made the draft, not that it

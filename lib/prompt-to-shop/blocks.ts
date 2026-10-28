@@ -102,6 +102,8 @@ export function validateIdentity(value: unknown): BlockParse<'identity'> {
   const tagline = text(value.tagline, 120)
   const description = text(value.description, 600)
   if (!name) issues.push('name vacío o > 60')
+  // A shop name is one line: it becomes an email subject, a page title and a Medusa seller name.
+  else if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(name)) issues.push('name con caracteres de control')
   if (!tagline) issues.push('tagline vacío o > 120')
   if (!description) issues.push('description vacío o > 600')
   if (!accentIsReadable(value.accent_color)) issues.push('accent_color no es hex legible sobre blanco')

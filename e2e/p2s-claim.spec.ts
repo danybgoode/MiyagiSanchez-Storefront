@@ -229,6 +229,20 @@ test('a draft whose name has not landed yet is not claimed; it stays claimable',
   expect(w.row.claimed_by).toBeNull()
 })
 
+test('claim lands, the create fails, the user then builds a shop by hand: the next keep applies NOTHING to it', async () => {
+  // The verifier's executed scenario. Same class: draft X half-kept, draft Y became the shop, X revisited.
+  const w = world({ failShopOnce: true })
+  expect(await keep(w)).toEqual({ kind: 'retry', message: CLAIM_RETRY.shop })
+  expect(w.row.claimed_by).toBe(USER)
+  w.sellers[USER] = { id: 'sel_manual', slug: 'hecha-a-mano' }
+  const before = w.trace.length
+  expect(await keep(w)).toEqual({ kind: 'has_shop', shopSlug: 'hecha-a-mano' })
+  expect(w.trace.slice(before)).toEqual(['findSeller', 'reread', 'release'])
+  expect(w.trace.filter((e) => e === 'applyConfig')).toHaveLength(0)
+  // Released: the draft is this phone's again (the owner canvas reads `claimed_by IS NULL`).
+  expect(w.row).toMatchObject({ claimed_by: null, claimed_seller_id: null })
+})
+
 test('partial failure: the shop create failed after the claim — the same user re-entering finishes it, once', async () => {
   const w = world({ failShopOnce: true })
   expect(await keep(w)).toEqual({ kind: 'retry', message: CLAIM_RETRY.shop })

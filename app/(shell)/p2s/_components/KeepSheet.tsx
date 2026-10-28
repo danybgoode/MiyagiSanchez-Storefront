@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
@@ -18,10 +18,19 @@ import { KEEP_COPY } from '@/lib/prompt-to-shop/copy'
  * `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL`, which does not exist in Clerk v7.
  *
  * Hash routing has one consequence handled here: a Google sign-up leaves the page and comes back to it with a
- * `#/sso-callback` hash that only a MOUNTED `<SignUp>` can finish. So a Clerk hash on load opens the sheet.
+ * `#/sso-callback` hash that only a MOUNTED `<SignUp>` can finish. So a Clerk hash opens the sheet: the hash is read
+ * as an external store (`useSyncExternalStore` on `hashchange`), false on the server, so there is no setState in an
+ * effect and no hydration mismatch.
  *
  * «Mándame el enlace» is the not-now path: it mails this phone's links (`/api/p2s/link/[id]`).
  */
+
+function subscribeHash(onChange: () => void) {
+  window.addEventListener('hashchange', onChange)
+  return () => window.removeEventListener('hashchange', onChange)
+}
+const readClerkHash = () => window.location.hash.startsWith('#/')
+const noClerkHashOnServer = () => false
 
 export default function KeepSheet({
   draftId,
@@ -36,16 +45,16 @@ export default function KeepSheet({
   ready: boolean
 }) {
   const keepHref = `/sell/armar?draft=${draftId}`
-  const [open, setOpen] = useState(false)
+  const [opened, setOpened] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+  // Back from Google (or mid email-code step): finish the Clerk flow in the sheet it started in.
+  const clerkHash = useSyncExternalStore(subscribeHash, readClerkHash, noClerkHashOnServer)
+  const open = !signedIn && (opened || (clerkHash && !dismissed))
+  const setOpen = (next: boolean) => { setOpened(next); setDismissed(!next) }
   const [mailOpen, setMailOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [mail, setMail] = useState<{ state: 'idle' | 'sending' | 'sent' | 'error'; message?: string }>({ state: 'idle' })
   const closeRef = useRef<HTMLButtonElement | null>(null)
-
-  // Back from Google (or mid email-code step): finish the Clerk flow in the sheet it started in.
-  useEffect(() => {
-    if (!signedIn && window.location.hash.startsWith('#/')) setOpen(true)
-  }, [signedIn])
 
   useEffect(() => {
     if (!open) return
