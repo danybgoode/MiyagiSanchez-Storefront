@@ -176,7 +176,7 @@ export default async function PreciosPage() {
             <h2 id="precios-compare-title" className="t-h3" style={{ letterSpacing: 0, marginBottom: 'var(--s-2)' }}>{ui.compare.title}</h2>
             <p className="t-lead" style={{ color: 'var(--fg-muted)', margin: 0 }}>{ui.compare.body}</p>
           </div>
-          <PreciosTrackedLink href="/comparador" event="precios_comparador_clicked" className="btn btn-secondary" testId="precios-compare-cta">
+          <PreciosTrackedLink href="/comparador?platform=t1&tier=basico" event="precios_comparador_clicked" className="btn btn-secondary" testId="precios-compare-cta">
             {ui.compare.cta}
             <i className="iconoir-arrow-right" aria-hidden="true" />
           </PreciosTrackedLink>

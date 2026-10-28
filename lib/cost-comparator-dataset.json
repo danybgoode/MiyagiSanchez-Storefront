@@ -206,6 +206,42 @@
       "verifiedAt": "2026-07-17",
       "label": "Tiendanube — comisión por pasarela externa, Plan Avanzado (negociable; 0 hasta que el vendedor la ajuste)"
     },
+    "t1.plan.basico.monthlyMxn": {
+      "value": 399,
+      "source": "https://t1.com/mx/precios",
+      "verifiedAt": "2026-10-28",
+      "label": "T1 — Plan Básico, mensual (MXN)"
+    },
+    "t1.plan.avanzado.monthlyMxn": {
+      "value": 1499,
+      "source": "https://t1.com/mx/precios",
+      "verifiedAt": "2026-10-28",
+      "label": "T1 — Plan Avanzado, mensual (MXN)"
+    },
+    "t1.t1pagos.pct": {
+      "value": 3.5,
+      "source": "https://t1.com/mx/precios",
+      "verifiedAt": "2026-10-28",
+      "label": "T1 — comisión con T1pagos, % por transacción (Básico y Avanzado)"
+    },
+    "t1.t1pagos.fixedMxn": {
+      "value": 1,
+      "source": "https://t1.com/mx/precios",
+      "verifiedAt": "2026-10-28",
+      "label": "T1 — comisión con T1pagos, cargo fijo por transacción (MXN)"
+    },
+    "t1.external.basico.pct": {
+      "value": 2,
+      "source": "https://t1.com/mx/precios",
+      "verifiedAt": "2026-10-28",
+      "label": "T1 — comisión de T1 con métodos de pago externos, Plan Básico (%)"
+    },
+    "t1.external.avanzado.pct": {
+      "value": 1,
+      "source": "https://t1.com/mx/precios",
+      "verifiedAt": "2026-10-28",
+      "label": "T1 — comisión de T1 con métodos de pago externos, Plan Avanzado (%)"
+    },
     "miyagi.sku.subdomain.monthlyMxn": {
       "value": 25,
       "source": "lib/subdomain-pricing.ts (SUBDOMAIN_PRICE_MONTHLY_MXN — SKU en producción)",

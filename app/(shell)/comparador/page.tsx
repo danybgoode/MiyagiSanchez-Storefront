@@ -6,6 +6,7 @@ import {
   mercadoLibreRatesFromDataset,
   wooCommerceRatesFromDataset,
   tiendanubeRatesFromDataset,
+  t1RatesFromDataset,
   miyagiRatesFromDataset,
   premiumAppsFromDataset,
   fxUsdToMxnFromDataset,
@@ -17,9 +18,9 @@ import ComparadorAnalytics from './_components/ComparadorAnalytics'
 const BASE_URL = 'https://miyagisanchez.com'
 const PAGE_PATH = '/comparador'
 
-const TITLE = 'Comparador de costos — Miyagi Sánchez vs. Shopify, Mercado Libre, WooCommerce y Tiendanube'
+const TITLE = 'Comparador de costos — Miyagi Sánchez vs. Shopify, Mercado Libre, WooCommerce, Tiendanube y T1'
 const DESCRIPTION =
-  'Compara lo que pagas hoy en Shopify, Mercado Libre, WooCommerce o Tiendanube contra Miyagi Sánchez (0% comisión) — con tus propios números de ventas.'
+  'Compara lo que pagas hoy en Shopify, Mercado Libre, WooCommerce, Tiendanube o T1 contra Miyagi Sánchez (0% comisión) — con tus propios números de ventas.'
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -73,6 +74,7 @@ export default async function ComparadorPage({ searchParams }: ComparadorPagePro
     mercadolibre: mercadoLibreRatesFromDataset(dataset),
     woocommerce: wooCommerceRatesFromDataset(dataset),
     tiendanube: tiendanubeRatesFromDataset(dataset),
+    t1: t1RatesFromDataset(dataset),
     miyagi: miyagiRatesFromDataset(dataset),
   }
   const apps = premiumAppsFromDataset(dataset)

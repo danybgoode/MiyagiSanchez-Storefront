@@ -209,6 +209,43 @@ export function computeTiendanubeCost(
 // what makes the Miyagi bar apples-to-apples with the others rather than a bare
 // $0 that hides the one real cost every platform shares (card processing).
 // ---------------------------------------------------------------------------
+// T1 — plan tiers; payments either through T1pagos (% + fixed) or an external
+// provider, where T1 takes its own cut (pricing-page A1/A2). Same shape as
+// Tiendanube's own-vs-external gateway. T1's free plan has no online store
+// («No se puede transaccionar»), so it is not a tier here — modelling it as a
+// $0 plan would flatter a plan that cannot sell.
+// ---------------------------------------------------------------------------
+
+export type T1Tier = 'basico' | 'avanzado'
+
+export interface T1Rates {
+  planMonthlyMxn: Record<T1Tier, number>
+  /** T1pagos card rate, % (flat across the paid tiers). */
+  t1PagosPct: number
+  t1PagosFixedMxn: number
+  /** T1's own cut, %, when the merchant uses an external payment provider. */
+  externalPct: Record<T1Tier, number>
+}
+
+export function computeT1Cost(
+  inputs: ComparatorInputs,
+  tier: T1Tier,
+  useT1Pagos: boolean,
+  rates: T1Rates,
+  appsMonthlyMxn = 0,
+): StackedCost {
+  const revenue = revenueMxn(inputs)
+  const paymentMxn = useT1Pagos
+    ? revenue * (rates.t1PagosPct / 100) + inputs.volumeMonthly * rates.t1PagosFixedMxn
+    : revenue * (rates.externalPct[tier] / 100)
+  return stack([
+    { key: 'plan', label: 'Plan mensual', monthlyMxn: rates.planMonthlyMxn[tier] },
+    { key: 'payment', label: useT1Pagos ? 'T1pagos' : 'Comisión de T1 por pasarela externa', monthlyMxn: paymentMxn },
+    { key: 'apps', label: 'Apps premium', monthlyMxn: appsMonthlyMxn },
+  ])
+}
+
+// ---------------------------------------------------------------------------
 
 export interface MiyagiSkuSelections {
   subdomain: boolean
