@@ -51,6 +51,8 @@ async function callGemini(req: ModelRequest): Promise<ModelResult> {
 const DRAFT_COLUMNS = 'id, description'
 
 export function draftsDeps(ip: string): DraftsDeps {
+  // One budget day per request: a refund just after Mexico City midnight must give back the day it was spent on.
+  const period = budgetPeriod(new Date())
   return {
     verifyTurnstile: (token) => verifyTurnstile({ secret: process.env.TURNSTILE_SECRET_KEY, token, ip }),
     burstAllowed: async (deviceId) => {
@@ -64,7 +66,7 @@ export function draftsDeps(ip: string): DraftsDeps {
       const { data, error } = await db.rpc('spend_p2s_generation', {
         p_device: subject,
         p_version_cap: versionCap,
-        p_budget_period: budgetPeriod(new Date()),
+        p_budget_period: period,
         p_budget_cap: resolveDailyBudget(process.env.P2S_DAILY_BUDGET),
       })
       return { data, error }
@@ -95,6 +97,9 @@ export function draftsDeps(ip: string): DraftsDeps {
         .eq('id', draft.id)
         .eq('device_id', deviceId)
         .is('claimed_by', null)
+        // Only forward. A refund can hand the same version number out twice; without this, a re-run would reuse a
+        // number an in-flight run is still saving under, and save_p2s_block's version guard would let both write.
+        .lt('versions_used', versionsUsed)
         .select('id')
       return !error && Array.isArray(data) && data.length === 1
     },
@@ -107,7 +112,7 @@ export function draftsDeps(ip: string): DraftsDeps {
       return !error && data === true
     },
     refund: async ({ subject }) => {
-      const { error } = await db.rpc('refund_p2s_generation', { p_device: subject, p_budget_period: budgetPeriod(new Date()) })
+      const { error } = await db.rpc('refund_p2s_generation', { p_device: subject, p_budget_period: period })
       if (error) console.error('[p2s] refund failed', error.message)
     },
     callModel: callGemini,
