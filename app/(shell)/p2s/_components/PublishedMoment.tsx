@@ -5,7 +5,9 @@ import { SuccessCard } from '@/components/SuccessCard'
 import { PUBLISH_COPY } from '@/lib/prompt-to-shop/copy'
 import { patchShop } from '@/lib/prompt-to-shop/client'
 import type { OwnProductCardView } from '@/lib/prompt-to-shop/view'
-import { shopShortLink } from '@/lib/share-link'
+import { isShopSlug, shopShortLink } from '@/lib/share-link'
+import { catalogUrl } from '@/lib/share-kit/catalog'
+import CatalogLinkTile from '@/components/share-kit/CatalogLinkTile'
 
 /**
  * The moment after «Publicar» (epic prompt-to-shop S5.2): the shop as the marketplace shows it, then the shares.
@@ -16,7 +18,9 @@ import { shopShortLink } from '@/lib/share-link'
  *
  * Shares: `SuccessCard` (the shared "done" screen) brings WhatsApp through `lib/share-link.ts` and the native share
  * sheet; under it, the story image (`/api/sell/shop/story-image`), the QR code (`/api/sell/shop/qr`) and the short
- * link (`mschz.org/<slug>`). Every share marks the checklist's `comparte` step, the seam Comparte uses.
+ * link (`mschz.org/<slug>`). Then the share kit's «Catálogo» tile (share-kit S1.3), the same component Comparte shows.
+ * Every share marks the checklist's `comparte` step, the seam Comparte uses. Prompt-to-shop builds Mexico shops only,
+ * so the catalog (Mexico-only, share-kit D5) always applies here.
  */
 export default function PublishedMoment({
   shopName,
@@ -101,6 +105,9 @@ export default function PublishedMoment({
         </button>
       </div>
       <p className="t-small" style={{ margin: 0, textAlign: 'center' }} role="status" aria-live="polite">{copied === 'copied' ? PUBLISH_COPY.copied : null}</p>
+      {isShopSlug(shopSlug) ? (
+        <CatalogLinkTile shopName={shopName} catalogUrl={catalogUrl(shopSlug)} onShared={() => shared()} />
+      ) : null}
       {copied === 'manual' ? (
         <label className="t-small grid gap-1">
           {PUBLISH_COPY.copyManual}

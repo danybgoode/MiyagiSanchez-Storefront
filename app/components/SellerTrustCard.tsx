@@ -2,6 +2,7 @@ import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
 /* eslint-disable @next/next/no-img-element -- seller logos may use arbitrary remote hosts */
 import Link from 'next/link'
 import type { Shop } from '@/lib/types'
+import { whatsappDigits, whatsappMessageLink } from '@/lib/share-kit/whatsapp'
 
 /**
  * Seller trust card — the "who am I buying from + how to reach them" block:
@@ -18,10 +19,9 @@ import type { Shop } from '@/lib/types'
 type PickupSpot = { name?: string; address?: string; instructions?: string }
 
 function whatsappUrl(raw: string, title: string): string {
-  const digits = raw.replace(/\D/g, '')
-  const full = digits.startsWith('52') ? digits : `52${digits}`
-  const text = encodeURIComponent(`Hola, vi tu anuncio "${title}" en miyagisanchez.com y me interesa. ¿Sigue disponible?`)
-  return `https://wa.me/${full}?text=${text}`
+  // Normalization is shared with the share kit's order link (`lib/share-kit/whatsapp.ts`, D3).
+  const full = whatsappDigits(raw) ?? '52'
+  return whatsappMessageLink(full, `Hola, vi tu anuncio "${title}" en miyagisanchez.com y me interesa. ¿Sigue disponible?`)
 }
 
 export default function SellerTrustCard({

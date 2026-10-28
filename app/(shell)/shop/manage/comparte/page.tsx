@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation'
 import { currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
-import { getShopListings } from '@/lib/listings'
+import { getShop, getShopListings } from '@/lib/listings'
+import { readPublicSellerMarket } from '@/lib/owned-market'
+import { catalogUrl } from '@/lib/share-kit/catalog'
 import ComparteClient from './ComparteClient'
 import type { Metadata } from 'next'
 
@@ -26,8 +28,10 @@ export default async function CompartePage() {
 
   if (!shop) redirect('/sell')
 
-  const listings = await getShopListings(shop.slug)
+  const [listings, medusaShop] = await Promise.all([getShopListings(shop.slug), getShop(shop.slug)])
   const meta = shop.metadata as Record<string, unknown> | null
+  // The share kit is Mexico-only (share-kit D5); the market is the Medusa seller's, the store the public page reads.
+  const isMexicoShop = readPublicSellerMarket(medusaShop)?.market_code === 'mx'
   const agentTokenSet = !!meta?.ucp_agent_token_hash
 
   return (
@@ -38,6 +42,7 @@ export default async function CompartePage() {
       location={shop.location}
       productCount={listings.length}
       agentTokenSet={agentTokenSet}
+      catalogUrl={isMexicoShop ? catalogUrl(shop.slug) : null}
     />
   )
 }

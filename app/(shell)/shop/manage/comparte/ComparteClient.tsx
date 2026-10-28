@@ -5,6 +5,8 @@ import { SellerBreadcrumb } from '../SellerBreadcrumb'
 import { Card } from '@/components/ui/Card'
 import { Toast, useToast } from '@/components/feedback/Toast'
 import ConnectAgentPanel from '@/components/ConnectAgentPanel'
+import CatalogLinkTile from '@/components/share-kit/CatalogLinkTile'
+import { SHARE_KIT_COPY } from '@/lib/share-kit/copy'
 import { buildWhatsAppShareLink } from '@/lib/share-link'
 import { pushAnalyticsEvent } from '@/lib/analytics-events'
 import { pushGrowthEvent } from '@/lib/growth-events'
@@ -18,6 +20,7 @@ export default function ComparteClient({
   location,
   productCount,
   agentTokenSet,
+  catalogUrl,
 }: {
   shopName: string
   shopSlug: string
@@ -25,6 +28,8 @@ export default function ComparteClient({
   location: string | null
   productCount: number
   agentTokenSet: boolean
+  /** The shop's catalog page, or null when the shop has none (share-kit D5). */
+  catalogUrl: string | null
 }) {
   const { toast, showToast, dismissToast } = useToast()
   const [copied, setCopied] = useState(false)
@@ -121,6 +126,17 @@ export default function ComparteClient({
           </a>
         </div>
       </Card>
+
+      {catalogUrl ? (
+        <div className="mb-6">
+          <CatalogLinkTile
+            shopName={shopName}
+            catalogUrl={catalogUrl}
+            onShared={(channel) => tapShare(`catalogo_${channel}`)}
+            onCopyResult={(ok) => showToast(ok ? SHARE_KIT_COPY.copiedToast : SHARE_KIT_COPY.copyFailed, ok ? 'success' : 'error')}
+          />
+        </div>
+      ) : null}
 
       <Card variant="panel" className="p-5">
         <h3 className="font-semibold mb-2">¿Sigues tú o sigue tu agente?</h3>

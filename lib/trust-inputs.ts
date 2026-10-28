@@ -20,6 +20,7 @@
 
 import { returnsWindowLabel, type TrustMethod } from '@/lib/trust-signals'
 import { publicShopPaymentAvailability } from '@/lib/public-shop-commerce'
+import { shopWhatsAppNumber } from '@/lib/share-kit/whatsapp'
 
 export interface ShopTrustInputs {
   paymentMethods: TrustMethod[]
@@ -72,7 +73,7 @@ export function deriveShopTrustInputs(
   const orders = (settings.orders ?? {}) as { processing_time?: string }
   const returnsPolicy = settings.returns_policy as { window?: string } | null | undefined
   const paymentAvailability = publicShopPaymentAvailability(meta)
-  const whatsapp = checkout.whatsapp_cta ? (theme.social?.whatsapp || checkout.phone || null) : null
+  const whatsapp = shopWhatsAppNumber({ checkout, theme })
 
   const localPickup = !!shipping.local_pickup
   const pickupSpots = localPickup ? (shipping.pickup_spots ?? []) : []

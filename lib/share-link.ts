@@ -34,8 +34,17 @@ export function shopShortLink(slug: string): string | null {
   return isShopSlug(slug) ? `${SHORTLINK_ORIGIN}/${slug}` : null
 }
 
+/** What a shop QR code can point at: the shop itself, or its catalog page (share-kit D10). */
+export type ShopQrTarget = 'shop' | 'catalogo'
+
+/** The `?target=` value as a QR target — anything that is not exactly `catalogo` is the shop. */
+export function parseShopQrTarget(value: unknown): ShopQrTarget {
+  return value === 'catalogo' ? 'catalogo' : 'shop'
+}
+
 /** What the shop QR route encodes and how it names the download — or nothing, for a slug that is not one. */
-export function shopQrPlan(slug: unknown): { url: string; filename: string } | null {
+export function shopQrPlan(slug: unknown, target: ShopQrTarget = 'shop'): { url: string; filename: string } | null {
   if (!isShopSlug(slug)) return null
+  if (target === 'catalogo') return { url: `${SHORTLINK_ORIGIN}/s/${slug}/catalogo`, filename: `${slug}-catalogo-qr.png` }
   return { url: `${SHORTLINK_ORIGIN}/${slug}`, filename: `${slug}-qr.png` }
 }

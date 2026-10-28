@@ -69,6 +69,7 @@ import { getDictionary } from '@/lib/dictionary'
 import { formatPresentationCurrency, resolveMarketPresentation } from '@/lib/market-presentation'
 import { marketCatalogCanonical } from '@/lib/market-seo'
 import { resolveCommerceReadiness } from '@/lib/commerce-readiness'
+import { shopWhatsAppNumber } from '@/lib/share-kit/whatsapp'
 
 export type ListingRequestContext = {
   mode: 'dynamic' | 'public'
@@ -300,9 +301,7 @@ export async function ListingPage({
   const bundleConfig = shopSettings.bundles as { enabled?: boolean; tiers?: BundleTier[] } | undefined
   const shopBundleTiers: BundleTier[] = bundleConfig?.enabled ? (bundleConfig.tiers ?? []) : []
   const visiblePhone = checkoutSettings?.show_phone && checkoutSettings.phone ? checkoutSettings.phone : null
-  const whatsappPhone = checkoutSettings?.whatsapp_cta
-    ? (themeSettings?.social?.whatsapp || checkoutSettings?.phone || null)
-    : null
+  const whatsappPhone = shopWhatsAppNumber({ checkout: checkoutSettings, theme: themeSettings })
   const contactEmail = checkoutSettings?.show_email ? checkoutSettings.contact_email ?? null : null
   const schedulingLinks = (schedulingSettings?.links ?? []).filter((link): link is { label?: string; url: string } => !!link.url)
   const bookingUrl = ensureUrlProtocol(

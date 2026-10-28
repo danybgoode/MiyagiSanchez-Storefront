@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { MARKETPLACE_SHOP_TAILS } from '../lib/public-read-routing'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
@@ -11,7 +12,10 @@ test.describe('public renderer parity · D7/D8/D19', () => {
     const route = read('app/(public-read)/internal-public-read/[channel]/[identity]/[slug]/shop/[[...rest]]/page.tsx')
     expect(route).toContain("from '@/app/(shell)/s/[slug]/ShopRenderer'")
     expect(route).toContain("from '@/app/(shell)/embed/s/[slug]/page'")
-    for (const surface of ['acerca', 'colecciones', 'eventos', 'faq', 'politicas', 'tienda']) {
+    // The population is the set middleware rewrites into this route, not a hand-kept list: the catalog (share-kit
+    // D8) joined the set, and a tail with no case here renders a 404 from the edge cache.
+    expect(MARKETPLACE_SHOP_TAILS.size).toBeGreaterThanOrEqual(7)
+    for (const surface of MARKETPLACE_SHOP_TAILS) {
       expect(route).toContain(`case '${surface}'`)
     }
     expect(route).not.toContain('getMarketplaceShopListings')

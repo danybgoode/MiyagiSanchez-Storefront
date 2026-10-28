@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import QRCode from 'qrcode'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
-import { shopQrPlan } from '@/lib/share-link'
+import { parseShopQrTarget, shopQrPlan } from '@/lib/share-link'
 
 /**
  * GET /api/sell/shop/qr — a PNG QR code for the current seller's own shop (prompt-to-shop S5.2, the shares after
@@ -15,7 +15,7 @@ import { shopQrPlan } from '@/lib/share-link'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'No autenticado.' }, { status: 401 })
 
@@ -27,7 +27,7 @@ export async function GET() {
     .limit(1)
     .maybeSingle()
   // Validated before it reaches the QR or a header: a slug outside the shop-slug charset is not encoded at all.
-  const plan = shopQrPlan(shop?.slug)
+  const plan = shopQrPlan(shop?.slug, parseShopQrTarget(new URL(req.url).searchParams.get('target')))
   if (!plan) return NextResponse.json({ error: 'Tienda no encontrada.' }, { status: 404 })
 
   const png = await QRCode.toBuffer(plan.url, {

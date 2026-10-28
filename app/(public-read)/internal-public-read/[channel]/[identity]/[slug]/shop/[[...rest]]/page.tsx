@@ -11,6 +11,7 @@ import { ShopPoliticasPage, generateShopPoliciesMetadata } from '@/app/(shell)/s
 import CollectionsPage, { generateMetadata as generateCollectionsMetadata } from '@/app/(shell)/mx/s/[slug]/colecciones/page'
 import EventsPage, { generateMetadata as generateEventsMetadata } from '@/app/(shell)/mx/s/[slug]/eventos/page'
 import ShopIndexPage, { generateMetadata as generateShopIndexMetadata } from '@/app/(shell)/mx/s/[slug]/tienda/page'
+import CatalogPage, { generateMetadata as generateCatalogMetadata } from '@/app/(shell)/mx/s/[slug]/catalogo/page'
 import EmbedShopPage, { generateMetadata as generateEmbedMetadata } from '@/app/(shell)/embed/s/[slug]/page'
 import { isPublicReadChannel, type PublicReadChannel } from '@/lib/public-read'
 
@@ -63,6 +64,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     case 'faq': return generateShopFaqMetadata({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
     case 'politicas': return generateShopPoliciesMetadata({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
     case 'tienda': return generateShopIndexMetadata({ params: routeParams })
+    case 'catalogo': return generateCatalogMetadata({ params: routeParams })
     default: return { title: 'Página no encontrada' }
   }
 }
@@ -94,6 +96,7 @@ export default async function PublicShopPage({ params }: Props) {
     case 'faq': return ShopFaqPage({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
     case 'politicas': return ShopPoliticasPage({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
     case 'tienda': return ShopIndexPage({ params: routeParams })
+    case 'catalogo': return CatalogPage({ params: routeParams })
     default: notFound()
   }
 }
