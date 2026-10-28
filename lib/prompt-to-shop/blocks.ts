@@ -18,7 +18,7 @@ export const BLOCK_KEYS = ['identity', 'words', 'catalog'] as const
 export type BlockKey = (typeof BLOCK_KEYS)[number]
 export type BlockStatus = 'ok' | 'fallback'
 
-export const MAX_DESCRIPTION_CHARS = 500
+export { MAX_DESCRIPTION_CHARS } from './constants'
 export const EXAMPLE_ROWS_MIN = 4
 export const EXAMPLE_ROWS_MAX = 6
 

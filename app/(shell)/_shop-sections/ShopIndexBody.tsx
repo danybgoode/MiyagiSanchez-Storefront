@@ -1,14 +1,12 @@
-import { getShopListings, formatPrice } from '@/lib/listings'
-import { hasExcerpt } from '@/lib/excerpt'
+import { getShopListings } from '@/lib/listings'
 import { publicShopPaymentAvailability } from '@/lib/public-shop-commerce'
-import ClosetListingCard from '@/app/(shell)/s/[slug]/ClosetListingCard'
+import ShopIndexGrid from './ShopIndexGrid'
 import ShopSectionNav from './ShopSectionNav'
 import ShopThemeShell from './ShopThemeShell'
 import ShopCollectionNav from '@/app/(shell)/s/[slug]/ShopCollectionNav'
 import { getDictionary } from '@/lib/dictionary'
 import { resolveMarketPresentation } from '@/lib/market-presentation'
 import { readPublicSellerMarket } from '@/lib/owned-market'
-import { listingHref } from '@/lib/shop-presentation/chrome'
 import type { ShopPresentationContext } from '@/lib/shop-presentation/context'
 
 /**
@@ -65,34 +63,14 @@ export default async function ShopIndexBody({ ctx }: { ctx: ShopPresentationCont
         {listings.length === 0 ? (
           <p className="text-center py-16 text-[var(--color-muted)]">{copy['shopSections.shopEmpty']}</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {listings.map((listing) => (
-              <ClosetListingCard
-                key={listing.id}
-                accent={ctx.accent}
-                item={{
-                  productId: listing.id,
-                  variantId: null,
-                  sellerId: ctx.shop.id ?? '',
-                  sellerSlug: ctx.shop.slug,
-                  sellerName: ctx.shop.name,
-                  title: listing.title,
-                  price_cents: listing.price_cents ?? 0,
-                  currency: listing.currency ?? 'MXN',
-                  imageUrl: listing.images?.[0]?.url ?? null,
-                  listing_type: listing.listing_type ?? 'product',
-                  paymentMethods: { stripe: payments.stripe, mp: payments.mercadopago, spei: payments.bankTransfer },
-                  // NOT `ctx.basePath` — that is the SHOP base, and a product is
-                  // not shop-scoped on the marketplace. This exact line 404'd
-                  // every product on /mx/s/<slug>/tienda. See `ShopBases`.
-                  href: listingHref({ listingBase: ctx.listingBase }, listing.id),
-                  formattedPrice: formatPrice(listing, presentation.htmlLang),
-                  status: listing.status,
-                  hasExcerpt: hasExcerpt(listing.metadata),
-                }}
-              />
-            ))}
-          </div>
+          <ShopIndexGrid
+            listings={listings}
+            shop={ctx.shop}
+            listingBase={ctx.listingBase}
+            accent={ctx.accent}
+            payments={payments}
+            htmlLang={presentation.htmlLang}
+          />
         )}
       </div>
     </div>

@@ -52,4 +52,18 @@
     grid-area: cta;
     align-self: start;
   }
+
+  /* The describe box (prompt-to-shop) takes the row under the title; without it the original areas stand, so
+     the other seller pages gain no empty row. */
+  .heroWithDescribe {
+    grid-template-areas:
+      'title    prompt'
+      'describe prompt'
+      'lead     prompt'
+      'trust    values'
+      'cta      values';
+  }
+  .describe {
+    grid-area: describe;
+  }
 }

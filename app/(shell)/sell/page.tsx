@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import SellWizard from './SellWizard'
+import DescribeBox from '@/app/(shell)/mx/vende/_components/DescribeBox'
 import SellerCopyBoundary from '@/app/components/SellerCopyBoundary'
 import { getDictionary } from '@/lib/dictionary'
 import { getMySeller } from '@/lib/get-my-seller'
@@ -130,13 +131,23 @@ export default async function SellPage({
 
   const content = (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      {/* Prompt-to-shop S2.2: a signed-in merchant with no shop starts by describing. The manual wizard stays right
+          below (its own anchor), and the three-doors redirect above is untouched — S3.3 removes it. */}
+      {/* es-MX only (AGENTS rule 5): generation is an MX-shaped shop in Spanish, so a US signup keeps today's flow. */}
+      {!existingShop && signupMarket !== 'us' && (
+        <div className="mb-6">
+          <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref="#armar-a-mano" />
+        </div>
+      )}
       {!existingShop && <AgentSetupNudge />}
-      <SellWizard
-        existingShop={existingShop}
-        arrangedOnlyEnabled={arrangedOnlyEnabled}
-        ownedShopOnlyEnabled={ownedShopOnlyEnabled}
-        signupMarket={signupMarket}
-      />
+      <div id="armar-a-mano">
+        <SellWizard
+          existingShop={existingShop}
+          arrangedOnlyEnabled={arrangedOnlyEnabled}
+          ownedShopOnlyEnabled={ownedShopOnlyEnabled}
+          signupMarket={signupMarket}
+        />
+      </div>
     </div>
   )
   // Existing US shops are wrapped by the layout from their Medusa market. This

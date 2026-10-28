@@ -49,6 +49,12 @@ export function listingHref(bases: Pick<ShopBases, 'listingBase'>, listingId: st
   return `${bases.listingBase}/l/${listingId}`
 }
 
+/**
+ * The shop index's product-grid columns. Lives here, not beside the grid component, so the prompt-to-shop canvas
+ * can lay its example cards out on the very same columns without importing the cart-aware card (and its client JS).
+ */
+export const SHOP_INDEX_GRID_CLASS = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3'
+
 /** Initials for a shop with no logo. Two letters, from the first two words. */
 export function shopInitials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)

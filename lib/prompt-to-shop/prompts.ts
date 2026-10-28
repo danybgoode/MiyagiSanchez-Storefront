@@ -50,8 +50,26 @@ ${SAFETY}
 ${wrap(description)}`
 }
 
-export function wordsPrompt(description: string, identity: Pick<IdentityBlock, 'name' | 'tagline'>): string {
-  return `Escribe los textos de la tienda "${identity.name}" (${identity.tagline}) en Miyagi Sánchez. Tono cercano, claro, sin exagerar, como habla el propio negocio.
+/**
+ * The tone «Otra versión» can ask for (S2.4). A closed enum on purpose: the hint goes into the prompt OUTSIDE the
+ * merchant's data tags, so it must be a string we wrote, never one the browser sent.
+ */
+export const TONES = ['cercano', 'formal', 'divertido'] as const
+export type Tone = (typeof TONES)[number]
+
+export const TONE_HINT: Record<Tone, string> = {
+  cercano: 'Tono cercano y cálido, de tú a tú, como habla el propio negocio.',
+  formal: 'Tono formal y sobrio, de usted, profesional sin sonar frío.',
+  divertido: 'Tono divertido y ligero, con humor suave, sin exagerar ni usar signos de más.',
+}
+
+export function isTone(value: unknown): value is Tone {
+  return typeof value === 'string' && (TONES as readonly string[]).includes(value)
+}
+
+export function wordsPrompt(description: string, identity: Pick<IdentityBlock, 'name' | 'tagline'>, tone?: Tone): string {
+  const voice = tone ? TONE_HINT[tone] : 'Tono cercano, claro, sin exagerar, como habla el propio negocio.'
+  return `Escribe los textos de la tienda "${identity.name}" (${identity.tagline}) en Miyagi Sánchez. ${voice}
 
 Devuelve un objeto JSON con:
 - "announcement": la barra de aviso arriba de la tienda (máx. 140 caracteres), por ejemplo cómo pedir o cuándo entrega.

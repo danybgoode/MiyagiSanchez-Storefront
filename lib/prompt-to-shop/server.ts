@@ -12,6 +12,8 @@ import { randomUUID } from 'node:crypto'
 import { db } from '@/lib/supabase'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { budgetPeriod, resolveDailyBudget } from './allowance'
+import type { IdentityBlock } from './blocks'
+import type { EditDeps } from './edit'
 import type { DraftRef, DraftsDeps } from './handler'
 import type { ModelRequest, ModelResult } from './planner'
 import { verifyTurnstile } from './turnstile'
@@ -138,5 +140,39 @@ export function draftsDeps(ip: string): DraftsDeps {
     modelConfigured: !!VERTEX_SA || !!process.env.GEMINI_API_KEY,
     newDeviceId: () => randomUUID(),
     log: (line) => console.info('[p2s]', JSON.stringify({ via: VERTEX_SA ? 'vertex' : 'gemini_api', ...line })),
+  }
+}
+
+/** The real reads/writes behind `PATCH /api/p2s/drafts/[id]`. The decisions live in `edit.ts`. */
+export function editDeps(): EditDeps {
+  return {
+    read: async (draftId, deviceId) => {
+      const { data, error } = await db
+        .from('shop_drafts')
+        .select('identity, updated_at')
+        .eq('id', draftId)
+        .eq('device_id', deviceId)
+        .is('claimed_by', null)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle()
+      if (error || !data) return null
+      const row = data as { identity: IdentityBlock | null; updated_at: string }
+      return { identity: row.identity, updatedAt: row.updated_at }
+    },
+    write: async (draftId, deviceId, expectedUpdatedAt, identity) => {
+      // Optimistic: lands only while `updated_at` is what the read saw (a generation saving a block bumps it), and
+      // `.select()` reads the row back, because supabase-js reports no error for an UPDATE that matched nothing.
+      const { data, error } = await db
+        .from('shop_drafts')
+        .update({ identity, updated_at: new Date().toISOString() })
+        .eq('id', draftId)
+        .eq('device_id', deviceId)
+        .is('claimed_by', null)
+        .gt('expires_at', new Date().toISOString())
+        .eq('updated_at', expectedUpdatedAt)
+        .select('id')
+      if (error) throw new Error(error.message)
+      return Array.isArray(data) && data.length === 1
+    },
   }
 }
