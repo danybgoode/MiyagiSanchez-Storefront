@@ -9,7 +9,7 @@ import 'server-only'
 import { db } from '@/lib/supabase'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { buildCreateBody, createSellerProduct } from '@/lib/seller-product-create'
-import { P2S_LIMITS, monthPeriod, userSubject } from './allowance'
+import { P2S_LIMITS, budgetPeriod, monthPeriod, photoAnalysisSubject, userSubject } from './allowance'
 import { findKeptDraft, lookupSeller } from './claim-server'
 import {
   PHOTO_MAX_BYTES,
@@ -100,6 +100,16 @@ export function analyzeDeps(userId: string, clerkJwt: string): AnalyzeDeps {
     resolveOwner: () => resolvePhotoOwner(userId, clerkJwt),
     burstAllowed: async () => (await checkRateLimit('p2s_photo', userId)).allowed,
     photosUsed: () => photosUsedThisMonth(userId),
+    // The existing D4 RPC on its own subject: no migration, and the same fail-closed single conditional write.
+    spendAnalysis: async () => {
+      const { data, error } = await db.rpc('spend_ai_allowance', {
+        p_subject: photoAnalysisSubject(userId),
+        p_kind: 'daily_budget',
+        p_period: budgetPeriod(new Date()),
+        p_cap: P2S_LIMITS.photoAnalysesPerDay,
+      })
+      return { data, error }
+    },
     fetchImage: fetchOwnImage,
     modelConfigured: MODEL_CONFIGURED,
     callModel: async (body) => {
@@ -163,19 +173,45 @@ interface SellerListing {
   metadata?: Record<string, unknown> | null
 }
 
-/** The seller's own Medusa products (drafts included). `null` = could not read — never "none". */
-export async function listOwnProducts(clerkJwt: string): Promise<SellerListing[] | null> {
+const PAGE = 200
+/** 10 pages = 2,000 products, the backend's own query ceiling. Past it the answer is "could not tell", not "none". */
+const MAX_PAGES = 10
+
+async function productsPage(clerkJwt: string, offset: number): Promise<{ listings: SellerListing[]; count: number } | null> {
   try {
-    const res = await fetch(`${MEDUSA_BASE}/store/sellers/me/products?limit=200`, {
+    const res = await fetch(`${MEDUSA_BASE}/store/sellers/me/products?limit=${PAGE}&offset=${offset}`, {
       headers: { 'Content-Type': 'application/json', 'x-publishable-api-key': PUB_KEY, Authorization: `Bearer ${clerkJwt}` },
       cache: 'no-store',
     })
     if (!res.ok) return null
-    const data = (await res.json().catch(() => null)) as { listings?: SellerListing[] } | null
-    return Array.isArray(data?.listings) ? data.listings : null
+    const data = (await res.json().catch(() => null)) as { listings?: SellerListing[]; count?: number } | null
+    if (!Array.isArray(data?.listings)) return null
+    return { listings: data.listings, count: typeof data.count === 'number' ? data.count : data.listings.length }
   } catch {
     return null
   }
+}
+
+/** The seller's own Medusa products (drafts included), first page — the canvas and «Publicar». `null` = could not
+ *  read, never "none". */
+export async function listOwnProducts(clerkJwt: string): Promise<SellerListing[] | null> {
+  return (await productsPage(clerkJwt, 0))?.listings ?? null
+}
+
+/**
+ * The product a nonce created, by `metadata.p2s_nonce`. The seller products endpoint filters by title (`q`), id,
+ * category, channel, stock and status — NOT by handle or metadata — and a title search would miss a card the
+ * merchant edited between tries, so this pages through the whole list (`limit`/`offset`, backend-capped at 200).
+ */
+async function findByNonce(clerkJwt: string, nonce: string): Promise<string | null | 'unavailable'> {
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const got = await productsPage(clerkJwt, page * PAGE)
+    if (!got) return 'unavailable'
+    const hit = got.listings.find((l) => l.metadata?.p2s_nonce === nonce)
+    if (hit) return hit.id
+    if (got.listings.length < PAGE || (page + 1) * PAGE >= got.count) return null
+  }
+  return 'unavailable'
 }
 
 export function confirmDeps(userId: string, clerkJwt: string): ConfirmDeps {
@@ -191,11 +227,7 @@ export function confirmDeps(userId: string, clerkJwt: string): ConfirmDeps {
       })
       return { data, error }
     },
-    findCreated: async (nonce) => {
-      const listings = await listOwnProducts(clerkJwt)
-      if (!listings) return 'unavailable'
-      return listings.find((l) => l.metadata?.p2s_nonce === nonce)?.id ?? null
-    },
+    findCreated: (nonce) => findByNonce(clerkJwt, nonce),
     createProduct: (row, imageUrl, nonce) =>
       createSellerProduct(
         clerkJwt,

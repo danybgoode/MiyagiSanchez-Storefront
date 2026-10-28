@@ -13,6 +13,9 @@ export const P2S_LIMITS = Object.freeze({
   anonVersions: 3,
   ownerVersionsPerMonth: 10,
   photosPerMonth: 20,
+  /** Vision analyses per user per Mexico City day (S4.2): the fail-closed bound on photos looked at but never
+   *  confirmed. Twice a month's photos, so retakes and discarded cards never reach it in normal use. */
+  photoAnalysesPerDay: 40,
   /** Platform-wide generations per Mexico City day. `P2S_DAILY_BUDGET` overrides it. */
   dailyBudgetDefault: 300,
 })
@@ -26,6 +29,12 @@ export function deviceSubject(deviceId: string): string {
 
 export function userSubject(clerkUserId: string): string {
   return `user:${clerkUserId}`
+}
+
+/** The subject of the daily analysis cap (kind `daily_budget`, period `budgetPeriod`). Its own row, never the user's
+ *  monthly photo row. */
+export function photoAnalysisSubject(clerkUserId: string): string {
+  return `photo_analysis:user:${clerkUserId}`
 }
 
 /** `YYYY-MM-DD` in Mexico City. */

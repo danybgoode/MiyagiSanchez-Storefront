@@ -5,8 +5,10 @@
  *
  *   • ANALYSE (`POST /api/p2s/photo`) — the merchant's own uploaded photo → Gemini vision → ONE `CatalogImportRow`
  *     suggestion, validated by `validateRows`. Invalid output → one retry → a refusal the UI shows as an empty card
- *     the merchant fills in. Nothing is written and nothing is spent: an analysis is bounded by the `p2s_photo`
- *     burst limit (may fail open, D5) and refused up front when the month's photos are already used.
+ *     the merchant fills in. No monthly photo is spent. Each vision call spends one unit of a per-user DAILY cap
+ *     (`photo_analysis:user:<id>` / `daily_budget`, `P2S_LIMITS.photoAnalysesPerDay`) through the D4 RPC BEFORE the
+ *     call, failing CLOSED; the `p2s_photo` burst limit (may fail open, D5) sits in front, and the request is refused
+ *     up front when the month's photos are already used.
  *
  *   • CONFIRM (`POST /api/p2s/photo/confirm`) — the merchant's (possibly edited) card → ONE Medusa DRAFT product,
  *     spending exactly one `photo` allowance (D4, fails CLOSED). The contract says "per confirmed suggestion", so the
@@ -72,6 +74,9 @@ function base(raw: string | null | undefined): URL | null {
  */
 export function isOwnPhotoUrl(raw: unknown, hosts: PhotoHosts, userId: string): raw is string {
   if (typeof raw !== 'string' || raw.length > 2048 || !userId || /[/\\]/.test(userId)) return false
+  // Defence in depth: our upload route never writes an encoded slash, backslash or dot, so any of them in the raw
+  // string is someone trying to make the prefix check below see a different path than the storage host serves.
+  if (/%2f|%5c|%2e/i.test(raw) || raw.includes('\\')) return false
   let u: URL
   try {
     u = new URL(raw)
@@ -199,6 +204,10 @@ export interface AnalyzeDeps {
   burstAllowed: () => Promise<boolean>
   /** This month's photos already used — a READ, never a spend. `null` = could not read. */
   photosUsed: () => Promise<number | null>
+  /** `spend_ai_allowance('photo_analysis:user:<id>', 'daily_budget', YYYY-MM-DD MX, photoAnalysesPerDay)` raw answer.
+   *  The fail-CLOSED bound on vision calls: the burst limiter fails open, and a merchant who never confirms never
+   *  spends a monthly photo. */
+  spendAnalysis: () => Promise<{ data: unknown; error: unknown }>
   /** Our own bucket only (the URL is validated before this is called). `null` = not an image we can show. */
   fetchImage: (url: string) => Promise<{ mimeType: string; base64: string } | null>
   modelConfigured: boolean
@@ -237,6 +246,22 @@ export async function analyzePhoto(input: AnalyzeInput, deps: AnalyzeDeps): Prom
 
   const empty = (message: string) => ({ status: 200 as const, body: { ok: true as const, suggestion: null, message, photos_left: left } })
   if (!deps.modelConfigured) return empty(PHOTO_COPY.fillYourself)
+
+  // The daily analysis cap, spent BEFORE the vision call. Fails CLOSED: an RPC error and a NULL (at the cap) both
+  // refuse with no model call.
+  let analysisRpc: { data: unknown; error: unknown }
+  try {
+    analysisRpc = await deps.spendAnalysis()
+  } catch (e) {
+    analysisRpc = { data: null, error: e instanceof Error ? e.message : 'spend threw' }
+  }
+  const analysis = decidePhotoSpend(analysisRpc, P2S_LIMITS.photoAnalysesPerDay)
+  if (!analysis.ok) {
+    deps.log?.({ step: 'photo_analysis_spend', ok: false, reason: analysis.reason })
+    return analysis.reason === 'allowance'
+      ? refuse(429, 'analysis_daily', PHOTO_COPY.analysisDaily)
+      : refuse(503, 'unavailable', PHOTO_COPY.analysisUnavailable)
+  }
 
   const image = await deps.fetchImage(imageUrl)
   if (!image) return empty(PHOTO_COPY.fillYourself)
@@ -297,6 +322,28 @@ export type Mutation<T> = { write: Partial<Pick<LedgerRow, 'catalog' | 'block_st
 
 export type ReserveResult = { kind: 'reserved' } | { kind: 'resumed' } | { kind: 'existing'; entry: LedgerEntry }
 
+/**
+ * How long a `pending` entry may sit before a retry may take it over. Longer than one confirm can take (a Medusa
+ * create plus two ledger writes), so a live request is never taken over — only one that died.
+ */
+export const PENDING_STALE_MS = 60_000
+
+export function isStale(entry: LedgerEntry, now: Date): boolean {
+  const at = Date.parse(entry.at)
+  return !Number.isFinite(at) || now.getTime() - at > PENDING_STALE_MS
+}
+
+/**
+ * Take over a STALE `pending` entry: re-stamp it, but only while it still carries the timestamp the caller saw, so
+ * two retries racing for the same dead entry cannot both win (the loser sees a fresh `pending` and gets a 409).
+ */
+export function takeoverMutation(row: LedgerRow, nonce: string, seenAt: string, now: Date): Mutation<boolean> {
+  const ledger = readLedger(row.block_status)
+  const entry = ledger[nonce]
+  if (entry?.state !== 'pending' || entry.at !== seenAt || !isStale(entry, now)) return { write: null, result: false }
+  return { write: { block_status: withLedger(row.block_status, { ...ledger, [nonce]: { state: 'pending', at: now.toISOString() } }) }, result: true }
+}
+
 /** A new nonce → `pending`. A `paid` one → `pending` again, and the caller skips the spend. Anything else answers. */
 export function reserveMutation(row: LedgerRow, nonce: string, now: Date): Mutation<ReserveResult> {
   const ledger = readLedger(row.block_status)
@@ -336,6 +383,9 @@ export interface ReplaceRef {
  */
 export function finishMutation(row: LedgerRow, nonce: string, productId: string, replace: ReplaceRef | null, now: Date): Mutation<{ exampleRemoved: boolean }> {
   const ledger = readLedger(row.block_status)
+  // Already finished (two requests finished the same product): touch nothing, or a second example with the same
+  // title would be removed too.
+  if (ledger[nonce]?.state === 'done') return { write: null, result: { exampleRemoved: false } }
   const block_status = withLedger(row.block_status, { ...ledger, [nonce]: { state: 'done', at: now.toISOString(), product_id: productId } })
   const catalog = Array.isArray(row.catalog) ? (row.catalog as ExampleRow[]) : null
   if (!replace || !catalog) return { write: { block_status }, result: { exampleRemoved: false } }
@@ -367,7 +417,7 @@ export interface ConfirmInput {
 }
 
 export type ConfirmOutcome =
-  | { status: 200; body: { ok: true; product_id: string; duplicate: boolean; example_removed: boolean; photos_left: number | null } }
+  | { status: 200; body: { ok: true; product_id: string; duplicate: boolean; example_removed: boolean; finished: boolean; photos_left: number | null } }
   | { status: 400 | 403 | 409 | 429 | 502 | 503; body: { ok: false; error: string; code: string } }
 
 export interface ConfirmRequest {
@@ -410,16 +460,31 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
   const reserved = await deps.mutate(draftId, (r) => reserveMutation(r, nonce, deps.now()))
   if (!reserved.ok) return refuse(503, 'unavailable', PHOTO_COPY.unavailable)
   const res = reserved.result
+  // A `pending` nonce is either in flight (another tap) or a request that died — after the spend, after the create,
+  // or in a finish that did not land. The rule: the PRODUCT is the truth. Look for it by the nonce first; if it
+  // exists, finish it (mark done, remove the example) whatever the entry's age. If it does not, a fresh entry is a
+  // live request (409); a stale one is taken over and goes through the spend again — we cannot prove its spend
+  // landed, and re-spending can at worst cost the merchant one photo after a crash, where skipping it could hand
+  // out a free product. A `paid` entry is known paid and skips the spend.
+  let mustSpend = res.kind === 'reserved'
+  let left: number | null = null
   if (res.kind === 'existing') {
     if (res.entry.state === 'done') {
-      return { status: 200, body: { ok: true, product_id: res.entry.product_id, duplicate: true, example_removed: false, photos_left: null } }
+      return { status: 200, body: { ok: true, product_id: res.entry.product_id, duplicate: true, example_removed: false, finished: true, photos_left: null } }
     }
-    return refuse(409, 'in_progress', PHOTO_COPY.inProgress)
+    const found = await deps.findCreated(nonce)
+    if (found === 'unavailable') return refuse(503, 'unavailable', PHOTO_COPY.unavailable)
+    if (found) return finish(found, true)
+    if (!isStale(res.entry, deps.now())) return refuse(409, 'in_progress', PHOTO_COPY.inProgress)
+    const seenAt = res.entry.at
+    const taken = await deps.mutate(draftId, (r) => takeoverMutation(r, nonce, seenAt, deps.now()))
+    if (!taken.ok) return refuse(503, 'unavailable', PHOTO_COPY.unavailable)
+    if (!taken.result) return refuse(409, 'in_progress', PHOTO_COPY.inProgress)
+    mustSpend = true
   }
 
   // spend — fails CLOSED. A resumed (`paid`) nonce already paid.
-  let left: number | null = null
-  if (res.kind === 'reserved') {
+  if (mustSpend) {
     let rpc: { data: unknown; error: unknown }
     try {
       rpc = await deps.spend()
@@ -435,7 +500,7 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
         : refuse(503, 'unavailable', PHOTO_COPY.unavailable)
     }
     left = decision.left
-  } else {
+  } else if (res.kind === 'resumed') {
     // A retry of a paid nonce: the first create may have landed before its answer was lost.
     const existing = await deps.findCreated(nonce)
     if (existing === 'unavailable') {
@@ -463,9 +528,11 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
     // finish — only now, with the product real, does the example leave the draft.
     const done = await deps.mutate(draftId, (r) => finishMutation(r, nonce, productId, replace, deps.now()))
     if (!done.ok) deps.log?.({ step: 'photo_finish', ok: false, product_id: productId })
+    // The product is real either way, so this is `ok`. But a finish that did not land says so (`finished: false`):
+    // the browser retries the SAME nonce once, which finds the product by its nonce and finishes it.
     return {
       status: 200,
-      body: { ok: true, product_id: productId, duplicate: resumed, example_removed: done.ok ? done.result.exampleRemoved : false, photos_left: left },
+      body: { ok: true, product_id: productId, duplicate: resumed, example_removed: done.ok ? done.result.exampleRemoved : false, finished: done.ok, photos_left: left },
     }
   }
 }

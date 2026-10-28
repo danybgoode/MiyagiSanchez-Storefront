@@ -232,7 +232,7 @@ export interface ConfirmBody {
 }
 
 export type ConfirmResult =
-  | { ok: true; productId: string; duplicate: boolean; photosLeft: number | null }
+  | { ok: true; productId: string; duplicate: boolean; finished: boolean; photosLeft: number | null }
   | { ok: false; status: number; message: string; code: string | null }
 
 /** `POST /api/p2s/photo/confirm`. A dead connection is a failure the merchant retries with the SAME nonce. */
@@ -246,7 +246,9 @@ export async function confirmPhotoRequest(body: ConfirmBody, deps: DraftRequestD
     })
     const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
     if (res.ok && data?.ok === true && typeof data.product_id === 'string') {
-      return { ok: true, productId: data.product_id, duplicate: data.duplicate === true, photosLeft: typeof data.photos_left === 'number' ? data.photos_left : null }
+      // `finished: false` = the product exists but the server could not record it on the shop yet; the caller
+      // retries the same nonce once (an absent field reads as finished, the shape before this flag existed).
+      return { ok: true, productId: data.product_id, duplicate: data.duplicate === true, finished: data.finished !== false, photosLeft: typeof data.photos_left === 'number' ? data.photos_left : null }
     }
     return { ok: false, status: res.status, message: typeof data?.error === 'string' && data.error ? data.error : PHOTO_COPY.createFailed, code: typeof data?.code === 'string' ? data.code : null }
   } catch {

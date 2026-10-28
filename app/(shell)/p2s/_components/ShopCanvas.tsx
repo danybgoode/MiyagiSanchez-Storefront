@@ -82,6 +82,7 @@ function OwnProductCard({ card, accent }: { card: OwnProductCardView; accent: st
         </span>
       )}
       {card.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- same plain card image as ClosetListingCard on the live shop grid
         <img src={card.imageUrl} alt={card.title} className="w-full h-36 object-cover" />
       ) : (
         <span className="block h-36" style={{ background: 'var(--shop-border, var(--border))' }} aria-hidden="true" />

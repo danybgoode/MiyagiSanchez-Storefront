@@ -230,6 +230,8 @@ export const PHOTO_COPY = {
   noShop: 'Primero quédate con tu tienda para agregar productos.',
   signedOut: 'Inicia sesión para agregar productos a tu tienda.',
   unavailable: 'No pudimos guardar ahora. Inténtalo de nuevo en un momento: no se gastó ninguna foto.',
+  analysisDaily: 'Ya revisamos muchas fotos hoy. Vuelve mañana.',
+  analysisUnavailable: 'No pudimos revisar tu foto ahora. Inténtalo de nuevo en un momento.',
   rateLimited: 'Vas muy rápido. Espera unos minutos y vuelve a intentarlo.',
   invalid: 'Algo no llegó bien. Vuelve a intentarlo.',
   invalidCard: 'Revisa la ficha: el nombre necesita al menos 5 letras y el precio debe ser mayor que cero.',

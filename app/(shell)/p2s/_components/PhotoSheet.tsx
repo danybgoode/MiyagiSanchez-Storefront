@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { CATEGORIES } from '@/lib/types'
@@ -54,6 +54,12 @@ async function shrink(file: File): Promise<File> {
   }
 }
 
+/**
+ * Only an object URL this sheet minted is ever rendered: the preview is the merchant's own file, read locally. The
+ * check also keeps any other string (a server value, a `javascript:` URL) out of the `src`.
+ */
+const isLocalPreview = (src: string | null): src is string => typeof src === 'string' && src.startsWith('blob:')
+
 const emptyCard = (): PhotoSuggestion => ({ title: '', description: '', category: 'otros', price: 0 })
 
 export default function PhotoSheet({
@@ -79,15 +85,24 @@ export default function PhotoSheet({
   const galleryRef = useRef<HTMLInputElement | null>(null)
   // A ref, not state: two taps inside one render must both see that a confirm is already in flight.
   const inFlight = useRef(false)
+  // The one object URL alive at a time. Replaced or dropped → revoked, so a sheet used for ten photos holds one.
+  const previewRef = useRef<string | null>(null)
+  function setPreview(file: File | null): string | null {
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current)
+    previewRef.current = file ? URL.createObjectURL(file) : null
+    return previewRef.current
+  }
+  useEffect(() => () => { if (previewRef.current) URL.revokeObjectURL(previewRef.current) }, [])
 
   async function onFile(file: File | undefined) {
     if (!file) return
     setError(null)
-    const preview = URL.createObjectURL(file)
+    const preview = setPreview(file)
     setPhase({ kind: 'busy', label: PHOTO_COPY.uploading, preview })
     const uploaded = await uploadPhoto(await shrink(file))
     if (!uploaded.ok) {
       setError(uploaded.message)
+      setPreview(null)
       setPhase({ kind: 'pick' })
       return
     }
@@ -95,12 +110,13 @@ export default function PhotoSheet({
     const read = await analyzePhotoRequest(uploaded.url)
     if (!read.ok) {
       setError(read.message)
+      setPreview(null)
       setPhase({ kind: 'pick' })
       return
     }
     if (read.photosLeft !== null) setLeft(read.photosLeft)
     setCard(read.suggestion ?? emptyCard())
-    setPhase({ kind: 'card', imageUrl: uploaded.url, preview, nonce: crypto.randomUUID(), note: read.suggestion ? null : read.message })
+    setPhase({ kind: 'card', imageUrl: uploaded.url, preview: preview ?? '', nonce: crypto.randomUUID(), note: read.suggestion ? null : read.message })
   }
 
   async function confirm() {
@@ -108,11 +124,15 @@ export default function PhotoSheet({
     inFlight.current = true
     setConfirming(true)
     setError(null)
-    const result = await confirmPhotoRequest({ nonce: phase.nonce, image_url: phase.imageUrl, card: { ...card, price: Number(card.price) }, replace: target })
+    const request = { nonce: phase.nonce, image_url: phase.imageUrl, card: { ...card, price: Number(card.price) }, replace: target }
+    let result = await confirmPhotoRequest(request)
+    // The product exists but the shop has not recorded it yet: the same nonce once more finds it and finishes it.
+    if (result.ok && !result.finished) result = await confirmPhotoRequest(request)
     inFlight.current = false
     setConfirming(false)
     if (result.ok) {
       if (result.photosLeft !== null) setLeft(result.photosLeft)
+      setPreview(null)
       setPhase({ kind: 'added' })
       onAdded()
       return
@@ -144,7 +164,10 @@ export default function PhotoSheet({
 
       {phase.kind === 'busy' ? (
         <div className="grid gap-3" aria-busy="true">
-          {phase.preview ? <img src={phase.preview} alt="" className="w-full rounded object-cover" style={{ maxHeight: 220 }} /> : null}
+          {isLocalPreview(phase.preview) ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a local blob: preview of the merchant's own file; the image loader cannot fetch it
+            <img src={phase.preview} alt="" className="w-full rounded object-cover" style={{ maxHeight: 220 }} />
+          ) : null}
           <p className="t-small" style={{ margin: 0 }} role="status" aria-live="polite">{phase.label}</p>
           <div className="grid gap-2" aria-hidden="true">
             <span className="block h-4 rounded animate-pulse motion-reduce:animate-none" style={{ background: 'var(--border)', width: '70%' }} />
@@ -156,7 +179,10 @@ export default function PhotoSheet({
 
       {phase.kind === 'card' ? (
         <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void confirm() }} data-testid="p2s-photo-card">
-          <img src={phase.preview} alt="" className="w-full rounded object-cover" style={{ maxHeight: 220 }} />
+          {isLocalPreview(phase.preview) ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a local blob: preview of the merchant's own file; the image loader cannot fetch it
+            <img src={phase.preview} alt="" className="w-full rounded object-cover" style={{ maxHeight: 220 }} />
+          ) : null}
           {phase.note ? <Banner variant="info">{phase.note}</Banner> : null}
           <label className="grid gap-1 t-small">
             <span style={{ fontWeight: 600 }}>{PHOTO_COPY.titleLabel}</span>
