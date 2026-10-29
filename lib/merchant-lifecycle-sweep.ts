@@ -60,7 +60,7 @@
 import 'server-only'
 import { db } from '@/lib/supabase'
 import { isEnabled } from '@/lib/flags'
-import { deriveSaleFacts, shopIdForEmissionSubject } from '@/lib/merchant-lifecycle'
+import { deriveSaleFacts, SELLER_GONE, shopIdForEmissionSubject } from '@/lib/merchant-lifecycle'
 import {
   emitMerchantLifecycleForShop,
   deliverClaimedEmission,
@@ -185,6 +185,9 @@ export interface SweepResult {
   telemetryOff: boolean
   /** Reads that failed. Non-zero means this run was incomplete, whatever else it did. */
   errors: number
+  /** Shops whose Medusa seller no longer exists (deleted or retired). KNOWN ABSENT, not a failed read, so NOT an
+   *  error: there is nothing left to derive a milestone from. Counted so the skip is visible. */
+  sellersGone: number
   /** Sprint 3, Story 3.1 — relationships whose stage was (re-)evaluated this run. */
   relationshipsEvaluated: number
   /** Relationships whose stage ADVANCED (one or more new transition rows written)
@@ -377,6 +380,7 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
     threeProductsLive: 0,
     retained30d: 0,
     errors: 0,
+    sellersGone: 0,
     relationshipsEvaluated: 0,
     relationshipsAdvanced: 0,
     relationshipsSkippedFlagOff: false,
@@ -494,6 +498,10 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
     // the commerce-fact adapter's own use of the same function.
     const needsOrders = !done.has('merchant.first_sale') || !done.has('merchant.retained_30d')
     const orders = needsOrders ? await listCapturedOrders(sellerSlug) : []
+    if (orders === SELLER_GONE) {
+      result.sellersGone += 1
+      continue
+    }
     if (needsOrders && orders === null) fail(result, `orders unreadable from Medusa for ${sellerSlug}`)
     const sale = orders && orders.length > 0 ? deriveSaleFacts(orders, now, RETENTION_WINDOW_MS) : null
 
@@ -510,7 +518,9 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
     if (!done.has('merchant.three_products_live')) {
       try {
         const live = await countLiveProductsFromMedusa(sellerSlug)
-        if (live === null) {
+        if (live === SELLER_GONE) {
+          result.sellersGone += 1
+        } else if (live === null) {
           fail(result, `live product count unreadable from Medusa for ${sellerSlug}`)
         } else if (live >= THREE_PRODUCTS_THRESHOLD) {
           // `occurredAt` is NOW, not the third product's publish time: nothing records

@@ -446,3 +446,20 @@ export function shopIdForEmissionSubject(
   if (relationshipShop.has(subjectId)) return relationshipShop.get(subjectId) ?? null
   return subjectId
 }
+
+/**
+ * A Medusa read for a seller that no longer exists. Returned instead of `null` so callers can tell KNOWN-ABSENT
+ * from UNAVAILABLE. Collapsing the two counted every deleted or retired seller as a failed read, so the daily
+ * lifecycle sweep reported 25 errors and a 503 for shops that are simply gone (2026-10-29).
+ */
+export const SELLER_GONE = 'seller_gone' as const
+
+/**
+ * True only for Medusa's own "this seller does not exist" answer: a 404 whose body says the seller was not found
+ * (`{"message":"Seller not found"}` from the internal orders route, `Seller '<slug>' not found` from the store
+ * route). Any other 404, such as a missing route after a bad deploy, stays UNAVAILABLE, so an outage can never
+ * read as "the seller is gone".
+ */
+export function isSellerGoneResponse(status: number, body: string): boolean {
+  return status === 404 && /\bseller\b[^"]{0,120}\bnot found\b/i.test(body)
+}
