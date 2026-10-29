@@ -5,6 +5,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const {
   allowedPageUrl,
+  createImageFailureTracker,
   createQueue,
   BusyError,
   isAllowedSubrequest,
@@ -125,4 +126,27 @@ test('a job that waited past its bound is refused instead of rendering for a cal
   assert.equal(ranLate, false)
   const fresh = await queue.run(() => 'ok', { maxWaitMs: 10 })
   assert.equal(fresh, 'ok')
+})
+
+test('the renderer loads print pages with scripts off and waits for load, not network idle (share-kit, 2026-10-29)', () => {
+  // A source pin on the I/O shell, which has no harness: with scripts on, a catalog never reached network idle and
+  // every render timed out at 45 s.
+  const server = require('node:fs').readFileSync(require('node:path').join(__dirname, 'server.js'), 'utf8')
+  assert.match(server, /await page\.setJavaScriptEnabled\(false\)\n\s+await page\.setRequestInterception\(true\)/)
+  assert.match(server, /page\.goto\(url, \{ waitUntil: 'load'/)
+  assert.doesNotMatch(server, /networkidle/)
+})
+
+test('missing images are counted, except the ones the allow-list blocked on purpose (PR 450)', () => {
+  const t = createImageFailureTracker()
+  t.responded('image', 200)
+  t.responded('document', 500)
+  assert.equal(t.count(), 0)
+  t.responded('image', 502)
+  t.blocked('https://evil.example/x.png')
+  t.failed('https://evil.example/x.png', 'image')
+  assert.equal(t.count(), 1)
+  t.failed('https://miyagisanchez.com/api/img?x', 'image')
+  t.failed('https://miyagisanchez.com/a.css', 'stylesheet')
+  assert.equal(t.count(), 2)
 })

@@ -93,6 +93,9 @@ test.describe('perf-budget · source-code checks (deterministic, no network)', (
     expect(imageVaryHeader(null)).toEqual({ Vary: 'Accept' })
     expect(selectImageFormat('webp', 'image/avif')).toBe('webp')
     expect(imageVaryHeader('webp')).toEqual({})
+    // The print renderer's pinned JPEG (Chromium embeds JPEG in a PDF as-is; share-kit 2026-10-29).
+    expect(selectImageFormat('jpeg', 'image/avif,image/webp')).toBe('jpeg')
+    expect(imageVaryHeader('jpeg')).toEqual({})
   })
 
   test('/api/img accepts only canonical bounded cache keys before any origin encode', () => {
@@ -102,6 +105,8 @@ test.describe('perf-budget · source-code checks (deterministic, no network)', (
     const fixed = new URLSearchParams({ url: src, w: '640', q: '75', f: 'webp', v: '2' })
     expect(resolveImageVariant(legacy)).toMatchObject({ ok: true, variant: { width: 160, quality: 90, fixedFormat: null } })
     expect(resolveImageVariant(fixed)).toMatchObject({ ok: true, variant: { width: 640, quality: 75, fixedFormat: 'webp' } })
+    const fixedJpeg = new URLSearchParams({ url: src, w: '640', q: '75', f: 'jpeg', v: '2' })
+    expect(resolveImageVariant(fixedJpeg)).toMatchObject({ ok: true, variant: { width: 640, quality: 75, fixedFormat: 'jpeg' } })
     const canonicalRaw = fixed.toString()
     expect(decideRaw(canonicalRaw)).toMatchObject({ ok: true })
     expect(decideRaw(canonicalRaw.replace('%3A', '%3a'))).toMatchObject({ ok: false })
@@ -114,6 +119,9 @@ test.describe('perf-budget · source-code checks (deterministic, no network)', (
       new URLSearchParams({ url: src, w: '641', q: '75', f: 'webp', v: '2' }),
       new URLSearchParams({ url: src, w: '640', q: '90', f: 'webp', v: '2' }),
       new URLSearchParams({ url: src, w: '640', q: '75', f: 'avif', v: '2' }),
+      new URLSearchParams({ url: src, w: '640', q: '75', f: 'png', v: '2' }),
+      new URLSearchParams({ url: src, w: '640', q: '75', f: 'jpg', v: '2' }),
+      new URLSearchParams({ url: src, w: '640', q: '75', f: 'jpeg' }),
       new URLSearchParams({ url: src, w: '640', q: '75', f: 'webp' }),
       new URLSearchParams({ w: '640', url: src, q: '75', f: 'webp', v: '2' }),
       new URLSearchParams({ url: src, w: '640', q: '75', f: 'webp', v: '2', extra: '1' }),

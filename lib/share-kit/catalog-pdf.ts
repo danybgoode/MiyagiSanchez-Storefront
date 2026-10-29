@@ -12,7 +12,7 @@ import type { CatalogModel } from './catalog'
 import { CATALOG_PDF_ERROR } from './catalog-pdf-copy'
 
 /** Bump when the print page's layout changes, so every cached PDF is re-rendered once. */
-export const CATALOG_PDF_TEMPLATE_VERSION = 1
+export const CATALOG_PDF_TEMPLATE_VERSION = 2
 
 export { CATALOG_PDF_ERROR }
 
@@ -35,7 +35,8 @@ export interface CatalogPdfDeps {
   cacheGet(key: string): Promise<ArrayBuffer | null>
   /** true = allowed. */
   rateLimit(kind: 'catalog_pdf_shop' | 'catalog_pdf_ip', identifier: string): Promise<boolean>
-  render(slug: string): Promise<ArrayBuffer | null>
+  /** The PDF, and whether every image on the print page loaded; null when the render failed. */
+  render(slug: string): Promise<{ pdf: ArrayBuffer; complete: boolean } | null>
   /** Best effort: a failed write still serves the freshly rendered PDF. */
   cachePut(key: string, pdf: ArrayBuffer): Promise<void>
 }
@@ -63,8 +64,10 @@ export async function serveCatalogPdf(slug: string, ip: string, deps: CatalogPdf
   if (!(await deps.rateLimit('catalog_pdf_ip', ip))) return { status: 429, error: CATALOG_PDF_ERROR }
   if (!(await deps.rateLimit('catalog_pdf_shop', model.shop.slug))) return { status: 429, error: CATALOG_PDF_ERROR }
 
-  const pdf = await deps.render(model.shop.slug).catch(() => null)
-  if (!pdf) return { status: 503, error: CATALOG_PDF_ERROR }
-  await deps.cachePut(key, pdf).catch(() => {})
-  return { status: 200, pdf, cache: 'miss', filename }
+  const rendered = await deps.render(model.shop.slug).catch(() => null)
+  if (!rendered) return { status: 503, error: CATALOG_PDF_ERROR }
+  // A PDF with a missing photo is served, never kept: the key is the model's hash, so a cached copy would outlive the
+  // transient image error that caused it until the catalog itself changed (verifier, PR 450).
+  if (rendered.complete) await deps.cachePut(key, rendered.pdf).catch(() => {})
+  return { status: 200, pdf: rendered.pdf, cache: 'miss', filename }
 }
