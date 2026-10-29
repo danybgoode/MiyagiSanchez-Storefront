@@ -18,7 +18,7 @@ export async function encodeImage(
   if (format === 'avif') return { body: await pipeline.avif({ quality }).toBuffer(), contentType: 'image/avif' }
   if (format === 'webp') return { body: await pipeline.webp({ quality }).toBuffer(), contentType: 'image/webp' }
   return {
-    body: await pipeline.flatten({ background: '#ffffff' }).jpeg({ quality, mozjpeg: true }).toBuffer(),
+    body: await pipeline.flatten({ background: { r: 255, g: 255, b: 255 } }).jpeg({ quality, mozjpeg: true }).toBuffer(),
     contentType: 'image/jpeg',
   }
 }
