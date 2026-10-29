@@ -126,3 +126,12 @@ test('a job that waited past its bound is refused instead of rendering for a cal
   const fresh = await queue.run(() => 'ok', { maxWaitMs: 10 })
   assert.equal(fresh, 'ok')
 })
+
+test('the renderer loads print pages with scripts off and waits for load, not network idle (share-kit, 2026-10-29)', () => {
+  // A source pin on the I/O shell, which has no harness: with scripts on, a catalog never reached network idle and
+  // every render timed out at 45 s.
+  const server = require('node:fs').readFileSync(require('node:path').join(__dirname, 'server.js'), 'utf8')
+  assert.match(server, /await page\.setJavaScriptEnabled\(false\)\n\s+await page\.setRequestInterception\(true\)/)
+  assert.match(server, /page\.goto\(url, \{ waitUntil: 'load'/)
+  assert.doesNotMatch(server, /networkidle/)
+})

@@ -12,7 +12,7 @@ import type { CatalogModel } from './catalog'
 import { CATALOG_PDF_ERROR } from './catalog-pdf-copy'
 
 /** Bump when the print page's layout changes, so every cached PDF is re-rendered once. */
-export const CATALOG_PDF_TEMPLATE_VERSION = 1
+export const CATALOG_PDF_TEMPLATE_VERSION = 2
 
 export { CATALOG_PDF_ERROR }
 

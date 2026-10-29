@@ -69,6 +69,10 @@ async function render(url, callerGone) {
     // A launch slower than the whole budget lands after the timeout already released the queue slot: close it now.
     if (abandoned) throw new Error('render abandoned after the timeout')
     const page = await browser.newPage()
+    // Our print pages are server-rendered; their scripts are the app shell (auth, analytics, hydration). With them
+    // off, a catalog loads in ~7 s instead of never going network-idle (two blob: requests stay pending forever), and
+    // the 0.2-CPU budget goes to layout and printing (share-kit, 2026-10-29). Fewer requests also means less surface.
+    await page.setJavaScriptEnabled(false)
     await page.setRequestInterception(true)
     // Every request, redirects included (each hop is its own request event), is checked against the allow-list.
     page.on('request', (request) => {
@@ -83,10 +87,15 @@ async function render(url, callerGone) {
         request.abort('blockedbyclient').catch(() => {})
       }
     })
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: RENDER_TIMEOUT_MS })
+    // `load` waits for every image; with scripts off nothing else arrives after it.
+    await page.goto(url, { waitUntil: 'load', timeout: RENDER_TIMEOUT_MS })
     // A redirect off our origins was already aborted; refuse explicitly rather than print whatever did load.
     if (!isAllowedUrl(page.url(), PAGE_ORIGINS)) throw new Error('the page left the allowed origins')
-    try { await page.evaluate(() => (document.fonts ? document.fonts.ready : null)) } catch { /* non-fatal */ }
+    // Bounded: with page scripts off, an in-page promise can stall a CDP call until its protocol timeout.
+    await Promise.race([
+      page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => true) : true)).catch(() => false),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ])
     return Buffer.from(await page.pdf({ preferCSSPageSize: true, printBackground: true }))
   })()
   try {

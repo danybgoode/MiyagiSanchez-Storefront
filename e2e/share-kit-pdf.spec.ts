@@ -124,3 +124,16 @@ test.describe('share kit · the print page and PDF routes, live', () => {
     expect((await request.get('/api/sell/catalogo/pdf')).status()).toBe(401)
   })
 })
+
+test.describe('share kit · the print page asks for JPEG (2026-10-29)', () => {
+  test('photos and the logo use the pinned JPEG variant, never the screen loader', async () => {
+    const { printImageUrl } = await import('../lib/image-loader')
+    const { resolveImageVariant } = await import('../lib/image-variant')
+    const url = printImageUrl('https://pub-x.r2.dev/a.webp', 640)
+    const query = url.slice('/api/img?'.length)
+    expect(resolveImageVariant(new URLSearchParams(query), query)).toMatchObject({ ok: true, variant: { fixedFormat: 'jpeg', width: 640 } })
+    const page = (await import('node:fs')).readFileSync(new URL('../app/(shell)/mx/s/[slug]/catalogo/imprimir/page.tsx', import.meta.url), 'utf8')
+    expect(page).not.toContain('r2ImageLoader')
+    expect(page.match(/printImageUrl\(/g)?.length).toBe(2)
+  })
+})

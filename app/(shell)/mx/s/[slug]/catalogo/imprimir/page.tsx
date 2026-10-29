@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import QRCode from 'qrcode'
 import type { Metadata } from 'next'
 import { resolveShopPresentation } from '@/lib/shop-presentation/context'
-import r2ImageLoader from '@/lib/image-loader'
+import { printImageUrl } from '@/lib/image-loader'
 import { catalogFor } from '@/lib/share-kit/catalog-server'
 import { chunkIntoSheets } from '@/lib/share-kit/print-plan'
 import { CATALOG_PRINT_COPY as copy } from '@/lib/share-kit/copy'
@@ -74,7 +74,7 @@ export default async function CatalogPrintPage({ params }: { params: Promise<{ s
         <div className="catalog-band" style={band} />
         {model.shop.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- printed by headless Chromium; next/image adds nothing here
-          <img className="logo" src={r2ImageLoader({ src: model.shop.logoUrl, width: 384 })} alt="" />
+          <img className="logo" src={printImageUrl(model.shop.logoUrl, 384)} alt="" />
         ) : null}
         <h1 style={{ fontSize: '28pt', margin: 0 }}>{model.shop.name}</h1>
         <p style={{ fontSize: '14pt', margin: 0 }}>{copy.subtitle(model.items.length)}</p>
@@ -88,7 +88,7 @@ export default async function CatalogPrintPage({ params }: { params: Promise<{ s
               <article key={item.id} className="catalog-card" data-testid="catalogo-print-item">
                 {item.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- printed by headless Chromium
-                  <img className="photo" src={r2ImageLoader({ src: item.imageUrl, width: 640 })} alt="" />
+                  <img className="photo" src={printImageUrl(item.imageUrl, 640)} alt="" />
                 ) : (
                   <div className="nophoto" />
                 )}

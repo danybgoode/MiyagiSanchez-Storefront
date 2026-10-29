@@ -10,11 +10,19 @@ export const LOADER_IMAGE_WIDTHS = [64, 96] as const
 const LOADER_WIDTHS: readonly number[] = [...LOADER_IMAGE_WIDTHS, ...LOADER_DEVICE_WIDTHS]
 export const LEGACY_QUALITIES = [60, 75, 90] as const
 
+/**
+ * The formats a versioned (`v=2`) key may pin. WebP is what every screen gets. JPEG exists for the PDF renderer only:
+ * Chromium's PDF writer embeds a JPEG as-is but decodes a WebP and stores it losslessly, so a 6-product catalog sheet
+ * of WebP photos came out at 12.6 MB and took 24 s to print (share-kit, 2026-10-29).
+ */
+export const FIXED_FORMATS = ['webp', 'jpeg'] as const
+export type FixedFormat = (typeof FIXED_FORMATS)[number]
+
 export type ImageVariant = {
   src: string
   width: number
   quality: number
-  fixedFormat: 'webp' | null
+  fixedFormat: FixedFormat | null
 }
 
 export type ImageVariantDecision =
@@ -67,7 +75,8 @@ export function resolveImageVariant(
   const requestedFormat = searchParams.get('f')
   const fixed = requestedFormat !== null
 
-  if (fixed && (requestedFormat !== 'webp' || searchParams.get('v') !== '2')) {
+  const fixedFormat = (FIXED_FORMATS as readonly string[]).includes(requestedFormat ?? '') ? (requestedFormat as FixedFormat) : null
+  if (fixed && (!fixedFormat || searchParams.get('v') !== '2')) {
     return { ok: false, error: 'Formato de imagen no permitido.' }
   }
 
@@ -80,24 +89,24 @@ export function resolveImageVariant(
   }
 
   const canonical = new URLSearchParams({ url: src, w: rawWidth, q: rawQuality })
-  if (fixed) {
-    canonical.set('f', 'webp')
+  if (fixed && fixedFormat) {
+    canonical.set('f', fixedFormat)
     canonical.set('v', '2')
   }
   if (rawQuery !== canonical.toString()) {
     return { ok: false, error: 'Parámetros de imagen no canónicos.' }
   }
 
-  return { ok: true, variant: { src, width: fixed ? width : legacyTransformWidth(width), quality, fixedFormat: fixed ? 'webp' : null } }
+  return { ok: true, variant: { src, width: fixed ? width : legacyTransformWidth(width), quality, fixedFormat: fixed ? fixedFormat : null } }
 }
 
-export function selectImageFormat(fixedFormat: 'webp' | null, accept: string): OutputFormat {
+export function selectImageFormat(fixedFormat: FixedFormat | null, accept: string): OutputFormat {
   if (fixedFormat) return fixedFormat
   if (accept.includes('image/avif')) return 'avif'
   if (accept.includes('image/webp')) return 'webp'
   return 'jpeg'
 }
 
-export function imageVaryHeader(fixedFormat: 'webp' | null): { Vary: 'Accept' } | Record<string, never> {
+export function imageVaryHeader(fixedFormat: FixedFormat | null): { Vary: 'Accept' } | Record<string, never> {
   return fixedFormat ? {} : { Vary: 'Accept' }
 }

@@ -42,3 +42,11 @@ export default function r2ImageLoader({ src, width }: ImageLoaderProps): string 
   })
   return `/api/img?${params.toString()}`
 }
+
+/**
+ * A JPEG variant for the print pages the PDF renderer loads (share-kit). Same route and cache rules as the loader;
+ * only the pinned format differs, because Chromium embeds a JPEG in a PDF as-is (`lib/image-variant.ts`).
+ */
+export function printImageUrl(src: string, width: number): string {
+  return `/api/img?${new URLSearchParams({ url: src, w: String(width), q: '75', f: 'jpeg', v: '2' }).toString()}`
+}
