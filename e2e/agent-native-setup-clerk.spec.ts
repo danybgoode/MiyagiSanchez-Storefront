@@ -21,12 +21,13 @@ const prompt = buildClerkPrompt()
 
 // ── Story 3.1 — names every live MCP tool ──────────────────────────────────────
 test.describe('clerk-prompt · names the live seller MCP tools (3.1)', () => {
-  test('the toolset is the 8 already-live seller tools', () => {
+  test('the toolset is the 9 live seller tools (get_share_kit added by share-kit S3.3)', () => {
     expect(SELLER_MCP_TOOLS.map((t) => t.name)).toEqual([
       'get_store_configuration',
       'patch_store_configuration',
       'create_listing',
       'list_my_listings',
+      'get_share_kit',
       'update_listing',
       'set_listing_status',
       'list_offers',

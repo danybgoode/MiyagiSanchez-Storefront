@@ -569,8 +569,17 @@ interface SellerProduct {
   categories?: CategoryRow[] | null
 }
 
-export const getShopListings = unstable_cache(
-  async (sellerSlug: string): Promise<Listing[]> => {
+/** Thrown inside the cache so a failed read is never cached as an empty catalog (share-kit verifier, PR 449). */
+class ShopListingsReadFailed extends Error {}
+
+/**
+ * One shop's listings AND whether the read was whole (share-kit S3, AGENTS "three states"). A failed first page
+ * throws inside the cache, so it is retried on the next call instead of serving an empty shop for the cache's
+ * lifetime; a later page that failed is cached as `complete: false`. Only the Meta feed acts on `complete` (a Meta
+ * replace-feed would delete every missing product); every other surface reads `getShopListings`.
+ */
+const getShopListingsCached = unstable_cache(
+  async (sellerSlug: string): Promise<{ listings: Listing[]; complete: boolean }> => {
     // Every page, not the backend's default first 20 (share-kit D2, `lib/seller-product-pages.ts`).
     const read = await readAllSellerProducts<SellerProduct>(async (limit, offset) => {
       const res = await medusaFetch(`/store/sellers/${sellerSlug}/products?limit=${limit}&offset=${offset}`, {
@@ -578,7 +587,7 @@ export const getShopListings = unstable_cache(
       } as RequestInit)
       return res.ok ? res.json() : null
     })
-    if (!read.ok) return []
+    if (!read.ok) throw new ShopListingsReadFailed(sellerSlug)
     if (!read.complete) {
       console.error(`[listings] getShopListings(${sellerSlug}) read ${read.products.length} products, then a page failed — the catalog is partial`)
     }
@@ -592,8 +601,8 @@ export const getShopListings = unstable_cache(
     // live in the backend /store/listings route.
     const seller = data.seller
     const sellerMarket = readPublicSellerMarket(seller)
-    if (!sellerMarket) return []
-    return (data.products ?? [])
+    if (!sellerMarket) return { listings: [], complete: true }
+    const listings = (data.products ?? [])
       .filter((p: SellerProduct) => !isPrintPlacementListing(p.metadata))
       .map((p: SellerProduct) => {
         const meta = (p.metadata ?? {}) as Record<string, unknown>
@@ -690,10 +699,24 @@ export const getShopListings = unstable_cache(
           } : null,
         } as Listing
       })
+    return { listings, complete: read.complete }
   },
-  ['shop-listings'],
+  ['shop-listings-read'],
   { revalidate: CACHE.LISTING, tags: ['listings'] },
 )
+
+export async function readShopListings(sellerSlug: string): Promise<{ listings: Listing[]; complete: boolean }> {
+  try {
+    return await getShopListingsCached(sellerSlug)
+  } catch (error) {
+    if (!(error instanceof ShopListingsReadFailed)) throw error
+    return { listings: [], complete: false }
+  }
+}
+
+export async function getShopListings(sellerSlug: string): Promise<Listing[]> {
+  return (await readShopListings(sellerSlug)).listings
+}
 
 /**
  * Country-market view of one seller's catalog.

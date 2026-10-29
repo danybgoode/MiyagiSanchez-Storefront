@@ -12,6 +12,7 @@ export const PARTNER_READ_TOOLS = new Set<string>([
   'get_store_configuration',
   'list_offers',
   'list_my_listings',
+  'get_share_kit', // share-kit S3.3 — public links + feed counts, no mutation; viewer-safe
   'list_my_collections',
   'list_orders',
   'list_manuscript_submissions',

@@ -6,6 +6,7 @@ import type { CatalogModel } from '@/lib/share-kit/catalog'
 import { catalogFor } from '@/lib/share-kit/catalog-server'
 import type { ShopPresentationContext } from '@/lib/shop-presentation/context'
 import ShopThemeShell from './ShopThemeShell'
+import CatalogOrderTracker from '@/components/share-kit/CatalogOrderTracker'
 
 export { catalogFor }
 
@@ -118,6 +119,7 @@ export default async function CatalogBody({ ctx }: { ctx: ShopPresentationContex
                         style={{ background: 'var(--provider-whatsapp)', color: 'var(--fg-inverse)' }}
                         data-testid="catalogo-order"
                         data-order="whatsapp"
+                        data-product={item.id}
                       >
                         <i className="iconoir-chat-bubble" aria-hidden="true" /> {CATALOG_COPY.orderWhatsApp}
                       </a>
@@ -128,6 +130,7 @@ export default async function CatalogBody({ ctx }: { ctx: ShopPresentationContex
                         style={{ background: ctx.accent, color: ctx.accentTextColor }}
                         data-testid="catalogo-order"
                         data-order="buy"
+                        data-product={item.id}
                       >
                         <i className="iconoir-shopping-bag" aria-hidden="true" /> {CATALOG_COPY.buy}
                       </a>
@@ -142,6 +145,7 @@ export default async function CatalogBody({ ctx }: { ctx: ShopPresentationContex
         <p className="text-center mt-8">
           <a href={shopHref} className="btn btn-ghost">{CATALOG_COPY.seeShop}</a>
         </p>
+        <CatalogOrderTracker shopSlug={model.shop.slug} />
       </main>
     </ShopThemeShell>
   )

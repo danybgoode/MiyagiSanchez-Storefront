@@ -297,6 +297,7 @@ export const SELLER_MCP_TOOLS: ReadonlyArray<{ name: string; desc: string }> = [
   { name: 'patch_store_configuration', desc: 'Ajusta esa configuración (marca, envíos, reglas de negociación, etc.).' },
   { name: 'create_listing', desc: 'Crea un producto nuevo (se crea como borrador para que lo revises).' },
   { name: 'list_my_listings', desc: 'Lista tus productos con su estado, precio e inventario.' },
+  { name: 'get_share_kit', desc: 'Te da el enlace de tu catálogo, su PDF y el feed para Instagram y WhatsApp.' },
   { name: 'update_listing', desc: 'Actualiza un producto: título, descripción, precio, fotos, inventario.' },
   { name: 'set_listing_status', desc: 'Publica, pausa o archiva un producto.' },
   { name: 'list_offers', desc: 'Revisa las ofertas y contraofertas de los compradores.' },

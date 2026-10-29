@@ -134,6 +134,7 @@ export const MCP_SELLER_TOOLS = [
   'respond_to_offer',
   'create_listing',
   'list_my_listings',
+  'get_share_kit',             // share-kit S3.3 — catalog link, PDF link, Meta feed URL (token-scoped)
   'list_wall_entries',         // living-shop S6.3 — the storefront Wall (token-scoped)
   'create_wall_entry',         // living-shop S6.3 (token-scoped)
   'update_wall_entry',         // living-shop S6.3 (token-scoped)
