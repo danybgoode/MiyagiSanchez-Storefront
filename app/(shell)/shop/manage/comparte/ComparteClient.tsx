@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { Toast, useToast } from '@/components/feedback/Toast'
 import ConnectAgentPanel from '@/components/ConnectAgentPanel'
 import CatalogLinkTile from '@/components/share-kit/CatalogLinkTile'
+import CatalogPdfTile from '@/components/share-kit/CatalogPdfTile'
 import { SHARE_KIT_COPY } from '@/lib/share-kit/copy'
 import { buildWhatsAppShareLink } from '@/lib/share-link'
 import { pushAnalyticsEvent } from '@/lib/analytics-events'
@@ -21,6 +22,7 @@ export default function ComparteClient({
   productCount,
   agentTokenSet,
   catalogUrl,
+  catalogPdfUrl,
 }: {
   shopName: string
   shopSlug: string
@@ -30,6 +32,8 @@ export default function ComparteClient({
   agentTokenSet: boolean
   /** The shop's catalog page, or null when the shop has none (share-kit D5). */
   catalogUrl: string | null
+  /** The shop's public catalog PDF link, null alongside `catalogUrl`. */
+  catalogPdfUrl: string | null
 }) {
   const { toast, showToast, dismissToast } = useToast()
   const [copied, setCopied] = useState(false)
@@ -135,6 +139,12 @@ export default function ComparteClient({
             onShared={(channel) => tapShare(`catalogo_${channel}`)}
             onCopyResult={(ok) => showToast(ok ? SHARE_KIT_COPY.copiedToast : SHARE_KIT_COPY.copyFailed, ok ? 'success' : 'error')}
           />
+        </div>
+      ) : null}
+
+      {catalogPdfUrl ? (
+        <div className="mb-6">
+          <CatalogPdfTile shopName={shopName} pdfUrl={catalogPdfUrl} onShared={(channel) => tapShare(`catalogo_pdf_${channel}`)} />
         </div>
       ) : null}
 

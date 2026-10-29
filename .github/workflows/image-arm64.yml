@@ -110,3 +110,50 @@ jobs:
 
       # The image's own sharp gate (`node -e "require('sharp')"` in the Dockerfile) proves the native
       # library loads on arm64 at BUILD time. The VM smoke (S1.5) proves a real /api/img request.
+
+  # share-kit S2.1 (D12) — the PDF renderer, `services/print-pdf`, as its own arm64 image. The VM's `update.sh` (root
+  # repo `infra/oci/`) pins it by digest exactly like the web and Medusa images. Rebuilt only when its directory
+  # changed (or on a manual dispatch), so a web-only merge does not spend a Chromium layer rebuild; a push that
+  # skips it leaves `:main` on the last renderer build, which is the image that matches the source.
+  print-pdf:
+    name: Build + push print-pdf linux/arm64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Did services/print-pdf change?
+        id: changed
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "${{ github.event_name }}" != "push" ] || [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- services/print-pdf; then
+            echo "build=false" >> "$GITHUB_OUTPUT"; echo "services/print-pdf unchanged — no rebuild"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: docker/setup-buildx-action@v3
+        if: steps.changed.outputs.build == 'true'
+      - uses: docker/login-action@v3
+        if: steps.changed.outputs.build == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        if: steps.changed.outputs.build == 'true'
+        with:
+          context: services/print-pdf
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ghcr.io/danybgoode/miyagisanchez-print-pdf:${{ github.sha }}
+            ${{ github.ref == 'refs/heads/main' && 'ghcr.io/danybgoode/miyagisanchez-print-pdf:main' || '' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=miyagisanchez-print-pdf-arm64
+          cache-to: type=gha,scope=miyagisanchez-print-pdf-arm64,mode=max

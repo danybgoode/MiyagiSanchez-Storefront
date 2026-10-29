@@ -13,4 +13,16 @@ export const SHARE_KIT_COPY = {
   qr: 'Descargar QR',
   open: 'Ver catálogo',
   shareText: (shopName: string) => `Mira el catálogo de ${shopName}`,
+  pdfTitle: 'Catálogo PDF',
+  pdfLead: 'Tus productos con fotos, precios y un código QR en cada uno, listo para reenviar.',
+  pdfDownload: 'Descargar',
+  pdfPreparing: 'Preparando tu PDF…',
+  pdfShareText: (shopName: string) => `Catálogo de ${shopName} (PDF)`,
+} as const
+
+/** The printed catalog's words (share-kit S2.2). */
+export const CATALOG_PRINT_COPY = {
+  subtitle: (count: number) => `Catálogo · ${count} producto${count === 1 ? '' : 's'}`,
+  closing: (shopName: string) => `Pide a ${shopName}`,
+  whatsapp: (digits: string) => `WhatsApp: +${digits}`,
 } as const

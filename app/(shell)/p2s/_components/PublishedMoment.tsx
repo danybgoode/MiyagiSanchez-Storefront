@@ -6,8 +6,9 @@ import { PUBLISH_COPY } from '@/lib/prompt-to-shop/copy'
 import { patchShop } from '@/lib/prompt-to-shop/client'
 import type { OwnProductCardView } from '@/lib/prompt-to-shop/view'
 import { isShopSlug, shopShortLink } from '@/lib/share-link'
-import { catalogUrl } from '@/lib/share-kit/catalog'
+import { catalogPdfUrl, catalogUrl } from '@/lib/share-kit/catalog'
 import CatalogLinkTile from '@/components/share-kit/CatalogLinkTile'
+import CatalogPdfTile from '@/components/share-kit/CatalogPdfTile'
 
 /**
  * The moment after «Publicar» (epic prompt-to-shop S5.2): the shop as the marketplace shows it, then the shares.
@@ -109,7 +110,10 @@ export default function PublishedMoment({
       </div>
       <p className="t-small" style={{ margin: 0, textAlign: 'center' }} role="status" aria-live="polite">{copied === 'copied' ? PUBLISH_COPY.copied : null}</p>
       {market === 'mx' && isShopSlug(shopSlug) ? (
-        <CatalogLinkTile shopName={shopName} catalogUrl={catalogUrl(shopSlug)} onShared={() => shared()} />
+        <>
+          <CatalogLinkTile shopName={shopName} catalogUrl={catalogUrl(shopSlug)} onShared={() => shared()} />
+          <CatalogPdfTile shopName={shopName} pdfUrl={catalogPdfUrl(shopSlug)} onShared={() => shared()} />
+        </>
       ) : null}
       {copied === 'manual' ? (
         <label className="t-small grid gap-1">

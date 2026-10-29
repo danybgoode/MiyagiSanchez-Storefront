@@ -3,7 +3,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
 import { getShop, getShopListings } from '@/lib/listings'
 import { readPublicSellerMarket } from '@/lib/owned-market'
-import { catalogUrl } from '@/lib/share-kit/catalog'
+import { catalogPdfUrl, catalogUrl } from '@/lib/share-kit/catalog'
 import ComparteClient from './ComparteClient'
 import type { Metadata } from 'next'
 
@@ -43,6 +43,7 @@ export default async function CompartePage() {
       productCount={listings.length}
       agentTokenSet={agentTokenSet}
       catalogUrl={isMexicoShop ? catalogUrl(shop.slug) : null}
+      catalogPdfUrl={isMexicoShop ? catalogPdfUrl(shop.slug) : null}
     />
   )
 }
