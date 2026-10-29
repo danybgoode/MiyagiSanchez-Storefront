@@ -5,6 +5,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const {
   allowedPageUrl,
+  createImageFailureTracker,
   createQueue,
   BusyError,
   isAllowedSubrequest,
@@ -134,4 +135,18 @@ test('the renderer loads print pages with scripts off and waits for load, not ne
   assert.match(server, /await page\.setJavaScriptEnabled\(false\)\n\s+await page\.setRequestInterception\(true\)/)
   assert.match(server, /page\.goto\(url, \{ waitUntil: 'load'/)
   assert.doesNotMatch(server, /networkidle/)
+})
+
+test('missing images are counted, except the ones the allow-list blocked on purpose (PR 450)', () => {
+  const t = createImageFailureTracker()
+  t.responded('image', 200)
+  t.responded('document', 500)
+  assert.equal(t.count(), 0)
+  t.responded('image', 502)
+  t.blocked('https://evil.example/x.png')
+  t.failed('https://evil.example/x.png', 'image')
+  assert.equal(t.count(), 1)
+  t.failed('https://miyagisanchez.com/api/img?x', 'image')
+  t.failed('https://miyagisanchez.com/a.css', 'stylesheet')
+  assert.equal(t.count(), 2)
 })

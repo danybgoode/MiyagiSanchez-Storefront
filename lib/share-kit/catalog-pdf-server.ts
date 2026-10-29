@@ -31,7 +31,10 @@ export const catalogPdfDeps: CatalogPdfDeps = {
       console.error(`[catalog-pdf] render failed for ${slug}: ${result.status} ${result.error ?? ''}`)
       return null
     }
-    return result.buffer
+    if (result.missingImages !== 0) {
+      console.warn(`[catalog-pdf] ${slug}: ${result.missingImages ?? 'unknown'} image(s) missing — served, not cached`)
+    }
+    return { pdf: result.buffer, complete: result.missingImages === 0 }
   },
   async cachePut(key, pdf) {
     if (!isR2Configured()) return

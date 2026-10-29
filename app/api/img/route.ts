@@ -32,8 +32,8 @@
  * new behavior.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import sharp from 'sharp'
 import { imageVaryHeader, resolveImageVariant, selectImageFormat } from '@/lib/image-variant'
+import { encodeImage } from '@/lib/image-encode'
 
 export const runtime = 'nodejs'
 
@@ -125,19 +125,9 @@ export async function GET(req: NextRequest) {
   let outBuf: Buffer
   let outType: string
   try {
-    // rotate() applies EXIF orientation before resizing; withoutEnlargement never
-    // upscales a source smaller than the requested width (no manufactured detail).
-    const pipeline = sharp(srcBuf).rotate().resize({ width, withoutEnlargement: true })
-    if (format === 'avif') {
-      outBuf = await pipeline.avif({ quality }).toBuffer()
-      outType = 'image/avif'
-    } else if (format === 'webp') {
-      outBuf = await pipeline.webp({ quality }).toBuffer()
-      outType = 'image/webp'
-    } else {
-      outBuf = await pipeline.jpeg({ quality, mozjpeg: true }).toBuffer()
-      outType = 'image/jpeg'
-    }
+    const encoded = await encodeImage(srcBuf, { width, quality, format })
+    outBuf = encoded.body
+    outType = encoded.contentType
   } catch (err) {
     console.error('[api/img] sharp transform failed:', err instanceof Error ? err.message : err)
     return NextResponse.json({ error: 'no se pudo procesar la imagen.' }, { status: 500 })

@@ -8,7 +8,8 @@ import type { Listing } from '../lib/types'
  * Share kit S2 — the catalog PDF's cache key, the order of its gates, and the print layout (share-kit D15, D16).
  *
  * Observed red, one mutation at a time: hashing only the slug in `catalogPdfKey` (a price change kept the old key);
- * moving the rate limits ABOVE the cache read (a hit was throttled); checking the shop limit before the IP one; dropping the cache write (the second call
+ * moving the rate limits ABOVE the cache read (a hit was throttled); caching a PDF with a missing image; dropping the
+ * white flatten before JPEG (a transparent pixel came out black); checking the shop limit before the IP one; dropping the cache write (the second call
  * rendered again); and `chunkIntoSheets` using a fixed 5 per sheet.
  */
 
@@ -38,7 +39,7 @@ function fakeDeps(over: Partial<CatalogPdfDeps> & { store?: Map<string, ArrayBuf
     loadModel: async () => model([listing('p1')]),
     cacheGet: async (key) => { calls.push('cacheGet'); return store.get(key) ?? null },
     rateLimit: async (kind) => { calls.push(`rateLimit:${kind}`); return true },
-    render: async () => { calls.push('render'); return PDF },
+    render: async () => { calls.push('render'); return { pdf: PDF, complete: true } },
     cachePut: async (key, pdf) => { calls.push('cachePut'); store.set(key, pdf) },
     ...over,
   }
@@ -81,6 +82,13 @@ test.describe('share kit · serving the PDF (D16)', () => {
     const { deps, calls } = fakeDeps({ rateLimit: async (kind) => { calls.push(`rateLimit:${kind}`); return kind !== 'catalog_pdf_ip' } })
     expect((await serveCatalogPdf('tienda-a', '1.1.1.1', deps)).status).toBe(429)
     expect(calls).not.toContain('rateLimit:catalog_pdf_shop')
+  })
+
+  test('a PDF with a missing image is served but never cached', async () => {
+    const { deps, calls, store } = fakeDeps({ render: async () => { calls.push('render'); return { pdf: PDF, complete: false } } })
+    expect(await serveCatalogPdf('tienda-a', '1.1.1.1', deps)).toMatchObject({ status: 200, cache: 'miss' })
+    expect(calls).not.toContain('cachePut')
+    expect(store.size).toBe(0)
   })
 
   test('a failed render is a 503 with the error line and caches nothing; an unknown shop is a 404', async () => {
@@ -135,5 +143,17 @@ test.describe('share kit · the print page asks for JPEG (2026-10-29)', () => {
     const page = (await import('node:fs')).readFileSync(new URL('../app/(shell)/mx/s/[slug]/catalogo/imprimir/page.tsx', import.meta.url), 'utf8')
     expect(page).not.toContain('r2ImageLoader')
     expect(page.match(/printImageUrl\(/g)?.length).toBe(2)
+  })
+})
+
+test.describe('share kit · a JPEG print image is never black where the source was transparent (PR 450)', () => {
+  test('a fully transparent PNG pixel encodes to white', async () => {
+    const sharp = (await import('sharp')).default
+    const { encodeImage } = await import('../lib/image-encode')
+    const png = await sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer()
+    const { body, contentType } = await encodeImage(png, { width: 8, quality: 75, format: 'jpeg' })
+    expect(contentType).toBe('image/jpeg')
+    const { data } = await sharp(body).raw().toBuffer({ resolveWithObject: true })
+    expect(Math.min(data[0], data[1], data[2])).toBeGreaterThan(245)
   })
 })

@@ -59,6 +59,7 @@ async function render(url, callerGone) {
   let browser
   let abandoned = false
   const blocked = []
+  const images = createImageFailureTracker()
   const work = (async () => {
     if (callerGone()) throw new Error('the caller left before the render started')
     browser = await puppeteer.launch({
@@ -84,19 +85,24 @@ async function render(url, callerGone) {
         request.continue().catch(() => {})
       } else {
         blocked.push(redactUrls(request.url()).slice(0, 120))
+        images.blocked(request.url())
         request.abort('blockedbyclient').catch(() => {})
       }
     })
+    page.on('requestfailed', (request) => images.failed(request.url(), request.resourceType()))
+    page.on('response', (response) => images.responded(response.request().resourceType(), response.status()))
     // `load` waits for every image; with scripts off nothing else arrives after it.
     await page.goto(url, { waitUntil: 'load', timeout: RENDER_TIMEOUT_MS })
     // A redirect off our origins was already aborted; refuse explicitly rather than print whatever did load.
     if (!isAllowedUrl(page.url(), PAGE_ORIGINS)) throw new Error('the page left the allowed origins')
     // Bounded: with page scripts off, an in-page promise can stall a CDP call until its protocol timeout.
+    let fontsTimer
     await Promise.race([
       page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => true) : true)).catch(() => false),
-      new Promise((resolve) => setTimeout(resolve, 3000)),
-    ])
-    return Buffer.from(await page.pdf({ preferCSSPageSize: true, printBackground: true }))
+      new Promise((resolve) => { fontsTimer = setTimeout(resolve, 3000) }),
+    ]).finally(() => clearTimeout(fontsTimer))
+    const pdf = Buffer.from(await page.pdf({ preferCSSPageSize: true, printBackground: true }))
+    return { pdf, missingImages: images.count() }
   })()
   try {
     return await withTimeout(work, RENDER_TIMEOUT_MS, () => {
@@ -126,9 +132,11 @@ app.post('/pdf', async (req, res) => {
   let gone = false
   res.on('close', () => { if (!res.writableEnded) gone = true })
   try {
-    const pdf = await queue.run(() => render(url, () => gone), { maxWaitMs: MAX_QUEUE_WAIT_MS })
-    console.log(`[print-pdf] rendered ${new URL(url).pathname} in ${Date.now() - started} ms (${pdf.length} bytes)`)
-    res.set('Content-Type', 'application/pdf').send(pdf)
+    const { pdf, missingImages } = await queue.run(() => render(url, () => gone), { maxWaitMs: MAX_QUEUE_WAIT_MS })
+    console.log(`[print-pdf] rendered ${new URL(url).pathname} in ${Date.now() - started} ms (${pdf.length} bytes, ${missingImages} missing image(s))`)
+    // The PDF is still served (a missing photo should not cost the merchant their download); the header lets the
+    // caller decide not to keep it.
+    res.set('Content-Type', 'application/pdf').set('X-Print-Missing-Images', String(missingImages)).send(pdf)
   } catch (e) {
     if (e instanceof BusyError) return res.status(503).json({ error: 'busy' })
     // Never the raw message: a navigation error carries the full URL, query string and all (verifier, PR 448).

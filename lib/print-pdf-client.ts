@@ -17,6 +17,8 @@ export interface RenderPrintPdfResult {
   /** HTTP status the caller should surface (503 = not configured, 502 = render failed). */
   status?: number
   buffer?: ArrayBuffer
+  /** Images the print page asked for and did not get (`X-Print-Missing-Images`); a PDF with any is not worth caching. */
+  missingImages?: number
   error?: string
 }
 
@@ -47,5 +49,7 @@ export async function renderPrintPdf(printUrl: string): Promise<RenderPrintPdfRe
     return { ok: false, status: 502, error: `Render falló (${r.status})` }
   }
 
-  return { ok: true, buffer: await r.arrayBuffer() }
+  // An absent or unreadable header counts as unknown, which a caller must treat as incomplete, not as zero.
+  const missing = Number(r.headers.get('x-print-missing-images') ?? NaN)
+  return { ok: true, buffer: await r.arrayBuffer(), missingImages: Number.isFinite(missing) ? missing : undefined }
 }

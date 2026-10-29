@@ -109,6 +109,22 @@ function redactUrls(message) {
   return String(message).replace(/(https?:\/\/[^\s?#]*)[?#][^\s]*/g, '$1?…')
 }
 
+/**
+ * Counts the images a print page asked for and did not get. `load` fires when an image FAILS too, so a transient
+ * `/api/img` error used to print a catalog with holes, and the PDF route cached it under the model's hash (verifier,
+ * PR 450). Images the allow-list aborted on purpose are not counted: they were never meant to load.
+ */
+function createImageFailureTracker() {
+  const blocked = new Set()
+  let missing = 0
+  return {
+    blocked(url) { blocked.add(url) },
+    failed(url, resourceType) { if (resourceType === 'image' && !blocked.has(url)) missing += 1 },
+    responded(resourceType, status) { if (resourceType === 'image' && status >= 400) missing += 1 },
+    count() { return missing },
+  }
+}
+
 class BusyError extends Error {
   constructor() {
     super('busy')
@@ -167,6 +183,7 @@ module.exports = {
   parseAssetOrigins,
   secretMatches,
   redactUrls,
+  createImageFailureTracker,
   createQueue,
   BusyError,
 }
