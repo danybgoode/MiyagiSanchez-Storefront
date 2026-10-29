@@ -17,7 +17,17 @@ const eslintConfig = defineConfig([
   // part of the Next app — `require` is its module system there.
   {
     files: ["services/**/*.js"],
-    rules: { "@typescript-eslint/no-require-imports": "off" },
+    // no-undef: a call to an unimported guard helper parsed fine, passed every test, and failed every render in
+    // production (share-kit PR 450). The globals are listed here rather than imported from `globals`, which is only
+    // a transitive dependency of this app.
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: Object.fromEntries(
+        ["require", "module", "process", "console", "Buffer", "setTimeout", "clearTimeout", "__dirname", "URL", "document"]
+          .map((name) => [name, "readonly"]),
+      ),
+    },
+    rules: { "@typescript-eslint/no-require-imports": "off", "no-undef": "error" },
   },
 ]);
 
