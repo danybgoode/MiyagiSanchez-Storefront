@@ -1,11 +1,9 @@
 import 'server-only'
 
-import { resolveShopPresentation } from '@/lib/shop-presentation/context'
-import { catalogFor } from '@/lib/share-kit/catalog-server'
+import { publicCatalogModel } from '@/lib/share-kit/catalog-server'
 import { renderPrintPdf } from '@/lib/print-pdf-client'
 import { isR2Configured, uploadToR2 } from '@/lib/r2'
 import { checkRateLimit } from '@/lib/ratelimit'
-import { isShopSlug } from '@/lib/share-link'
 import { PLATFORM_ORIGIN } from '@/lib/shortlink'
 import type { CatalogPdfDeps } from './catalog-pdf'
 
@@ -15,11 +13,7 @@ import type { CatalogPdfDeps } from './catalog-pdf'
  * limits, and the renderer on the VM loading the print page.
  */
 export const catalogPdfDeps: CatalogPdfDeps = {
-  async loadModel(slug) {
-    if (!isShopSlug(slug)) return null
-    const ctx = await resolveShopPresentation(slug, { marketBasePath: '/mx', market: 'mx' })
-    return ctx ? catalogFor(ctx) : null
-  },
+  loadModel: publicCatalogModel,
   async cacheGet(key) {
     const base = process.env.R2_PUBLIC_URL
     if (!base) return null

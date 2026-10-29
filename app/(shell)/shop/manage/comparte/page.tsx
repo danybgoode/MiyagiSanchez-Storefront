@@ -4,6 +4,8 @@ import { db } from '@/lib/supabase'
 import { getShop, getShopListings } from '@/lib/listings'
 import { readPublicSellerMarket } from '@/lib/owned-market'
 import { catalogPdfUrl, catalogUrl } from '@/lib/share-kit/catalog'
+import { publicCatalogModel } from '@/lib/share-kit/catalog-server'
+import { buildMetaFeed, metaFeedExcludedCount } from '@/lib/share-kit/meta-feed'
 import ComparteClient from './ComparteClient'
 import type { Metadata } from 'next'
 
@@ -33,6 +35,11 @@ export default async function CompartePage() {
   // The share kit is Mexico-only (share-kit D5); the market is the Medusa seller's, the store the public page reads.
   const isMexicoShop = readPublicSellerMarket(medusaShop)?.market_code === 'mx'
   const agentTokenSet = !!meta?.ucp_agent_token_hash
+  // The Meta feed tile (D18): the same public model the feed route serves, and only for a claimed shop, as the route.
+  const model = isMexicoShop ? await publicCatalogModel(shop.slug) : null
+  const metaFeed = model?.shop.claimed
+    ? { url: model.links.feed, excludedCount: metaFeedExcludedCount(buildMetaFeed(model)) }
+    : null
 
   return (
     <ComparteClient
@@ -44,6 +51,7 @@ export default async function CompartePage() {
       agentTokenSet={agentTokenSet}
       catalogUrl={isMexicoShop ? catalogUrl(shop.slug) : null}
       catalogPdfUrl={isMexicoShop ? catalogPdfUrl(shop.slug) : null}
+      metaFeed={metaFeed}
     />
   )
 }

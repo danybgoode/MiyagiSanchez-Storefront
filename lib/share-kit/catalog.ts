@@ -26,6 +26,8 @@ export interface CatalogItem {
   priceCents: number | null
   currency: string
   priceLabel: string
+  /** `new` or `used` — the two grades a buyer-facing feed can state truthfully from the listing's condition (D18). */
+  condition: 'new' | 'used'
   /** The product page, absolute on the platform origin. */
   url: string
   /** `mschz.org/l/<id>` — what a QR code and an order message carry. */
@@ -116,6 +118,8 @@ export function buildCatalogModel({ shop, listings }: { shop: CatalogShopInput; 
         priceCents: listing.price_cents,
         currency: listing.currency ?? 'MXN',
         priceLabel,
+        // Unset means new: every listing form defaults to it. Any graded used state is just `used` to a buyer.
+        condition: listing.condition && listing.condition !== 'new' ? 'used' : 'new',
         url,
         shortUrl,
         order,
@@ -142,4 +146,11 @@ export function buildCatalogModel({ shop, listings }: { shop: CatalogShopInput; 
     },
     items,
   }
+}
+
+/** The funnel event an order tap on the catalog page fires (share-kit D19), from the button's `data-order`. */
+export function catalogOrderEvent(order: string | null | undefined): 'catalog_order_whatsapp' | 'catalog_order_buy' | null {
+  if (order === 'whatsapp') return 'catalog_order_whatsapp'
+  if (order === 'buy') return 'catalog_order_buy'
+  return null
 }

@@ -7,6 +7,7 @@ import { Toast, useToast } from '@/components/feedback/Toast'
 import ConnectAgentPanel from '@/components/ConnectAgentPanel'
 import CatalogLinkTile from '@/components/share-kit/CatalogLinkTile'
 import CatalogPdfTile from '@/components/share-kit/CatalogPdfTile'
+import MetaFeedTile from '@/components/share-kit/MetaFeedTile'
 import { SHARE_KIT_COPY } from '@/lib/share-kit/copy'
 import { buildWhatsAppShareLink } from '@/lib/share-link'
 import { pushAnalyticsEvent } from '@/lib/analytics-events'
@@ -23,6 +24,7 @@ export default function ComparteClient({
   agentTokenSet,
   catalogUrl,
   catalogPdfUrl,
+  metaFeed,
 }: {
   shopName: string
   shopSlug: string
@@ -34,6 +36,8 @@ export default function ComparteClient({
   catalogUrl: string | null
   /** The shop's public catalog PDF link, null alongside `catalogUrl`. */
   catalogPdfUrl: string | null
+  /** The Meta feed URL and how many products it leaves out; null for an unclaimed or non-Mexico shop (D18). */
+  metaFeed: { url: string; excludedCount: number } | null
 }) {
   const { toast, showToast, dismissToast } = useToast()
   const [copied, setCopied] = useState(false)
@@ -145,6 +149,16 @@ export default function ComparteClient({
       {catalogPdfUrl ? (
         <div className="mb-6">
           <CatalogPdfTile shopName={shopName} pdfUrl={catalogPdfUrl} onShared={(channel) => tapShare(`catalogo_pdf_${channel}`)} />
+        </div>
+      ) : null}
+
+      {metaFeed ? (
+        <div className="mb-6">
+          <MetaFeedTile
+            feedUrl={metaFeed.url}
+            excludedCount={metaFeed.excludedCount}
+            onCopyResult={(ok) => showToast(ok ? SHARE_KIT_COPY.copiedToast : SHARE_KIT_COPY.copyFailed, ok ? 'success' : 'error')}
+          />
         </div>
       ) : null}
 

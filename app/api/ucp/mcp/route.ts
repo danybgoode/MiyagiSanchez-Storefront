@@ -109,6 +109,8 @@ import { getNeighborhoodPulseAgentView } from '@/lib/neighborhood-pulse-agent'
 import { aboutMcpResource, RELAY_LANGUAGE_DIRECTIVE } from '@/lib/about-agent'
 import { getOverriddenAboutSections } from '@/lib/about-content-overrides'
 import { buildSetupSpec } from '@/lib/setup-spec'
+import { publicCatalogModel } from '@/lib/share-kit/catalog-server'
+import { buildMetaFeed, metaFeedExcludedCount } from '@/lib/share-kit/meta-feed'
 import type { Listing } from '@/lib/types'
 import {
   computeShopifyCost, computeMercadoLibreCost, computeWooCommerceCost, computeTiendanubeCost, computeMiyagiCost,
@@ -511,6 +513,12 @@ const TOOLS = [
   {
     name: 'list_my_listings',
     description: "SELLER TOOL. List YOUR OWN shop's listings (all statuses, incl. paused) so you can manage them. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop. Returns each listing's product_id, title, price, status, and type. Use product_id with update_listing / set_listing_status.",
+    inputSchema: { type: 'object', properties: {} },
+  },
+  // ── Share kit (share-kit S3.3, D19) ─────────────────────────────────────────
+  {
+    name: 'get_share_kit',
+    description: "SELLER TOOL. Get YOUR OWN shop's share kit: the catalog page link (and its short form), the catalog PDF link, and the Meta product-feed URL for Instagram Shopping and WhatsApp Business catalogs, with how many products the feed leaves out and why. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop — another shop's slug is never reachable. Mexico shops only. Hand the links to your human, or post them for them.",
     inputSchema: { type: 'object', properties: {} },
   },
   // ── Living Shop — the Wall (epic 07, Story 6.3) ─────────────────────────────
@@ -2756,6 +2764,40 @@ async function handleListMyListings(args: Record<string, unknown>, authHeader?: 
   }
 }
 
+/**
+ * get_share_kit (share-kit S3.3, D19). The shop comes from `resolveToolShop` alone (seller credentials ignore any
+ * slug argument), and the links from the same public model the catalog page, PDF and feed read, so an agent is
+ * handed nothing a buyer could not open.
+ */
+async function handleGetShareKit(args: Record<string, unknown>, authHeader?: string | null) {
+  const agentAuth = await resolveToolShop(authHeader, args, 'get_share_kit')
+  if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
+  const slug = agentAuth.shop.slug
+  const model = slug ? await publicCatalogModel(slug) : null
+  if (!model) {
+    return { isError: true, content: [{ type: 'text', text: 'El kit para compartir es para tiendas de México con catálogo público. Esta tienda no tiene uno.' }] }
+  }
+  const feed = model.shop.claimed ? buildMetaFeed(model) : null
+  const kit = {
+    shop_slug: model.shop.slug,
+    products: model.items.length,
+    catalog_url: model.links.catalog,
+    catalog_short_url: model.links.catalogShort,
+    catalog_pdf_url: model.links.pdf,
+    meta_feed_url: feed ? model.links.feed : null,
+    meta_feed: feed ? { included: feed.included, excluded: feed.excluded } : null,
+  }
+  const lines = [
+    `## Kit para compartir — ${model.shop.name}`,
+    `• Catálogo: ${kit.catalog_url} (corto: ${kit.catalog_short_url})`,
+    `• Catálogo PDF: ${kit.catalog_pdf_url}`,
+    feed
+      ? `• Feed para Instagram y WhatsApp (Meta Commerce Manager): ${kit.meta_feed_url} — ${feed.included} productos${metaFeedExcludedCount(feed) > 0 ? `; ${metaFeedExcludedCount(feed)} no aparecen (sin foto: ${feed.excluded.no_photo}, sin precio: ${feed.excluded.no_price})` : ''}`
+      : '• Feed para Meta: disponible cuando la tienda esté reclamada.',
+  ]
+  return { content: [{ type: 'text', text: lines.join('\n') }, { type: 'text', text: JSON.stringify(kit, null, 2) }] }
+}
+
 async function handleListMyCollections(args: Record<string, unknown>, authHeader?: string | null) {
   const agentAuth = await resolveToolShop(authHeader, args, 'list_my_collections')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
@@ -4576,6 +4618,7 @@ async function handleMcpMethod(
       case 'create_wall_entry':         { const r = await handleCreateWallEntry(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'update_wall_entry':         { const r = await handleUpdateWallEntry(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'delete_wall_entry':         { const r = await handleDeleteWallEntry(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
+      case 'get_share_kit':             { const r = await handleGetShareKit(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'list_my_collections':       { const r = await handleListMyCollections(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'create_collection':         { const r = await handleCreateCollection(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'update_collection':         { const r = await handleUpdateCollection(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
