@@ -413,7 +413,7 @@
         "app/(shell)/admin/relaciones/page.tsx:21",
         "app/(shell)/promotor/cerrar/page.tsx:27",
         "app/(shell)/promotor/relaciones/page.tsx:19",
-        "lib/merchant-lifecycle-sweep.ts:577",
+        "lib/merchant-lifecycle-sweep.ts:587",
         "lib/relationship-access.ts:126"
       ]
     },

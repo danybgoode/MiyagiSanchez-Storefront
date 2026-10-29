@@ -64,7 +64,7 @@ import 'server-only'
 import { db } from '@/lib/supabase'
 import type { StageFacts } from '@/lib/merchant-stage'
 import { computeShopCompletion, type ShopRow } from '@/lib/setup-guide'
-import { deriveSaleFacts } from '@/lib/merchant-lifecycle'
+import { deriveSaleFacts, SELLER_GONE } from '@/lib/merchant-lifecycle'
 import {
   THREE_PRODUCTS_THRESHOLD,
   RETENTION_WINDOW_DAYS,
@@ -156,17 +156,19 @@ export async function loadCommerceFacts(relationship: { shopId: string | null })
     return { facts, ok: false }
   }
 
+  // A seller Medusa says no longer exists is KNOWN ABSENT: its Medusa facts stay unset and the read is complete.
+  // Only an unanswered read makes the evaluation incomplete (`ok: false`).
   const liveCount = await countLiveProductsFromMedusa(sellerSlug)
   if (liveCount === null) {
     ok = false
-  } else {
+  } else if (liveCount !== SELLER_GONE) {
     facts.threeProductsLive = liveCount >= THREE_PRODUCTS_THRESHOLD
   }
 
   const orders = await listCapturedOrders(sellerSlug)
   if (orders === null) {
     ok = false
-  } else if (orders.length > 0) {
+  } else if (orders !== SELLER_GONE && orders.length > 0) {
     const sale = deriveSaleFacts(orders, new Date(), RETENTION_WINDOW_MS)
     facts.firstSale = sale.firstSaleAt !== null
     facts.retained30d = sale.retainedAt !== null

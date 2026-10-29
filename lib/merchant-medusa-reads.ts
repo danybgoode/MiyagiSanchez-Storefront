@@ -24,7 +24,7 @@
  * Runtime: Node only (`fetch` + `AbortSignal.timeout`).
  */
 import 'server-only'
-import { isCapturedOrder } from '@/lib/merchant-lifecycle'
+import { isCapturedOrder, isSellerGoneResponse, SELLER_GONE } from '@/lib/merchant-lifecycle'
 
 /** The activation threshold the contract names: the THIRD product going live. */
 export const THREE_PRODUCTS_THRESHOLD = 3
@@ -46,18 +46,21 @@ const INTERNAL_SECRET = process.env.MEDUSA_INTERNAL_SECRET ?? ''
  * LIVE product count, from Medusa. `GET /store/sellers/{slug}/products` is the public,
  * visibility-filtered storefront read — what it returns is what is actually published.
  *
- * Returns null on ANY failure so the caller SKIPS rather than reads zero. An
+ * Returns SELLER_GONE when Medusa says the seller does not exist (known absent), and null on ANY other failure
+ * so the caller SKIPS rather than reads zero. An
  * unreachable Medusa must never be able to withhold a milestone forever, and — worse in
  * the other direction — a partial response must never be able to grant one.
  */
-export async function countLiveProductsFromMedusa(sellerSlug: string): Promise<number | null> {
+export async function countLiveProductsFromMedusa(
+  sellerSlug: string,
+): Promise<number | null | typeof SELLER_GONE> {
   try {
     const res = await fetch(`${MEDUSA_BASE}/store/sellers/${encodeURIComponent(sellerSlug)}/products`, {
       headers: medusaHeaders(),
       cache: 'no-store',
       signal: AbortSignal.timeout(MEDUSA_TIMEOUT_MS),
     })
-    if (!res.ok) return null
+    if (!res.ok) return isSellerGoneResponse(res.status, await res.text().catch(() => '')) ? SELLER_GONE : null
     const data = (await res.json()) as {
       products?: unknown[]
       listings?: unknown[]
@@ -80,11 +83,12 @@ export async function countLiveProductsFromMedusa(sellerSlug: string): Promise<n
  * Has this merchant transacted again SINCE their first sale? Read from Medusa, the
  * order system of record, via the backend's internal route (a cron has no Clerk JWT).
  *
- * Returns null when the answer cannot be determined, so the caller skips.
+ * Returns SELLER_GONE when Medusa says the seller does not exist, and null when the answer cannot be
+ * determined, so the caller skips.
  */
 export async function listCapturedOrders(
   sellerSlug: string,
-): Promise<Array<{ created_at: string }> | null> {
+): Promise<Array<{ created_at: string }> | null | typeof SELLER_GONE> {
   if (!INTERNAL_SECRET) return null
   try {
     const res = await fetch(
@@ -95,7 +99,7 @@ export async function listCapturedOrders(
         signal: AbortSignal.timeout(MEDUSA_TIMEOUT_MS),
       },
     )
-    if (!res.ok) return null
+    if (!res.ok) return isSellerGoneResponse(res.status, await res.text().catch(() => '')) ? SELLER_GONE : null
     const data = (await res.json()) as {
       orders?: Array<{ created_at?: string; status?: string; payment_captured?: boolean }>
     }

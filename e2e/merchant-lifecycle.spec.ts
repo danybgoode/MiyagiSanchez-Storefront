@@ -4,7 +4,7 @@ import {
   buildLifecycleTrackPayload,
   MERCHANT_LIFECYCLE_EVENTS,
   MAX_SUBJECT_ID_LENGTH,
-  isCapturedOrder, shopIdForEmissionSubject } from '../lib/merchant-lifecycle'
+  isCapturedOrder, isSellerGoneResponse, shopIdForEmissionSubject } from '../lib/merchant-lifecycle'
 import {
   lifecycleFixtures,
   shapingFixtures,
@@ -406,5 +406,24 @@ test.describe('shopIdForEmissionSubject — emission subjects back to shops (202
 
   test('an empty subject maps to nothing', () => {
     expect(shopIdForEmissionSubject('', rels)).toBeNull()
+  })
+})
+
+test.describe('isSellerGoneResponse — known absent is not unavailable (2026-10-29)', () => {
+  test("Medusa's own seller-not-found answers mean the seller is gone", () => {
+    // The two real bodies seen from production on 2026-10-29.
+    expect(isSellerGoneResponse(404, '{"message":"Seller not found"}')).toBe(true)
+    expect(isSellerGoneResponse(404, `{"message":"Seller 'miyagi-sanchez' not found"}`)).toBe(true)
+  })
+
+  test('any other 404 stays unavailable, so a missing route can never read as a deleted seller', () => {
+    expect(isSellerGoneResponse(404, 'Cannot GET /internal/sellers/orders')).toBe(false)
+    expect(isSellerGoneResponse(404, '{"message":"Product not found"}')).toBe(false)
+    expect(isSellerGoneResponse(404, '')).toBe(false)
+  })
+
+  test('the same words on any other status are not a verdict', () => {
+    expect(isSellerGoneResponse(500, '{"message":"Seller not found"}')).toBe(false)
+    expect(isSellerGoneResponse(200, '{"message":"Seller not found"}')).toBe(false)
   })
 })
