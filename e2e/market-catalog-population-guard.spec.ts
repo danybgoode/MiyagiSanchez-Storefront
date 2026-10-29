@@ -320,8 +320,9 @@ test.describe('population guard · owned detail is a real seller boundary', () =
   })
 
   test('owned shop display currency is the validated seller contract, with no MXN fallback', () => {
-    const body = byName.get('getShopListings')
-    expect(body, 'getShopListings no longer exists — re-point this guard').toBeTruthy()
+    // The seller-catalog mapping lives in the cached reader since share-kit S3 (getShopListings delegates to it).
+    const body = byName.get('getShopListingsCached')
+    expect(body, 'getShopListingsCached no longer exists — re-point this guard').toBeTruthy()
     expect(body).toContain('readPublicSellerMarket')
     expect(body).toContain('selectBaseSellerPrice')
     expect(body).toContain('sellerMarket.currency_code.toUpperCase()')
