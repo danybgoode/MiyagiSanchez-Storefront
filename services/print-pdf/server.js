@@ -14,6 +14,7 @@ const express = require('express')
 const puppeteer = require('puppeteer-core')
 const {
   BusyError,
+  createImageFailureTracker,
   createQueue,
   allowedPageUrl,
   isAllowedSubrequest,

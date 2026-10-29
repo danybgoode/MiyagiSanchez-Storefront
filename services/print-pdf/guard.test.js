@@ -150,3 +150,18 @@ test('missing images are counted, except the ones the allow-list blocked on purp
   t.failed('https://miyagisanchez.com/a.css', 'stylesheet')
   assert.equal(t.count(), 2)
 })
+
+test('server.js imports every guard export it uses (PR 450 shipped a call to an unimported helper)', () => {
+  // The I/O shell has no harness and `node --check` only parses, so an unimported name surfaced in production as
+  // "createImageFailureTracker is not defined" on every render. This reads the shell's guard destructuring and
+  // fails on any guard export used below it but missing from it.
+  const server = require('node:fs').readFileSync(require('node:path').join(__dirname, 'server.js'), 'utf8')
+  const match = /const \{([^}]*)\} = require\('\.\/guard'\)/.exec(server)
+  assert.ok(match, 'the guard require in server.js moved — re-point this test')
+  const imported = new Set(match[1].split(',').map((name) => name.trim()).filter(Boolean))
+  const body = server.slice(match.index + match[0].length)
+  for (const name of Object.keys(require('./guard'))) {
+    if (new RegExp(`\\b${name}\\b`).test(body)) assert.ok(imported.has(name), `server.js uses ${name} without importing it`)
+  }
+  for (const name of imported) assert.ok(name in require('./guard'), `server.js imports ${name}, which guard.js does not export`)
+})
