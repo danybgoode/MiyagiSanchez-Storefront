@@ -11,6 +11,7 @@
  * failed render, never a hang: the call is bounded by RENDER_CLIENT_TIMEOUT_MS.
  */
 import 'server-only'
+import { parseMissingImages } from './print-pdf-header'
 
 export interface RenderPrintPdfResult {
   ok: boolean
@@ -50,6 +51,5 @@ export async function renderPrintPdf(printUrl: string): Promise<RenderPrintPdfRe
   }
 
   // An absent or unreadable header counts as unknown, which a caller must treat as incomplete, not as zero.
-  const missing = Number(r.headers.get('x-print-missing-images') ?? NaN)
-  return { ok: true, buffer: await r.arrayBuffer(), missingImages: Number.isFinite(missing) ? missing : undefined }
+  return { ok: true, buffer: await r.arrayBuffer(), missingImages: parseMissingImages(r.headers.get('x-print-missing-images')) }
 }

@@ -157,3 +157,12 @@ test.describe('share kit · a JPEG print image is never black where the source w
     expect(Math.min(data[0], data[1], data[2])).toBeGreaterThan(245)
   })
 })
+
+test.describe('share kit · the missing-images header (PR 450)', () => {
+  test('only plain digits are a count; empty, absent or garbage is unknown, never zero', async () => {
+    const { parseMissingImages } = await import('../lib/print-pdf-header')
+    expect(parseMissingImages('0')).toBe(0)
+    expect(parseMissingImages('3')).toBe(3)
+    for (const bad of [null, '', ' ', '-1', '1.5', '0x1', '1e2', ' 0']) expect(parseMissingImages(bad), String(bad)).toBeUndefined()
+  })
+})

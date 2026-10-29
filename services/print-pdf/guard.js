@@ -112,7 +112,9 @@ function redactUrls(message) {
 /**
  * Counts the images a print page asked for and did not get. `load` fires when an image FAILS too, so a transient
  * `/api/img` error used to print a catalog with holes, and the PDF route cached it under the model's hash (verifier,
- * PR 450). Images the allow-list aborted on purpose are not counted: they were never meant to load.
+ * PR 450). Images the allow-list aborted on purpose are not counted: they were never meant to load. That is safe for
+ * the catalog, whose images all come from our own `/api/img` (which refuses redirects); a print page that pulls
+ * images from another origin must allow-list it, or its holes go uncounted.
  */
 function createImageFailureTracker() {
   const blocked = new Set()
