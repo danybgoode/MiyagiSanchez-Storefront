@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { buildCatalogModel, catalogOrderEvent } from '../lib/share-kit/catalog'
-import { buildMetaFeed, csvField, feedSlugFromSegment, META_FEED_COLUMNS, metaFeedExcludedCount, metaPrice } from '../lib/share-kit/meta-feed'
+import { buildMetaFeed, csvField, feedSlugFromSegment, META_FEED_COLUMNS, metaFeedExcludedCount, metaFeedResponse, metaPrice } from '../lib/share-kit/meta-feed'
 import { MCP_SELLER_TOOLS } from '../lib/ucp/capabilities'
 import { PARTNER_READ_TOOLS } from '../lib/partner-tools'
 import { SELLER_MCP_TOOLS } from '../lib/setup-spec'
@@ -12,8 +12,9 @@ import type { Listing } from '../lib/types'
  * Share kit S3 — the Meta feed, its route, the order-tap events and `get_share_kit` (share-kit D18, D19).
  *
  * Observed red, one mutation at a time: `metaPrice` without `toFixed(2)` («199 MXN»); `csvField` not doubling a
- * quote; dropping the no-photo exclusion (a photo-less product reached the feed); the feed route serving an unclaimed
- * shop; and `get_share_kit` reading `args.shop_slug` instead of the resolved shop.
+ * quote; dropping the no-photo exclusion (a photo-less product reached the feed); `metaFeedResponse` serving an
+ * unclaimed shop or a partial read; availability hard-coded to `in stock`; and `get_share_kit` reading
+ * `args.shop_slug` instead of the resolved shop.
  */
 
 function listing(id: string, over: Partial<Listing> = {}): Listing {
@@ -27,8 +28,12 @@ function listing(id: string, over: Partial<Listing> = {}): Listing {
   }
 }
 
+function modelOf(listings: Listing[], { owner = 'user_1', complete = true }: { owner?: string | null; complete?: boolean } = {}) {
+  return buildCatalogModel({ shop: { slug: 'tienda-a', name: 'Tienda A', clerk_user_id: owner, metadata: {} }, listings, complete })
+}
+
 function feedOf(listings: Listing[]) {
-  return buildMetaFeed(buildCatalogModel({ shop: { slug: 'tienda-a', name: 'Tienda A', clerk_user_id: 'user_1', metadata: {} }, listings }))
+  return buildMetaFeed(modelOf(listings))
 }
 
 /** Minimal RFC 4180 reader — enough to prove the writer round-trips. */
@@ -90,6 +95,27 @@ test.describe('share kit · the Meta feed (D18)', () => {
     expect(rows.slice(1).map((r) => r[4])).toEqual(['used', 'new', 'used'])
   })
 
+  test('availability follows stock: sold out is `out of stock`, sold out but taking orders is `available for order`', () => {
+    const rows = parseCsv(feedOf([
+      listing('a', { in_stock: true }),
+      listing('b', { in_stock: false, allow_backorder: false }),
+      listing('c', { in_stock: false, allow_backorder: true }),
+      listing('d'),
+    ]).csv)
+    expect(rows.slice(1).map((r) => r[3])).toEqual(['in stock', 'out of stock', 'available for order', 'in stock'])
+  })
+
+  test('the route answers 404 for no shop or an unclaimed one, 503 for a partial read, and the CSV otherwise', () => {
+    expect(metaFeedResponse(null)).toEqual({ status: 404 })
+    expect(metaFeedResponse(modelOf([listing('a')], { owner: null }))).toEqual({ status: 404 })
+    expect(metaFeedResponse(modelOf([listing('a')], { owner: 'pending:x' }))).toEqual({ status: 404 })
+    expect(metaFeedResponse(modelOf([listing('a')], { complete: false }))).toEqual({ status: 503 })
+    expect(metaFeedResponse(modelOf([], { complete: false }))).toEqual({ status: 503 })
+    const ok = metaFeedResponse(modelOf([listing('a')]))
+    expect(ok.status).toBe(200)
+    expect(ok.status === 200 && parseCsv(ok.csv).length).toBe(2)
+  })
+
   test('the route segment must be <slug>.csv', () => {
     expect(feedSlugFromSegment('tienda-a.csv')).toBe('tienda-a')
     for (const bad of ['tienda-a', 'tienda-a.json', '.csv', '..%2Fadmin.csv', 'Tienda.csv', 'a/b.csv']) {
@@ -126,8 +152,8 @@ test.describe('share kit · get_share_kit is the seller\'s own shop only (D19)',
     expect(body).not.toMatch(/args\.(shop_slug|slug)|args\[/)
   })
 
-  test('the feed route and the tile both require a claimed shop', () => {
-    expect(read('app/api/feeds/meta/[slug]/route.ts')).toContain('if (!model || !model.shop.claimed) return new Response')
+  test('the feed route answers through metaFeedResponse, and the tile also needs a claimed shop', () => {
+    expect(read('app/api/feeds/meta/[slug]/route.ts')).toContain('const plan = metaFeedResponse(')
     expect(read('app/(shell)/shop/manage/comparte/page.tsx')).toContain('const metaFeed = model?.shop.claimed')
   })
 })

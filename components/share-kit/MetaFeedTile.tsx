@@ -53,7 +53,7 @@ export default function MetaFeedTile({
       </ol>
       {excludedCount > 0 ? (
         <p className="text-sm text-[var(--color-muted)] mt-3 flex items-center gap-2" data-testid="share-meta-feed-excluded">
-          <i className="iconoir-warning-circle" aria-hidden="true" /> {COPY.feedExcluded(excludedCount)}
+          <i className="iconoir-warning-triangle" aria-hidden="true" /> {COPY.feedExcluded(excludedCount)}
         </p>
       ) : null}
     </Card>

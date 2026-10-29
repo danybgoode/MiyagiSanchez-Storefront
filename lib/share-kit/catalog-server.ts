@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { getShopListings } from '@/lib/listings'
+import { readShopListings } from '@/lib/listings'
 import { readPublicSellerMarket } from '@/lib/owned-market'
 import { isShopSlug } from '@/lib/share-link'
 import { resolveShopPresentation, type ShopPresentationContext } from '@/lib/shop-presentation/context'
@@ -12,8 +12,8 @@ import { buildCatalogModel, type CatalogModel } from './catalog'
  */
 export async function catalogFor(ctx: ShopPresentationContext): Promise<CatalogModel | null> {
   if (readPublicSellerMarket(ctx.shop)?.market_code !== 'mx') return null
-  const listings = await getShopListings(ctx.shop.slug)
-  return buildCatalogModel({ shop: ctx.shop, listings })
+  const { listings, complete } = await readShopListings(ctx.shop.slug)
+  return buildCatalogModel({ shop: ctx.shop, listings, complete })
 }
 
 /**
