@@ -60,7 +60,7 @@
 import 'server-only'
 import { db } from '@/lib/supabase'
 import { isEnabled } from '@/lib/flags'
-import { deriveSaleFacts } from '@/lib/merchant-lifecycle'
+import { deriveSaleFacts, shopIdForEmissionSubject } from '@/lib/merchant-lifecycle'
 import {
   emitMerchantLifecycleForShop,
   deliverClaimedEmission,
@@ -266,7 +266,15 @@ async function loadCandidates(): Promise<{ candidates: Candidate[]; truncated: b
   const emitted = await readPaged('merchant_lifecycle_emissions', 'merchant_id')
   errors += emitted.errors
   truncated ||= emitted.truncated
-  for (const row of emitted.rows) if (row?.merchant_id) ids.add(String(row.merchant_id))
+  // Emission rows carry the merchant SUBJECT id, which is a relationship id since Sprint 3: map each back to its
+  // shop (`shopIdForEmissionSubject`), or the relationship id becomes a phantom shop candidate.
+  const subjects = emissionSubjects(emitted.rows)
+  const relShops = await loadRelationshipShops(subjects)
+  errors += relShops.errors
+  for (const subject of subjects) {
+    const shopId = shopIdForEmissionSubject(subject, relShops.map)
+    if (shopId) ids.add(shopId)
+  }
 
   // Resolve slug + claim state in batches rather than one read per merchant.
   const merchantIds = [...ids]
@@ -277,6 +285,7 @@ async function loadCandidates(): Promise<{ candidates: Candidate[]; truncated: b
       .select('id, slug, clerk_user_id')
       .in('id', merchantIds.slice(i, i + IN_BATCH_SIZE))
     if (shops.error) {
+      console.error('[merchant-lifecycle] shop lookup failed:', shops.error.message)
       errors += 1
       continue
     }
@@ -301,6 +310,32 @@ async function loadCandidates(): Promise<{ candidates: Candidate[]; truncated: b
   }
 }
 
+function emissionSubjects(rows: Array<Record<string, unknown>>): string[] {
+  return [...new Set(rows.map((r) => (r?.merchant_id ? String(r.merchant_id) : '')).filter(Boolean))]
+}
+
+/** relationship id → its shop id (null when the relationship has no shop yet), for the given subject ids.
+ *  Ids that are not relationships are simply absent; `shopIdForEmissionSubject` treats those as shop ids. */
+async function loadRelationshipShops(subjects: string[]): Promise<{ map: Map<string, string | null>; errors: number }> {
+  const map = new Map<string, string | null>()
+  let errors = 0
+  for (let i = 0; i < subjects.length; i += IN_BATCH_SIZE) {
+    const rels = await db
+      .from('merchant_relationships')
+      .select('id, shop_id')
+      .in('id', subjects.slice(i, i + IN_BATCH_SIZE))
+    if (rels.error) {
+      console.error('[merchant-lifecycle] relationship lookup failed:', rels.error.message)
+      errors += 1
+      continue
+    }
+    for (const row of rels.data ?? []) {
+      if (row?.id) map.set(String(row.id), row.shop_id ? String(row.shop_id) : null)
+    }
+  }
+  return { map, errors }
+}
+
 /** Milestones already delivered or claimed, so the sweep skips the work rather than
  *  relying on the unique-violation path for every merchant on every run. The constraint
  *  is still what GUARANTEES once-only — this is an optimisation, not the guard. */
@@ -312,8 +347,12 @@ async function loadClaimed(): Promise<{
   const byMerchant = new Map<string, Set<string>>()
   const paged = await readPaged('merchant_lifecycle_emissions', 'merchant_id, event_type')
   if (paged.errors > 0) return { byMerchant, errors: paged.errors, truncated: paged.truncated }
+  // Keyed by SHOP id, like the candidates. Keyed by the raw subject (a relationship id since Sprint 3), no real
+  // shop ever matched its own claims, so every run re-attempted every milestone for every shop.
+  const relShops = await loadRelationshipShops(emissionSubjects(paged.rows))
+  if (relShops.errors > 0) return { byMerchant, errors: relShops.errors, truncated: paged.truncated }
   for (const row of paged.rows) {
-    const id = String(row?.merchant_id ?? '')
+    const id = shopIdForEmissionSubject(String(row?.merchant_id ?? ''), relShops.map)
     if (!id) continue
     if (!byMerchant.has(id)) byMerchant.set(id, new Set())
     byMerchant.get(id)!.add(String(row?.event_type ?? ''))
@@ -352,7 +391,7 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
   const outOfTime = () => Date.now() > deadline
 
   const drain = await listPendingEmissions()
-  if (drain.failed) result.errors += 1
+  if (drain.failed) fail(result, 'listing pending emissions failed')
   if (drain.truncated) result.truncated = true
   for (const pending of drain.pending) {
     if (outOfTime()) {
@@ -378,10 +417,10 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
         // Includes 'delivered_unrecorded': golden-beans has it, we could not record
         // that. Harmless to re-send (the idempotency key dedupes), but the run is not
         // clean and must not be reported as such.
-        result.errors += 1
+        fail(result, `redelivery of ${pending.eventType} for ${pending.merchantId}: ${outcome}`)
       }
-    } catch {
-      result.errors += 1
+    } catch (err) {
+      fail(result, `redelivery of ${pending.eventType} for ${pending.merchantId} threw: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -443,8 +482,7 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
         ['merchant.three_products_live', 'merchant.first_sale', 'merchant.retained_30d'] as const
       ).some((e) => !done.has(e))
       if (unreachable) {
-        console.error(`[merchant-lifecycle] no seller slug for merchant ${merchantId} — skipped`)
-        result.errors += 1
+        fail(result, `no seller slug for shop ${merchantId}: Medusa-derived milestones skipped`)
       }
       continue
     }
@@ -456,7 +494,7 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
     // the commerce-fact adapter's own use of the same function.
     const needsOrders = !done.has('merchant.first_sale') || !done.has('merchant.retained_30d')
     const orders = needsOrders ? await listCapturedOrders(sellerSlug) : []
-    if (needsOrders && orders === null) result.errors += 1
+    if (needsOrders && orders === null) fail(result, `orders unreadable from Medusa for ${sellerSlug}`)
     const sale = orders && orders.length > 0 ? deriveSaleFacts(orders, now, RETENTION_WINDOW_MS) : null
 
     if (!done.has('merchant.first_sale') && sale?.firstSaleAt) {
@@ -473,7 +511,7 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
       try {
         const live = await countLiveProductsFromMedusa(sellerSlug)
         if (live === null) {
-          result.errors += 1
+          fail(result, `live product count unreadable from Medusa for ${sellerSlug}`)
         } else if (live >= THREE_PRODUCTS_THRESHOLD) {
           // `occurredAt` is NOW, not the third product's publish time: nothing records
           // when the count crossed the threshold, and inventing a timestamp we cannot
@@ -487,8 +525,8 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
             result.threeProductsLive += 1
           }
         }
-      } catch {
-        result.errors += 1
+      } catch (err) {
+        fail(result, `three_products_live for ${sellerSlug} threw: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
 
@@ -512,8 +550,8 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
         }), result)) {
           result.retained30d += 1
         }
-      } catch {
-        result.errors += 1
+      } catch (err) {
+        fail(result, `retained_30d for ${sellerSlug} threw: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
   }
@@ -555,7 +593,7 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
       if (!outcome) {
         // The relationship itself couldn't be read — report and move on; the
         // whole run is not clean, but one bad id must not abort the rest.
-        result.errors += 1
+        fail(result, `relationship ${relationshipId} could not be read`)
         continue
       }
       result.relationshipsEvaluated += 1
@@ -566,7 +604,7 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
       // failed to send (the transition row is still durably written; the
       // sweep's own drain, step 1, will redeliver it next run). Either way
       // the run as a whole is not clean.
-      if (!outcome.ok) result.errors += 1
+      if (!outcome.ok) fail(result, `relationship ${relationshipId}: commerce facts incomplete or an emission failed to send`)
 
       // Merchant Partner lifecycle · Sprint 3, Story 3.1 (README D7) — the
       // sweep is what DISCOVERS `first_sale`, so scheduling the retention
@@ -608,10 +646,10 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
       }
 
       if (scheduled === 'error') {
-        result.errors += 1
+        fail(result, `retention task scheduling failed for relationship ${relationshipId}`)
       }
-    } catch {
-      result.errors += 1
+    } catch (err) {
+      fail(result, `relationship ${relationshipId} threw: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -640,7 +678,7 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
   }
   const slaScan = await loadPortfolio(PORTFOLIO_EVENT_SWEEP_ACTOR, { view: 'all' }, now)
   if (!slaScan.ok) {
-    result.errors += 1
+    fail(result, 'portfolio SLA scan failed')
     return result
   }
   for (const row of slaScan.portfolio.rows) {
@@ -670,8 +708,8 @@ export async function sweepMerchantLifecycle(now: Date = new Date()): Promise<Sw
         })
         if (recordPortfolioEvent(outcome, result)) result.portfolioEventsEmitted += 1
       }
-    } catch {
-      result.errors += 1
+    } catch (err) {
+      fail(result, `SLA event for relationship ${row.id} threw: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -695,6 +733,13 @@ async function loadRelationshipCandidates(): Promise<{ ids: string[]; truncated:
   return { ids, truncated: paged.truncated, errors: paged.errors }
 }
 
+/** Count a failure AND log what it was. The cron used to answer `errors: 41` with nothing in the log for most of
+ *  them, so a daily 503 could not be diagnosed without re-deriving this file's logic by hand (2026-10-29). */
+function fail(result: SweepResult, reason: string): void {
+  result.errors += 1
+  console.error(`[merchant-lifecycle] ${reason}`)
+}
+
 /**
  * Did this emission actually go out, and if not, was that a FAILURE?
  *
@@ -711,7 +756,7 @@ function record(outcome: EmitOutcome, result: SweepResult): boolean {
     result.telemetryOff = true
     return false
   }
-  result.errors += 1
+  fail(result, `emit ${outcome}`)
   return false
 }
 
