@@ -1,6 +1,6 @@
 // node --test services/print-pdf — the renderer's allow-list, secret and queue (share-kit D14).
 // Observed red under a mutation: `isAllowedUrl` returning true for any https URL, `isAllowedSubrequest` admitting a
-// `script` from an asset origin, `allowedPageUrl` returning the caller's string unchanged, `secretMatches` accepting an empty expected secret, and the queue never refusing.
+// `script` from an asset origin, `allowedPageUrl` returning the caller's string unchanged, `redactUrls` keeping the query, the queue ignoring `maxWaitMs`, `secretMatches` accepting an empty expected secret, and the queue never refusing.
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const {
@@ -11,6 +11,7 @@ const {
   isAllowedUrl,
   parseAllowedOrigins,
   parseAssetOrigins,
+  redactUrls,
   secretMatches,
 } = require('./guard')
 
@@ -98,4 +99,30 @@ test('a failed render frees its slot', async () => {
   const queue = createQueue({ concurrency: 1, maxWaiting: 0 })
   await assert.rejects(queue.run(async () => { throw new Error('boom') }), /boom/)
   assert.equal(await queue.run(async () => 'ok'), 'ok')
+})
+
+test('a logged error never carries a query string (the admin rate card URL holds ?secret=)', () => {
+  const msg = 'net::ERR_NAME_NOT_RESOLVED at https://miyagisanchez.com/admin/print/rate-card/print?secret=s3cr3t&x=1'
+  const out = redactUrls(msg)
+  assert.equal(out.includes('s3cr3t'), false)
+  assert.equal(out, 'net::ERR_NAME_NOT_RESOLVED at https://miyagisanchez.com/admin/print/rate-card/print?…')
+  assert.equal(redactUrls('plain failure'), 'plain failure')
+  assert.equal(redactUrls('https://a.example/p#k=secret').includes('secret'), false)
+})
+
+test('a job that waited past its bound is refused instead of rendering for a caller who left', async () => {
+  let t = 0
+  const queue = createQueue({ concurrency: 1, maxWaiting: 4, now: () => t })
+  let release
+  const first = queue.run(() => new Promise((r) => { release = r }), { maxWaitMs: 10 })
+  let ranLate = false
+  const late = queue.run(() => { ranLate = true; return 'x' }, { maxWaitMs: 10 })
+  t = 50
+  await new Promise((r) => setImmediate(r)) // the first job starts a microtask later
+  release('done')
+  assert.equal(await first, 'done')
+  await assert.rejects(late, (e) => e instanceof BusyError)
+  assert.equal(ranLate, false)
+  const fresh = await queue.run(() => 'ok', { maxWaitMs: 10 })
+  assert.equal(fresh, 'ok')
 })

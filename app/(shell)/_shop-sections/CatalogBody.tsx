@@ -4,10 +4,10 @@ import r2ImageLoader from '@/lib/image-loader'
 import { listingHref } from '@/lib/shop-presentation/chrome'
 import type { CatalogModel } from '@/lib/share-kit/catalog'
 import { catalogFor } from '@/lib/share-kit/catalog-server'
-
-export { catalogFor }
 import type { ShopPresentationContext } from '@/lib/shop-presentation/context'
 import ShopThemeShell from './ShopThemeShell'
+
+export { catalogFor }
 
 /**
  * The shop's catalog page — one scroll of products with one order button each (share-kit S1.2).

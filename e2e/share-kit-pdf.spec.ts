@@ -8,7 +8,7 @@ import type { Listing } from '../lib/types'
  * Share kit S2 — the catalog PDF's cache key, the order of its gates, and the print layout (share-kit D15, D16).
  *
  * Observed red, one mutation at a time: hashing only the slug in `catalogPdfKey` (a price change kept the old key);
- * moving the rate limits ABOVE the cache read (a hit was throttled); dropping the cache write (the second call
+ * moving the rate limits ABOVE the cache read (a hit was throttled); checking the shop limit before the IP one; dropping the cache write (the second call
  * rendered again); and `chunkIntoSheets` using a fixed 5 per sheet.
  */
 
@@ -61,7 +61,7 @@ test.describe('share kit · serving the PDF (D16)', () => {
     const { deps, calls } = fakeDeps()
     const first = await serveCatalogPdf('tienda-a', '1.1.1.1', deps)
     expect(first).toMatchObject({ status: 200, cache: 'miss', filename: 'tienda-a-catalogo.pdf' })
-    expect(calls).toEqual(['cacheGet', 'rateLimit:catalog_pdf_shop', 'rateLimit:catalog_pdf_ip', 'render', 'cachePut'])
+    expect(calls).toEqual(['cacheGet', 'rateLimit:catalog_pdf_ip', 'rateLimit:catalog_pdf_shop', 'render', 'cachePut'])
     calls.length = 0
     const second = await serveCatalogPdf('tienda-a', '1.1.1.1', deps)
     expect(second).toMatchObject({ status: 200, cache: 'hit' })
@@ -75,6 +75,12 @@ test.describe('share kit · serving the PDF (D16)', () => {
       expect(result).toEqual({ status: 429, error: CATALOG_PDF_ERROR })
       expect(calls).not.toContain('render')
     }
+  })
+
+  test("a client over its IP limit never spends the shop's budget", async () => {
+    const { deps, calls } = fakeDeps({ rateLimit: async (kind) => { calls.push(`rateLimit:${kind}`); return kind !== 'catalog_pdf_ip' } })
+    expect((await serveCatalogPdf('tienda-a', '1.1.1.1', deps)).status).toBe(429)
+    expect(calls).not.toContain('rateLimit:catalog_pdf_shop')
   })
 
   test('a failed render is a 503 with the error line and caches nothing; an unknown shop is a 404', async () => {

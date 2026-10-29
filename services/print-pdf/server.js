@@ -20,6 +20,7 @@ const {
   isAllowedUrl,
   parseAllowedOrigins,
   parseAssetOrigins,
+  redactUrls,
   secretMatches,
 } = require('./guard')
 
@@ -31,6 +32,9 @@ const RENDER_TIMEOUT_MS = Number(process.env.RENDER_TIMEOUT_MS || 45000)
 const PAGE_ORIGINS = parseAllowedOrigins(process.env.PRINT_PDF_ALLOWED_ORIGINS)
 const ASSET_ORIGINS = parseAssetOrigins(process.env.PRINT_PDF_ASSET_ORIGINS)
 const queue = createQueue({ concurrency: 1, maxWaiting: Number(process.env.PRINT_PDF_MAX_WAITING || 4) })
+// The web client gives up at 55 s, so a render that starts more than 10 s after its request arrived can finish after
+// the caller left. It is refused as busy instead (verifier, PR 448).
+const MAX_QUEUE_WAIT_MS = Number(process.env.PRINT_PDF_MAX_QUEUE_WAIT_MS || 10000)
 
 const app = express()
 app.disable('x-powered-by')
@@ -51,15 +55,19 @@ function withTimeout(promise, ms, onTimeout) {
   ]).finally(() => clearTimeout(timer))
 }
 
-async function render(url) {
+async function render(url, callerGone) {
   let browser
+  let abandoned = false
   const blocked = []
   const work = (async () => {
+    if (callerGone()) throw new Error('the caller left before the render started')
     browser = await puppeteer.launch({
       executablePath: CHROMIUM_PATH,
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'],
     })
+    // A launch slower than the whole budget lands after the timeout already released the queue slot: close it now.
+    if (abandoned) throw new Error('render abandoned after the timeout')
     const page = await browser.newPage()
     await page.setRequestInterception(true)
     // Every request, redirects included (each hop is its own request event), is checked against the allow-list.
@@ -71,7 +79,7 @@ async function render(url) {
       if (allowed) {
         request.continue().catch(() => {})
       } else {
-        blocked.push(request.url().slice(0, 120))
+        blocked.push(redactUrls(request.url()).slice(0, 120))
         request.abort('blockedbyclient').catch(() => {})
       }
     })
@@ -82,10 +90,15 @@ async function render(url) {
     return Buffer.from(await page.pdf({ preferCSSPageSize: true, printBackground: true }))
   })()
   try {
-    return await withTimeout(work, RENDER_TIMEOUT_MS, () => { if (browser) browser.close().catch(() => {}) })
+    return await withTimeout(work, RENDER_TIMEOUT_MS, () => {
+      abandoned = true
+      if (browser) browser.close().catch(() => {})
+    })
   } finally {
     if (blocked.length > 0) console.warn(`[print-pdf] blocked ${blocked.length} request(s): ${blocked.slice(0, 5).join(' ')}`)
     if (browser) await browser.close().catch(() => {})
+    // A launch still in flight closes its browser when it lands (codex review, PR 448).
+    else work.catch(() => {}).finally(() => { if (browser) browser.close().catch(() => {}) })
   }
 }
 
@@ -101,14 +114,17 @@ app.post('/pdf', async (req, res) => {
   if (!url) return res.status(403).json({ error: 'url not allowed' })
 
   const started = Date.now()
+  let gone = false
+  res.on('close', () => { if (!res.writableEnded) gone = true })
   try {
-    const pdf = await queue.run(() => render(url))
+    const pdf = await queue.run(() => render(url, () => gone), { maxWaitMs: MAX_QUEUE_WAIT_MS })
     console.log(`[print-pdf] rendered ${new URL(url).pathname} in ${Date.now() - started} ms (${pdf.length} bytes)`)
     res.set('Content-Type', 'application/pdf').send(pdf)
   } catch (e) {
     if (e instanceof BusyError) return res.status(503).json({ error: 'busy' })
-    console.error('[print-pdf] render failed:', e)
-    res.status(500).json({ error: String((e && e.message) || e).slice(0, 300) })
+    // Never the raw message: a navigation error carries the full URL, query string and all (verifier, PR 448).
+    console.error(`[print-pdf] render failed: ${redactUrls((e && e.message) || e).slice(0, 300)}`)
+    res.status(500).json({ error: 'render failed' })
   }
 })
 

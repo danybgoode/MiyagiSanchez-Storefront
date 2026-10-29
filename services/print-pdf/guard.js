@@ -101,6 +101,14 @@ function secretMatches(expected, given) {
   return timingSafeEqual(a, b)
 }
 
+/**
+ * An error message safe to log: every URL's query string is cut. Puppeteer puts the full URL in a navigation error,
+ * and the admin rate-card URL carries `?secret=` (verifier, PR 448), so a raw message must never be logged or returned.
+ */
+function redactUrls(message) {
+  return String(message).replace(/(https?:\/\/[^\s?#]*)[?#][^\s]*/g, '$1?…')
+}
+
 class BusyError extends Error {
   constructor() {
     super('busy')
@@ -110,15 +118,21 @@ class BusyError extends Error {
 
 /**
  * A FIFO that runs `concurrency` jobs at once and holds at most `maxWaiting` more; the next one is refused with a
- * BusyError instead of piling up Chromium processes on a 768 MB container.
+ * BusyError instead of piling up Chromium processes on a 512 MB container.
+ * A job that waited longer than `maxWaitMs` is refused too: its caller (the web app gives up at 55 s) has left, and
+ * rendering for nobody would only make the next caller wait (verifier, PR 448).
  */
-function createQueue({ concurrency = 1, maxWaiting = 4 } = {}) {
+function createQueue({ concurrency = 1, maxWaiting = 4, now = Date.now } = {}) {
   let running = 0
   const waiting = []
 
   function next() {
     while (running < concurrency && waiting.length > 0) {
-      const { job, resolve, reject } = waiting.shift()
+      const { job, resolve, reject, enqueuedAt, maxWaitMs } = waiting.shift()
+      if (maxWaitMs != null && now() - enqueuedAt > maxWaitMs) {
+        reject(new BusyError())
+        continue
+      }
       running += 1
       Promise.resolve()
         .then(job)
@@ -131,10 +145,10 @@ function createQueue({ concurrency = 1, maxWaiting = 4 } = {}) {
   }
 
   return {
-    run(job) {
+    run(job, { maxWaitMs } = {}) {
       if (running >= concurrency && waiting.length >= maxWaiting) return Promise.reject(new BusyError())
       return new Promise((resolve, reject) => {
-        waiting.push({ job, resolve, reject })
+        waiting.push({ job, resolve, reject, enqueuedAt: now(), maxWaitMs })
         next()
       })
     },
@@ -152,6 +166,7 @@ module.exports = {
   isAllowedSubrequest,
   parseAssetOrigins,
   secretMatches,
+  redactUrls,
   createQueue,
   BusyError,
 }

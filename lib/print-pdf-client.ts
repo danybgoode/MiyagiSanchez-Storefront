@@ -40,11 +40,11 @@ export async function renderPrintPdf(printUrl: string): Promise<RenderPrintPdfRe
       cache: 'no-store',
     })
   } catch (e) {
-    return { ok: false, status: 502, error: `No se pudo contactar el servicio PDF: ${(e as Error).message}` }
+    return { ok: false, status: 502, error: `No se pudo contactar el servicio PDF (${(e as Error).name})` }
   }
   if (!r.ok) {
-    const msg = await r.text().catch(() => '')
-    return { ok: false, status: 502, error: `Render falló (${r.status}): ${msg.slice(0, 300)}` }
+    // The status only: a renderer body is never relayed, because some print URLs carry a secret (verifier, PR 448).
+    return { ok: false, status: 502, error: `Render falló (${r.status})` }
   }
 
   return { ok: true, buffer: await r.arrayBuffer() }

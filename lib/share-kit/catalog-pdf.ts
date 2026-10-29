@@ -58,8 +58,10 @@ export async function serveCatalogPdf(slug: string, ip: string, deps: CatalogPdf
   const cached = await deps.cacheGet(key).catch(() => null)
   if (cached) return { status: 200, pdf: cached, cache: 'hit', filename }
 
-  if (!(await deps.rateLimit('catalog_pdf_shop', model.shop.slug))) return { status: 429, error: CATALOG_PDF_ERROR }
+  // The IP first: a client already over its own limit must not spend the shop's, or a stranger could use up a
+  // merchant's six renders an hour right after they edit their catalog (verifier, PR 448).
   if (!(await deps.rateLimit('catalog_pdf_ip', ip))) return { status: 429, error: CATALOG_PDF_ERROR }
+  if (!(await deps.rateLimit('catalog_pdf_shop', model.shop.slug))) return { status: 429, error: CATALOG_PDF_ERROR }
 
   const pdf = await deps.render(model.shop.slug).catch(() => null)
   if (!pdf) return { status: 503, error: CATALOG_PDF_ERROR }
