@@ -18,7 +18,7 @@ Seller «Descargar» / admin «Descargar PDF»
 - **Image:** `ghcr.io/danybgoode/miyagisanchez-print-pdf:<sha>`, built by `.github/workflows/image-arm64.yml` (job
   `print-pdf`) when this directory changes on `main`.
 - **Container:** root repo `infra/oci/docker-compose.yml` (service `print-pdf`). It sits on the `miyagi` network
-  only, with no published port, `mem_limit 768m` and `cpus 0.2`. `infra/oci/update.sh` pins it by digest like the
+  only, with no published port, `mem_limit 512m` and `cpus 0.2`. `infra/oci/update.sh` pins it by digest like the
   other two images; roll back with `PRINT_PDF_IMAGE_PIN=…:<sha>` in `infra/oci/.env`.
 - **Env, renderer side (`infra/oci/print.env`, 0600):** `PRINT_PDF_SECRET`; `PRINT_PDF_ASSET_ORIGINS` (the public R2
   origin, `R2_PUBLIC_URL`'s scheme and host, so print-edition ad photos and QR codes load).
@@ -27,7 +27,7 @@ Seller «Descargar» / admin «Descargar PDF»
 
 ## The rules it enforces (`guard.js`, tested by `node --test guard.test.js`, run in CI)
 - The secret is compared in constant time. An unset secret refuses every call.
-- The page URL must be on an allowed origin (403 otherwise, before Chromium starts). Every request the page makes,
+- The page URL must be on an allowed origin (403 otherwise, before Chromium starts), and Chromium loads that origin plus the path and query only, rebuilt from the allow-list. Every request the page makes,
   including each redirect hop, is checked too. Asset origins may serve images, fonts, stylesheets and media only.
 - One render at a time, up to 4 waiting. The next caller gets 503 `busy`. Each render has a 45 s budget.
 

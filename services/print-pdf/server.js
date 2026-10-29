@@ -15,6 +15,7 @@ const puppeteer = require('puppeteer-core')
 const {
   BusyError,
   createQueue,
+  allowedPageUrl,
   isAllowedSubrequest,
   isAllowedUrl,
   parseAllowedOrigins,
@@ -92,10 +93,12 @@ app.post('/pdf', async (req, res) => {
   if (!secretMatches(SECRET, req.get('x-internal-secret'))) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
-  const url = req.body && typeof req.body.url === 'string' ? req.body.url : null
-  if (!url) return res.status(400).json({ error: 'url required' })
-  // Refused before Chromium starts: a URL off the allow-list never costs a browser launch.
-  if (!isAllowedUrl(url, PAGE_ORIGINS)) return res.status(403).json({ error: 'url not allowed' })
+  const requested = req.body && typeof req.body.url === 'string' ? req.body.url : null
+  if (!requested) return res.status(400).json({ error: 'url required' })
+  // Refused before Chromium starts: a URL off the allow-list never costs a browser launch. What loads is the URL
+  // rebuilt from the allow-list entry, never the caller's string.
+  const url = allowedPageUrl(requested, PAGE_ORIGINS)
+  if (!url) return res.status(403).json({ error: 'url not allowed' })
 
   const started = Date.now()
   try {

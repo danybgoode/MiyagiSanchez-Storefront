@@ -1,9 +1,10 @@
 // node --test services/print-pdf — the renderer's allow-list, secret and queue (share-kit D14).
 // Observed red under a mutation: `isAllowedUrl` returning true for any https URL, `isAllowedSubrequest` admitting a
-// `script` from an asset origin, `secretMatches` accepting an empty expected secret, and the queue never refusing.
+// `script` from an asset origin, `allowedPageUrl` returning the caller's string unchanged, `secretMatches` accepting an empty expected secret, and the queue never refusing.
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const {
+  allowedPageUrl,
   createQueue,
   BusyError,
   isAllowedSubrequest,
@@ -36,6 +37,16 @@ test('only our own origin is a page the renderer will load', () => {
     assert.equal(isAllowedUrl(url, PAGES), false, url)
   }
   assert.equal(isAllowedUrl(`https://miyagisanchez.com/${'a'.repeat(5000)}`, PAGES), false)
+})
+
+test('the page loaded is rebuilt from the allow-list entry, keeping only the path and query', () => {
+  assert.equal(
+    allowedPageUrl('https://miyagisanchez.com/mx/s/x/catalogo/imprimir?v=2#frag', PAGES),
+    'https://miyagisanchez.com/mx/s/x/catalogo/imprimir?v=2',
+  )
+  for (const url of ['https://miyagisanchez.com@evil.example/', 'http://169.254.169.254/', 'not a url']) {
+    assert.equal(allowedPageUrl(url, PAGES), null, url)
+  }
 })
 
 test('an asset origin serves images and fonts, never a document, script or fetch', () => {

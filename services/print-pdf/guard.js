@@ -47,6 +47,18 @@ function isAllowedUrl(raw, allowedOrigins) {
   return allowedOrigins.includes(url.origin)
 }
 
+/**
+ * The URL the renderer actually navigates to: the matching allow-list entry (our own config) followed by the caller's
+ * path and query, or null. Rebuilding it, rather than passing the caller's string to `page.goto`, means no caller byte
+ * can ever pick the host — the check and the request can no longer disagree (CodeQL js/request-forgery, PR 448).
+ */
+function allowedPageUrl(raw, allowedOrigins) {
+  if (!isAllowedUrl(raw, allowedOrigins)) return null
+  const url = new URL(raw)
+  const origin = allowedOrigins.find((allowed) => allowed === url.origin)
+  return origin ? `${origin}${url.pathname}${url.search}` : null
+}
+
 /** Resource types a public ASSET origin may serve: passive content only, never a document, script or fetch. */
 const ASSET_RESOURCE_TYPES = new Set(['image', 'font', 'stylesheet', 'media'])
 
@@ -136,6 +148,7 @@ module.exports = {
   DEFAULT_ALLOWED_ORIGINS,
   parseAllowedOrigins,
   isAllowedUrl,
+  allowedPageUrl,
   isAllowedSubrequest,
   parseAssetOrigins,
   secretMatches,
