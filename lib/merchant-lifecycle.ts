@@ -424,3 +424,25 @@ export function deriveSaleFacts(
 
   return { firstSaleAt: new Date(firstSaleMs), retainedAt }
 }
+
+/**
+ * Which SHOP an emission row belongs to.
+ *
+ * `merchant_lifecycle_emissions.merchant_id` holds the merchant SUBJECT id: a shop mirror id on rows written before
+ * Sprint 3 (README D1), a `merchant_relationships.id` after. The sweep candidates and skips by SHOP id, so it maps
+ * each row back. Read as a shop id, every relationship id became a phantom candidate with no shop row: 29 of them,
+ * each counted as an error, so the cron answered 503 every day, and the claim map was keyed so that no real shop
+ * matched its own claims (found 2026-10-29).
+ *
+ * `relationshipShop` maps relationship id → its shop id, or null for a relationship with no shop yet (a scouted
+ * merchant), which has nothing for the shop sweep to do. An id that is not a relationship is a pre-Sprint-3 shop id
+ * and comes back unchanged.
+ */
+export function shopIdForEmissionSubject(
+  subjectId: string,
+  relationshipShop: ReadonlyMap<string, string | null>,
+): string | null {
+  if (!subjectId) return null
+  if (relationshipShop.has(subjectId)) return relationshipShop.get(subjectId) ?? null
+  return subjectId
+}

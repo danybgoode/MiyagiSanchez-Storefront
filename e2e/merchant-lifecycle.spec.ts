@@ -4,8 +4,7 @@ import {
   buildLifecycleTrackPayload,
   MERCHANT_LIFECYCLE_EVENTS,
   MAX_SUBJECT_ID_LENGTH,
-  isCapturedOrder,
-} from '../lib/merchant-lifecycle'
+  isCapturedOrder, shopIdForEmissionSubject } from '../lib/merchant-lifecycle'
 import {
   lifecycleFixtures,
   shapingFixtures,
@@ -378,5 +377,34 @@ test.describe('merchant lifecycle · isCapturedOrder (the first_sale gate)', () 
   test('a garbage order object is refused rather than throwing', () => {
     expect(isCapturedOrder({})).toBe(false)
     expect(isCapturedOrder({ status: null, payment_captured: null })).toBe(false)
+  })
+})
+
+test.describe('shopIdForEmissionSubject — emission subjects back to shops (2026-10-29)', () => {
+  // Real ids from the production incident: the sweep read 29 relationship ids as shop ids, found no shop row for
+  // any of them, and counted each as an error, so the cron answered 503 every day.
+  const REL = '0d6c9a52-7f3e-4b1a-9c55-2f1e8b7a4d10'
+  const SHOP = '9f8eb59b-5638-4e34-a037-c9ad57d7fcc3'
+  const SCOUTED_REL = '5b2f0c1e-8d4a-4e7f-b1c3-6a9d2e0f7c44'
+  const LEGACY_SHOP = '11d0bcd9-9689-4f8c-aa9c-b9055741e2d3'
+  const rels = new Map<string, string | null>([
+    [REL, SHOP],
+    [SCOUTED_REL, null],
+  ])
+
+  test('a relationship id maps to its shop', () => {
+    expect(shopIdForEmissionSubject(REL, rels)).toBe(SHOP)
+  })
+
+  test('a relationship with no shop yet has nothing for the shop sweep', () => {
+    expect(shopIdForEmissionSubject(SCOUTED_REL, rels)).toBeNull()
+  })
+
+  test('a pre-Sprint-3 row already holds a shop id and passes through unchanged', () => {
+    expect(shopIdForEmissionSubject(LEGACY_SHOP, rels)).toBe(LEGACY_SHOP)
+  })
+
+  test('an empty subject maps to nothing', () => {
+    expect(shopIdForEmissionSubject('', rels)).toBeNull()
   })
 })
