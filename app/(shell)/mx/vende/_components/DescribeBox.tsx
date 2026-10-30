@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { MAX_DESCRIPTION_CHARS } from '@/lib/prompt-to-shop/constants'
-import { characterCounter, DESCRIBE_COPY } from '@/lib/prompt-to-shop/copy'
+import { characterCounter, DESCRIBE_COPY, OWNER_COPY } from '@/lib/prompt-to-shop/copy'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 import { nextTypewriterStep, TYPEWRITER_START, typewriterText, type TypewriterStep } from '@/lib/prompt-to-shop/typewriter'
 import TurnstileWidget from '@/app/(shell)/p2s/_components/TurnstileWidget'
@@ -36,7 +36,11 @@ function useRotatingPlaceholder(lines: readonly string[], active: boolean): stri
       timer = setTimeout(tick, next.delay)
     }
     timer = setTimeout(tick, 600)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      // Forget where the last run stopped: a cleared box starts from the static placeholder, not a half-typed line.
+      setStep(null)
+    }
   }, [lines, active])
   return active && step ? typewriterText(lines, step) : null
 }
@@ -132,13 +136,16 @@ export default function DescribeBox({
             </button>
           ))}
         </div>
+        {/* Inside the examples block, not its own grid row: the check is invisible unless Cloudflare needs a tap, and
+            an empty row would still take a gap. */}
+        {siteKey ? <TurnstileWidget siteKey={siteKey} onToken={setToken} /> : null}
       </div>
 
-      {siteKey ? (
-        <TurnstileWidget siteKey={siteKey} onToken={setToken} />
-      ) : (
-        <Banner variant="warning">{DESCRIBE_COPY.unverifiable}</Banner>
-      )}
+      {siteKey ? null : <Banner variant="warning">{DESCRIBE_COPY.unverifiable}</Banner>}
+      {/* The check is invisible, so a disabled button needs a reason on screen (same line as the owner canvas). */}
+      {siteKey && !token && trimmed.length > 0 ? (
+        <p className="t-small" data-testid="p2s-verifying" style={{ margin: 0, color: 'var(--fg-muted)' }}>{OWNER_COPY.verifyNeeded}</p>
+      ) : null}
 
       <Button type="submit" variant="primary" size="lg" disabled={!ready} data-testid="p2s-describe-submit">
         {DESCRIBE_COPY.submit}

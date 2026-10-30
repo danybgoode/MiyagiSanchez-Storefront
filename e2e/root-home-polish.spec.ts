@@ -48,6 +48,14 @@ test('the box animates its placeholder only while empty, and respects reduced mo
   expect(box).toContain('useRotatingPlaceholder(DESCRIBE_COPY.rotatingExamples, text.length === 0')
   expect(box).toContain('placeholder={rotating ?? DESCRIBE_COPY.placeholder}')
   expect(box).toContain('prefers-reduced-motion: reduce')
+  // A cleared box restarts from the static placeholder, not the line the last run stopped on (fresh review, PR 457).
+  expect(box).toMatch(/clearTimeout\(timer\)\s*\n[^\n]*\n\s*setStep\(null\)/)
+})
+
+test('with the check invisible, a disabled button says why: «verificando» shows while there is text but no token', () => {
+  const box = read('app/(shell)/mx/vende/_components/DescribeBox.tsx')
+  expect(box).toContain('{siteKey && !token && trimmed.length > 0 ? (')
+  expect(box).toContain('OWNER_COPY.verifyNeeded')
 })
 
 test('the domain proof point no longer promises a free link', () => {

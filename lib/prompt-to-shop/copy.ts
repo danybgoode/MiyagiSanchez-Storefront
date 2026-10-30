@@ -19,7 +19,7 @@ export const DESCRIBE_COPY = {
   rotatingExamples: [
     'Hago pasteles personalizados para fiestas en Monterrey, con entrega a domicilio',
     'Vendo joyería de plata hecha a mano en Taxco y la envío a todo México',
-    'Tengo una tienda de tenis originales y ropa deportiva en Guadalajara',
+    'Tengo una tienda de tenis y ropa deportiva en Guadalajara',
     'Vendo café de especialidad de Chiapas, en grano o molido, por kilo',
     'Hago muebles de madera de parota a la medida en Mérida',
     'Vendo maquillaje y skincare coreano en la Ciudad de México, con envíos el mismo día',
@@ -34,7 +34,7 @@ export const DESCRIBE_COPY = {
     { label: 'Ropa', text: 'Vendo ropa de segunda mano en buen estado, tallas S a XL, en la Ciudad de México' },
     { label: 'Joyería', text: 'Hago aretes y collares de plata y chaquira hechos a mano, y los envío a todo México' },
     { label: 'Pasteles', text: 'Hago pasteles y galletas decoradas por pedido para cumpleaños y bodas en Monterrey' },
-    { label: 'Belleza', text: 'Vendo cosméticos, skincare y perfumes originales en la Ciudad de México, con envío a domicilio' },
+    { label: 'Belleza', text: 'Vendo cosméticos, skincare y perfumes en la Ciudad de México, con envío a domicilio' },
     { label: 'Artesanías', text: 'Vendo artesanías de Oaxaca: barro negro, textiles bordados y alebrijes pintados a mano' },
     { label: 'Muebles', text: 'Fabrico muebles de madera maciza a la medida para sala y comedor en Guadalajara' },
     { label: 'Mascotas', text: 'Vendo camas, correas y premios naturales para perros y gatos, con envío en Querétaro' },
