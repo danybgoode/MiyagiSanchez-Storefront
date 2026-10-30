@@ -39,7 +39,7 @@ import type { SellerLocale } from './seller-locale'
  */
 const NAV_LABELS = {
   es: {
-    operar: 'Operar', resumen: 'Resumen', pedidos: 'Pedidos', ofertas: 'Ofertas', venderEnPersona: 'Vender en persona',
+    operar: 'Operar', resumen: 'Resumen', pedidos: 'Pedidos', ofertas: 'Ofertas', venderEnPersona: 'Vender en persona', cobrarConLink: 'Cobrar con un link',
     catalogo: 'Catálogo', anuncios: 'Anuncios', colecciones: 'Colecciones',
     canales: 'Canales', mercadoLibre: 'Mercado Libre', importar: 'Importar catálogo',
     crecer: 'Crecer', cupones: 'Cupones', suscripciones: 'Suscripciones',
@@ -48,7 +48,7 @@ const NAV_LABELS = {
     miTienda: 'Mi tienda',
   },
   en: {
-    operar: 'Operate', resumen: 'Overview', pedidos: 'Orders', ofertas: 'Offers', venderEnPersona: 'Sell in person',
+    operar: 'Operate', resumen: 'Overview', pedidos: 'Orders', ofertas: 'Offers', venderEnPersona: 'Sell in person', cobrarConLink: 'Charge with a link',
     catalogo: 'Catalog', anuncios: 'Listings', colecciones: 'Collections',
     canales: 'Channels', mercadoLibre: 'Mercado Libre', importar: 'Import catalog',
     crecer: 'Grow', cupones: 'Coupons', suscripciones: 'Subscriptions',
@@ -143,6 +143,7 @@ export const SELLER_NAV: SellerNavGroup[] = [
       // In-person sales S1.3: the counter. Appended LAST so the indices the mobile bar and
       // the "Más" sheet slice by (Resumen 0, Pedidos 1, Ofertas 2) do not move.
       { key: 'vender', label: 'Vender en persona', href: '/shop/manage/en-persona', icon: 'iconoir-smartphone-device' },
+      { key: 'cobros', label: 'Cobrar con un link', href: '/shop/manage/cobros', icon: 'iconoir-link' },
     ],
   },
   {

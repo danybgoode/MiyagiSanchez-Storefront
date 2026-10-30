@@ -171,6 +171,15 @@ export async function GET(req: NextRequest) {
           mcp_tools: ['get_store_configuration', 'patch_store_configuration'],
         },
 
+        seller_payment_links: {
+          method: 'POST',
+          url: `${base}/api/ucp/mcp`,
+          description: "A seller's own agent can charge anyone with a payment link — for products from its catalog or for any amount ($10 to $50,000 MXN) — and list or cancel those links, via the MCP tools create_payment_link, list_payment_links and cancel_payment_link. Mexico shops only. Each link comes back with its full URL and a short mschz.org URL.",
+          auth: 'authorization_bearer_shop_token',
+          note: "Per-shop token (Authorization: Bearer ms_agent_…) generated in the shop's “Agentes e integraciones” settings; scoped to one shop.",
+          mcp_tools: ['create_payment_link', 'list_payment_links', 'cancel_payment_link'],
+        },
+
         seller_orders: {
           method: 'POST',
           url: `${base}/api/ucp/mcp`,

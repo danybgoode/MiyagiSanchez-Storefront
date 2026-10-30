@@ -52,7 +52,7 @@ test.describe('shortlink · targets', () => {
  */
 test.describe('shortlink · known-prefix passthrough', () => {
   test('allowlist contains exactly g, e, v, s, l', () => {
-    expect([...PASSTHROUGH_PREFIXES].sort()).toEqual(['e', 'g', 'l', 's', 'v'])
+    expect([...PASSTHROUGH_PREFIXES].sort()).toEqual(['e', 'g', 'l', 'pagar', 's', 'v'])
   })
 
   test('marketplace prefixes canonicalize to MX; out-of-scope prefixes keep the identical path', () => {
