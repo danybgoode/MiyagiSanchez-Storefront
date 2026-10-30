@@ -3,14 +3,17 @@ import path from 'node:path'
 import { test, expect } from '@playwright/test'
 import {
   buildLinkBody, extraPayments, isLinkCancellable, isLinkToken, linkShortUrl, linkStateLabel, linkTitle, linkUrl, linkWhatsAppUrl,
-  payChoices, payFailureKind, linkBadge, cancelOutcome, payScreen, payStartBody, shouldRebuildCart,
+  payChoices, payFailureKind, payPrecheck, linkBadge, cancelOutcome, payScreen, payStartBody, shouldRebuildCart,
 } from '../lib/in-person/payment-link'
+import { ATTEMPT_TTL_MS, attemptKey, parseAttempt, resumeDecision, usableAttempt } from '../lib/in-person/pay-attempt'
+import { shouldLoadAnalytics } from '../lib/analytics-gating'
+import { PARTNER_READ_TOOLS } from '../lib/partner-tools'
 import { runPayFlow, type PayFlowDeps } from '../lib/in-person/payment-link-flow'
 import { filterLinksByState, formatLinkForAgent, mapCancelLinkArgs, mapCreateLinkArgs, pesosToCents } from '../lib/in-person/payment-link-mcp'
 
 /** In-person sales · Sprint 4 — payment links: form, pay page, flow, agent tools. */
 
-const TOKEN = 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6'
+const TOKEN = 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v'
 const form = { mode: 'products' as const, lines: [{ variant_id: 'v1', quantity: 2 }], uses: 'single' as const, days: 7, concept: '', amountText: '' }
 
 test.describe('link form to request body', () => {
@@ -45,7 +48,8 @@ test.describe('link views and urls', () => {
   test('urls are built only from a real token', () => {
     expect(linkUrl(TOKEN)).toBe(`https://miyagisanchez.com/pagar/${TOKEN}`)
     expect(linkShortUrl(TOKEN)).toBe(`https://mschz.org/pagar/${TOKEN}`)
-    for (const bad of ['', 'short', '../etc', 'a b'.repeat(8), 'x'.repeat(200)]) {
+    expect(TOKEN).toHaveLength(43)
+    for (const bad of ['', 'short', '../etc', 'a b'.repeat(8), 'x'.repeat(200), 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6', TOKEN + 'x']) {
       expect(isLinkToken(bad)).toBe(false)
       expect(linkUrl(bad)).toBeNull()
       expect(linkShortUrl(bad)).toBeNull()
@@ -73,8 +77,8 @@ test.describe('pay page state to screen', () => {
     for (const state of [undefined, null, '', 'weird']) expect(payScreen({ httpStatus: 200, state }).screen, String(state)).toBe('unavailable')
   })
   test('paid, expired, cancelled and missing say the agreed words', () => {
-    expect(payScreen({ httpStatus: 200, state: 'paid' })).toEqual({ screen: 'paid', message: 'Este cobro ya se pagó.' })
-    expect(payScreen({ httpStatus: 200, state: 'expired' })).toEqual({ screen: 'expired', message: 'Este link ya venció. Pídele uno nuevo a la tienda.' })
+    expect(payScreen({ httpStatus: 200, state: 'paid' })).toEqual({ screen: 'paid', message: 'Este cobro ya se pagó.', code: 'LINK_PAID' })
+    expect(payScreen({ httpStatus: 200, state: 'expired' })).toEqual({ screen: 'expired', message: 'Este link ya venció. Pídele uno nuevo a la tienda.', code: 'LINK_EXPIRED' })
     expect(payScreen({ httpStatus: 200, state: 'cancelled' }).screen).toBe('cancelled')
     expect(payScreen({ httpStatus: 409, code: 'LINK_PAID' }).screen).toBe('paid')
     expect(payScreen({ httpStatus: 410, code: 'LINK_EXPIRED' }).screen).toBe('expired')
@@ -121,6 +125,78 @@ test.describe('link busy, closed and pending-confirmation', () => {
     expect(cancelOutcome({ ok: false, code: 'LINK_PAID', message: 'x' })).toEqual({ kind: 'paid', message: 'Este cobro ya se pagó' })
     expect(cancelOutcome({ ok: false, message: 'Falló' })).toEqual({ kind: 'error', message: 'Falló' })
     expect(cancelOutcome({ ok: false }).kind).toBe('error')
+  })
+})
+
+test.describe('the pay route\'s pre-check drives the buttons', () => {
+  test('every closed outcome the route returns is a code payFailureKind closes on', () => {
+    const cases = [
+      { httpStatus: 200, state: 'paid' }, { httpStatus: 200, state: 'expired' }, { httpStatus: 200, state: 'cancelled' },
+      { httpStatus: 409, code: 'LINK_PAID' }, { httpStatus: 410, code: 'LINK_EXPIRED' }, { httpStatus: 410, code: 'LINK_CANCELLED' },
+      { httpStatus: 409, code: 'LINK_AWAITING_CONFIRMATION', message: 'Este cobro está esperando que la tienda confirme un pago.' },
+    ]
+    for (const c of cases) {
+      const r = payPrecheck(c)!
+      expect(r, JSON.stringify(c)).not.toBeNull()
+      expect(r.code).toMatch(/^LINK_/)
+      expect(payFailureKind(r.code), JSON.stringify(c)).toBe('closed')
+    }
+    expect(payPrecheck({ httpStatus: 200, state: 'pending' })).toBeNull()
+    expect(payPrecheck({ httpStatus: 409, code: 'LINK_AWAITING_CONFIRMATION', message: 'Hola' })!.message).toBe('Hola')
+    expect(payPrecheck({ httpStatus: 502 })).toMatchObject({ status: 502, code: 'LINK_UNAVAILABLE' })
+    expect(payFailureKind(payPrecheck({ httpStatus: 502 })!.code)).toBe('retry')
+  })
+  test('the route uses the shared pre-check, not its own code mapping', () => {
+    const src = readFileSync(path.resolve(import.meta.dirname, '../app/api/pagar/[token]/pay/route.ts'), 'utf8')
+    expect(src).toContain('payPrecheck(')
+    expect(src).not.toContain('toUpperCase()')
+  })
+})
+
+test.describe('resuming a payment attempt', () => {
+  const now = 1_800_000_000_000
+  const redirect = { at: now - 60_000, redirect_url: 'https://pay.example/x' }
+  const manualA = { at: now - 60_000, manual: { spei: { clabe: '012345678901234567', bank_name: null, account_holder: null }, dimo: null } }
+  test('a fresh redirect or manual attempt is offered back; stale, empty or non-https is not', () => {
+    expect(usableAttempt(redirect, now)).toBe(redirect)
+    expect(usableAttempt(manualA, now)).toBe(manualA)
+    expect(usableAttempt({ ...redirect, at: now - ATTEMPT_TTL_MS - 1 }, now)).toBeNull()
+    expect(usableAttempt({ ...redirect, at: now + 5000 }, now)).toBeNull()
+    expect(usableAttempt({ at: now }, now)).toBeNull()
+    expect(usableAttempt({ at: now, redirect_url: 'javascript:alert(1)' }, now)).toBeNull()
+    expect(usableAttempt({ at: now, manual: { spei: null, dimo: null } }, now)).toBeNull()
+    expect(usableAttempt(null, now)).toBeNull()
+  })
+  test('parse is tolerant; the key is per token', () => {
+    expect(parseAttempt(JSON.stringify(redirect), now)).toEqual(redirect)
+    for (const bad of [null, '', '{nope', 'null', '[]']) expect(parseAttempt(bad, now)).toBeNull()
+    expect(attemptKey('a')).not.toBe(attemptKey('b'))
+  })
+  test('decision: continue when there is an attempt (even if busy); busy_retry only without one; else start', () => {
+    expect(resumeDecision({ attempt: redirect, now })).toBe('continue')
+    expect(resumeDecision({ attempt: manualA, now, failure: 'busy' })).toBe('continue')
+    expect(resumeDecision({ attempt: null, now, failure: 'busy' })).toBe('busy_retry')
+    expect(resumeDecision({ attempt: { ...redirect, at: now - ATTEMPT_TTL_MS - 1 }, now, failure: 'busy' })).toBe('busy_retry')
+    expect(resumeDecision({ attempt: null, now })).toBe('start')
+  })
+})
+
+test.describe('privacy and tooling nits', () => {
+  test('analytics never loads on the pay page, still loads elsewhere', () => {
+    expect(shouldLoadAnalytics({ hostname: 'miyagisanchez.com', pathname: `/pagar/${TOKEN}` })).toBe(false)
+    expect(shouldLoadAnalytics({ hostname: 'miyagisanchez.com', pathname: '/pagar' })).toBe(false)
+    expect(shouldLoadAnalytics({ hostname: 'miyagisanchez.com', pathname: '/pagarx' })).toBe(true)
+    expect(shouldLoadAnalytics({ hostname: 'miyagisanchez.com', pathname: '/shop/manage/cobros' })).toBe(true)
+  })
+  test('list_payment_links is a read tool for viewers; create and cancel are not', () => {
+    expect(PARTNER_READ_TOOLS.has('list_payment_links')).toBe(true)
+    expect(PARTNER_READ_TOOLS.has('create_payment_link')).toBe(false)
+    expect(PARTNER_READ_TOOLS.has('cancel_payment_link')).toBe(false)
+  })
+  test('the internal call never hands a raw error to the agent', () => {
+    const src = readFileSync(path.resolve(import.meta.dirname, '../lib/in-person/payment-link-backend.ts'), 'utf8')
+    expect(src).not.toContain('String(e) }')
+    expect(src).toContain('console.error(')
   })
 })
 

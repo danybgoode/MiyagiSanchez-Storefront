@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, getClientIp } from '@/lib/ratelimit'
-import { isLinkToken, payChoices, payScreen } from '@/lib/in-person/payment-link'
+import { isLinkToken, payChoices, payPrecheck } from '@/lib/in-person/payment-link'
 import { runPayFlow } from '@/lib/in-person/payment-link-flow'
 import { pickTransferSubType } from '@/lib/in-person/counter-checkout'
 import { readCheckoutMethods } from '@/lib/in-person/counter-backend'
@@ -27,10 +27,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
   const link = await getPublicLink(token)
   const pl = link.body.payment_link as { state?: string; shop?: { slug?: string } } | undefined
-  const screen = payScreen({ httpStatus: link.status, state: pl?.state, code: link.body.code })
-  if (screen.screen !== 'ready') {
-    return NextResponse.json({ code: screen.screen.toUpperCase(), message: screen.message }, { status: screen.screen === 'unavailable' ? 502 : 409, headers: NO_STORE })
-  }
+  const blocked = payPrecheck({ httpStatus: link.status, state: pl?.state, code: link.body.code, message: link.body.message })
+  if (blocked) return NextResponse.json({ code: blocked.code, message: blocked.message }, { status: blocked.status, headers: NO_STORE })
   const slug = pl?.shop?.slug
   if (!slug) return NextResponse.json({ code: 'LINK_UNAVAILABLE', message: 'No pudimos abrir este cobro.' }, { status: 502, headers: NO_STORE })
 

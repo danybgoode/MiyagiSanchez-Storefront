@@ -49,7 +49,8 @@ export function buildLinkBody(form: LinkForm): LinkBodyResult {
   return { ok: true, body: { kind: 'amount', concept, amount_cents: cents, uses: 'single', expires_in_days: form.days } }
 }
 
-const TOKEN = /^[A-Za-z0-9_-]{16,128}$/
+// The backend mints 32 random bytes as base64url: exactly 43 characters.
+const TOKEN = /^[A-Za-z0-9_-]{43}$/
 
 export function isLinkToken(value: unknown): value is string {
   return typeof value === 'string' && TOKEN.test(value)
@@ -136,12 +137,13 @@ export function extraPayments(link: Pick<LinkView, 'uses' | 'paid_order_ids'>): 
 
 export type PayScreen =
   | { screen: 'ready' }
-  | { screen: 'paid' | 'expired' | 'cancelled' | 'not_found' | 'unavailable'; message: string }
+  | { screen: 'paid' | 'expired' | 'cancelled' | 'awaiting' | 'not_found' | 'unavailable'; message: string; code: string }
 
 const PAY_MESSAGES = {
   paid: 'Este cobro ya se pagó.',
   expired: 'Este link ya venció. Pídele uno nuevo a la tienda.',
   cancelled: 'La tienda canceló este cobro. Pídele uno nuevo.',
+  awaiting: 'Este cobro está esperando que la tienda confirme un pago.',
   not_found: 'No encontramos este cobro. Revisa el link con la tienda.',
   unavailable: 'No pudimos abrir este cobro. Inténtalo de nuevo en un momento.',
 } as const
@@ -150,19 +152,32 @@ const PAY_MESSAGES = {
  * The page's state from the backend. Only an explicit `pending` link (or a multi-use one still
  * open) is payable; an unknown or missing state is NEVER treated as payable.
  */
-export function payScreen(input: { httpStatus: number; state?: string | null; code?: string | null }): PayScreen {
+export function payScreen(input: { httpStatus: number; state?: string | null; code?: string | null; message?: string | null }): PayScreen {
   const { httpStatus, state, code } = input
-  if (code === 'LINK_PAID') return { screen: 'paid', message: PAY_MESSAGES.paid }
-  if (code === 'LINK_EXPIRED') return { screen: 'expired', message: PAY_MESSAGES.expired }
-  if (code === 'LINK_CANCELLED') return { screen: 'cancelled', message: PAY_MESSAGES.cancelled }
-  if (httpStatus === 404 || code === 'LINK_NOT_FOUND') return { screen: 'not_found', message: PAY_MESSAGES.not_found }
+  // The `code` on a closed screen is the LINK_* code the pay buttons' failure mapper understands.
+  if (code === 'LINK_PAID') return { screen: 'paid', message: PAY_MESSAGES.paid, code: 'LINK_PAID' }
+  if (code === 'LINK_EXPIRED') return { screen: 'expired', message: PAY_MESSAGES.expired, code: 'LINK_EXPIRED' }
+  if (code === 'LINK_CANCELLED') return { screen: 'cancelled', message: PAY_MESSAGES.cancelled, code: 'LINK_CANCELLED' }
+  if (code === 'LINK_AWAITING_CONFIRMATION') return { screen: 'awaiting', message: input.message || PAY_MESSAGES.awaiting, code: 'LINK_AWAITING_CONFIRMATION' }
+  if (httpStatus === 404 || code === 'LINK_NOT_FOUND') return { screen: 'not_found', message: PAY_MESSAGES.not_found, code: 'LINK_NOT_FOUND' }
   if (httpStatus >= 200 && httpStatus < 300) {
     if (state === 'pending') return { screen: 'ready' }
-    if (state === 'paid') return { screen: 'paid', message: PAY_MESSAGES.paid }
-    if (state === 'expired') return { screen: 'expired', message: PAY_MESSAGES.expired }
-    if (state === 'cancelled') return { screen: 'cancelled', message: PAY_MESSAGES.cancelled }
+    if (state === 'paid') return { screen: 'paid', message: PAY_MESSAGES.paid, code: 'LINK_PAID' }
+    if (state === 'expired') return { screen: 'expired', message: PAY_MESSAGES.expired, code: 'LINK_EXPIRED' }
+    if (state === 'cancelled') return { screen: 'cancelled', message: PAY_MESSAGES.cancelled, code: 'LINK_CANCELLED' }
   }
-  return { screen: 'unavailable', message: PAY_MESSAGES.unavailable }
+  return { screen: 'unavailable', message: PAY_MESSAGES.unavailable, code: 'LINK_UNAVAILABLE' }
+}
+
+/**
+ * The pay route's pre-check: the response it sends when the link is not payable, or null when it
+ * is. One function so the page and the route agree, and so a test can drive the route's actual
+ * output through `payFailureKind`.
+ */
+export function payPrecheck(input: { httpStatus: number; state?: string | null; code?: string | null; message?: string | null }): { status: number; code: string; message: string } | null {
+  const screen = payScreen(input)
+  if (screen.screen === 'ready') return null
+  return { status: screen.screen === 'unavailable' ? 502 : screen.screen === 'not_found' ? 404 : 409, code: screen.code, message: screen.message }
 }
 
 /** Which payment choices the page offers, from the shop's checkout-options (online first). */

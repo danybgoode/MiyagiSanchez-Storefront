@@ -38,12 +38,12 @@ export default async function PagarPage({ params }: { params: Promise<{ token: s
 
   const { status, body } = await getPublicLink(token)
   const link = body.payment_link as PublicLink | undefined
-  const screen = payScreen({ httpStatus: status, state: link?.state, code: body.code })
+  const screen = payScreen({ httpStatus: status, state: link?.state, code: body.code, message: body.message })
 
-  if (screen.screen !== 'ready' || !link) {
+  if (screen.screen !== 'ready' || !link || !link.shop) {
     return (
       <main className="max-w-md mx-auto px-4 py-16 text-center">
-        {link?.shop && <p className="text-sm text-[var(--color-muted)] mb-2">{link.shop.name}</p>}
+        {link?.shop?.name && <p className="text-sm text-[var(--color-muted)] mb-2">{link.shop.name}</p>}
         <h1 className="text-xl font-bold">{screen.screen === 'ready' ? 'No pudimos abrir este cobro.' : screen.message}</h1>
       </main>
     )
@@ -81,7 +81,7 @@ export default async function PagarPage({ params }: { params: Promise<{ token: s
         </div>
       </div>
 
-      <PayClient token={token} choices={choices} />
+      <PayClient token={token} choices={choices} totalCents={link.total_cents} currency={link.currency} />
     </main>
   )
 }

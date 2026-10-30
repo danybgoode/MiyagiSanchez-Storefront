@@ -52,6 +52,8 @@ test.describe('shortlink · targets', () => {
  */
 test.describe('shortlink · known-prefix passthrough', () => {
   test('allowlist contains exactly g, e, v, s, l', () => {
+    const payToken = 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v'
+    expect(passthroughTarget(`/pagar/${payToken}`, '')).toBe(`${PLATFORM_ORIGIN}/pagar/${payToken}`)
     expect([...PASSTHROUGH_PREFIXES].sort()).toEqual(['e', 'g', 'l', 'pagar', 's', 'v'])
   })
 

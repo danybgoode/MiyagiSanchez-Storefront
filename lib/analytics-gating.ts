@@ -43,6 +43,10 @@ export function shouldLoadAnalytics({
   // platform host. Middleware tags it `x-miyagi-embed`; client-side we read the path.
   if (path === '/embed' || path.startsWith('/embed/')) return false
 
+  // A payment link's pay page: the URL carries a bearer token and the page shows a CLABE. Neither
+  // may reach GA4 or Clarity (in-person-sales S4.2).
+  if (path === '/pagar' || path.startsWith('/pagar/')) return false
+
   // A `<slug>.miyagisanchez.com` shop subdomain is white-label — skip. (Returns null
   // for the apex, www, reserved/infra labels, previews, custom domains.)
   if (shopSlugFromHost(host)) return false

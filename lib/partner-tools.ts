@@ -15,6 +15,7 @@ export const PARTNER_READ_TOOLS = new Set<string>([
   'get_share_kit', // share-kit S3.3 — public links + feed counts, no mutation; viewer-safe
   'list_my_collections',
   'list_orders',
+  'list_payment_links', // in-person-sales S4.4 — read-only; create/cancel stay writes
   'list_manuscript_submissions',
   'list_launchpad_campaigns',
   'get_domain_entitlement',

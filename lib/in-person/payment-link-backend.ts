@@ -96,6 +96,8 @@ export async function internalLinkCall(
     })
     return { ok: res.ok, status: res.status, body: await readJson(res) }
   } catch (e) {
-    return { ok: false, status: 502, body: { message: String(e) } }
+    // Log the cause for us; the agent gets a fixed sentence (a raw error can carry internal hosts).
+    console.error('[payment-links] internal call failed:', path, e instanceof Error ? e.message : String(e))
+    return { ok: false, status: 502, body: { message: 'No pudimos contactar a la tienda. Inténtalo de nuevo.' } }
   }
 }
