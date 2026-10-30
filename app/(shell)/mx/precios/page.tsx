@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { sellerLandingPath } from '@/lib/seller-acquisition'
 import es from '@/locales/es.json'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { getPricingCatalog } from '@/lib/pricing-catalog-server'
@@ -119,7 +120,7 @@ export default async function PreciosPage() {
         <p className="t-small" style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: 'var(--s-2)' }}>{ui.eyebrow}</p>
         <h1 className="t-h1" style={{ letterSpacing: 0, marginBottom: 'var(--s-3)' }}>{ui.heroTitle}</h1>
         <p className="t-lead" style={{ marginBottom: 'var(--s-5)' }}>{ui.heroLead}</p>
-        <PreciosTrackedLink href="/mx/vende" event="precios_signup_clicked" className="btn btn-primary btn-lg" testId="precios-primary-cta">
+        <PreciosTrackedLink href={sellerLandingPath('mx')} event="precios_signup_clicked" className="btn btn-primary btn-lg" testId="precios-primary-cta">
           {ui.primaryCta}
           <i className="iconoir-arrow-right" aria-hidden="true" />
         </PreciosTrackedLink>
@@ -194,7 +195,7 @@ export default async function PreciosPage() {
       </section>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-3)' }}>
-        <PreciosTrackedLink href="/mx/vende" event="precios_signup_clicked" className="btn btn-primary btn-lg" testId="precios-closing-cta">
+        <PreciosTrackedLink href={sellerLandingPath('mx')} event="precios_signup_clicked" className="btn btn-primary btn-lg" testId="precios-closing-cta">
           {ui.primaryCta}
           <i className="iconoir-arrow-right" aria-hidden="true" />
         </PreciosTrackedLink>

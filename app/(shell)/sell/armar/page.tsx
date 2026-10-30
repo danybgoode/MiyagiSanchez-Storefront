@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { sellerLandingPath } from '@/lib/seller-acquisition'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import ClaimRunner from '@/app/(shell)/p2s/_components/ClaimRunner'
@@ -48,7 +49,7 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
   const draftId = raw && UUID.test(raw) ? raw.toLowerCase() : null
 
   const { userId } = await auth()
-  if (!userId) redirect(draftId ? `/p2s/${draftId}` : '/mx/vende')
+  if (!userId) redirect(draftId ? `/p2s/${draftId}` : sellerLandingPath('mx'))
 
   // A `draft` that is not a draft id at all is a link that leads nowhere: say so the same way as any other.
   if (raw && !draftId) return <ClaimRunner draftId={null} initial={{ kind: 'other_phone' }} />

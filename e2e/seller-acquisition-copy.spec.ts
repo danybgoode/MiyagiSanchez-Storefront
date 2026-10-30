@@ -58,7 +58,8 @@ test.describe('seller acquisition · es-MX copy guards', () => {
 
   test('sellerTrustPrompt substitutes the page URL and keeps the comparison instruction', () => {
     const anchor = sellerTrustPrompt('vende', sa.shared.trustPrompt)
-    expect(anchor).toContain('https://miyagisanchez.com/mx/vende')
+    expect(anchor).toContain('https://miyagisanchez.com/')
+    expect(anchor).not.toContain('/mx/vende')
     expect(anchor).not.toContain('{url}')
     expect(anchor).toContain('Mercado Libre')
     expect(anchor).toContain('Shopify')

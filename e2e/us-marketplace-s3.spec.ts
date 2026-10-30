@@ -10,7 +10,8 @@ test.describe('US marketplace Sprint 3 contract', () => {
   test('the literal US landing is a thin adapter over the shared marketplace home', () => {
     const us = source('app/(us-site)/us/page.tsx')
     const shared = source('app/(mx-site)/mx/page.tsx')
-    const selector = source('app/(site)/page.tsx')
+    // `/en` is the one document that renders the selector since root-shop-builder-home.
+    const selector = source('app/(en-site)/en/page.tsx')
 
     expect(us).toContain("import { MarketHomePage } from '@/app/(mx-site)/mx/page'")
     expect(us).toContain("MarketHomePage({ market: 'us' })")
@@ -37,7 +38,7 @@ test.describe('US marketplace Sprint 3 contract', () => {
     }
     // And the selector still renders that copy rather than having quietly kept a literal.
     expect(source('app/(site)/MarketSelector.tsx')).toContain('page.marketCardUsLede')
-    expect(selector).toContain('<MarketSelector language="es" />')
+    expect(selector).toContain('<MarketSelector language="en" />')
   })
 
   test('US has its own en-US shell and browse adapter while partner recruiting remains intact', () => {

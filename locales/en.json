@@ -1645,6 +1645,12 @@
             "Basic plan ≈$19–39 USD/mo + VAT — whether or not you sell."
           ]
         }
+      },
+      "marketLinks": {
+        "label": "Also on Miyagi Sánchez:",
+        "mx": "Mexico marketplace",
+        "us": "United States",
+        "en": "English"
       }
     },
     "creadores": {

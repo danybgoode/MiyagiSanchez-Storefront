@@ -14,6 +14,7 @@
  */
 
 import { PLATFORM_ORIGIN, listingTarget, shopTarget } from './shortlink'
+import { SELLER_LANDING_PATHS } from './seller-acquisition'
 
 /**
  * What the shopper is looking at. The `kind` + URL fields are derived from the path
@@ -139,8 +140,15 @@ export function resolveAgentContext(
   if (seg[0] === 'promotor') return { kind: 'promoter' }
   if (seg[0] === 'vende' && seg[1] === 'promotor') return { kind: 'promoter' }
 
-  // Seller acquisition: /mx/vende* (anchor + persona pages) · /sell* (the portal).
+  // Seller acquisition: /mx/vende* (persona pages) · /sell* (the portal).
   if (seg[0] === 'vende' || seg[0] === 'sell') return { kind: 'seller' }
+
+  // The bare root `/` — the Mexico shop builder since root-shop-builder-home. Matched on
+  // the exact pathname, not on an empty segment list: `/mx` also strips to an empty `seg`
+  // (that is the marketplace, which keeps the buyer prompt), and a missing pathname is
+  // UNKNOWN, which must stay generic rather than be read as the pitch. Without this the
+  // page's own "ask your AI" button would hand a merchant on the pitch the buyer prompt.
+  if (pathname === '/') return { kind: 'seller' }
 
   // `/us/sell` — the US seller landing. It is matched on the RAW segments because
   // `/us` is deliberately not stripped above (the US has no catalog namespace, and
@@ -235,7 +243,7 @@ Usa el API del marketplace (UCP/MCP) para revisar el estado de un pedido, el env
     }
 
     case 'seller':
-      return `Estoy pensando en vender en Miyagi Sánchez. Abre ${PLATFORM_ORIGIN}/mx/vende, dime qué es, cuánto pagaría vs. Mercado Libre y Shopify, qué puedo vender y cómo abro mi tienda.`
+      return `Estoy pensando en vender en Miyagi Sánchez. Abre ${PLATFORM_ORIGIN}${SELLER_LANDING_PATHS.mx}, dime qué es, cuánto pagaría vs. Mercado Libre y Shopify, qué puedo vender y cómo abro mi tienda.`
 
     case 'promoter':
       return `Quiero ser promotor de Miyagi Sánchez y ganar comisión abriendo tiendas para negocios en persona. Abre ${PLATFORM_ORIGIN}/mx/vende/promotor, dime cómo funciona, cuánto puedo ganar y cómo empiezo.`

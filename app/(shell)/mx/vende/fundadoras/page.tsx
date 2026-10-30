@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import es from '@/locales/es.json'
 import Link from 'next/link'
+import { sellerLandingPath } from '@/lib/seller-acquisition'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { isEnabled } from '@/lib/flags'
 import { decideFundadorasGateState } from '@/lib/fundadoras-application'
@@ -111,7 +112,7 @@ export default async function FundadorasPage() {
           <section className="card-panel mt-8 flex flex-col gap-3" aria-live="polite">
             <h2 className="t-h2">{gate === 'closed' ? ui.closed.title : ui.full.title}</h2>
             <p>{gate === 'closed' ? ui.closed.body : ui.full.body}</p>
-            <Link href="/mx/vende" className="btn btn-secondary w-fit">
+            <Link href={sellerLandingPath('mx')} className="btn btn-secondary w-fit">
               {gate === 'closed' ? ui.closed.cta : ui.full.cta}
             </Link>
           </section>

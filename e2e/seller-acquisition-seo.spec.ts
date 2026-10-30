@@ -14,7 +14,8 @@ const es = JSON.parse(readFileSync(new URL('../locales/es.json', import.meta.url
 }
 
 const sellerPages = [
-  { path: '/mx/vende', meta: es.sellerAcquisition.anchor.metadata },
+  // The anchor landing is the root since root-shop-builder-home.
+  { path: '/', meta: es.sellerAcquisition.anchor.metadata },
   { path: '/mx/vende/mundial', meta: es.sellerAcquisition.mundial.metadata },
   { path: '/mx/vende/creadores', meta: es.sellerAcquisition.creadores.metadata },
   { path: '/mx/vende/negocios', meta: es.sellerAcquisition.negocios.metadata },
@@ -33,10 +34,12 @@ test.describe('seller acquisition · SEO and OpenGraph', () => {
       expect(getMetaContents(html, 'name', 'description')).toContain(page.meta.description)
       expect(getMetaContents(html, 'property', 'og:title')).toContain(page.meta.title)
       expect(getMetaContents(html, 'property', 'og:description')).toContain(page.meta.description)
-      expect(getMetaContents(html, 'property', 'og:url')).toContain(`${BASE_URL}${page.path}`)
+      // Next writes the root's absolute URL without its trailing slash (`https://miyagisanchez.com`).
+      const absolute = page.path === '/' ? BASE_URL : `${BASE_URL}${page.path}`
+      expect(getMetaContents(html, 'property', 'og:url')).toContain(absolute)
       expect(getMetaContents(html, 'property', 'og:image:alt')).toContain(page.meta.ogAlt)
       expect(getMetaContents(html, 'name', 'twitter:card')).toContain('summary_large_image')
-      expect(getLinkHrefs(html, 'canonical')).toContain(`${BASE_URL}${page.path}`)
+      expect(getLinkHrefs(html, 'canonical')).toContain(absolute)
     })
 
     // agent-discovery-and-indexing S1.3 — regression guard. The og:image URL used to be
@@ -51,7 +54,7 @@ test.describe('seller acquisition · SEO and OpenGraph', () => {
 
       const [ogImageUrl] = getMetaContents(html, 'property', 'og:image')
       expect(ogImageUrl, 'og:image meta tag must be present').toBeTruthy()
-      expect(ogImageUrl).toContain(`${page.path}/opengraph-image`)
+      expect(ogImageUrl).toContain(`${page.path === '/' ? '' : page.path}/opengraph-image`)
 
       // Next resolves the auto-detected image route to the CURRENT request origin (not the
       // static metadataBase), so the tag is already a full, directly-fetchable URL here.
@@ -67,7 +70,10 @@ test.describe('seller acquisition · SEO and OpenGraph', () => {
 
     const xml = await res.text()
     for (const page of sellerPages) {
-      expect(xml).toContain(`<loc>${BASE_URL}${page.path}</loc>`)
+      // The sitemap may write the root either way; both are the same URL.
+      const loc = page.path === '/' ? new RegExp(`<loc>${BASE_URL}/?</loc>`) : `<loc>${BASE_URL}${page.path}</loc>`
+      if (typeof loc === 'string') expect(xml).toContain(loc)
+      else expect(xml).toMatch(loc)
     }
   })
 })

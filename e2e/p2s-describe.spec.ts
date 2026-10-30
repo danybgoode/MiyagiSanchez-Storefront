@@ -62,8 +62,9 @@ test('the box is the hero\'s first block after the title, so it is above the fol
   }
 })
 
-test('/mx/vende mounts the box with a runtime site key; the pitch still carries the no-JS commission claim', () => {
-  const page = read('app/(shell)/mx/vende/page.tsx')
+test('/ mounts the box with a runtime site key; the pitch still carries the no-JS commission claim', () => {
+  // The anchor seller page moved from /mx/vende to the root (root-shop-builder-home).
+  const page = read('app/(site)/page.tsx')
   expect(page).toContain('<DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null}')
   // agent-readability asserts the no-JS HTML contains «0% de comisión»; the new hero title no longer says it, so
   // another block of the page must keep saying it.

@@ -13,7 +13,7 @@ test.describe('routeForKey / routeForNamespaceSection', () => {
   })
 
   test('sellerAcquisition fans out per-section to the real /mx/vende/* page', () => {
-    expect(routeForKey('sellerAcquisition', 'anchor.heroTitle')).toEqual({ label: 'Vende (portada)', path: '/mx/vende' })
+    expect(routeForKey('sellerAcquisition', 'anchor.heroTitle')).toEqual({ label: 'Vende (portada)', path: '/' })
     expect(routeForKey('sellerAcquisition', 'autos.heroTitle')).toEqual({ label: 'Vende — Autos', path: '/mx/vende/autos' })
     expect(routeForKey('sellerAcquisition', 'migracionShopify.heroTitle')).toEqual({
       label: 'Vende — Migración Shopify',
@@ -79,7 +79,7 @@ test.describe('routeForKey / routeForNamespaceSection', () => {
     })
     expect(routeForNamespaceSection('sellerAcquisition', 'aiChannel')).toEqual({
       label: 'Vende (portada)',
-      path: '/mx/vende',
+      path: '/',
     })
   })
 

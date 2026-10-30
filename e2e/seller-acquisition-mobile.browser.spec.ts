@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test'
 // via browser-smoke.yml. Real-device nuances (font scaling, on-screen-keyboard viewport, safe-area
 // insets) still evade headless viewport checks and stay owed to Daniel (see sprint-4.md walkthrough).
 
-const PAGES = ['/mx/vende', '/mx/vende/creadores', '/mx/vende/negocios', '/mx/vende/servicios', '/mx/vende/mundial']
+const PAGES = ['/', '/mx/vende/creadores', '/mx/vende/negocios', '/mx/vende/servicios', '/mx/vende/mundial']
 const WIDTHS = [360, 390, 414]
 
 test.describe('seller acquisition · mobile no-overflow sweep (browser)', () => {

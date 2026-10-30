@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { sellerLandingPath } from '@/lib/seller-acquisition'
 import { GONE_COPY } from '@/lib/prompt-to-shop/copy'
 
 /**
@@ -16,7 +17,7 @@ export default function P2sGone() {
         <h1 className="t-h3" style={{ letterSpacing: 0, margin: 0 }}>{GONE_COPY.title}</h1>
         <p className="t-lead" style={{ margin: 0, color: 'var(--fg-muted)' }}>{GONE_COPY.message}</p>
         <div>
-          <Link href="/mx/vende" className="btn btn-primary btn-lg" prefetch={false}>
+          <Link href={sellerLandingPath('mx')} className="btn btn-primary btn-lg" prefetch={false}>
             {GONE_COPY.action}
           </Link>
         </div>

@@ -42,11 +42,11 @@ export interface RouteInfo {
 }
 
 const SELLER_ACQUISITION_SECTIONS: Record<string, RouteInfo | null> = {
-  anchor: { label: 'Vende (portada)', path: '/mx/vende' },
-  // Rendered as part of the /mx/vende portada (`buildAnchorPageConfig` reads
+  anchor: { label: 'Vende (portada)', path: '/' },
+  // Rendered as part of the portada at `/` (root-shop-builder-home; it was /mx/vende) (`buildAnchorPageConfig` reads
   // `copy.aiChannel` directly, `app/(shell)/mx/vende/_components/page-config.ts`)
   // — same page as `anchor`, not a separate one.
-  aiChannel: { label: 'Vende (portada)', path: '/mx/vende' },
+  aiChannel: { label: 'Vende (portada)', path: '/' },
   creadores: { label: 'Vende — Creadores', path: '/mx/vende/creadores' },
   negocios: { label: 'Vende — Negocios', path: '/mx/vende/negocios' },
   fundadoras: { label: 'Vende — Fundadoras', path: '/mx/vende/fundadoras' },

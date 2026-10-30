@@ -115,7 +115,7 @@ test.describe('the US has a seller entry at all', () => {
     // in `PlatformShell`, whose header, mobile and footer CTAs were a hardcoded
     // `/vende` in BOTH markets. A source-shape assertion guards a spelling; this guards
     // the rule, and every call site now reads it from here.
-    expect(sellerLandingPath('mx')).toBe('/mx/vende')
+    expect(sellerLandingPath('mx')).toBe('/')
     expect(sellerLandingPath('us')).toBe('/us/sell')
     expect(sellerLandingPath('us')).not.toBe(sellerLandingPath('mx'))
   })

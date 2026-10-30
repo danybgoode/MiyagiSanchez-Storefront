@@ -129,7 +129,7 @@ test('signed in, «Quedármela» is a plain link to the claim — no sheet', () 
 
 test('/sell/armar sends a signed-out visitor back to their draft, and never claims during the render', () => {
   const page = strip(read('app/(shell)/sell/armar/page.tsx'))
-  expect(page).toContain("redirect(draftId ? `/p2s/${draftId}` : '/mx/vende')")
+  expect(page).toContain("redirect(draftId ? `/p2s/${draftId}` : sellerLandingPath('mx'))")
   expect(page).toContain("export const dynamic = 'force-dynamic'")
   // The claim runs in the route handler (it busts the shop cache, which a render may not do).
   expect(page).not.toMatch(/claimAndApply|claimDeps|revalidateTag/)

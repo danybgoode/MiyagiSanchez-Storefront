@@ -29,7 +29,7 @@ for (const viewport of [
   { name: 'mobile', width: 390, height: 844 },
   { name: 'desktop', width: 1280, height: 900 },
 ]) {
-  test(`root selector chooses Mexico without an automatic redirect (${viewport.name})`, async ({ page }) => {
+  test(`root is the shop builder and reaches Mexico without an automatic redirect (${viewport.name})`, async ({ page }) => {
     /**
      * Three listeners, because "is this page healthy" is three different questions
      * and the old single `console` listener conflated them into one.
@@ -102,13 +102,17 @@ for (const viewport of [
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
     await page.goto('/')
 
+    // root-shop-builder-home: `/` is the Mexico shop builder. The describe box is the first
+    // action, the picker is gone from here (it lives on at `/en`), and D7's promise holds —
+    // the brand's front door previews no catalog. The markets are a quiet strip of links.
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByTestId('market-selector')).toBeVisible()
-    await expect(page.getByTestId('market-choice-mx')).toHaveAttribute('href', '/mx')
-    await expect(page.getByTestId('market-choice-us')).toHaveAttribute('href', '/us')
+    await expect(page.getByTestId('p2s-describe-box')).toBeVisible()
+    await expect(page.getByTestId('market-selector')).toHaveCount(0)
+    await expect(page.getByTestId('root-market-link-mx')).toHaveAttribute('href', '/mx')
+    await expect(page.getByTestId('root-market-link-us')).toHaveAttribute('href', '/us')
     await expect(page.locator('[data-listing-id]')).toHaveCount(0)
 
-    await page.getByTestId('market-choice-mx').click()
+    await page.getByTestId('root-market-link-mx').click()
     await expect(page).toHaveURL(/\/mx$/)
     await expect(page.locator('body')).toContainText('Lo que tu barrio vende, compra y recomienda')
 

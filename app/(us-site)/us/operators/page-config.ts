@@ -1,6 +1,6 @@
 import type { Dictionary } from '@/lib/dictionary'
 import type { SellerAcquisitionPageConfig } from '@/app/(shell)/mx/vende/_components/SellerAcquisitionSections'
-import { SELLER_LANDING_PATHS } from '@/lib/seller-acquisition'
+import { MX_SELLER_PAGES_BASE } from '@/lib/seller-acquisition'
 
 export type OperatorLandingCopy = Dictionary['partnersRecruiting']['landing']
 
@@ -43,7 +43,7 @@ export function buildUsOperatorPageConfig(copy: OperatorLandingCopy): SellerAcqu
     // actually works in Mexico is a Promotor lead, and the funnel should record that.
     secondaryCta: {
       label: copy.promotorCta,
-      href: `${SELLER_LANDING_PATHS.mx}/promotor`,
+      href: `${MX_SELLER_PAGES_BASE}/promotor`,
       testId: 'promotor-secondary-cta',
       dataTrack: 'promoter',
     },

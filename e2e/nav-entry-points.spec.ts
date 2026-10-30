@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test'
  * Navigation & Settings Reorg — Sprint 4 (entry-point wiring · api gate).
  *
  * 4.1 — the signed-out seller pitch and the publish action are distinct surfaces:
- *   - signed-out CTAs ("Publicar gratis" header, "Vende gratis" footer) → /mx/vende
+ *   - signed-out CTAs ("Publicar gratis" header, "Vende gratis" footer) → / (the shop builder)
  *     (epic #6's acquisition landing).
  *   - the publish affordance (bottom-bar ⊕ FAB, signed-in "Publicar") stays /sell.
  * 4.2 — Vecindario left the tab bar in S1, so the Inicio feed carries an entry to it,
@@ -13,15 +13,16 @@ import { test, expect } from '@playwright/test'
  * Anonymous request → the home page renders the signed-out chrome (Clerk `<Show
  * when="signed-out">`) and the catalog-independent Vecindario card. No mutation.
  */
-test.describe('nav entry points · /mx/vende vs /sell + Vecindario', () => {
-  test('signed-out seller CTAs lead to /mx/vende, not /sell', async ({ request }) => {
+test.describe('nav entry points · the seller landing vs /sell + Vecindario', () => {
+  test('signed-out seller CTAs lead to the shop builder at /, not /sell', async ({ request }) => {
     const res = await request.get('/mx', { headers: { Accept: 'text/html' } })
     expect(res.ok()).toBeTruthy()
     const html = await res.text()
 
-    // The two named signed-out pitch CTAs render and sit inside a /mx/vende anchor.
-    expect(html).toMatch(/href="\/mx\/vende"[^>]*>\s*Publicar gratis/)
-    expect(html).toMatch(/href="\/mx\/vende"[^>]*>\s*Vende gratis/)
+    // The two named signed-out pitch CTAs render and sit inside an anchor to the root, the
+    // seller landing since root-shop-builder-home.
+    expect(html).toMatch(/href="\/"[^>]*>\s*Publicar gratis/)
+    expect(html).toMatch(/href="\/"[^>]*>\s*Vende gratis/)
 
     // Regression guard: neither pitch CTA is wired to the publish flow any more.
     expect(html).not.toMatch(/href="\/sell"[^>]*>\s*Publicar gratis/)

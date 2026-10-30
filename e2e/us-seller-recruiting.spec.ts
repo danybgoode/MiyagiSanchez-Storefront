@@ -159,9 +159,9 @@ test.describe('US seller recruiting · signed-out /sell', () => {
     expect(target.searchParams.get('market')).toBeNull()
 
     // No campaign, no empty query string dangling off the URL.
-    expect(sellerLandingRedirectPath('mx')).toBe('/mx/vende')
+    expect(sellerLandingRedirectPath('mx')).toBe('/')
     // An unknown/absent market falls back to the default market's landing rather
     // than to a dead link.
-    expect(sellerLandingRedirectPath(undefined)).toBe('/mx/vende')
+    expect(sellerLandingRedirectPath(undefined)).toBe('/')
   })
 })
