@@ -1,53 +1,107 @@
 import type { Metadata } from 'next'
-import { marketLandingMetadata, rootSelectorMetadata } from '@/lib/market-seo'
-import MarketSelector from './MarketSelector'
+import es from '@/locales/es.json'
+import { getOverriddenDictionary } from '@/lib/copy-overrides'
+import { sellerPersonaCtaHref, sellerLandingPath } from '@/lib/seller-acquisition'
+import { SellerAcquisitionPage } from '@/app/(shell)/mx/vende/_components/SellerAcquisitionSections'
+import { buildAnchorPageConfig } from '@/app/(shell)/mx/vende/_components/page-config'
+import DescribeBox from '@/app/(shell)/mx/vende/_components/DescribeBox'
+import RootMarketLinks from './RootMarketLinks'
 
 /**
- * `/` — the master-brand market selector, Spanish telling.
+ * `/` — the Mexico shop builder. Epic root-shop-builder-home (D1).
  *
- * Epic 07 · market-architecture-foundation, Story 2.1 (decision D7). Until that
- * cutover `/` WAS the Mexico marketplace homepage; it now lives at `/mx`
- * (`app/(mx-site)/mx/page.tsx`) and this page took its place.
+ * `miyagisanchez.com` is the address that gets said out loud, printed and handed over by
+ * promoters, and until this epic it opened on a country picker that never showed the offer:
+ * the describe box lived at `/mx/vende`, a URL nobody guesses. So the anchor seller page moved
+ * HERE (moved, not copied — `/mx/vende` is now a 308 to `/` in `next.config.ts`), and the
+ * marketplace became one tap away at `/mx`.
  *
- * The markup lives in `MarketSelector`, shared with the English root at `/en`
- * (`app/(en-site)/en/page.tsx`). Each root supplies only its metadata and its
- * language; every string comes from the dictionary its own layout mounts. See
- * `lib/root-language.ts` for why the two languages are two static documents rather
- * than one page reading `Accept-Language`.
+ * The country picker did not disappear: `/en` still renders it (`MarketSelector`, untouched by
+ * product-owner decision), and the strip at the end of this page links México · Estados Unidos ·
+ * English. What `/` no longer does is HOP: the selector moved English browsers to `/en`, and an
+ * `en-MX` phone — common in Mexico — would have skipped the pitch entirely (D5).
+ *
+ * Rendered per request (D2), like `/mx/vende` was: it reads the A/B `v` and UTM from
+ * `searchParams`, and the describe box needs `TURNSTILE_SITE_KEY` at RUNTIME (prompt-to-shop D8),
+ * not baked at build. Measured live before the move (2026-10-29, cache-busted): static `/`
+ * ≈ 0.28 s TTFB, dynamic `/mx/vende` ≈ 0.31 s. `force-dynamic` rather than an implicit dynamic
+ * render because it also ends the CDN-pinning bug class on this route for good: no `s-maxage`
+ * means Cloudflare never stores the HTML whose build-hashed chunks the next deploy deletes
+ * (2026-08-06, an unstyled homepage for 7 days).
  */
+export const dynamic = 'force-dynamic'
 
-/**
- * The page holds no data, so this window is NOT about content freshness — it is
- * about the build-scoped asset URLs the HTML embeds.
- *
- * This page used to carry no `revalidate` at all, reasoned from "there is
- * nothing here that can go stale". That reasoning was wrong, and it broke the
- * homepage in production (2026-08-06): a prerender with no `revalidate` is
- * served with `s-maxage=31536000`, Cloudflare cached `/` on that one-year TTL,
- * and the HTML kept pointing at `/_next/static/chunks/*` hashes from the build
- * that produced it. Those chunks are deleted the moment a new Cloud Run
- * revision takes over, so the edge served a 7-day-old document whose CSS 404'd
- * — an unstyled homepage, while every other route (all of which do carry a
- * `revalidate`) rendered fine.
- *
- * The content is static; the asset hashes are not. A page is only as cacheable
- * as the shortest-lived thing its HTML references. 60s matches `/mx` and, with
- * Next's `stale-while-revalidate`, bounds post-deploy breakage to roughly one
- * request instead of a year.
- */
-export const revalidate = 60
+const BASE_URL = 'https://miyagisanchez.com'
+const PAGE_PATH = sellerLandingPath('mx')
 
+const meta = es.sellerAcquisition.anchor.metadata
+
+// No `languages` alternates on purpose (D3): `/` and `/en` are no longer the same document in
+// two languages, so an hreflang pair would tell crawlers something false. The OG image is the
+// sibling `opengraph-image.tsx` file convention, which hashes the served route.
 export const metadata: Metadata = {
-  title: 'Miyagi Sánchez — Tu tienda propia y los mercados por país',
-  description:
-    'Explora los mercados de Miyagi Sánchez en México y Estados Unidos, o abre tu propia tienda y véndele a quien quieras.',
-  ...rootSelectorMetadata('es'),
+  // `absolute`: the title already ends with the brand; a layout template must not append it twice.
+  title: { absolute: meta.title },
+  description: meta.description,
+  alternates: { canonical: `${BASE_URL}${PAGE_PATH}` },
+  openGraph: {
+    type: 'website',
+    locale: 'es_MX',
+    url: `${BASE_URL}${PAGE_PATH}`,
+    siteName: 'Miyagi Sánchez',
+    title: meta.title,
+    description: meta.description,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: meta.title,
+    description: meta.description,
+  },
 }
 
-export default function MarketSelectorPage() {
-  return <MarketSelector language="es" />
+type HomePageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
-// Referenced so a future edit that drops the market-landing metadata helper from
-// this tree fails the type check rather than silently un-canonicalizing `/mx`.
-export type MarketLandingMetadata = ReturnType<typeof marketLandingMetadata>
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const query = await searchParams
+  const dict = await getOverriddenDictionary('es')
+  const ui = dict.sellerAcquisition
+  const config = buildAnchorPageConfig(ui, query)
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: meta.title,
+    description: meta.description,
+    url: `${BASE_URL}${PAGE_PATH}`,
+    inLanguage: 'es-MX',
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'Miyagi Sánchez',
+      url: BASE_URL,
+    },
+    potentialAction: {
+      '@type': 'CreateAction',
+      name: ui.anchor.primaryCta,
+      target: `${BASE_URL}${sellerPersonaCtaHref('vende', query)}`,
+    },
+  }
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <SellerAcquisitionPage
+        config={{
+          ...config,
+          // Prompt-to-shop S2.2: the describe box is the hero's first action.
+          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell'} />,
+        }}
+      />
+      <RootMarketLinks copy={ui.anchor.marketLinks} />
+    </>
+  )
+}

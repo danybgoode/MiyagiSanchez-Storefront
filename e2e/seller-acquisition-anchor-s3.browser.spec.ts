@@ -8,7 +8,7 @@ test.describe('seller acquisition · anchor S3 sections (browser)', () => {
   for (const width of [360, 390]) {
     test(`benchmark + AI-channel render with no horizontal overflow at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 })
-      const res = await page.goto('/mx/vende')
+      const res = await page.goto('/')
       expect(res?.ok()).toBeTruthy()
 
       // US-3 — benchmark table renders with the competitor columns.

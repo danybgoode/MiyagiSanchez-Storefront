@@ -23,9 +23,14 @@ export type SellerAcquisitionVariant = 'a' | 'b'
  * NOT `marketBasePath(market) + suffix`: the suffix is a different WORD per market
  * ("vende" in Spanish, "sell" in English) and that is deliberate, not an oversight
  * to be normalized away — a Mexican seller should not be sent to an English URL.
+ *
+ * Mexico's is the exception, on purpose: since root-shop-builder-home (2026-10-29) its landing
+ * is the bare domain, `/`. The domain is what gets said out loud and printed, and a landing
+ * nobody can guess (`/mx/vende`) was the one leads never reached. `/mx/vende` and `/vende` are
+ * 308s to `/`; the Spanish persona pages stay under `/mx/vende/<persona>`.
  */
 export const SELLER_LANDING_PATHS: Readonly<Record<MarketCode, string>> = Object.freeze({
-  mx: '/mx/vende',
+  mx: '/',
   us: '/us/sell',
 })
 
@@ -40,8 +45,16 @@ export function sellerLandingPath(market: MarketCode | null | undefined = DEFAUL
   return SELLER_LANDING_PATHS[market ?? DEFAULT_MARKET] ?? SELLER_LANDING_PATHS[DEFAULT_MARKET]
 }
 
-/** The MX landing, the base every Spanish persona page hangs off. */
+/** The MX landing — `/` since root-shop-builder-home. */
 const MX_LANDING = SELLER_LANDING_PATHS.mx
+
+/**
+ * Where the Spanish persona pages live: `/mx/vende/<persona>`. NOT derived from the landing.
+ * It was, as `${MX_LANDING}/creadores`, until the landing became `/` — at which point every
+ * persona URL would have become `//creadores` (a protocol-relative URL to a host named
+ * "creadores"). The landing and the persona family are two facts now; each is stated once.
+ */
+export const MX_SELLER_PAGES_BASE = '/mx/vende'
 
 /**
  * Where a SIGNED-OUT visitor who asked for `/sell` should be sent.
@@ -123,33 +136,33 @@ export const SELLER_PERSONA_ROUTES: Record<SellerPersonaId, SellerPersonaRoute> 
   },
   creadores: {
     id: 'creadores',
-    pagePath: `${MX_LANDING}/creadores`,
+    pagePath: `${MX_SELLER_PAGES_BASE}/creadores`,
     from: 'creadores',
     status: 'live',
   },
   mundial: {
     id: 'mundial',
-    pagePath: `${MX_LANDING}/mundial`,
+    pagePath: `${MX_SELLER_PAGES_BASE}/mundial`,
     from: 'mundial',
     type: 'service',
     status: 'live',
   },
   negocios: {
     id: 'negocios',
-    pagePath: `${MX_LANDING}/negocios`,
+    pagePath: `${MX_SELLER_PAGES_BASE}/negocios`,
     from: 'negocios',
     status: 'live',
   },
   servicios: {
     id: 'servicios',
-    pagePath: `${MX_LANDING}/servicios`,
+    pagePath: `${MX_SELLER_PAGES_BASE}/servicios`,
     from: 'servicios',
     type: 'service',
     status: 'live',
   },
   autos: {
     id: 'autos',
-    pagePath: `${MX_LANDING}/autos`,
+    pagePath: `${MX_SELLER_PAGES_BASE}/autos`,
     from: 'autos',
     status: 'live',
   },

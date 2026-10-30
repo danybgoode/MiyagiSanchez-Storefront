@@ -108,6 +108,8 @@
     "app/(us-site)/us/page.tsx"
   ],
   "closure": [
+    "app/(en-site)/en/page.tsx",
+    "app/(en-site)/layout.tsx",
     "app/(mx-site)/layout.tsx",
     "app/(mx-site)/mx/page.tsx",
     "app/(shell)/_shop-chrome/ShopFooter.tsx",
@@ -221,7 +223,6 @@
     "app/(site)/MarketSelector.tsx",
     "app/(site)/RootLanguageSwitch.tsx",
     "app/(site)/layout.tsx",
-    "app/(site)/page.tsx",
     "app/(us-shell)/layout.tsx",
     "app/(us-shell)/us/l/[id]/page.tsx",
     "app/(us-shell)/us/l/page.tsx",
@@ -290,6 +291,7 @@
   ],
   "copyClassification": {
     "dictionaryConsuming": [
+      "app/(en-site)/en/page.tsx",
       "app/(mx-site)/mx/page.tsx",
       "app/(shell)/_shop-chrome/ShopFooter.tsx",
       "app/(shell)/_shop-chrome/ShopHeader.tsx",
@@ -352,6 +354,7 @@
       "app/components/SearchSheet.tsx"
     ],
     "noLiteralUiCopy": [
+      "app/(en-site)/layout.tsx",
       "app/(mx-site)/layout.tsx",
       "app/(shell)/_shop-sections/ShopIndexGrid.tsx",
       "app/(shell)/account/favorites/page.tsx",
@@ -422,7 +425,6 @@
       "app/(site)/MarketRecommendation.tsx",
       "app/(site)/RootLanguageSwitch.tsx",
       "app/(site)/layout.tsx",
-      "app/(site)/page.tsx",
       "app/(us-shell)/layout.tsx",
       "app/(us-shell)/us/l/[id]/page.tsx",
       "app/(us-shell)/us/l/page.tsx",

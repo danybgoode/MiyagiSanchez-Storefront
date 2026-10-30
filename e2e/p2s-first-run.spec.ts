@@ -62,8 +62,9 @@ test('/sell keeps the file import and the manual wizard one tap from the describ
   expect(read('app/(shell)/sell/(onboarding)/agente/AgenteIntakeClient.tsx')).toContain('<Link href="/sell"')
 })
 
-test('/mx/vende prints the brand once in its title', () => {
-  const page = read('app/(shell)/mx/vende/page.tsx')
+test('the seller landing at / prints the brand once in its title', () => {
+  // The anchor seller page moved from /mx/vende to the root (root-shop-builder-home).
+  const page = read('app/(site)/page.tsx')
   expect(page).toContain('title: { absolute: meta.title }')
   // The template would append « | Miyagi Sánchez» to a title that already ends with the brand.
   expect(es.sellerAcquisition.anchor.metadata.title).toMatch(/Miyagi Sánchez$/)

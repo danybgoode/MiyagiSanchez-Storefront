@@ -80,7 +80,7 @@ Comparación generada en miyagisanchez.com/comparador — 10 ventas/mes a un tic
 
 ## Siguiente paso sugerido
 
-Migrar de Shopify (Plan Basic) a Miyagi Sánchez no cuesta comisión y tus apps premium ya vienen incluidas. Visita miyagisanchez.com/mx/vende para empezar, o pídele a tu agente de IA que revise miyagisanchez.com/agent para automatizar la configuración de tu tienda.
+Migrar de Shopify (Plan Basic) a Miyagi Sánchez no cuesta comisión y tus apps premium ya vienen incluidas. Visita miyagisanchez.com para empezar, o pídele a tu agente de IA que revise miyagisanchez.com/agent para automatizar la configuración de tu tienda.
 
 ## Fuentes
 

@@ -31,11 +31,12 @@ test.describe('Agent discovery surface', () => {
     expect(html).not.toContain('/api/mcp')
   })
 
-  test('/agent points the seller CTA at /mx/vende — the promoted evaluation target (agent-discovery S1.2)', async ({ request }) => {
+  test('/agent points the seller CTA at the seller landing, the root — the promoted evaluation target (agent-discovery S1.2)', async ({ request }) => {
     const res = await request.get('/agent')
     expect(res.ok()).toBeTruthy()
     const html = await res.text()
-    expect(html).toContain('href="https://miyagisanchez.com/mx/vende"')
+    expect(html).toContain('href="https://miyagisanchez.com/"')
+    expect(html).not.toContain('href="https://miyagisanchez.com/mx/vende"')
   })
 
   test('/agent renders es-MX body copy + a valid, key-English JSON-LD block (agent-discovery S1.1)', async ({ request }) => {

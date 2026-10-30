@@ -60,7 +60,12 @@ const BUYER_ENTRYPOINTS = [
   'app/components/MarketDocument.tsx',
   'app/(shell)/layout.tsx',
   'app/(site)/layout.tsx',
-  'app/(site)/page.tsx',
+  // `/` is the Mexico shop builder since root-shop-builder-home: a seller-acquisition page,
+  // es-MX by design, so it is no longer a buyer entrypoint (same reason as NON_BUYER_SUBTREES).
+  // The buyer surface it used to carry — the market selector and its language island — now
+  // renders only at `/en`, so `/en` is the entrypoint that keeps them inside this scan.
+  'app/(en-site)/layout.tsx',
+  'app/(en-site)/en/page.tsx',
   'app/(mx-site)/layout.tsx',
   'app/(mx-site)/mx/page.tsx',
   'app/(us-site)/layout.tsx',

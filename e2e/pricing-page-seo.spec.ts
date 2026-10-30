@@ -45,7 +45,9 @@ test.describe('/mx/precios · server HTML', () => {
     expect(html).toContain('SPEI')
     expect(html).toContain('más IVA')
     expect(html).toContain('href="/comparador?platform=t1&tier=basico"')
-    expect(html).toContain('href="/mx/vende"')
+    // The signup CTA goes to the shop builder, which is the root since root-shop-builder-home.
+    expect(html).toContain('data-testid="precios-primary-cta"')
+    expect(html).not.toContain('href="/mx/vende"')
     // No unfilled token reached the page.
     expect(html).not.toMatch(/\{(subdomain|customDomain|mlSync|printAd|migration)\w*\}/)
   })

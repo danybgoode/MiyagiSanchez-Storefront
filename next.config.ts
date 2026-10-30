@@ -56,8 +56,18 @@ const nextConfig: NextConfig = {
       // `permanent: true` is a 308, which preserves the METHOD and the body. A
       // 301 lets an intermediary rewrite a POST into a GET, and
       // `/vende/fundadoras` posts an application form.
-      { source: '/vende', destination: '/mx/vende', permanent: true },
+      //
+      // root-shop-builder-home D6: the anchor landing itself then moved to `/`, the address
+      // people actually say. `/vende` and `/mx/vende` both go there in ONE hop (never
+      // `/vende` → `/mx/vende` → `/`); only the bare landing moved, so every persona and
+      // sub-path (`/vende/fundadoras`, `/mx/vende/creadores`, …) resolves exactly as before.
+      // The exact rules sit above the wildcard so they win.
+      { source: '/vende', destination: '/', permanent: true },
+      { source: '/mx/vende', destination: '/', permanent: true },
       { source: '/vende/:path*', destination: '/mx/vende/:path*', permanent: true },
+      // A sayable word for the marketplace (D6). An alias, not a second home: `/mx` stays
+      // the one canonical marketplace URL every shop and listing link hangs off.
+      { source: '/mercado', destination: '/mx', permanent: true },
     ]
   },
   async headers() {

@@ -4,14 +4,16 @@
  * headers module into the deterministic API test project.
  */
 export const PLATFORM_SITEMAP_ENTRIES = [
-  { path: '/', changeFrequency: 'monthly', priority: 0.8 },
+  // `/` is the Mexico shop builder since root-shop-builder-home: the most important page, and
+  // it changes weekly like the landing it replaced. `/mx/vende` is a 308 now, so it is not
+  // listed — a sitemap that names a redirect source asks crawlers to index a hop.
+  { path: '/', changeFrequency: 'weekly', priority: 1 },
   { path: '/mx', changeFrequency: 'daily', priority: 1 },
   { path: '/mx/l', changeFrequency: 'daily', priority: 0.9 },
   { path: '/us', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/us/l', changeFrequency: 'daily', priority: 0.9 },
   { path: '/acerca', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/en', changeFrequency: 'monthly', priority: 0.8 },
-  { path: '/mx/vende', changeFrequency: 'weekly', priority: 0.9 },
   { path: '/mx/vende/creadores', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/mx/vende/mundial', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/mx/vende/negocios', changeFrequency: 'weekly', priority: 0.8 },

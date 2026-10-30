@@ -153,7 +153,7 @@ ${JSON.stringify(chart)}
 
 ## Siguiente paso sugerido
 
-Migrar de ${platformLabel} a Miyagi Sánchez no cuesta comisión y tus apps premium ya vienen incluidas. Visita miyagisanchez.com/mx/vende para empezar, o pídele a tu agente de IA que revise miyagisanchez.com/agent para automatizar la configuración de tu tienda.
+Migrar de ${platformLabel} a Miyagi Sánchez no cuesta comisión y tus apps premium ya vienen incluidas. Visita miyagisanchez.com para empezar, o pídele a tu agente de IA que revise miyagisanchez.com/agent para automatizar la configuración de tu tienda.
 
 ## Fuentes
 

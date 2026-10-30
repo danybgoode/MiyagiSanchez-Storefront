@@ -120,7 +120,7 @@
       "criticality": "low",
       "enforcement": "frontend",
       "callsites": [
-        "app/(shell)/mx/vende/fundadoras/page.tsx:53",
+        "app/(shell)/mx/vende/fundadoras/page.tsx:54",
         "app/api/vende/fundadoras/apply/route.ts:67"
       ]
     },
@@ -131,7 +131,7 @@
       "criticality": "low",
       "enforcement": "frontend",
       "callsites": [
-        "app/(shell)/mx/vende/fundadoras/page.tsx:55",
+        "app/(shell)/mx/vende/fundadoras/page.tsx:56",
         "app/api/growth/fundadoras/track/route.ts:68",
         "app/api/growth/satisfaction/route.ts:30",
         "app/api/growth/track/route.ts:39",
@@ -553,7 +553,7 @@
       "enforcement": "both",
       "callsites": [
         "app/(shell)/sell/armar/cobros/page.tsx:37",
-        "app/(shell)/sell/armar/page.tsx:69",
+        "app/(shell)/sell/armar/page.tsx:70",
         "app/(shell)/shop/manage/settings/[section]/page.tsx:97"
       ]
     },

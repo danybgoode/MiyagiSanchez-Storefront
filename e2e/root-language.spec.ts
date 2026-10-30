@@ -14,6 +14,11 @@ import { sellerLandingPath } from '../lib/seller-acquisition'
  * The bilingual front door: `/` in Spanish, `/en` in English, chosen by the
  * browser once and by the visitor forever after.
  *
+ * root-shop-builder-home (2026-10-29) changed what `/` IS: the Mexico shop builder, not
+ * the Spanish copy of the selector. `/en` is untouched — it still renders the selector
+ * and still hops a Spanish browser to `/` (which now lands them on the pitch). `/` no
+ * longer hops anyone: an `en-MX` phone, common in Mexico, must see the pitch.
+ *
  * The whole decision is a pure function so it can be pinned without a browser —
  * the client island is a five-line `useEffect` around it.
  */
@@ -98,7 +103,7 @@ test.describe('the selector wires language to destination', () => {
   test('each document sends a seller to the landing in its own language', () => {
     // The bottom CTA is the one thing on the page that varies by language rather than
     // being a translation: Spanish reader → the Spanish landing, English → the English.
-    expect(sellerLandingPath('mx')).toBe('/mx/vende')
+    expect(sellerLandingPath('mx')).toBe('/')
     expect(sellerLandingPath('us')).toBe('/us/sell')
 
     const selector = source('app/(site)/MarketSelector.tsx')
@@ -125,8 +130,9 @@ test.describe('the selector wires language to destination', () => {
     // document the visitor was just moved out of.
     expect(island).toContain('router.replace(target)')
     expect(island).not.toContain('router.push(')
-    // The server render must read no request headers, or `/` stops being a static
-    // CDN asset — the ~30s cold start marketplace-static-shell fixed.
+    // The selector's server render must read no request headers, or `/en` stops being a
+    // static CDN asset — the ~30s cold start marketplace-static-shell fixed. `/` renders
+    // per request now (root-shop-builder-home D2) but still has no reason to read them.
     for (const route of ['app/(site)/page.tsx', 'app/(en-site)/en/page.tsx', 'app/(site)/MarketSelector.tsx']) {
       expect(source(route), route).not.toMatch(/\bheaders\(\)|\bcookies\(\)/)
     }
@@ -134,9 +140,22 @@ test.describe('the selector wires language to destination', () => {
 
   test('both roots bound their CDN TTL', () => {
     // Duplicated from the population guard on purpose: this is the one property whose
-    // absence is invisible until a deploy, and `/en` is new.
-    for (const route of ['app/(site)/page.tsx', 'app/(en-site)/en/page.tsx']) {
-      expect(source(route), route).toMatch(/export const revalidate = 60\b/)
-    }
+    // absence is invisible until a deploy. `/en` is a 60 s ISR document; `/` renders per
+    // request, which Cloudflare never stores (root-shop-builder-home D2).
+    expect(source('app/(en-site)/en/page.tsx')).toMatch(/export const revalidate = 60\b/)
+    expect(source('app/(site)/page.tsx')).toMatch(/export const dynamic = 'force-dynamic'/)
+  })
+
+  test('/ is the shop builder and never hops; /en still does', () => {
+    const root = source('app/(site)/page.tsx')
+    // The island that moves English browsers lives only in the selector, which `/` no
+    // longer renders — so an en-MX phone stays on the pitch.
+    // Imports, not text: the page's own comment explains the move and names the selector.
+    expect(root).not.toMatch(/^import .*RootLanguageSwitch/m)
+    expect(root).not.toMatch(/^import .*MarketSelector/m)
+    expect(root).toMatch(/^import DescribeBox from /m)
+    // `/en` keeps the island, and its target for a Spanish reader is still `/`.
+    expect(source('app/(site)/MarketSelector.tsx')).toContain('<RootLanguageSwitch current={language} />')
+    expect(rootLanguageRedirect({ current: 'en', languages: ['es-MX'] })).toBe('/')
   })
 })

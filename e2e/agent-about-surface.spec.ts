@@ -35,7 +35,7 @@ test.describe('about surface · pure payloads', () => {
     expect(about.how_to_start.length).toBeGreaterThan(0)
     expect(about.cost_transparency.trim()).not.toBe('')
     expect(about.links.about).toBe(`${base}/acerca`)
-    expect(about.links.sellers).toBe(`${base}/mx/vende`)
+    expect(about.links.sellers).toBe(`${base}/`)
     // es-MX copy-completeness carried from the source: every section heading present in both locales.
     for (const s of about.sections) {
       expect(s.heading.es.trim(), `${s.id}.es heading`).not.toBe('')
@@ -48,7 +48,7 @@ test.describe('about surface · pure payloads', () => {
     expect(txt).toContain('# miyagisanchez.com')
     expect(txt).toContain(RELAY_PHRASE)
     expect(txt).toContain(`${base}/acerca`)
-    expect(txt).toContain(`${base}/mx/vende`)
+    expect(txt).toContain(`[For sellers](${base}/)`)
     expect(txt).toContain(`${base}/api/ucp/manifest`)
     expect(txt).toContain('## Resumen (es)') // the Spanish summary block
   })

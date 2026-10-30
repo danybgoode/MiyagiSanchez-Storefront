@@ -61,19 +61,27 @@ async function settledPath(page: Page): Promise<string> {
   throw new Error(`path never settled within ${SETTLE_CAP_MS}ms (last seen "${last}")`)
 }
 
-test.describe('an English browser is moved to the English document', () => {
+/**
+ * root-shop-builder-home (2026-10-29): `/` is the Mexico shop builder and NEVER hops.
+ *
+ * Before this epic `/` was the Spanish copy of the selector and moved English browsers to
+ * `/en`. That hop would now carry an `en-MX` phone — common in Mexico — straight past the
+ * pitch onto a country picker, so the selector island is no longer mounted on `/`. `/en` is
+ * untouched by product-owner decision: it still hops a Spanish browser to `/`, which now
+ * lands them on the pitch, and its "Español" link still goes to `/`.
+ */
+test.describe('an English browser', () => {
   test.use({ locale: 'en-US' })
 
-  test('/ hops to /en and lands on the English selector', async ({ page }) => {
+  test('/ does not hop: it stays on the shop builder', async ({ page }) => {
     await page.goto('/')
 
-    expect(await settledPath(page)).toBe('/en')
-    await expect(page.locator('html')).toHaveAttribute('lang', 'en-US')
-    await expect(page.getByTestId('market-selector')).toBeVisible()
-    // The hop decides a DOCUMENT, never a market — both markets stay on offer,
-    // which is the invariant `market-selector.browser.spec.ts` guards for `/`.
-    await expect(page.getByTestId('market-choice-mx')).toHaveAttribute('href', '/mx')
-    await expect(page.getByTestId('market-choice-us')).toHaveAttribute('href', '/us')
+    expect(await settledPath(page)).toBe('/')
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX')
+    await expect(page.getByTestId('p2s-describe-box')).toBeVisible()
+    await expect(page.getByTestId('market-selector')).toHaveCount(0)
+    // The English document is one deliberate tap away, never an automatic move.
+    await expect(page.getByTestId('root-market-link-en')).toHaveAttribute('href', '/en')
   })
 
   test('/en is a terminus, not a bounce — an English browser stays put', async ({ page }) => {
@@ -100,32 +108,25 @@ test.describe('an English browser is moved to the English document', () => {
 
     expect(movedAway, 'an English browser on /en must not be moved anywhere').toEqual([])
     expect(new URL(page.url()).pathname).toBe('/en')
+    await expect(page.getByTestId('market-selector')).toBeVisible()
   })
 
-  test('clicking Español outranks the browser, and keeps outranking it', async ({ page }) => {
-    // The whole reason the choice is stored. Without it, a Mexican visitor on an
-    // en-US laptop who switches to Spanish is thrown back to English by the next page
-    // load, and the switcher reads as broken.
-    await page.goto('/')
+  test('Español on /en lands on the shop builder, and it stays there', async ({ page }) => {
+    await page.goto('/en')
     expect(await settledPath(page)).toBe('/en')
 
-    // Settling BEFORE the click is load-bearing, not defensive padding. Clicking while
-    // the hop is still committing hits a node React is in the middle of replacing: the
-    // actionability check passes, the click lands on a detached element, and no
-    // navigation happens. That failed twice in three runs while the feature was
-    // provably fine (localStorage read back 'es' and the revisit stayed on `/`).
+    // Settling BEFORE the click is load-bearing, not defensive padding: clicking while a
+    // hop is still committing hits a node React is replacing, and no navigation happens.
     const toSpanish = page.getByTestId('root-language-es')
     await expect(toSpanish).toBeVisible()
     await toSpanish.click()
 
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 10_000 }).toBe('/')
     await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX')
+    await expect(page.getByTestId('p2s-describe-box')).toBeVisible()
 
-    // The second visit is the assertion that matters: the stored choice has to
-    // suppress the automatic hop, not merely survive the click that made it.
     await page.goto('/')
     expect(await settledPath(page)).toBe('/')
-    await expect(page.getByTestId('market-selector')).toBeVisible()
   })
 })
 
@@ -138,10 +139,10 @@ test.describe('a Spanish browser is left alone', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX')
   })
 
-  test('/en hops back to the Spanish document', async ({ page }) => {
+  test('/en hops back to the Spanish document, which is now the shop builder', async ({ page }) => {
     await page.goto('/en')
     expect(await settledPath(page)).toBe('/')
-    await expect(page.getByTestId('market-selector')).toBeVisible()
+    await expect(page.getByTestId('p2s-describe-box')).toBeVisible()
   })
 })
 
@@ -151,9 +152,9 @@ test.describe('a browser that reads neither language falls to Spanish', () => {
   test('/ is the default and does not hop', async ({ page }) => {
     // Spanish is the canonical locale and the deliberate fallback for the majority of
     // the world's languages — not a claim the visitor reads it, which is why the
-    // switcher is rendered on both documents.
+    // English document stays one link away.
     await page.goto('/')
     expect(await settledPath(page)).toBe('/')
-    await expect(page.getByTestId('root-language-en')).toBeVisible()
+    await expect(page.getByTestId('root-market-link-en')).toBeVisible()
   })
 })

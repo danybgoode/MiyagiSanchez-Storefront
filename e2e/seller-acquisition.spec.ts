@@ -20,7 +20,7 @@ const publishTarget = (href: string) =>
 test.describe('seller acquisition · persona config and attribution seam', () => {
   test('resolves live persona routes without touching middleware', () => {
     expect(resolveSellerPersonaRoute('vende')).toMatchObject({
-      pagePath: '/mx/vende',
+      pagePath: '/',
       from: 'vende',
       status: 'live',
     })

@@ -195,7 +195,7 @@ Ayuda a este vendedor a abrir una tienda completa y útil en Miyagi Sánchez. El
 PASO 1 — CONTEXTO
 Antes de preguntar nada o de emitir el archivo, revisa estas fuentes para entender la plataforma:
 - https://miyagisanchez.com/api/ucp/setup-spec — el esquema/spec completo de este archivo (schema, bloques, ejemplo).
-- https://miyagisanchez.com/mx/vende — qué es Miyagi Sánchez y por qué vender aquí.
+- https://miyagisanchez.com — qué es Miyagi Sánchez y por qué vender aquí.
 - https://miyagisanchez.com/acerca — cómo funciona la plataforma para vendedores y compradores.
 
 PASO 2 — ENTREVISTA

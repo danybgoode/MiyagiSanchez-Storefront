@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { sellerLandingPath } from '@/lib/seller-acquisition'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
@@ -98,7 +99,7 @@ export default function ClaimRunner({ draftId, initial }: { draftId: string | nu
   // other_phone, and signed_out (a session that ended between the page and the request): the same way forward.
   return (
     <Panel title={ARMAR_COPY.otherPhoneTitle} lead={ARMAR_COPY.otherPhoneLead}>
-      <div><Link href="/mx/vende" prefetch={false} className="btn btn-primary">{ARMAR_COPY.startNew}</Link></div>
+      <div><Link href={sellerLandingPath('mx')} prefetch={false} className="btn btn-primary">{ARMAR_COPY.startNew}</Link></div>
     </Panel>
   )
 }

@@ -30,13 +30,15 @@ test.describe('market root documents · server-owned language', () => {
     }
   })
 
-  test('the selector and both market roots own locale-consistent file-convention OG images', () => {
-    const selectorOg = source('app/(site)/opengraph-image.tsx')
+  test('the root and both market roots own locale-consistent file-convention OG images', () => {
+    // `/` is the Mexico shop builder (root-shop-builder-home D4), so a shared bare-domain
+    // link previews the seller pitch, at its own path.
+    const rootOg = source('app/(site)/opengraph-image.tsx')
+    expect(rootOg).toContain('createSellerAcquisitionOgImage')
+    expect(rootOg).toContain("path: '/'")
     const mxOg = source('app/(mx-site)/mx/opengraph-image.tsx')
-    for (const image of [selectorOg, mxOg]) {
-      expect(image).toContain("from '@/app/opengraph-image'")
-      expect(image).toContain('alt, contentType, size, default')
-    }
+    expect(mxOg).toContain("from '@/app/opengraph-image'")
+    expect(mxOg).toContain('alt, contentType, size, default')
     const usOg = source('app/(us-site)/us/opengraph-image.tsx')
     expect(usOg).toContain('Marketplace for the United States')
     expect(usOg).toContain("path: '/us'")

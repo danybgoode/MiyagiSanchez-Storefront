@@ -111,7 +111,7 @@ test('not found, not yours and expired all end at ONE friendly page, never a 500
   expect(owner).toContain("if (resolved.kind === 'gone') notFound()")
   const gone = read('app/(shell)/p2s/not-found.tsx')
   expect(gone).toContain('GONE_COPY.action')
-  expect(gone).toContain('href="/mx/vende"')
+  expect(gone).toContain("href={sellerLandingPath('mx')}")
 })
 
 test('a re-run that fails re-reads the draft instead of restoring blocks the server already cleared', () => {

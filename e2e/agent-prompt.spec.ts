@@ -85,8 +85,8 @@ test.describe('resolveAgentContext · URL → context (S1.3)', () => {
     expect(resolveAgentContext('/account', null)).toEqual({ kind: 'account', orderRef: undefined })
   })
 
-  test('homepage + unknown routes fall back to generic', () => {
-    expect(resolveAgentContext('/', null)).toEqual({ kind: 'generic' })
+  test('unknown routes fall back to generic (the root is the shop builder now)', () => {
+    // root-shop-builder-home: `/` is the seller pitch, so it is `seller` — asserted below.
     expect(resolveAgentContext('/quien-sabe/que', null)).toEqual({ kind: 'generic' })
     expect(resolveAgentContext('', null)).toEqual({ kind: 'generic' })
     expect(resolveAgentContext(null, null)).toEqual({ kind: 'generic' })
@@ -258,7 +258,8 @@ test.describe('resolveAgentContext · seller/promoter paths (promoter-funnel-fix
     expect(resolveAgentContext('/l/prod_1', null)).toEqual({ kind: 'pdp', listingId: 'prod_1' })
     expect(resolveAgentContext('/s/zapatos-mx', null)).toEqual({ kind: 'shop', slug: 'zapatos-mx' })
     expect(resolveAgentContext('/account', null)).toEqual({ kind: 'account', orderRef: undefined })
-    expect(resolveAgentContext('/', null)).toEqual({ kind: 'generic' })
+    // The marketplace home is `/mx` since the market cutover; `/` is the shop builder.
+    expect(resolveAgentContext('/mx', null)).toEqual({ kind: 'generic' })
   })
 })
 
@@ -296,10 +297,21 @@ test.describe('buildAgentPrompt · seller/promoter asks (promoter-funnel-fixes S
     expect(resolveAgentContext('/us')).toEqual({ kind: 'generic' })
   })
 
-  test('seller ask pitches selling + points at /mx/vende, not the generic buyer ask', () => {
+  test('the bare root is the shop builder (seller); /mx stays the buyer marketplace', () => {
+    // root-shop-builder-home: `/` and `/mx` both strip to an empty segment list, so the
+    // root is matched on the RAW path — the marketplace must keep the buyer prompt.
+    expect(resolveAgentContext('/')).toEqual({ kind: 'seller' })
+    expect(resolveAgentContext('/mx')).toEqual({ kind: 'generic' })
+    // A missing pathname is unknown, not the pitch.
+    expect(resolveAgentContext('')).toEqual({ kind: 'generic' })
+    expect(resolveAgentContext(null)).toEqual({ kind: 'generic' })
+  })
+
+  test('seller ask pitches selling + points at the seller landing (the root), not the generic buyer ask', () => {
     const p = buildAgentPrompt({ kind: 'seller' })
     expect(p).toContain('vender en Miyagi Sánchez')
-    expect(p).toContain('https://miyagisanchez.com/mx/vende')
+    expect(p).toContain('Abre https://miyagisanchez.com/, dime')
+    expect(p).not.toContain('/mx/vende')
     expect(p).not.toContain('¿Qué estás buscando hoy?')
   })
 

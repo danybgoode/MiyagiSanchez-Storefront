@@ -209,7 +209,9 @@ export default async function AgentPage() {
             */}
           <a href={`${ENDPOINT}${SELLER_LANDING_PATHS.mx}`} className="btn btn-secondary btn-sm">
             <i className="iconoir-shop" style={{ fontSize: 14 }} />
-            Para vendedores — {SELLER_LANDING_PATHS.mx}
+            {/* The MX landing is `/` since root-shop-builder-home, so the label names the
+                full address — a bare "/" reads as nothing to a person or an agent. */}
+            Para vendedores — {`${ENDPOINT}${SELLER_LANDING_PATHS.mx}`.replace(/^https:\/\//, '')}
           </a>
         </div>
       </section>
