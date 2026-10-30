@@ -169,6 +169,20 @@ export type SellerAcquisitionPageConfig = {
   aiChannel?: LandingAiChannel
   applyTeaser?: ApplyTeaser
   migrationCallout?: LandingCallout
+  /**
+   * The anchor's own section order (root-shop-builder-home D11). The anchor is the root `/`, the
+   * page the bare domain opens on, so it leads with the shop a merchant gets and keeps the
+   * marketplace as a bonus further down. Persona pages leave this unset and keep their order.
+   */
+  sectionOrder?: 'anchor'
+  /** «Y además, apareces en el marketplace» — the marketplace as a bonus, not the headline. */
+  marketplaceBonus?: LandingCallout
+  /**
+   * A quiet «¿Vienes a comprar?» line for the buyer who typed the domain. Rendered INSIDE the hero,
+   * under the prompt card: the hero is taller than a desktop screen, so a line after it was never
+   * seen without scrolling (the browser spec caught that on the first build).
+   */
+  buyerLink?: { question: string; label: string; href: string }
   /** «¿Cuánto cuesta?» → /mx/precios (pricing-page D10). In the page sections, never the hero. */
   pricingCallout?: LandingCallout
   /**
@@ -191,6 +205,50 @@ export function SellerAcquisitionPage({ config }: { config: SellerAcquisitionPag
     >
       <SellerAcquisitionVariantTag persona={config.pageId} variant={config.variant} />
       <LandingHero config={config} />
+      {config.sectionOrder === 'anchor' ? <AnchorSections config={config} /> : <PersonaSections config={config} />}
+      <FaqSection config={config} />
+      {config.applyTeaser ? <ApplyTeaserSection teaser={config.applyTeaser} /> : null}
+      {config.migrationCallout ? (
+        <CalloutSection callout={config.migrationCallout} pageId={config.pageId} slug="migration" />
+      ) : null}
+      <ClosingCta config={config} />
+    </main>
+  )
+}
+
+/**
+ * The root's order: describe (in the hero) → what you get → how it works → what it costs →
+ * the comparison → who it is for → the AI channel → what else is included → the marketplace,
+ * as a bonus. Shop infrastructure first, because the bare domain is where merchants arrive and
+ * buyer traffic is still small (root-shop-builder-home, the product owner's 10-29 ask).
+ */
+function AnchorSections({ config }: { config: SellerAcquisitionPageConfig }) {
+  return (
+    <>
+      <ProofSection config={config} />
+      <StepsSection config={config} />
+      {config.pricingCallout ? (
+        <CalloutSection callout={config.pricingCallout} pageId={config.pageId} slug="pricing" />
+      ) : null}
+      {config.benchmark ? <BenchmarkSection benchmark={config.benchmark} pageId={config.pageId} /> : null}
+      {config.personaRouter ? <PersonaRouterSection router={config.personaRouter} pageId={config.pageId} /> : null}
+      {config.aiChannel ? <AiChannelSection aiChannel={config.aiChannel} pageId={config.pageId} /> : null}
+      {config.premiumFeatures ? (
+        <PremiumFeaturesSection features={config.premiumFeatures} pageId={config.pageId} />
+      ) : (
+        <SocialProofSection config={config} />
+      )}
+      {config.marketplaceBonus ? (
+        <CalloutSection callout={config.marketplaceBonus} pageId={config.pageId} slug="marketplace" />
+      ) : null}
+    </>
+  )
+}
+
+/** The persona pages' order, unchanged by the anchor's move to `/`. */
+function PersonaSections({ config }: { config: SellerAcquisitionPageConfig }) {
+  return (
+    <>
       <ProofSection config={config} />
       {config.benchmark ? <BenchmarkSection benchmark={config.benchmark} pageId={config.pageId} /> : null}
       {config.personaRouter ? <PersonaRouterSection router={config.personaRouter} pageId={config.pageId} /> : null}
@@ -204,13 +262,21 @@ export function SellerAcquisitionPage({ config }: { config: SellerAcquisitionPag
       {config.pricingCallout ? (
         <CalloutSection callout={config.pricingCallout} pageId={config.pageId} slug="pricing" />
       ) : null}
-      <FaqSection config={config} />
-      {config.applyTeaser ? <ApplyTeaserSection teaser={config.applyTeaser} /> : null}
-      {config.migrationCallout ? (
-        <CalloutSection callout={config.migrationCallout} pageId={config.pageId} slug="migration" />
-      ) : null}
-      <ClosingCta config={config} />
-    </main>
+    </>
+  )
+}
+
+function BuyerLink({ link }: { link: { question: string; label: string; href: string } }) {
+  return (
+    <p
+      data-testid="vende-buyer-link"
+      style={{ marginTop: 'var(--s-4)', marginBottom: 0, fontSize: 14, color: 'var(--fg-muted)' }}
+    >
+      {link.question}{' '}
+      <Link href={link.href} prefetch={false} style={{ color: 'var(--fg)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+        {link.label}
+      </Link>
+    </p>
   )
 }
 
@@ -288,6 +354,7 @@ function LandingHero({ config }: { config: SellerAcquisitionPageConfig }) {
           copiedLabel={config.copiedLabel}
           testId={`${config.pageId}-prompt-copy`}
         />
+        {config.buyerLink ? <BuyerLink link={config.buyerLink} /> : null}
       </div>
 
       <HeroValueList values={values} className={styles.values} />

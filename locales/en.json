@@ -1359,12 +1359,12 @@
     "anchor": {
       "metadata": {
         "title": "Sell with no commissions in Mexico — Miyagi Sánchez",
-        "description": "Open a free shop on Miyagi Sánchez. Sell products, services, experiences, or full catalogs with no platform commissions.",
+        "description": "Describe your business. In seconds you have your online shop, ready to take payments and share — no commission.",
         "ogAlt": "Miyagi Sánchez: sell anything in Mexico with no commissions."
       },
       "eyebrow": "Sellers in Mexico",
-      "heroTitle": "Sell anything in Mexico. No commissions.",
-      "heroLead": "Open your shop in minutes. Join the marketplace or sell on your own domain. Your AI can build it with you — free and low risk.",
+      "heroTitle": "Describe your business. In seconds you have your online shop, ready to take payments and share — no commission.",
+      "heroLead": "Your shop at your own address, payments straight to your account and your catalog ready for WhatsApp and Instagram. And you also appear in the marketplace.",
       "trustLine": "Do not take our word for it: ask Claude, Gemini, or ChatGPT what miyagisanchez.com is.",
       "primaryCta": "Start free",
       "secondaryCta": "View World Cup page",
@@ -1399,28 +1399,33 @@
           "icon": "iconoir-star"
         }
       ],
-      "proofTitle": "Everything we promise already exists in the platform",
-      "proofLead": "No vaporware: publishing, direct payments, owned storefronts, and agents are already part of Miyagi Sánchez.",
+      "proofTitle": "What you get",
+      "proofLead": "A complete online shop, yours from day one. The marketplace comes as a bonus.",
       "proofPoints": [
         {
+          "icon": "iconoir-shop",
+          "title": "Your shop, at your address",
+          "body": "A free link ready to share. If you want, your subdomain ({subdomainYearly}) or your own domain ({customDomainYearly})."
+        },
+        {
           "icon": "iconoir-percentage",
-          "title": "0% commission",
-          "body": "Collect 100%. Your money goes directly to Stripe, MercadoPago, SPEI, or the method you coordinate."
+          "title": "Direct payments, 0% commission",
+          "body": "Money goes straight to your Stripe, MercadoPago, SPEI or the method you agree on. We take no commission."
+        },
+        {
+          "icon": "iconoir-share-android",
+          "title": "Your catalog to share",
+          "body": "A catalog link for WhatsApp, a PDF to send or print, and your catalog connected to Instagram and WhatsApp."
+        },
+        {
+          "icon": "iconoir-check-circle",
+          "title": "A step-by-step guide",
+          "body": "Profile, catalog, payments, shipping and sharing: you always know what is left before you can sell."
         },
         {
           "icon": "iconoir-sparks",
-          "title": "Ready in minutes",
-          "body": "Bring photos, Instagram, text, or a file; your AI can turn it into a publishable shop."
-        },
-        {
-          "icon": "iconoir-shop",
-          "title": "Your shop, your brand",
-          "body": "Use a free link, subdomain, custom domain, or embeddable widget on your site."
-        },
-        {
-          "icon": "iconoir-brain",
-          "title": "Built for agents",
-          "body": "Claude, Gemini, or ChatGPT can read the page, explain the offer, and help you operate."
+          "title": "Built for AI",
+          "body": "Claude, Gemini and ChatGPT can read your shop, recommend it and help you run it."
         }
       ],
       "routerTitle": "What kind of seller are you?",
@@ -1469,16 +1474,16 @@
       "stepsTitle": "How it works",
       "steps": [
         {
-          "title": "Ask your AI about us",
-          "body": "Or go straight in. The page is written so an agent can audit it."
+          "title": "Describe your business",
+          "body": "Write in one sentence what you sell. You don't need an account to start."
         },
         {
-          "title": "Register in seconds",
-          "body": "Use Google, create your shop, and choose how you want customers to find you."
+          "title": "Watch your shop take shape",
+          "body": "In seconds you see your shop with a name, copy and example products. Rename it, change the colour, or ask for another version."
         },
         {
-          "title": "Upload your catalog",
-          "body": "Paste text, import a file, or let your agent organize it with you."
+          "title": "Keep it and publish",
+          "body": "Create your account, upload your photos, choose how you get paid and deliver, and publish."
         }
       ],
       "socialTitle": "",
@@ -1486,7 +1491,7 @@
       "socialStats": [],
       "premiumFeatures": {
         "title": "All of this is already included",
-        "lead": "Features you pay extra for on other platforms — here they are part of the marketplace.",
+        "lead": "Features you pay extra for on other platforms — here they come included with your shop.",
         "items": [
           {
             "icon": "iconoir-qr-code",
@@ -1514,9 +1519,9 @@
             "sub": "Discounts and codes for your campaigns."
           },
           {
-            "icon": "iconoir-globe",
-            "label": "Your domain, subdomain, or widget",
-            "sub": "Your brand on any channel."
+            "icon": "iconoir-list",
+            "label": "Collections",
+            "sub": "Group your products so people find them faster."
           }
         ]
       },
@@ -1651,6 +1656,15 @@
         "mx": "Mexico marketplace",
         "us": "United States",
         "en": "English"
+      },
+      "marketplaceBonus": {
+        "title": "And you also appear in the marketplace",
+        "body": "Your products are also published in the Miyagi Sánchez marketplace: one more shop window, at no cost.",
+        "ctaLabel": "Explore the marketplace"
+      },
+      "buyerLink": {
+        "question": "Here to shop?",
+        "label": "Explore the marketplace"
       }
     },
     "creadores": {

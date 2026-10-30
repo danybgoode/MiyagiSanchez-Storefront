@@ -19,6 +19,7 @@
     { "id": "promoter-landing-mobile", "category": "A", "env": "prod", "flow": "unauthed", "file": "e2e/promoter-landing-mobile.browser.spec.ts" },
     { "id": "recovery-market", "category": "A", "env": "prod", "flow": "unauthed", "file": "e2e/recovery-market.browser.spec.ts" },
     { "id": "root-language-hop", "category": "A", "env": "prod", "flow": "unauthed", "file": "e2e/root-language-hop.browser.spec.ts", "note": "epic: one-landing-per-market; the / <-> /en client hop. Sets locale per-describe, so it needs a real browser — the api suite sees a 200 and learns nothing." },
+    { "id": "root-shop-builder-home", "category": "A", "env": "prod", "flow": "unauthed", "file": "e2e/root-shop-builder-home.browser.spec.ts", "note": "epic: root-shop-builder-home; the buyer link's position on / is a rendered fact." },
     { "id": "seller-acquisition-anchor", "category": "A", "env": "prod", "flow": "unauthed", "file": "e2e/seller-acquisition-anchor.browser.spec.ts" },
     { "id": "seller-acquisition-anchor-s3", "category": "A", "env": "prod", "flow": "unauthed", "file": "e2e/seller-acquisition-anchor-s3.browser.spec.ts" },
     { "id": "seller-acquisition-creators", "category": "A", "env": "prod", "flow": "unauthed", "file": "e2e/seller-acquisition-creators.browser.spec.ts" },

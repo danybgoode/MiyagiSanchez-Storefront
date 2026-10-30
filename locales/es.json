@@ -1196,7 +1196,7 @@
       },
       "pricingCallout": {
         "title": "¿Cuánto cuesta?",
-        "body": "Vender es gratis, con 0% de comisión. Los extras son opcionales y todos tienen su precio publicado.",
+        "body": "Abrir tu tienda y vender es gratis, con 0% de comisión. Lo opcional tiene precio publicado: subdominio {subdomainYearly}, dominio propio {customDomainYearly}.",
         "ctaLabel": "Ver precios"
       }
     },
@@ -1223,12 +1223,12 @@
     "anchor": {
       "metadata": {
         "title": "Describe tu negocio y abre tu tienda — Miyagi Sánchez",
-        "description": "Describe tu negocio. En segundos tienes tienda, compradores en el marketplace y una IA que la atiende — sin comisión.",
+        "description": "Describe tu negocio. En segundos tienes tu tienda en línea, lista para cobrar y compartir — sin comisión.",
         "ogAlt": "Miyagi Sánchez: vende lo que sea en México con 0% de comisión."
       },
       "eyebrow": "",
-      "heroTitle": "Describe tu negocio. En segundos tienes tienda, compradores en el marketplace y una IA que la atiende — sin comisión.",
-      "heroLead": "Abre tu tienda en minutos: súbete al marketplace o vende en tu propio dominio. Tu IA puede armarla por ti, y tu dinero llega directo a tu cuenta.",
+      "heroTitle": "Describe tu negocio. En segundos tienes tu tienda en línea, lista para cobrar y compartir — sin comisión.",
+      "heroLead": "Tu tienda con tu propia dirección, cobros directos a tu cuenta y tu catálogo listo para WhatsApp e Instagram. Y además, apareces en el marketplace.",
       "trustLine": "Compruébalo tú mismo: pídele a Claude, Gemini o ChatGPT que evalúe miyagisanchez.com y te diga si te conviene.",
       "primaryCta": "Empieza gratis",
       "secondaryCta": "¿Qué puedo vender?",
@@ -1263,26 +1263,31 @@
           "icon": "iconoir-star"
         }
       ],
-      "proofTitle": "Lo que ves es lo que ya puedes usar",
-      "proofLead": "Publicar, cobrar directo, tener tu propia tienda y vender con ayuda de IA: todo está listo desde el primer día.",
+      "proofTitle": "Lo que te llevas",
+      "proofLead": "Una tienda en línea completa y tuya desde el primer día. El marketplace viene de regalo.",
       "proofPoints": [
         {
+          "icon": "iconoir-shop",
+          "title": "Tu tienda, con tu dirección",
+          "body": "Un link gratis listo para compartir. Si quieres, tu subdominio ({subdomainYearly}) o tu propio dominio ({customDomainYearly})."
+        },
+        {
           "icon": "iconoir-percentage",
-          "title": "0% de comisión",
-          "body": "Te quedas con el 100% de tu venta. Tu dinero llega directo a Stripe, MercadoPago, SPEI o el método que acuerdes."
+          "title": "Cobros directos, 0% de comisión",
+          "body": "El dinero llega directo a tu Stripe, MercadoPago, SPEI o el método que acuerdes. Nosotros no tomamos comisión."
+        },
+        {
+          "icon": "iconoir-share-android",
+          "title": "Tu catálogo para compartir",
+          "body": "Un link de catálogo para WhatsApp, un PDF para mandar o imprimir, y tu catálogo conectado a Instagram y WhatsApp."
+        },
+        {
+          "icon": "iconoir-check-circle",
+          "title": "Una guía paso a paso",
+          "body": "Perfil, catálogo, pagos, envíos y compartir: siempre sabes qué te falta para vender."
         },
         {
           "icon": "iconoir-sparks",
-          "title": "Lista en minutos",
-          "body": "Trae fotos, tu Instagram, texto o un archivo; tu IA lo convierte en una tienda lista para publicar."
-        },
-        {
-          "icon": "iconoir-shop",
-          "title": "Tu tienda, tu marca",
-          "body": "Usa un link gratis, un subdominio, tu propio dominio o un widget para tu sitio."
-        },
-        {
-          "icon": "iconoir-brain",
           "title": "Hecha para la IA",
           "body": "Claude, Gemini y ChatGPT pueden leer tu tienda, recomendarla y ayudarte a operarla."
         }
@@ -1333,16 +1338,16 @@
       "stepsTitle": "Cómo funciona",
       "steps": [
         {
-          "title": "Pregúntale a tu IA por nosotros",
-          "body": "O entra directo. La página está escrita para que un agente pueda evaluarla."
+          "title": "Describe tu negocio",
+          "body": "Escribe en una frase qué vendes. No necesitas cuenta para empezar."
         },
         {
-          "title": "Regístrate en segundos",
-          "body": "Entra con Google, crea tu tienda y elige cómo quieres que te encuentren."
+          "title": "Mira tu tienda tomar forma",
+          "body": "En segundos ves tu tienda con nombre, textos y productos de ejemplo. Cámbiale el nombre o el color, o pide otra versión."
         },
         {
-          "title": "Sube tu catálogo",
-          "body": "Pega texto, importa un archivo o deja que tu agente lo organice por ti."
+          "title": "Quédatela y publica",
+          "body": "Crea tu cuenta, sube tus fotos, elige cómo cobrar y cómo entregar, y publica."
         }
       ],
       "socialTitle": "",
@@ -1350,7 +1355,7 @@
       "socialStats": [],
       "premiumFeatures": {
         "title": "Todo esto ya viene incluido",
-        "lead": "Funciones que en otras plataformas pagas aparte — aquí son parte del marketplace.",
+        "lead": "Funciones que en otras plataformas pagas aparte — aquí vienen incluidas en tu tienda.",
         "items": [
           {
             "icon": "iconoir-qr-code",
@@ -1378,9 +1383,9 @@
             "sub": "Descuentos y códigos para tus campañas."
           },
           {
-            "icon": "iconoir-globe",
-            "label": "Tu dominio, subdominio o widget",
-            "sub": "Tu marca en cualquier canal."
+            "icon": "iconoir-list",
+            "label": "Colecciones",
+            "sub": "Agrupa tus productos para que te encuentren más rápido."
           }
         ]
       },
@@ -1515,6 +1520,15 @@
         "mx": "Marketplace México",
         "us": "Estados Unidos",
         "en": "English"
+      },
+      "marketplaceBonus": {
+        "title": "Y además, apareces en el marketplace",
+        "body": "Tus productos también se publican en el marketplace de Miyagi Sánchez: una vitrina más para que te encuentren, sin costo.",
+        "ctaLabel": "Explora el marketplace"
+      },
+      "buyerLink": {
+        "question": "¿Vienes a comprar?",
+        "label": "Explora el marketplace"
       }
     },
     "creadores": {
