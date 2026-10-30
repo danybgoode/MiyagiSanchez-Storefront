@@ -66,6 +66,9 @@ test('the domain proof point no longer promises a free link', () => {
   expect(domain, 'the address proof point is gone').toBeTruthy()
   expect(domain!.body).not.toMatch(/link gratis/i)
   expect(domain!.body).toMatch(/subdominio \(\$[\d,]+ MXN al año\)/)
+  // Same claim on the creators page (product owner, 10-29): gone in both languages.
+  expect(read('locales/es.json')).not.toMatch(/link gratis/i)
+  expect(read('locales/en.json')).not.toMatch(/free link/i)
 })
 
 test('the bot check renders only when Cloudflare needs a tap, and reserves no empty band', () => {
