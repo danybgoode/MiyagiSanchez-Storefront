@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { payFailureKind, type PayChoice } from '@/lib/in-person/payment-link'
-import { attemptKey, parseAttempt, resumeDecision, usableAttempt, type PayAttempt } from '@/lib/in-person/pay-attempt'
+import { ATTEMPT_TTL_MS, attemptKey, parseAttempt, resumeDecision, usableAttempt, type PayAttempt } from '@/lib/in-person/pay-attempt'
 import type { ManualPayment } from '@/lib/in-person/counter-checkout'
 
 /** Clock read for handlers (kept out of the render path). */
@@ -52,6 +52,16 @@ export default function PayClient({ token, choices, totalCents, currency }: { to
     })
   }, [token])
 
+  // Clear a stored attempt the moment its hold lapses, so «Continuar con tu pago» never
+  // outlives it (codex, PR 461 round 3: the offer stayed and the click then did nothing).
+  useEffect(() => {
+    if (!attempt) return
+    const left = attempt.at + ATTEMPT_TTL_MS - clock()
+    if (left <= 0) { queueMicrotask(() => setAttempt(null)); return }
+    const t = window.setTimeout(() => setAttempt(null), left)
+    return () => window.clearTimeout(t)
+  }, [attempt])
+
   function remember(a: PayAttempt) {
     setAttempt(a)
     try { window.sessionStorage.setItem(attemptKey(token), JSON.stringify(a)) } catch { /* ignore */ }
@@ -59,7 +69,14 @@ export default function PayClient({ token, choices, totalCents, currency }: { to
 
   function resume(a: PayAttempt) {
     // The hold may have lapsed while the page sat open: re-check at the click, else start over.
-    if (!usableAttempt(a, clock())) { setAttempt(null); return }
+    // Lapsed between the timer's tick and the click: drop it and SAY so — the method
+    // buttons return; never start a payment with a method the buyer did not pick.
+    if (!usableAttempt(a, clock())) {
+      setAttempt(null)
+      setKind('retry')
+      setError('Tu intento anterior expiró. Elige cómo pagar.')
+      return
+    }
     if (a.redirect_url) window.location.assign(a.redirect_url)
     else if (a.manual) setManual(a.manual)
   }
