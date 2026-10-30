@@ -8,13 +8,9 @@ import { useSellerFormat } from '@/app/components/SellerFormatProvider'
 import { isSellable, matchesQuery, type CounterProduct } from '@/lib/in-person/counter-catalog'
 import { MAX_QUANTITY } from '@/lib/in-person/counter-cart'
 import {
-  buildLinkBody, extraPayments, isLinkCancellable, linkShortUrl, linkStateLabel, linkTitle, linkUrl, linkWhatsAppUrl,
+  buildLinkBody, extraPayments, isLinkCancellable, linkBadge, linkShortUrl, linkTitle, linkUrl, linkWhatsAppUrl,
   LINK_DEFAULT_DAYS, LINK_MAX_DAYS, type LinkView,
 } from '@/lib/in-person/payment-link'
-
-const STATE_TOKEN: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
-  pending: 'info', paid: 'success', expired: 'neutral', cancelled: 'danger',
-}
 
 /** The result of creating a link: URL, short URL, WhatsApp and a QR drawn in the browser. */
 function LinkResult({ link, shopName, what }: { link: LinkView; shopName: string; what: string }) {
@@ -196,7 +192,7 @@ export default function CobrosClient({ products, shopName }: { products: Counter
                   <div className="text-xs text-[var(--color-muted)]">{l.uses === 'multi' ? 'Varios pagos' : 'Un solo pago'} · vence {fmt.date(l.expires_at, { day: 'numeric', month: 'short' })}{l.paid_order_ids.length > 0 ? ` · ${l.paid_order_ids.length} pagos` : ''}</div>
                   {extra > 0 && <div className="text-xs text-[var(--color-warning)]">Se pagó más de una vez: revisa tus pedidos.</div>}
                 </div>
-                <StatusBadge token={STATE_TOKEN[l.state] ?? 'neutral'}>{linkStateLabel(l.state)}</StatusBadge>
+                <StatusBadge token={linkBadge(l).token}>{linkBadge(l).label}</StatusBadge>
                 {isLinkCancellable(l.state) && <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => cancel(l)}>Cancelar</Button>}
               </Card>
             </li>

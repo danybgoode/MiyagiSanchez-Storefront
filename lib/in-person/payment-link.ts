@@ -81,6 +81,17 @@ export function linkStateLabel(state: string): string {
   return LINK_STATE_LABEL[state as LinkState] ?? state
 }
 
+/**
+ * The badge a link row shows. A single-use link paid by direct transfer stays `pending` until the
+ * seller confirms the money, but its order already exists: that is «Pago por confirmar», not
+ * «Esperando pago», so the seller knows to look in Pedidos.
+ */
+export function linkBadge(link: Pick<LinkView, 'state' | 'paid_order_ids'>): { label: string; token: 'info' | 'success' | 'warning' | 'neutral' | 'danger' } {
+  if (link.state === 'pending' && link.paid_order_ids.length > 0) return { label: 'Pago por confirmar', token: 'warning' }
+  const token = ({ pending: 'info', paid: 'success', expired: 'neutral', cancelled: 'danger' } as const)[link.state as LinkState] ?? 'neutral'
+  return { label: linkStateLabel(link.state), token }
+}
+
 /** Only a link that can still be paid can be cancelled. */
 export function isLinkCancellable(state: string): boolean {
   return state === 'pending'
@@ -163,6 +174,17 @@ export function payStartBody(choice: PayChoice['id'], manualSubType: 'clabe' | '
   return choice === 'manual'
     ? { provider: 'manual' as const, manual_sub_type: manualSubType ?? 'clabe', fulfillment_method: 'digital' as const }
     : { provider: choice, fulfillment_method: 'digital' as const }
+}
+
+/**
+ * What the pay page does with a failed «Pagar»: `closed` shows the closed screen (no buttons),
+ * `busy` shows the message with «Intentar de nuevo» (another buyer holds a single-use link for up
+ * to 31 minutes), anything else is a plain retry with the same button.
+ */
+export function payFailureKind(code: string | undefined): 'closed' | 'busy' | 'retry' {
+  if (code === 'LINK_PAID' || code === 'LINK_EXPIRED' || code === 'LINK_CANCELLED') return 'closed'
+  if (code === 'LINK_BUSY') return 'busy'
+  return 'retry'
 }
 
 /** After start-checkout refuses with these, build a fresh cart instead of reusing the old one. */

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import type { PayChoice } from '@/lib/in-person/payment-link'
+import { payFailureKind, type PayChoice } from '@/lib/in-person/payment-link'
 import type { ManualPayment } from '@/lib/in-person/counter-checkout'
 
 /** «Pagar»: asks the server to open a fresh cart for this link, then goes to the provider or shows the transfer data. */
@@ -10,6 +10,7 @@ export default function PayClient({ token, choices }: { token: string; choices: 
   const [busy, setBusy] = useState<PayChoice['id'] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [manual, setManual] = useState<ManualPayment | null>(null)
+  const [kind, setKind] = useState<'closed' | 'busy' | 'retry'>('retry')
 
   async function pay(choice: PayChoice['id']) {
     if (busy) return
@@ -22,9 +23,10 @@ export default function PayClient({ token, choices }: { token: string; choices: 
         body: JSON.stringify({ choice }),
         signal: AbortSignal.timeout(40_000),
       })
-      const json = (await res.json().catch(() => null)) as { redirect_url?: string; manual_payment?: ManualPayment; message?: string } | null
+      const json = (await res.json().catch(() => null)) as { redirect_url?: string; manual_payment?: ManualPayment; message?: string; code?: string } | null
       if (res.ok && json?.redirect_url) { window.location.href = json.redirect_url; return }
       if (res.ok && json?.manual_payment) { setManual(json.manual_payment); return }
+      setKind(payFailureKind(json?.code))
       setError(json?.message ?? 'No pudimos preparar el pago. Inténtalo de nuevo.')
     } catch {
       setError('Sin conexión. Inténtalo de nuevo.')
@@ -56,6 +58,10 @@ export default function PayClient({ token, choices }: { token: string; choices: 
     )
   }
 
+  if (kind === 'closed' && error) {
+    return <p role="alert" className="mt-5 font-medium">{error}</p>
+  }
+
   if (choices.length === 0) {
     return <p className="mt-5 text-[var(--color-muted)]">Esta tienda todavía no puede recibir pagos por aquí. Pregúntale cómo pagar.</p>
   }
@@ -64,7 +70,7 @@ export default function PayClient({ token, choices }: { token: string; choices: 
     <div className="mt-5 flex flex-col gap-2">
       {choices.map((c, i) => (
         <Button key={c.id} variant={i === 0 ? 'primary' : 'secondary'} size="lg" className="w-full min-h-[52px]" loading={busy === c.id} disabled={busy !== null} onClick={() => pay(c.id)}>
-          Pagar con {c.label}
+          {kind === 'busy' ? `Intentar de nuevo con ${c.label}` : `Pagar con ${c.label}`}
         </Button>
       ))}
       {error && <p role="alert" className="text-sm text-[var(--color-danger)]">{error}</p>}

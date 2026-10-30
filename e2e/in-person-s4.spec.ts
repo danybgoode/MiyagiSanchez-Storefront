@@ -3,7 +3,7 @@ import path from 'node:path'
 import { test, expect } from '@playwright/test'
 import {
   buildLinkBody, extraPayments, isLinkCancellable, isLinkToken, linkShortUrl, linkStateLabel, linkTitle, linkUrl, linkWhatsAppUrl,
-  payChoices, payScreen, payStartBody, shouldRebuildCart,
+  payChoices, payFailureKind, linkBadge, payScreen, payStartBody, shouldRebuildCart,
 } from '../lib/in-person/payment-link'
 import { runPayFlow, type PayFlowDeps } from '../lib/in-person/payment-link-flow'
 import { filterLinksByState, formatLinkForAgent, mapCancelLinkArgs, mapCreateLinkArgs, pesosToCents } from '../lib/in-person/payment-link-mcp'
@@ -88,6 +88,30 @@ test.describe('pay page state to screen', () => {
     expect(payStartBody('stripe', null)).toEqual({ provider: 'stripe', fulfillment_method: 'digital' })
     expect(payStartBody('manual', 'dimo')).toEqual({ provider: 'manual', manual_sub_type: 'dimo', fulfillment_method: 'digital' })
     expect(Object.keys(payStartBody('mercadopago', null))).not.toEqual(expect.arrayContaining(['seller_id', 'amount', 'offer_amount_cents']))
+  })
+})
+
+test.describe('link busy, closed and pending-confirmation', () => {
+  test('closed codes close the page, LINK_BUSY offers a retry, the rest retry plainly', () => {
+    for (const c of ['LINK_PAID', 'LINK_EXPIRED', 'LINK_CANCELLED']) expect(payFailureKind(c)).toBe('closed')
+    expect(payFailureKind('LINK_BUSY')).toBe('busy')
+    for (const c of ['CHECKOUT_START_FAILED', undefined, 'CART_CHANGED']) expect(payFailureKind(c)).toBe('retry')
+  })
+  test('a LINK_BUSY from start-checkout is passed through, not retried into a second cart', async () => {
+    let carts = 0
+    const d: PayFlowDeps = {
+      async buildCart() { carts += 1; return { ok: true, cart_id: 'c' } },
+      async startCheckout() { return { ok: false, status: 409, code: 'LINK_BUSY', message: 'Alguien está pagando este cobro.' } },
+      async completeCart() { return true },
+    }
+    expect(await runPayFlow('stripe', d)).toMatchObject({ ok: false, code: 'LINK_BUSY' })
+    expect(carts).toBe(1)
+  })
+  test('a pending single-use link with an order reads «Pago por confirmar»; otherwise the plain state', () => {
+    expect(linkBadge({ state: 'pending', paid_order_ids: ['o1'] }).label).toBe('Pago por confirmar')
+    expect(linkBadge({ state: 'pending', paid_order_ids: [] }).label).toBe('Esperando pago')
+    expect(linkBadge({ state: 'paid', paid_order_ids: ['o1'] })).toEqual({ label: 'Pagado', token: 'success' })
+    expect(linkBadge({ state: 'cancelled', paid_order_ids: ['o1'] }).label).toBe('Cancelado')
   })
 })
 
