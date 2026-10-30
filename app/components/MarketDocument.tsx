@@ -10,6 +10,7 @@ import { DEFAULT_MARKET, isMarketplaceOpen, marketBasePath, type MarketCode } fr
 import { resolveMarketPresentation } from '@/lib/market-presentation'
 import { PLATFORM_OG_COLORS } from '@/lib/platform-theme'
 import RouteProgress from '@/app/components/RouteProgress'
+import CounterCacheGuard from '@/app/components/CounterCacheGuard'
 
 const BASE_URL = 'https://miyagisanchez.com'
 
@@ -205,6 +206,7 @@ export default async function MarketDocument({
               navigation it reports on, which anything below the layout boundary
               cannot do. */}
           <RouteProgress />
+          <CounterCacheGuard />
           <BuyerPresentationProvider presentation={presentation} copy={dictionary.buyerCopy}>
             <CartProvider>
               {children}

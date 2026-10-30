@@ -118,6 +118,15 @@ export function wakeAll(q: SaleQueue, now: number): SaleQueue {
   return { entries: q.entries.map((e) => (e.status === 'pending' ? { ...e, next_attempt_at: now } : e)) }
 }
 
+/**
+ * Whether a sync pass goes on to the next entry. It stops at the first retry-later answer, and
+ * when the outcome could not be stored: an entry uploaded but not removed would otherwise be
+ * re-posted over and over (a safe replay on the server, but pointless load and a stuck count).
+ */
+export function shouldContinuePass(verdict: QueueVerdict | null, persisted: boolean): boolean {
+  return persisted && verdict !== 'retry' && verdict !== null
+}
+
 /** What changed between two queues, as per-entry writes (the store is never cleared and rewritten). */
 export function diffQueues(prev: SaleQueue, next: SaleQueue): { put: QueueEntry[]; remove: string[] } {
   const before = new Map(prev.entries.map((e) => [e.client_id, JSON.stringify(e)]))

@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { test, expect } from '@playwright/test'
-import { applyResponse, dismiss, emptyQueue, enqueue, needsAttention, nextToSend, pendingCount, sanitizeEntries, backoffMs, diffQueues, retryParked, wakeAll, QUEUE_PARK_CODES } from '../lib/in-person/sale-queue'
-import { cacheOwnerAction } from '../lib/in-person/counter-cache'
+import { applyResponse, dismiss, emptyQueue, enqueue, needsAttention, nextToSend, pendingCount, sanitizeEntries, backoffMs, diffQueues, retryParked, wakeAll, QUEUE_PARK_CODES, shouldContinuePass } from '../lib/in-person/sale-queue'
+import { authCacheAction, cacheOwnerAction } from '../lib/in-person/counter-cache'
 import { isOversold, oversoldLines, oversoldSummary } from '../lib/in-person/oversold'
 
 /** In-person sales · Sprint 3 — offline cash queue, worker scope, oversell flag. */
@@ -162,6 +162,25 @@ test.describe('counter service-worker scope', () => {
     expect(own).toContain('caches.delete')
     const client = readFileSync(path.resolve(import.meta.dirname, '../app/(shell)/shop/manage/en-persona/CounterClient.tsx'), 'utf8')
     expect(client).toContain("register('/counter-sw.js', { scope: '/shop/manage/en-persona' })")
+  })
+  test('auth transition: purge when the user changes or signs out; keep for the same user and first sight', () => {
+    expect(authCacheAction('u1', null)).toBe('purge')
+    expect(authCacheAction('u1', 'u2')).toBe('purge')
+    expect(authCacheAction('u1', 'u1')).toBe('keep')
+    expect(authCacheAction(null, 'u1')).toBe('keep')
+    expect(authCacheAction(null, null)).toBe('keep')
+  })
+  test('the cache guard is mounted site-wide and never touches IndexedDB', () => {
+    const guard = readFileSync(path.resolve(import.meta.dirname, '../app/components/CounterCacheGuard.tsx'), 'utf8')
+    expect(guard).not.toMatch(/indexedDB|deleteDatabase/)
+    expect(readFileSync(path.resolve(import.meta.dirname, '../app/components/MarketDocument.tsx'), 'utf8')).toContain('<CounterCacheGuard />')
+  })
+  test('a sync pass stops when the result could not be stored, or on retry-later', () => {
+    expect(shouldContinuePass('recorded', true)).toBe(true)
+    expect(shouldContinuePass('parked', true)).toBe(true)
+    expect(shouldContinuePass('recorded', false)).toBe(false)
+    expect(shouldContinuePass('retry', true)).toBe(false)
+    expect(shouldContinuePass(null, true)).toBe(false)
   })
   test('cache owner: a different seller on the same browser purges the counter cache', () => {
     expect(cacheOwnerAction('sel_1', 'sel_1')).toBe('keep')

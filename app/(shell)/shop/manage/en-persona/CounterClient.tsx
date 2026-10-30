@@ -55,7 +55,7 @@ import {
 import { classifySaleResponse } from '@/lib/in-person/sale-response'
 import type { CounterKind, ManualPayment, SaleState } from '@/lib/in-person/counter-checkout'
 import { parseStoredSale } from '@/lib/in-person/stored-sale'
-import { applyResponse, diffQueues, dismiss, emptyQueue, enqueue, needsAttention, nextToSend, pendingCount, retryParked, wakeAll, type SaleQueue } from '@/lib/in-person/sale-queue'
+import { applyResponse, diffQueues, dismiss, shouldContinuePass, emptyQueue, enqueue, needsAttention, nextToSend, pendingCount, retryParked, wakeAll, type SaleQueue } from '@/lib/in-person/sale-queue'
 import { cacheOwnerAction, COUNTER_CACHE_PREFIX, COUNTER_OWNER_KEY } from '@/lib/in-person/counter-cache'
 import { idbApply, idbLoad } from '@/lib/in-person/sale-queue-idb'
 import { buildReceiptText } from '@/lib/in-person/receipt'
@@ -350,8 +350,9 @@ export default function CounterClient({ products: initialProducts, truncated, sh
         res = { status: null }
       }
       const { queue: next, verdict } = applyResponse(queueRef.current, entry.client_id, res, clock())
-      await commitQueue(next)
-      if (verdict === 'retry') break
+      // If the result could not be stored, stop: the entry stays as it was and the next pass
+      // replays it safely, instead of re-posting the same sale in a tight loop.
+      if (!shouldContinuePass(verdict, await commitQueue(next))) break
     }
   }
 
