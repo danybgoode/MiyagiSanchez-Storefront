@@ -69,7 +69,7 @@ export default async function EnPersonaPage() {
     <div className="max-w-5xl mx-auto px-4 pt-4 pb-40 md:pb-24">
       <SellerBreadcrumb />
       <h1 className="text-xl sm:text-2xl font-bold mt-2 mb-3">Vender en persona</h1>
-      <CounterClient products={products} truncated={truncated} shopName={seller.name} shopSlug={seller.slug} />
+      <CounterClient products={products} truncated={truncated} shopName={seller.name} shopSlug={seller.slug} sellerId={seller.id} />
     </div>
   )
 }

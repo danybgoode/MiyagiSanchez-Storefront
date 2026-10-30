@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { SellerBreadcrumb } from '../SellerBreadcrumb'
 import { manualPaymentStateFromOrder, manualPaymentBadge, whoActsNext } from '@/lib/manual-payment-state'
 import { mlOrderBadgeLabel } from '@/lib/ml-order-badge'
+import { OVERSOLD_LABEL, isOversold, oversoldSummary } from '@/lib/in-person/oversold'
 import { filterBySource, inPersonBadgeLabel, orderSourceLabel, presentSources, type OrderSource } from '@/lib/in-person/order-source'
 import { orderStatusToToken } from '@/lib/status-badge'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -49,6 +50,7 @@ interface Order {
   manual_payment_state?: string | null
   // Which marketplace sold this (ml-orders-native S1 · US-3).
   source?: string | null
+  in_person_oversold?: unknown
   ml_order_id?: string | null
   ml_pack_id?: string | null
   // Free-form seller tags (ml-orders-native S3 · US-7).
@@ -252,6 +254,12 @@ function OrderCard({
             <span>{order.buyer_name ?? 'Comprador'}</span>
             <span>{fmt.relativeShort(order.created_at, now)}</span>
           </div>
+
+          {isOversold(order.in_person_oversold) && (
+            <p className="text-xs text-[var(--color-warning)] mt-1.5">
+              {OVERSOLD_LABEL}. {oversoldSummary(order.in_person_oversold)}
+            </p>
+          )}
 
           {/* Tag chips */}
           {order.tags && order.tags.length > 0 && (

@@ -5393,6 +5393,18 @@
     "s_2fd5a3edfca23c16": "View in Orders",
     "s_3f3f7d88e05abb17": "Got it",
     "s_def20d787de04f86": "The buyer is already paying. Wait a few seconds.",
-    "s_914cd715e73076dd": "Leave pending"
+    "s_914cd715e73076dd": "Leave pending",
+    "s_361624b80ee09403": "sale to upload",
+    "s_51047935c8edc570": "No signal and this browser cannot save sales. Wait for a signal.",
+    "s_8620948bd513e025": "No signal: you can take cash. It is saved and uploaded later.",
+    "s_ada3e0224eac73f0": "It will upload when there is signal.",
+    "s_b10953dcec7804b4": "Sale saved",
+    "s_b6bc8a3dbd87021b": "sales to upload",
+    "s_c07b050f090bb93d": "Could not upload a sale of",
+    "s_c4a482534579c47d": "Card and transfer need signal.",
+    "s_ff85c3a64eb93046": "No signal and this browser cannot save sales: wait for a signal.",
+    "s_4b20d162ed7a5267": "If you discard this sale it is lost: it will not be recorded in Orders. Discard it?",
+    "s_5d81e12652744b8c": "We could not save the sale on this phone. Tap «Retry» when you have signal.",
+    "s_acbbd429ad47a5dc": "We could not save the sale on this phone. Do not treat it as charged."
   }
 }

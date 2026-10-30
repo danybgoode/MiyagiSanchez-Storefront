@@ -55,6 +55,9 @@ import {
 import { classifySaleResponse } from '@/lib/in-person/sale-response'
 import type { CounterKind, ManualPayment, SaleState } from '@/lib/in-person/counter-checkout'
 import { parseStoredSale } from '@/lib/in-person/stored-sale'
+import { applyResponse, diffQueues, dismiss, shouldContinuePass, emptyQueue, enqueue, needsAttention, nextToSend, pendingCount, retryParked, wakeAll, type SaleQueue } from '@/lib/in-person/sale-queue'
+import { cacheOwnerAction, COUNTER_CACHE_PREFIX, COUNTER_OWNER_KEY } from '@/lib/in-person/counter-cache'
+import { idbApply, idbLoad } from '@/lib/in-person/sale-queue-idb'
 import { buildReceiptText } from '@/lib/in-person/receipt'
 import { cancelVerdict, LEAVE_PENDING_NOTE, screenForState, UNVERIFIED_MESSAGE } from '@/lib/in-person/sale-screen'
 import { buildWhatsAppShareLink, shopShortLink } from '@/lib/share-link'
@@ -75,6 +78,8 @@ interface SaleDone {
   totalCents: number
   changeCents: number
   replayed: boolean
+  /** Saved on this device to upload later (offline cash), not yet an order. */
+  queued?: boolean
 }
 
 /** A card / transfer sale that exists and is waiting for money (or for «Ya me llegó»). */
@@ -101,7 +106,7 @@ type SaleOutcome =
   | { kind: 'ok'; done: SaleDone; remote: null }
   | { kind: 'ok'; done: null; remote: ActiveRemote }
   | { kind: 'refused'; message: string; serverTotalCents: number | null }
-  | { kind: 'uncertain'; message: string }
+  | { kind: 'uncertain'; message: string; network?: boolean }
 
 const PAD_KEYS: PadKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del']
 const QUICK_BILLS = [50, 100, 200, 500, 1000]
@@ -110,6 +115,33 @@ const IN_PROGRESS_WAIT_MS = 2000
 const REQUEST_TIMEOUT_MS = 30_000
 const STORAGE_KEY = 'ms.en-persona.frozen-sale'
 const RETRY_HINT = 'Toca «Reintentar»: no se cobra doble.'
+
+/** Clock read for event handlers (kept out of the render path). */
+const clock = () => Date.now()
+/**
+ * Set up the counter's own worker (scope limited to this page) and the offline cache.
+ * Order matters on a shared phone: if the cache belongs to another seller it is deleted BEFORE
+ * anything else, then this seller is recorded as owner.
+ */
+async function setupCounterWorker(sellerId: string) {
+  try {
+    let owner: string | null = null
+    try { owner = window.localStorage.getItem(COUNTER_OWNER_KEY) } catch { /* no storage: purge to be safe below */ }
+    const action = cacheOwnerAction(owner, sellerId)
+    if (action !== 'keep' && 'caches' in window) {
+      const names = await caches.keys()
+      await Promise.all(names.filter((n) => n.startsWith(COUNTER_CACHE_PREFIX)).map((n) => caches.delete(n)))
+    }
+    try { window.localStorage.setItem(COUNTER_OWNER_KEY, sellerId) } catch { /* ignore */ }
+    if (!('serviceWorker' in navigator)) return
+    await navigator.serviceWorker.register('/counter-sw.js', { scope: '/shop/manage/en-persona' })
+    const reg = await navigator.serviceWorker.ready
+    // First visit works offline after one online load: hand the worker what this page loaded.
+    const urls = [location.pathname, ...performance.getEntriesByType('resource').map((r) => r.name)]
+      .filter((u) => { try { return new URL(u, location.origin).origin === location.origin } catch { return false } })
+    reg.active?.postMessage({ type: 'precache', page: location.href, urls })
+  } catch { /* no worker: the counter still works online */ }
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -136,7 +168,7 @@ async function postSale(sale: FrozenSale): Promise<SaleOutcome> {
       })
     } catch {
       sale.uncertain = true
-      return { kind: 'uncertain', message: `Sin conexión. ${RETRY_HINT}` }
+      return { kind: 'uncertain', message: `Sin conexión. ${RETRY_HINT}`, network: true }
     }
     const json = (await res.json().catch(() => null)) as {
       order_id?: string
@@ -213,7 +245,7 @@ function stockLabel(variants: CounterVariant[]): string {
   return units > 0 ? `Quedan ${units}` : 'Agotado'
 }
 
-export default function CounterClient({ products: initialProducts, truncated, shopName, shopSlug }: { products: CounterProduct[]; truncated: boolean; shopName: string; shopSlug: string }) {
+export default function CounterClient({ products: initialProducts, truncated, shopName, shopSlug, sellerId }: { products: CounterProduct[]; truncated: boolean; shopName: string; shopSlug: string; sellerId: string }) {
   const fmt = useSellerFormat()
   const money = (cents: number) => fmt.money(cents, 'MXN')
 
@@ -232,6 +264,13 @@ export default function CounterClient({ products: initialProducts, truncated, sh
   const [frozenKind, setFrozenKind] = useState<CounterKind | null>(null)
   const [qrImage, setQrImage] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // Offline cash queue (S3.1). `storage`: unknown until IndexedDB answers; 'unavailable' disables offline selling.
+  const [queue, setQueue] = useState<SaleQueue>(emptyQueue)
+  const [storage, setStorage] = useState<'unknown' | 'ready' | 'unavailable'>('unknown')
+  const [online, setOnline] = useState(true)
+  const queueRef = useRef<SaleQueue>(emptyQueue())
+  const syncing = useRef(false)
+  const alive = useRef(true)
   const [receipt, setReceipt] = useState<{ lines: CounterCart['lines']; totalCents: number; method: CounterKind } | null>(null)
   const pendingRef = useRef<FrozenSale | null>(null)
 
@@ -261,6 +300,114 @@ export default function CounterClient({ products: initialProducts, truncated, sh
     })
     return () => { cancelled = true }
   }, [])
+
+  /**
+   * Write the change to IndexedDB FIRST (per-entry put/delete, never a clear), then show it.
+   * False when the write failed: the caller must not say «Venta guardada» and must keep its
+   * frozen sale. Memory only changes after the store accepted it.
+   */
+  async function commitQueue(next: SaleQueue): Promise<boolean> {
+    const prev = queueRef.current
+    const ok = await idbApply(sellerId, diffQueues(prev, next))
+    if (!ok) { setStorage('unavailable'); return false }
+    queueRef.current = next
+    setQueue(next)
+    return true
+  }
+
+  /** The store is the truth (another tab may have added or finished entries): re-read it. */
+  async function reloadQueue(): Promise<boolean> {
+    const entries = await idbLoad(sellerId)
+    if (entries === null) { setStorage('unavailable'); return false }
+    if (!alive.current) return false
+    setStorage('ready')
+    queueRef.current = { entries }
+    setQueue({ entries })
+    return true
+  }
+
+  /**
+   * Upload every due entry, one at a time. An entry leaves only when the backend returns its
+   * order. The pass stops at the FIRST retry-later answer (no signal, expired session, 5xx):
+   * hammering the rest would only burn attempts. Serialised across tabs with Web Locks.
+   */
+  async function syncPass() {
+    if (!(await reloadQueue())) return
+    for (let guard = 0; guard < 200 && alive.current; guard += 1) {
+      const entry = nextToSend(queueRef.current, clock())
+      if (!entry) break
+      let res: { status: number | null; code?: string | null; hasOrder?: boolean; message?: string | null }
+      try {
+        const r = await fetch('/api/shop/en-persona/sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: entry.client_id, kind: 'cash', lines: entry.lines, tendered_cents: entry.tendered_cents, offline: true, sold_at: entry.sold_at }),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+        const j = (await r.json().catch(() => null)) as { order_id?: string; total_cents?: number; code?: string; message?: string } | null
+        res = { status: r.status, code: j?.code, hasOrder: !!j?.order_id && Number.isSafeInteger(j?.total_cents), message: j?.message }
+      } catch {
+        res = { status: null }
+      }
+      const { queue: next, verdict } = applyResponse(queueRef.current, entry.client_id, res, clock())
+      // If the result could not be stored, stop: the entry stays as it was and the next pass
+      // replays it safely, instead of re-posting the same sale in a tight loop.
+      if (!shouldContinuePass(verdict, await commitQueue(next))) break
+    }
+  }
+
+  async function syncQueue() {
+    if (syncing.current) return
+    syncing.current = true
+    try {
+      const locks = (navigator as Navigator & { locks?: { request: (name: string, cb: () => Promise<void>) => Promise<void> } }).locks
+      if (locks) await locks.request(`ms-en-persona-sync:${sellerId}`, syncPass)
+      else await syncPass()
+    } catch { /* a failed pass is just a later pass */ } finally {
+      syncing.current = false
+    }
+  }
+
+  // Load the queue (survives reloads), track connectivity, set up the counter worker, sync on
+  // load / online / focus / every 30 s while online.
+  useEffect(() => {
+    alive.current = true
+    const goOnline = () => {
+      setOnline(true)
+      // Backoff grown while offline is meaningless now: everything pending is due at once.
+      void reloadQueue().then((ok) => ok && commitQueue(wakeAll(queueRef.current, clock()))).then(() => syncQueue())
+    }
+    const goOffline = () => setOnline(false)
+    const refresh = () => { if (document.visibilityState === 'visible') void reloadQueue() }
+    queueMicrotask(() => {
+      if (!alive.current) return
+      setOnline(navigator.onLine)
+      void setupCounterWorker(sellerId)
+      void reloadQueue().then((ok) => { if (ok) void syncQueue() })
+    })
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    const timer = setInterval(() => {
+      if (navigator.onLine && pendingCount(queueRef.current) > 0) void syncQueue()
+    }, 30_000)
+    return () => {
+      alive.current = false
+      clearInterval(timer)
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+    // The handlers only touch refs and stable setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const offlineCash = !online
+  const canQueue = storage === 'ready'
+  const queuedCount = pendingCount(queue)
+  const parked = needsAttention(queue)
 
   const total = cartTotalCents(cart)
   const units = cartUnits(cart)
@@ -364,6 +511,18 @@ export default function CounterClient({ products: initialProducts, truncated, sh
   async function submitSale(kind: CounterKind) {
     if (inFlight || cart.lines.length === 0) return
     if (kind === 'cash' && !canSubmit) return
+    if (kind === 'cash' && offlineCash) {
+      if (!canQueue) { setError('Sin señal y este navegador no puede guardar ventas. Espera a tener señal.'); return }
+      if (!pendingRef.current) {
+        const entryId = crypto.randomUUID()
+        setInFlight(true)
+        const saved = await commitQueue(enqueue(queueRef.current, { client_id: entryId, lines: toSaleLines(cart), tendered_cents: tendered, total_cents: total }, clock()))
+        setInFlight(false)
+        if (!saved) { setError('No pudimos guardar la venta en este teléfono. No la entregues como cobrada.'); return }
+        finishSale({ clientId: entryId, lines: toSaleLines(cart), tenderedCents: tendered, kind: 'cash', uncertain: false }, { totalCents: total, changeCents: cash?.change_cents ?? 0, replayed: false, queued: true })
+        return
+      }
+    }
     // First press mints the id and freezes the payload; every retry re-sends that exact payload.
     if (!pendingRef.current) {
       pendingRef.current = { clientId: crypto.randomUUID(), lines: toSaleLines(cart), tenderedCents: kind === 'cash' ? tendered : null, kind, uncertain: false }
@@ -404,6 +563,20 @@ export default function CounterClient({ products: initialProducts, truncated, sh
       setUncertain(false)
       setActive(remote)
       setStage(remote.kind === 'card' ? 'qr' : 'transfer')
+      return
+    }
+    if (outcome.kind === 'uncertain' && outcome.network && sale.kind === 'cash' && canQueue) {
+      // The signal dropped mid-send: the order MAY exist. Queue the SAME frozen sale (same id,
+      // marked uncertain) so the upload is a replay, and let the merchant carry on.
+      const saved = await commitQueue(enqueue(queueRef.current, { client_id: sale.clientId, lines: sale.lines, tendered_cents: sale.tenderedCents, total_cents: total, uncertain: true }, clock()))
+      if (!saved) {
+        // Not stored: keep the frozen sale (and its sessionStorage copy) so «Reintentar» resumes it.
+        writeStored({ sale, cart, padText })
+        setUncertain(true)
+        setError('No pudimos guardar la venta en este teléfono. Toca «Reintentar» cuando tengas señal.')
+        return
+      }
+      finishSale(sale, { totalCents: total, changeCents: cash?.change_cents ?? 0, replayed: false, queued: true })
       return
     }
     if (outcome.kind === 'refused') {
@@ -551,6 +724,35 @@ export default function CounterClient({ products: initialProducts, truncated, sh
         <p className="text-xs text-[var(--color-muted)] mt-2">Mostramos hasta 200 productos de cada tipo. La búsqueda solo filtra los que ya cargaron; si no ves uno, ajusta su estado en Catálogo.</p>
       )}
 
+      {(offlineCash || queuedCount > 0 || parked.length > 0 || (storage === 'unavailable' && offlineCash)) && (
+        <div role="status" className="mt-3 rounded-[var(--r-md)] border border-[var(--color-border)] bg-[var(--color-warning-soft)] p-3 text-sm">
+          {offlineCash && (
+            <p className="font-medium">
+              {canQueue ? 'Sin señal: puedes cobrar en efectivo. Se guarda y se sube después.' : 'Sin señal y este navegador no puede guardar ventas: espera a tener señal.'}
+            </p>
+          )}
+          {queuedCount > 0 && <p className="mt-1">{queuedCount} {queuedCount === 1 ? 'venta por subir' : 'ventas por subir'}</p>}
+          {parked.map((e) => (
+            <div key={e.client_id} className="mt-2 flex items-start justify-between gap-2">
+              <p className="text-[var(--color-danger)]">No se pudo subir una venta de {money(e.total_cents)}: {e.message}</p>
+              <span className="flex flex-shrink-0">
+                <Button variant="secondary" size="sm" className="min-h-[44px]" onClick={() => { void commitQueue(retryParked(queueRef.current, e.client_id, clock())).then(() => syncQueue()) }}>Reintentar</Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="min-h-[44px]"
+                  onClick={() => {
+                    if (window.confirm('Si descartas esta venta se pierde: no quedará registrada en Pedidos. ¿Descartarla?')) void commitQueue(dismiss(queueRef.current, e.client_id))
+                  }}
+                >
+                  Descartar
+                </Button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {products.length === 0 ? (
         <Card className="mt-4 p-6 text-center">
           <p className="font-medium">Aún no tienes productos activos para vender.</p>
@@ -637,7 +839,8 @@ export default function CounterClient({ products: initialProducts, truncated, sh
           {stage === 'done' && done ? (
             <div className="text-center py-4">
               <i className="iconoir-check-circle text-5xl text-[var(--color-success)]" aria-hidden />
-              <h2 className="text-xl font-bold mt-2">Venta registrada</h2>
+              <h2 className="text-xl font-bold mt-2">{done.queued ? 'Venta guardada' : 'Venta registrada'}</h2>
+              {done.queued && <p className="text-sm text-[var(--color-muted)] mt-1">Se subirá cuando haya señal.</p>}
               <p className="text-[var(--color-muted)] mt-1">Total {money(done.totalCents)}</p>
               {done.changeCents > 0 && (
                 <p className="text-3xl font-bold mt-4">Cambio {money(done.changeCents)}</p>
@@ -851,12 +1054,13 @@ export default function CounterClient({ products: initialProducts, truncated, sh
                   <Button variant="primary" size="lg" className="w-full min-h-[52px]" disabled={cart.lines.length === 0 || locked} onClick={() => { setPadText(''); setStage('cash') }}>
                     <i className="iconoir-cash" aria-hidden /> Efectivo
                   </Button>
-                  <Button variant="secondary" size="lg" className="w-full min-h-[52px]" loading={inFlight} disabled={cart.lines.length === 0 || locked} onClick={() => submitSale('card')}>
+                  <Button variant="secondary" size="lg" className="w-full min-h-[52px]" loading={inFlight} disabled={cart.lines.length === 0 || locked || offlineCash} onClick={() => submitSale('card')}>
                     <i className="iconoir-credit-card" aria-hidden /> Tarjeta o Mercado Pago
                   </Button>
-                  <Button variant="secondary" size="lg" className="w-full min-h-[52px]" loading={inFlight} disabled={cart.lines.length === 0 || locked} onClick={() => submitSale('transfer')}>
+                  <Button variant="secondary" size="lg" className="w-full min-h-[52px]" loading={inFlight} disabled={cart.lines.length === 0 || locked || offlineCash} onClick={() => submitSale('transfer')}>
                     <i className="iconoir-bank" aria-hidden /> Transferencia
                   </Button>
+                  {offlineCash && <p className="text-xs text-[var(--color-muted)]">Tarjeta y transferencia necesitan señal.</p>}
                 </div>
               )}
             </div>
