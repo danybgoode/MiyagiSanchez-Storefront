@@ -56,7 +56,7 @@ import { classifySaleResponse } from '@/lib/in-person/sale-response'
 import type { CounterKind, ManualPayment, SaleState } from '@/lib/in-person/counter-checkout'
 import { parseStoredSale } from '@/lib/in-person/stored-sale'
 import { buildReceiptText } from '@/lib/in-person/receipt'
-import { cancelVerdict, screenForState, UNVERIFIED_MESSAGE } from '@/lib/in-person/sale-screen'
+import { cancelVerdict, LEAVE_PENDING_NOTE, screenForState, UNVERIFIED_MESSAGE } from '@/lib/in-person/sale-screen'
 import { buildWhatsAppShareLink, shopShortLink } from '@/lib/share-link'
 import { isSellable, matchesQuery, type CounterProduct, type CounterVariant } from '@/lib/in-person/counter-catalog'
 
@@ -462,6 +462,11 @@ export default function CounterClient({ products: initialProducts, truncated, sh
     return () => { cancelled = true }
   }, [qrUrl])
 
+  /** Transfer exit: clear the counter WITHOUT cancelling. The order stays in Pedidos, pending payment. */
+  function leavePending() {
+    resetSale()
+  }
+
   async function cancelWaitingSale() {
     const sale = pendingRef.current
     if (!sale || inFlight) return
@@ -477,6 +482,8 @@ export default function CounterClient({ products: initialProducts, truncated, sh
         markUnverified(sale, { ...active, orderId: json?.order_id ?? active.orderId })
       } else if (verdict === 'cancelled') {
         releaseSale(null)
+      } else if (verdict === 'leave_pending') {
+        leavePending()
       } else if (json?.code === 'PAYMENT_IN_PROGRESS') {
         // The buyer is paying right now: keep the screen and keep polling.
         setError(json.message ?? 'El comprador ya está pagando. Espera unos segundos.')
@@ -719,9 +726,10 @@ export default function CounterClient({ products: initialProducts, truncated, sh
               <Button variant="primary" size="lg" className="w-full mt-4 min-h-[52px]" loading={inFlight} disabled={!active.orderId} onClick={confirmTransfer}>
                 Ya me llegó
               </Button>
-              <Button variant="secondary" className="w-full mt-2 min-h-[44px]" disabled={inFlight} onClick={cancelWaitingSale}>
-                Cancelar
+              <Button variant="secondary" className="w-full mt-2 min-h-[44px]" disabled={inFlight} onClick={leavePending}>
+                Dejar pendiente
               </Button>
+              <p className="text-sm text-[var(--color-muted)] mt-2">{LEAVE_PENDING_NOTE}</p>
             </div>
           ) : stage === 'cash' ? (
             <div>

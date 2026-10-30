@@ -87,7 +87,7 @@ export interface OrchestrateDeps {
    * `exists`: the backend says a checkout is already open (409 CHECKOUT_EXISTS) — fine, use it.
    * `closed`: the claim is no longer awaiting payment (409 SALE_CLOSED) — the cancelled path.
    */
-  startCheckout(): Promise<{ ok: true; manual_payment: ManualPayment | null } | { ok: false; reason: 'exists' | 'closed' | 'failed' }>
+  startCheckout(): Promise<{ ok: true; manual_payment: ManualPayment | null } | { ok: false; reason: 'exists' | 'closed' | 'failed'; code?: string; message?: string }>
   completeCart(): Promise<boolean>
   manualFallback(): Promise<ManualPayment | null>
   /** Best effort: close a sale we could not make payable. True when the backend confirmed it. */
@@ -116,19 +116,27 @@ export async function makeSalePayable(kind: 'card' | 'transfer', deps: Orchestra
   if (!alreadyStarted) {
     const started = await deps.startCheckout()
     if (!started.ok && started.reason === 'closed') {
-      return { ok: false, httpStatus: 409, code: 'SALE_CLOSED', message: 'Esta venta ya no se puede cobrar. Puedes volver a cobrarla.' }
+      // SALE_CLOSED (claim no longer awaiting payment) or CART_CHANGED (the cart no longer matches
+      // what was rung up): a definite refusal for THIS sale, the id is released.
+      const changed = started.code === 'CART_CHANGED'
+      return {
+        ok: false, httpStatus: 409, code: changed ? 'CART_CHANGED' : 'SALE_CLOSED',
+        message: started.message ?? (changed ? 'Esta venta cambió. Vuelve a cobrarla desde el mostrador.' : 'Esta venta ya no se puede cobrar. Puedes volver a cobrarla.'),
+      }
     }
     if (!started.ok && started.reason === 'exists') {
       // A checkout is already open (a racing retry): do NOT open another, just use it.
       manual = null
       status = (await deps.getStatus()) ?? status
     } else if (!started.ok) {
-      // The sale is claimed but cannot be paid. Close it if we can, so it does not linger
-      // as a payable-looking claim; a confirmed close is a definite "not recorded".
-      if (await deps.cancelSale()) {
-        return { ok: false, httpStatus: 409, code: 'SALE_CLOSED', message: 'No pudimos preparar el cobro y la venta se canceló. Inténtalo de nuevo.' }
+      // The backend releases its open mark when the provider checkout fails, so the SAME id can
+      // retry. Surface its own reason (PAYMENT_METHOD_DISABLED, SELLER_MP_NOT_CONNECTED,
+      // MP_TOKEN_EXPIRED, PAYMENT_SESSION_FAILED...) instead of a generic error, and do NOT
+      // cancel: the sale stays retryable.
+      return {
+        ok: false, httpStatus: 502, code: 'CHECKOUT_START_FAILED',
+        message: started.message ? `${started.message} Toca «Reintentar».` : START_FAILED.message,
       }
-      return START_FAILED
     }
     else {
       manual = started.manual_payment

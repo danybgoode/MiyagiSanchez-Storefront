@@ -1455,6 +1455,7 @@
         "s_7cca69b0af737deb",
         "s_d8dd878fb14359e9",
         "s_26b1a7d1bbc5eecb",
+        "s_914cd715e73076dd",
         "s_8b4e93e928dfd6ca",
         "s_95e9e61bf82d86c0",
         "s_22fac51606a2a1aa",
@@ -7441,6 +7442,10 @@
     {
       "key": "s_91144ffb5c755fb7",
       "source": "Pide datos al comprador antes de pagar — un nombre para grabar, un mensaje de regalo, una talla. Lo que escriba viajará con el pedido hasta tu pantalla de pedidos."
+    },
+    {
+      "key": "s_914cd715e73076dd",
+      "source": "Dejar pendiente"
     },
     {
       "key": "s_9165e8b4de708b88",

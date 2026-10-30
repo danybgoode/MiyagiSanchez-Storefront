@@ -29,7 +29,7 @@ export const PRE_CLAIM_REFUSALS: ReadonlySet<string> = new Set([
 ])
 
 /** Raised after the claim: they say the sale was NOT recorded even following an uncertain attempt. */
-export const POST_CLAIM_REFUSALS: ReadonlySet<string> = new Set(['OUT_OF_STOCK', 'SALE_CLOSED', 'TENDERED_SHORT'])
+export const POST_CLAIM_REFUSALS: ReadonlySet<string> = new Set(['OUT_OF_STOCK', 'SALE_CLOSED', 'TENDERED_SHORT', 'CART_CHANGED'])
 
 export function classifySaleResponse(input: {
   status: number | null

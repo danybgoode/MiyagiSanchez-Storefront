@@ -21,13 +21,13 @@ const status = (over: Partial<SaleStatus> = {}): SaleStatus => ({
   state: 'awaiting_payment', order_id: null, cart_id: 'cart_1', checkout_url: null, total_cents: 24000, ...over,
 })
 
-function fakeDeps(reads: SaleStatus[], opts: { startOk?: boolean; startReason?: 'exists' | 'closed' | 'failed'; completeOk?: boolean; cancelOk?: boolean } = {}) {
+function fakeDeps(reads: SaleStatus[], opts: { startOk?: boolean; startReason?: 'exists' | 'closed' | 'failed'; startCode?: string; startMessage?: string; completeOk?: boolean; cancelOk?: boolean } = {}) {
   const calls = { start: 0, complete: 0, cancel: 0, read: 0, manualFallback: 0 }
   const deps: OrchestrateDeps = {
     async getStatus() { const s = reads[Math.min(calls.read, reads.length - 1)]; calls.read += 1; return s },
     async startCheckout() {
       calls.start += 1
-      return opts.startOk === false ? { ok: false as const, reason: opts.startReason ?? 'failed' } : { ok: true, manual_payment: { spei: { clabe: '012345678901234567', bank_name: 'BBVA', account_holder: 'Ana' }, dimo: null } }
+      return opts.startOk === false ? { ok: false as const, reason: opts.startReason ?? 'failed', code: opts.startCode, message: opts.startMessage } : { ok: true, manual_payment: { spei: { clabe: '012345678901234567', bank_name: 'BBVA', account_holder: 'Ana' }, dimo: null } }
     },
     async completeCart() { calls.complete += 1; return opts.completeOk !== false },
     async manualFallback() { calls.manualFallback += 1; return { spei: null, dimo: { phone: '5512345678' } } },
@@ -66,14 +66,6 @@ test.describe('counter-checkout · card QR', () => {
     expect(r.ok).toBe(false)
   })
 
-  test('a start-checkout that fails closes the claimed sale; if that works it is a definite SALE_CLOSED, otherwise retryable', async () => {
-    const closed = await makeSalePayable('card', fakeDeps([status()], { startOk: false, cancelOk: true }).deps)
-    expect(!closed.ok && closed.code).toBe('SALE_CLOSED')
-    const open = await makeSalePayable('card', fakeDeps([status()], { startOk: false, cancelOk: false }).deps)
-    expect(!open.ok && open.code).toBe('CHECKOUT_START_FAILED')
-    // the retryable code must NOT release the client id
-    expect(classifySaleResponse({ status: 502, code: 'CHECKOUT_START_FAILED', hadUncertainAttempt: false })).toBe('uncertain')
-  })
 })
 
 test.describe('counter-checkout · start-checkout refusals (security review)', () => {
@@ -99,6 +91,25 @@ test.describe('counter-checkout · start-checkout refusals (security review)', (
   })
 })
 
+test.describe('counter-checkout · refusals that release the id and failures that do not', () => {
+  test('CART_CHANGED is a definite refusal: id released, merchant told to ring it up again, nothing cancelled', async () => {
+    const deps = fakeDeps([status()], { startOk: false, startReason: 'closed', startCode: 'CART_CHANGED', startMessage: 'Esta venta cambió. Vuelve a cobrarla desde el mostrador.' })
+    const r = await makeSalePayable('card', deps.deps)
+    expect(!r.ok && r.code).toBe('CART_CHANGED')
+    expect(!r.ok && r.message).toContain('cambió')
+    expect(deps.calls.cancel).toBe(0)
+    expect(classifySaleResponse({ status: 409, code: 'CART_CHANGED', hadUncertainAttempt: true })).toBe('refused')
+  })
+  test('a failed checkout open surfaces the backend reason, stays retryable and cancels nothing', async () => {
+    const deps = fakeDeps([status()], { startOk: false, startReason: 'failed', cancelOk: true, startCode: 'SELLER_MP_NOT_CONNECTED', startMessage: 'Tu Mercado Pago no está conectado.' })
+    const r = await makeSalePayable('card', deps.deps)
+    expect(!r.ok && r.code).toBe('CHECKOUT_START_FAILED')
+    expect(!r.ok && r.message).toContain('Tu Mercado Pago no está conectado.')
+    expect(deps.calls.cancel).toBe(0)
+    expect(classifySaleResponse({ status: 502, code: 'CHECKOUT_START_FAILED', hadUncertainAttempt: false })).toBe('uncertain')
+  })
+})
+
 test.describe('sale-screen · what a state may show', () => {
   test('only paid is paid; unverified is its own warning, never paid', () => {
     expect(screenForState('paid')).toBe('paid')
@@ -115,6 +126,7 @@ test.describe('sale-screen · what a state may show', () => {
     expect(cancelVerdict({ ok: false, code: 'PAYMENT_IN_PROGRESS' })).toBe('keep_waiting')
     expect(cancelVerdict({ ok: false, code: 'CANCEL_FAILED' })).toBe('keep_waiting')
     expect(cancelVerdict({ ok: true, state: 'awaiting_payment' })).toBe('keep_waiting')
+    expect(cancelVerdict({ ok: false, code: 'TRANSFER_ORDER_EXISTS' })).toBe('leave_pending')
   })
 })
 

@@ -5392,6 +5392,7 @@
     "s_2f011b34f9e2c544": "Payment not confirmed",
     "s_2fd5a3edfca23c16": "View in Orders",
     "s_3f3f7d88e05abb17": "Got it",
-    "s_def20d787de04f86": "The buyer is already paying. Wait a few seconds."
+    "s_def20d787de04f86": "The buyer is already paying. Wait a few seconds.",
+    "s_914cd715e73076dd": "Leave pending"
   }
 }

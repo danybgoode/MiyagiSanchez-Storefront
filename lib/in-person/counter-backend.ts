@@ -65,10 +65,15 @@ export function buildOrchestrateDeps(args: {
           const text = await res.text().catch(() => '')
           console.error('[en-persona] start-checkout refused', res.status, text)
           let code: string | undefined
-          try { code = (JSON.parse(text) as { code?: string }).code } catch { /* not JSON */ }
+          let message: string | undefined
+          try {
+            const parsed = JSON.parse(text) as { code?: string; message?: string }
+            code = parsed.code
+            message = typeof parsed.message === 'string' ? parsed.message : undefined
+          } catch { /* not JSON */ }
           if (res.status === 409 && code === 'CHECKOUT_EXISTS') return { ok: false as const, reason: 'exists' as const }
-          if (res.status === 409 && code === 'SALE_CLOSED') return { ok: false as const, reason: 'closed' as const }
-          return { ok: false as const, reason: 'failed' as const }
+          if (res.status === 409 && (code === 'SALE_CLOSED' || code === 'CART_CHANGED')) return { ok: false as const, reason: 'closed' as const, code, message }
+          return { ok: false as const, reason: 'failed' as const, code, message }
         }
         const json = (await res.json()) as { manual_payment?: ManualPayment | null }
         return { ok: true as const, manual_payment: json.manual_payment ?? null }
