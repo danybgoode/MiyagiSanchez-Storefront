@@ -5393,6 +5393,15 @@
     "s_2fd5a3edfca23c16": "View in Orders",
     "s_3f3f7d88e05abb17": "Got it",
     "s_def20d787de04f86": "The buyer is already paying. Wait a few seconds.",
-    "s_914cd715e73076dd": "Leave pending"
+    "s_914cd715e73076dd": "Leave pending",
+    "s_361624b80ee09403": "sale to upload",
+    "s_51047935c8edc570": "No signal and this browser cannot save sales. Wait for a signal.",
+    "s_8620948bd513e025": "No signal: you can take cash. It is saved and uploaded later.",
+    "s_ada3e0224eac73f0": "It will upload when there is signal.",
+    "s_b10953dcec7804b4": "Sale saved",
+    "s_b6bc8a3dbd87021b": "sales to upload",
+    "s_c07b050f090bb93d": "Could not upload a sale of",
+    "s_c4a482534579c47d": "Card and transfer need signal.",
+    "s_ff85c3a64eb93046": "No signal and this browser cannot save sales: wait for a signal."
   }
 }

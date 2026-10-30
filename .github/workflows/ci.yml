@@ -88,7 +88,7 @@ jobs:
         # home. The preview shards below intentionally have no local build.
         run: npx playwright test e2e/sentry-replay-build.spec.ts e2e/buyer-route-vendor-manifest.spec.ts e2e/perf-budget.spec.ts e2e/collapsible-description-native.spec.ts e2e/excerpt-panel-native.spec.ts e2e/cuenta-menu-native.spec.ts e2e/ai-agent-button-native.spec.ts --project=api --grep 'S3\.[1-4]'
       - name: In-person counter specs
-        run: npx playwright test e2e/in-person-counter-cart.spec.ts e2e/in-person-s2.spec.ts --project=api
+        run: npx playwright test e2e/in-person-counter-cart.spec.ts e2e/in-person-s2.spec.ts e2e/in-person-s3.spec.ts --project=api
 
   prep:
     name: Resolve Vercel preview

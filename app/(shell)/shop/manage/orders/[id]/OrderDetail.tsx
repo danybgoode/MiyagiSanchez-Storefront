@@ -22,6 +22,7 @@ import {
 } from '@/lib/pickup-appointment'
 import { ticketQrPath, type EventTicket } from '@/lib/event-ticket-state'
 import { isMlOrder, mlOrderBadgeLabel } from '@/lib/ml-order-badge'
+import { OVERSOLD_LABEL, isOversold, oversoldSummary } from '@/lib/in-person/oversold'
 import { inPersonBadgeLabel } from '@/lib/in-person/order-source'
 import { formatRentalBookingLines, type RentalBookingLike, type RentalBookingState } from '@/lib/rental-booking'
 import { addTag as addTagLocal, removeTag as removeTagLocal } from '@/lib/order-tags'
@@ -96,6 +97,7 @@ interface OrderDetailProps {
     proof_approved?: boolean | null
     // Which marketplace sold this (ml-orders-native S1 · US-3).
     source?: string | null
+    in_person_oversold?: unknown
     ml_order_id?: string | null
     ml_pack_id?: string | null
     // Free-form seller tags (ml-orders-native S3 · US-7).
@@ -968,6 +970,9 @@ export default function OrderDetail({ order }: OrderDetailProps) {
               </StatusBadge>
             )}
             {counterBadge && <StatusBadge token="info">{counterBadge}</StatusBadge>}
+            {isOversold(order.in_person_oversold) && (
+              <StatusBadge token="warning" title={oversoldSummary(order.in_person_oversold) ?? undefined}>{OVERSOLD_LABEL}</StatusBadge>
+            )}
             {orderMeta.channel === 'custom_domain' && (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-[var(--r-pill)]"

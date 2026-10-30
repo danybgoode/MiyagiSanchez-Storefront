@@ -14,7 +14,7 @@
  * is what makes a retry exactly-once (D4).
  *
  * The body is WHITELISTED rather than spread through, so a browser cannot set backend fields
- * the counter does not own (`offline`, `sold_at` belong to the Sprint 3 queue). A card or
+ * the counter does not own (only `offline` and `sold_at`, the Sprint 3 queue's, are let through). A card or
  * transfer sale carries no tendered amount.
  */
 import { NextRequest, NextResponse } from 'next/server'
@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
     kind,
     lines: body.lines,
     ...(isRemote ? {} : { tendered_cents: body.tendered_cents }),
+    // Offline cash upload (S3): the backend validates both and refuses them for any other kind.
+    ...(body.offline === true ? { offline: true } : {}),
+    ...(typeof body.sold_at === 'string' ? { sold_at: body.sold_at } : {}),
     buyer_email: body.buyer_email,
   }
 

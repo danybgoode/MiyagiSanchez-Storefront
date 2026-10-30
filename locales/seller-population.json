@@ -1456,6 +1456,7 @@
         "s_d8dd878fb14359e9",
         "s_26b1a7d1bbc5eecb",
         "s_914cd715e73076dd",
+        "s_1a878a55c594b0f7",
         "s_8b4e93e928dfd6ca",
         "s_95e9e61bf82d86c0",
         "s_22fac51606a2a1aa",
@@ -1474,6 +1475,7 @@
         "s_e77c6b92f2b79407",
         "s_cee16cee78ea7e30",
         "s_87901f2495f629a0",
+        "s_c07b050f090bb93d",
         "s_b17e2d61f133a0dd",
         "s_2f011b34f9e2c544",
         "s_1946aa7238ea73b9",
@@ -1485,23 +1487,31 @@
         "s_916ecffd702d5690",
         "s_393dce59ad1b0d3c",
         "s_a9254c5f812829af",
+        "s_ada3e0224eac73f0",
         "s_7aa9ea49fb320d5e",
         "s_d54c8eb58f7b2966",
         "s_b2961fa5829de50c",
         "s_553f5b2ff5d004f1",
         "s_d6a7762c4346177a",
+        "s_51047935c8edc570",
+        "s_ff85c3a64eb93046",
+        "s_8620948bd513e025",
         "s_e37736329cadeb79",
+        "s_c4a482534579c47d",
         "s_950a79942dd65710",
         "s_c9b3c38247f744e1",
         "s_4ed786ebd4f83bae",
         "s_dac3440089332961",
         "s_a7eed74001b1cfd3",
         "s_ebda66b3f2fc0d8d",
+        "s_b10953dcec7804b4",
         "s_0d8a87529fa23067",
         "s_2fd5a3edfca23c16",
         "s_dab91b7247e2d05d",
         "s_2354f259a738a375",
         "s_4d4bf7098750e7ea",
+        "s_361624b80ee09403",
+        "s_b6bc8a3dbd87021b",
         "s_69ca69d01ec26010"
       ]
     },
@@ -4640,6 +4650,10 @@
       "source": "sin daños"
     },
     {
+      "key": "s_361624b80ee09403",
+      "source": "venta por subir"
+    },
+    {
       "key": "s_3620c81fa5072fd3",
       "source": "Aplicar precio sugerido"
     },
@@ -5398,6 +5412,10 @@
     {
       "key": "s_5104757b71d669ed",
       "source": "El monto se cobra de forma segura"
+    },
+    {
+      "key": "s_51047935c8edc570",
+      "source": "Sin señal y este navegador no puede guardar ventas. Espera a tener señal."
     },
     {
       "key": "s_5107ec66ddfac5bb",
@@ -7084,6 +7102,10 @@
       "source": "Alto"
     },
     {
+      "key": "s_8620948bd513e025",
+      "source": "Sin señal: puedes cobrar en efectivo. Se guarda y se sube después."
+    },
+    {
       "key": "s_866996b042aa5cf2",
       "source": "Tu dominio, tu marca. Sin miyagisanchez.com en la URL. SSL activo, infraestructura nuestra."
     },
@@ -8384,6 +8406,10 @@
       "source": "Cambia tu facturación cuando quieras — se prorratea, sin cargo doble."
     },
     {
+      "key": "s_ada3e0224eac73f0",
+      "source": "Se subirá cuando haya señal."
+    },
+    {
       "key": "s_adb4fb1788f839d0",
       "source": "¡Envío confirmado! El comprador recibió una notificación."
     },
@@ -8494,6 +8520,10 @@
     {
       "key": "s_b0cbdeea8c20b9ee",
       "source": "¿Ya tienes tu catálogo en un archivo?"
+    },
+    {
+      "key": "s_b10953dcec7804b4",
+      "source": "Venta guardada"
     },
     {
       "key": "s_b1439e30496d1755",
@@ -8662,6 +8692,10 @@
     {
       "key": "s_b6b49b735c9e32bd",
       "source": "Cuéntale a tus compradores qué ofreces, tu especialidad, años de experiencia..."
+    },
+    {
+      "key": "s_b6bc8a3dbd87021b",
+      "source": "ventas por subir"
     },
     {
       "key": "s_b6f416b2137a0c91",
@@ -8964,6 +8998,10 @@
       "source": "Error de red al conectar Cal.com."
     },
     {
+      "key": "s_c07b050f090bb93d",
+      "source": "No se pudo subir una venta de"
+    },
+    {
       "key": "s_c08f8821f107af1b",
       "source": "Reemplazando…"
     },
@@ -9094,6 +9132,10 @@
     {
       "key": "s_c4a445bb84832808",
       "source": "Archivo digital"
+    },
+    {
+      "key": "s_c4a482534579c47d",
+      "source": "Tarjeta y transferencia necesitan señal."
     },
     {
       "key": "s_c4c3864359ba74ad",
@@ -10974,6 +11016,10 @@
     {
       "key": "s_ff64a043a23b0bef",
       "source": "Paso 2 — Pega el token y aplica"
+    },
+    {
+      "key": "s_ff85c3a64eb93046",
+      "source": "Sin señal y este navegador no puede guardar ventas: espera a tener señal."
     },
     {
       "key": "s_ff89b5f55560971e",
