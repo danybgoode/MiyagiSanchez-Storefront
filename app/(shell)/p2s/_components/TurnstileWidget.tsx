@@ -72,6 +72,9 @@ export default function TurnstileWidget({
       widgetId.current = window.turnstile.render(host.current, {
         sitekey: siteKey,
         theme: 'light',
+        // Hidden unless Cloudflare needs the visitor to tap (managed mode, flagged traffic only): most merchants
+        // never see it. A challenge that does appear pushes the button down, which beats a reserved empty band.
+        appearance: 'interaction-only',
         language: 'es',
         callback: (token: string) => onTokenRef.current(token),
         'expired-callback': () => onTokenRef.current(null),
@@ -93,5 +96,5 @@ export default function TurnstileWidget({
     }
   }, [resetKey])
 
-  return <div ref={host} data-testid="p2s-turnstile" className="min-h-[65px]" />
+  return <div ref={host} data-testid="p2s-turnstile" />
 }

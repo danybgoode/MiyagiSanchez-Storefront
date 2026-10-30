@@ -12,11 +12,33 @@ import { MAX_DESCRIPTION_CHARS } from './constants'
 export const DESCRIBE_COPY = {
   label: 'Cuéntanos qué vendes',
   placeholder: 'Por ejemplo: vendo tamales de masa madre en Puebla, por pedido',
+  /**
+   * Typed out, held and deleted one after another in the empty textarea (`typewriter.ts`). Each is a whole
+   * description a merchant could send as is: what they sell, where, and how it reaches the buyer.
+   */
+  rotatingExamples: [
+    'Hago pasteles personalizados para fiestas en Monterrey, con entrega a domicilio',
+    'Vendo joyería de plata hecha a mano en Taxco y la envío a todo México',
+    'Tengo una tienda de tenis y ropa deportiva en Guadalajara',
+    'Vendo café de especialidad de Chiapas, en grano o molido, por kilo',
+    'Hago muebles de madera de parota a la medida en Mérida',
+    'Vendo maquillaje y skincare coreano en la Ciudad de México, con envíos el mismo día',
+    'Pinto alebrijes a mano en Oaxaca y los vendo a coleccionistas',
+    'Vendo croquetas, juguetes y accesorios para perros y gatos en Querétaro',
+    'Preparo salsa macha artesanal en frasco y la envío a todo el país',
+  ],
   examplesHint: 'O toca un ejemplo',
   examples: [
     { label: 'Tamales', text: 'Vendo tamales de masa madre en Puebla, por pedido' },
     { label: 'Velas', text: 'Hago velas de soya con aromas de la región en Guadalajara y las envío a todo México' },
     { label: 'Ropa', text: 'Vendo ropa de segunda mano en buen estado, tallas S a XL, en la Ciudad de México' },
+    { label: 'Joyería', text: 'Hago aretes y collares de plata y chaquira hechos a mano, y los envío a todo México' },
+    { label: 'Pasteles', text: 'Hago pasteles y galletas decoradas por pedido para cumpleaños y bodas en Monterrey' },
+    { label: 'Belleza', text: 'Vendo cosméticos, skincare y perfumes en la Ciudad de México, con envío a domicilio' },
+    { label: 'Artesanías', text: 'Vendo artesanías de Oaxaca: barro negro, textiles bordados y alebrijes pintados a mano' },
+    { label: 'Muebles', text: 'Fabrico muebles de madera maciza a la medida para sala y comedor en Guadalajara' },
+    { label: 'Mascotas', text: 'Vendo camas, correas y premios naturales para perros y gatos, con envío en Querétaro' },
+    { label: 'Café', text: 'Tuesto café de especialidad de Veracruz y lo vendo en grano o molido, por bolsa de 250 g y 1 kg' },
   ],
   submit: 'Armar mi tienda',
   fileLink: '¿Ya tienes tu catálogo en un archivo?',

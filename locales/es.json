@@ -1269,7 +1269,7 @@
         {
           "icon": "iconoir-shop",
           "title": "Tu tienda, con tu dirección",
-          "body": "Un link gratis listo para compartir. Si quieres, tu subdominio ({subdomainYearly}) o tu propio dominio ({customDomainYearly})."
+          "body": "Elige tu subdominio ({subdomainYearly}) o conecta tu propio dominio ({customDomainYearly})."
         },
         {
           "icon": "iconoir-percentage",
@@ -1573,7 +1573,7 @@
         {
           "icon": "iconoir-internet",
           "title": "Tu propia vitrina",
-          "body": "Link gratis, subdominio, dominio propio y widget para tu web o tu bio."
+          "body": "Subdominio, dominio propio y widget para tu web o tu bio."
         },
         {
           "icon": "iconoir-wallet",

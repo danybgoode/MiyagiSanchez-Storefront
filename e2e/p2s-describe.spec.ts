@@ -16,10 +16,12 @@ const es = JSON.parse(read('locales/es.json')) as { sellerAcquisition: { anchor:
 // for the hero and the description (prompt-to-shop's contract), just a truer one.
 const HERO = 'Describe tu negocio. En segundos tienes tu tienda en línea, lista para cobrar y compartir — sin comisión.'
 
-test('the box asks «Cuéntanos qué vendes», offers three examples (one of them tamales), and counts to the limit', () => {
+test('the box asks «Cuéntanos qué vendes», offers a rail of examples (one of them tamales), and counts to the limit', () => {
   expect(DESCRIBE_COPY.label).toBe('Cuéntanos qué vendes')
   expect(DESCRIBE_COPY.submit).toBe('Armar mi tienda')
-  expect(DESCRIBE_COPY.examples).toHaveLength(3)
+  // Three at launch; the product owner asked for more to try (10-29). Labels key the test ids, so they stay unique.
+  expect(DESCRIBE_COPY.examples.length).toBeGreaterThanOrEqual(8)
+  expect(new Set(DESCRIBE_COPY.examples.map((e) => e.label.toLowerCase())).size).toBe(DESCRIBE_COPY.examples.length)
   expect(DESCRIBE_COPY.examples.some((e) => /tamales/i.test(e.text))).toBe(true)
   for (const e of DESCRIBE_COPY.examples) expect(e.text.length, e.label).toBeLessThanOrEqual(MAX_DESCRIPTION_CHARS)
   expect(characterCounter(12)).toBe(`12/${MAX_DESCRIPTION_CHARS}`)
