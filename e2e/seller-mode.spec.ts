@@ -31,6 +31,7 @@ const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 const REAL_MANAGE_ROUTES = new Set([
   '/shop/manage',
   '/shop/manage/orders',
+  '/shop/manage/en-persona',
   '/shop/manage/offers',
   '/shop/manage/catalogo',
   '/shop/manage/analytics',
@@ -135,7 +136,7 @@ test.describe('seller-mode · SELLER_NAV config', () => {
   })
 
   test('labels match the sprint spec', () => {
-    expect(SELLER_NAV[0].entries.map(e => e.label)).toEqual(['Resumen', 'Pedidos', 'Ofertas'])
+    expect(SELLER_NAV[0].entries.map(e => e.label)).toEqual(['Resumen', 'Pedidos', 'Ofertas', 'Vender en persona'])
     expect(SELLER_NAV[1].entries.map(e => e.label)).toEqual(['Anuncios', 'Colecciones', 'Canales', 'Mercado Libre', 'Importar catálogo'])
     expect(SELLER_NAV[2].entries.map(e => e.label)).toEqual([
       'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas', 'Ganancias',
