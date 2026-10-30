@@ -1448,21 +1448,33 @@
         "s_8b165cc0eec9ce0e",
         "s_d50a3d4468356132",
         "s_2cfb3269b4a0144c",
+        "s_b67c700489ed49b2",
         "s_82c10fd2159cee3e",
+        "s_bb9dbb406dcbd524",
         "s_aeccae342e4bd0a7",
+        "s_7cca69b0af737deb",
+        "s_d8dd878fb14359e9",
+        "s_26b1a7d1bbc5eecb",
         "s_8b4e93e928dfd6ca",
+        "s_95e9e61bf82d86c0",
         "s_22fac51606a2a1aa",
         "s_2a88d492dd01e575",
+        "s_00ab58b5710afc33",
         "s_ce15ad6bc8530898",
         "s_52a18f3a764e4517",
         "s_44de42c372e42794",
         "s_5ad6184f78f2a3bf",
         "s_b5fa51d564a9d880",
+        "s_da64833a67227fbc",
         "s_5c9617491fe3087e",
         "s_11d1fe9ee2f3ed84",
+        "s_e77c6b92f2b79407",
+        "s_cee16cee78ea7e30",
+        "s_87901f2495f629a0",
         "s_b17e2d61f133a0dd",
-        "s_f44cddb1bb0325b6",
+        "s_1946aa7238ea73b9",
         "s_c04994c6176e1ce6",
+        "s_f8905a9f419b3eca",
         "s_c989e10bc67ee8be",
         "s_659c5da3a09c406c",
         "s_fcb99775d674466c",
@@ -1470,6 +1482,7 @@
         "s_393dce59ad1b0d3c",
         "s_a9254c5f812829af",
         "s_7aa9ea49fb320d5e",
+        "s_d54c8eb58f7b2966",
         "s_b2961fa5829de50c",
         "s_553f5b2ff5d004f1",
         "s_d6a7762c4346177a",
@@ -1477,12 +1490,13 @@
         "s_950a79942dd65710",
         "s_c9b3c38247f744e1",
         "s_4ed786ebd4f83bae",
+        "s_dac3440089332961",
         "s_a7eed74001b1cfd3",
         "s_ebda66b3f2fc0d8d",
         "s_0d8a87529fa23067",
         "s_dab91b7247e2d05d",
+        "s_2354f259a738a375",
         "s_4d4bf7098750e7ea",
-        "s_9b9789415b763cbe",
         "s_69ca69d01ec26010"
       ]
     },
@@ -1746,6 +1760,7 @@
         "s_c229ae0f7c2723da",
         "s_b64d208e6cc2aab4",
         "s_a960d638efd06caf",
+        "s_5e692c19cbfa1b46",
         "s_b5fa51d564a9d880",
         "s_1c1d46a22eca07fd",
         "s_5c99bb00345fad45",
@@ -2029,6 +2044,7 @@
         "s_4bbd1f566d7d8bd9",
         "s_9e9ea5774a2dda55",
         "s_d948171024d73fe2",
+        "s_da8af4a7afbefe76",
         "s_6eca44f1bf5f0513",
         "s_1b2e7259e97606bf",
         "s_77b9238931ed566d",
@@ -2038,7 +2054,7 @@
         "s_c92bb4da96214006",
         "s_8bf282b730e1a2cf",
         "s_d5664fb801b128b5",
-        "s_48e3dc659d7bcb88",
+        "s_80223513ed72da03",
         "s_3a68dd3c75a81c9b",
         "s_b8507134efc74973",
         "s_479d477be7d8333f"
@@ -3035,6 +3051,10 @@
       "source": "Convocatoria"
     },
     {
+      "key": "s_00ab58b5710afc33",
+      "source": "Esperando el pago…"
+    },
+    {
       "key": "s_01163dad846525c0",
       "source": "para conectar tu tienda."
     },
@@ -3747,6 +3767,10 @@
       "source": "Total:"
     },
     {
+      "key": "s_1946aa7238ea73b9",
+      "source": "Preparando el código…"
+    },
+    {
       "key": "s_19542694849b993c",
       "source": "Personaliza el aspecto de tu tienda pública: banner, logo, color y redes sociales."
     },
@@ -4083,6 +4107,10 @@
       "source": "subdominio"
     },
     {
+      "key": "s_2354f259a738a375",
+      "source": "Ya me llegó"
+    },
+    {
       "key": "s_2382bb61c01bd0a2",
       "source": "Cerrar acciones"
     },
@@ -4161,6 +4189,10 @@
     {
       "key": "s_26a6bdfdb3c08277",
       "source": "Migrar desde Shopify"
+    },
+    {
+      "key": "s_26b1a7d1bbc5eecb",
+      "source": "Copiar CLABE"
     },
     {
       "key": "s_26b9efb5e15ec9b4",
@@ -5135,10 +5167,6 @@
       "source": "Tu tienda estará lista en cuanto propague el DNS"
     },
     {
-      "key": "s_48e3dc659d7bcb88",
-      "source": "· Mercado Libre"
-    },
-    {
       "key": "s_49005c084eaca658",
       "source": "{0} / {1} usos"
     },
@@ -5781,6 +5809,10 @@
     {
       "key": "s_5e53fc953165319a",
       "source": "Este anuncio está pausado — no es visible para compradores. Actívalo desde &quot;Mi tienda&quot;."
+    },
+    {
+      "key": "s_5e692c19cbfa1b46",
+      "source": "Filtrar por origen"
     },
     {
       "key": "s_5e77e1785d574f9b",
@@ -6783,6 +6815,10 @@
       "source": "Antes de aplicar"
     },
     {
+      "key": "s_7cca69b0af737deb",
+      "source": "Cobro con tarjeta"
+    },
+    {
       "key": "s_7cec3fafb21092e4",
       "source": "Creando tu tienda…"
     },
@@ -6857,6 +6893,10 @@
     {
       "key": "s_801a890d840e7b6c",
       "source": "Error al guardar el stock."
+    },
+    {
+      "key": "s_80223513ed72da03",
+      "source": "ventas · ganancia"
     },
     {
       "key": "s_806b58095b027ce1",
@@ -7073,6 +7113,10 @@
     {
       "key": "s_875be4ebd33124f4",
       "source": "Mantén tu existencia igual en Mercado Libre y en Miyagi — cada venta descuenta de ambos, sin vender de más. Tus pedidos de Mercado Libre también aparecen en tu bandeja de pedidos de Miyagi."
+    },
+    {
+      "key": "s_87901f2495f629a0",
+      "source": "No se pudo cancelar. Intenta otra vez."
     },
     {
       "key": "s_8797dfc346d3eea7",
@@ -7705,10 +7749,6 @@
     {
       "key": "s_9b92f0c94abb9faa",
       "source": "Pega aquí el objeto JSON completo: { \"miyagi_setup_version\": \"1\", \"profile\": {…}, \"config\": {…}, \"catalog\": [...] }"
-    },
-    {
-      "key": "s_9b9789415b763cbe",
-      "source": "{0} El total es {1}."
     },
     {
       "key": "s_9bb4d087a3379410",
@@ -8595,6 +8635,10 @@
       "source": "pendiente"
     },
     {
+      "key": "s_b67c700489ed49b2",
+      "source": "CLABE"
+    },
+    {
       "key": "s_b6b49b735c9e32bd",
       "source": "Cuéntale a tus compradores qué ofreces, tu especialidad, años de experiencia..."
     },
@@ -9391,6 +9435,10 @@
       "source": "La imagen es demasiado grande (máx. 8 MB)."
     },
     {
+      "key": "s_cee16cee78ea7e30",
+      "source": "No pudimos confirmar el pago. Intenta otra vez."
+    },
+    {
       "key": "s_cefe1c006050b503",
       "source": "Indicaciones para quienes envían (opcional)"
     },
@@ -9583,6 +9631,10 @@
       "source": "Borrar"
     },
     {
+      "key": "s_d54c8eb58f7b2966",
+      "source": "Sin conexión. Intenta confirmar otra vez."
+    },
+    {
       "key": "s_d55bda9231f9db64",
       "source": "Vehículo limpio"
     },
@@ -9747,8 +9799,16 @@
       "source": "Deja que tu agente la lleve"
     },
     {
+      "key": "s_da64833a67227fbc",
+      "source": "Mandar recibo"
+    },
+    {
       "key": "s_da8ae6b653d7da81",
       "source": "Desfijar"
+    },
+    {
+      "key": "s_da8af4a7afbefe76",
+      "source": "Por origen"
     },
     {
       "key": "s_da8c171aee826f7e",
@@ -9765,6 +9825,10 @@
     {
       "key": "s_dab91b7247e2d05d",
       "source": "Ver venta"
+    },
+    {
+      "key": "s_dac3440089332961",
+      "source": "Tus datos de pago están en Ajustes."
     },
     {
       "key": "s_dad23a2f4ecaa11e",
@@ -10153,6 +10217,10 @@
     {
       "key": "s_e73a83c8f6bafdff",
       "source": "Unidades"
+    },
+    {
+      "key": "s_e77c6b92f2b79407",
+      "source": "No pudimos cancelar el cobro: el QR todavía podría pagarse. Sigue esperando o intenta cancelar otra vez."
     },
     {
       "key": "s_e7948be99e9354c3",
@@ -10649,6 +10717,10 @@
     {
       "key": "s_f88ba99c9b342767",
       "source": "SKU"
+    },
+    {
+      "key": "s_f8905a9f419b3eca",
+      "source": "Que lo escanee con su celular y pague ahí"
     },
     {
       "key": "s_f8f6241d9623751e",

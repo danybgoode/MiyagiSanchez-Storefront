@@ -24,6 +24,8 @@ export const PRE_CLAIM_REFUSALS: ReadonlySet<string> = new Set([
   'TOO_MANY_LINES', 'INVALID_TENDERED', 'TENDERED_NOT_CASH', 'OFFLINE_NOT_CASH', 'INVALID_SOLD_AT',
   'INVALID_EMAIL', 'VARIANT_NOT_OWNED', 'KIND_NOT_AVAILABLE', 'IN_PERSON_MX_ONLY', 'SELLER_NOT_FOUND',
   'seller_not_active', 'MX_COMMERCE_UNCONFIGURED', 'UNAUTHENTICATED',
+  // Card / transfer: checked by the proxy BEFORE the claim (the shop cannot take that payment).
+  'NO_CARD_PROVIDER', 'SELLER_MANUAL_MISSING',
 ])
 
 /** Raised after the claim: they say the sale was NOT recorded even following an uncertain attempt. */

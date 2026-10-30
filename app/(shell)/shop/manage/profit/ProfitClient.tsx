@@ -11,6 +11,7 @@ import {
   type PendingPiece,
 } from '@/lib/profit'
 import PricingCard from './PricingCard'
+import { orderSourceLabel, summarizeBySource } from '@/lib/in-person/order-source'
 import { useSellerFormat } from '@/app/components/SellerFormatProvider'
 
 /**
@@ -142,6 +143,26 @@ export default function ProfitClient({
         </div>
       ))}
 
+      {/* Split by where the sale came from (in-person-sales S2.3, D17) — only when there is more than one. */}
+      {(() => {
+        const bySource = summarizeBySource(orderRows)
+        if (new Set(bySource.map((b) => b.source)).size < 2) return null
+        return (
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">Por origen</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {bySource.map((b) => (
+                <div key={`${b.source}-${b.currency_code}`} className="border border-[var(--color-border)] rounded-[var(--r-md)] p-4">
+                  <p className="text-xs text-[var(--color-muted)] font-medium">{b.label}{showOrderCurrency ? ` · ${b.currency_code.toUpperCase()}` : ''}</p>
+                  <p className="text-xl font-bold text-[var(--color-text)] mt-1">{formatCents(b.revenue_cents, b.currency_code)}</p>
+                  <p className="text-xs text-[var(--color-muted)] mt-0.5">{b.orders} ventas · ganancia {formatCents(b.margin_cents, b.currency_code)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Per-order table */}
       <div>
         <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">Por pedido</h2>
@@ -176,7 +197,7 @@ export default function ProfitClient({
                         </p>
                         <p className="text-xs text-[var(--color-muted)]">
                           {fmtDate(r.created_at)}
-                          {r.source === 'mercadolibre' ? ' · Mercado Libre' : ''}
+                          {r.source && r.source !== 'native' ? ` · ${orderSourceLabel(r.source)}` : ''}
                         </p>
                         {r.pending.length > 0 && (
                           <p className="text-xs text-amber-700 mt-0.5">

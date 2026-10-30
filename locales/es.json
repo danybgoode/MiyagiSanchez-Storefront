@@ -3926,7 +3926,6 @@
     "s_487369ccbcccbcaa": "Contenido mensual / acceso recurrente",
     "s_4893566aded6276d": "https://facebook.com/tutienda",
     "s_48afa1df3a6e6e4c": "Tu tienda estará lista en cuanto propague el DNS",
-    "s_48e3dc659d7bcb88": "· Mercado Libre",
     "s_49005c084eaca658": "{0} / {1} usos",
     "s_4950852f759abe68": "Requiere la integración de Mercado Libre",
     "s_497aee4628ed062e": "Para tu historia",
@@ -5373,7 +5372,22 @@
     "s_5ad6184f78f2a3bf": "La venta sigue en proceso. {0}",
     "s_5c9617491fe3087e": "Mostramos hasta 200 productos de cada tipo. La búsqueda solo filtra los que ya cargaron; si no ves uno, ajusta su estado en Catálogo.",
     "s_659c5da3a09c406c": "Quedó una venta sin confirmar. {0}",
-    "s_9b9789415b763cbe": "{0} El total es {1}.",
-    "s_b2961fa5829de50c": "Sin conexión. {0}"
+    "s_b2961fa5829de50c": "Sin conexión. {0}",
+    "s_00ab58b5710afc33": "Esperando el pago…",
+    "s_1946aa7238ea73b9": "Preparando el código…",
+    "s_2354f259a738a375": "Ya me llegó",
+    "s_26b1a7d1bbc5eecb": "Copiar CLABE",
+    "s_5e692c19cbfa1b46": "Filtrar por origen",
+    "s_7cca69b0af737deb": "Cobro con tarjeta",
+    "s_80223513ed72da03": "ventas · ganancia",
+    "s_87901f2495f629a0": "No se pudo cancelar. Intenta otra vez.",
+    "s_b67c700489ed49b2": "CLABE",
+    "s_cee16cee78ea7e30": "No pudimos confirmar el pago. Intenta otra vez.",
+    "s_d54c8eb58f7b2966": "Sin conexión. Intenta confirmar otra vez.",
+    "s_da64833a67227fbc": "Mandar recibo",
+    "s_da8af4a7afbefe76": "Por origen",
+    "s_dac3440089332961": "Tus datos de pago están en Ajustes.",
+    "s_e77c6b92f2b79407": "No pudimos cancelar el cobro: el QR todavía podría pagarse. Sigue esperando o intenta cancelar otra vez.",
+    "s_f8905a9f419b3eca": "Que lo escanee con su celular y pague ahí"
   }
 }
