@@ -20,6 +20,7 @@ import {
   type CounterItem,
   type CounterCart,
 } from '../lib/in-person/counter-cart'
+import { classifySaleResponse } from '../lib/in-person/sale-response'
 import { isSellable, matchesQuery, toCounterProducts } from '../lib/in-person/counter-catalog'
 
 /**
@@ -204,4 +205,36 @@ test.describe('counter-catalog · the seller catalog flattened for the grid', ()
     expect(matchesQuery('Taza', 'PLATO')).toBe(false)
     expect(matchesQuery('Taza', '  ')).toBe(true)
   })
+})
+
+test.describe('sale-response · may the client_id be released?', () => {
+  type Row = [string, Parameters<typeof classifySaleResponse>[0], ReturnType<typeof classifySaleResponse>]
+  const fresh = { hadUncertainAttempt: false }
+  const sticky = { hadUncertainAttempt: true }
+  const rows: Row[] = [
+    ['201 with order', { status: 201, hasOrder: true, ...fresh }, 'recorded'],
+    ['200 replay with order', { status: 200, hasOrder: true, ...sticky }, 'recorded'],
+    ['200 without readable order', { status: 200, hasOrder: false, ...fresh }, 'uncertain'],
+    ['409 IN_PROGRESS', { status: 409, code: 'IN_PROGRESS', ...fresh }, 'retry_in_progress'],
+    ['network failure', { status: null, ...fresh }, 'uncertain'],
+    ['400 WITHOUT a code', { status: 400, ...fresh }, 'uncertain'],
+    ['404 without a code', { status: 404, ...fresh }, 'uncertain'],
+    ['502 BACKEND_UNREACHABLE', { status: 502, code: 'BACKEND_UNREACHABLE', ...fresh }, 'uncertain'],
+    ['BAD_UPSTREAM', { status: 502, code: 'BAD_UPSTREAM', ...fresh }, 'uncertain'],
+    ['503 RETRY_SAME_ID', { status: 503, code: 'RETRY_SAME_ID', ...fresh }, 'uncertain'],
+    ['500 with an unknown code', { status: 500, code: 'WHATEVER', ...fresh }, 'uncertain'],
+    ['409 CLIENT_ID_REUSED', { status: 409, code: 'CLIENT_ID_REUSED', ...fresh }, 'uncertain'],
+    ['422 VARIANT_NOT_OWNED, first attempt', { status: 422, code: 'VARIANT_NOT_OWNED', ...fresh }, 'refused'],
+    ['422 VARIANT_NOT_OWNED after an uncertain attempt', { status: 422, code: 'VARIANT_NOT_OWNED', ...sticky }, 'uncertain'],
+    ['401 UNAUTHENTICATED, first attempt', { status: 401, code: 'UNAUTHENTICATED', ...fresh }, 'refused'],
+    ['401 UNAUTHENTICATED after an uncertain attempt', { status: 401, code: 'UNAUTHENTICATED', ...sticky }, 'uncertain'],
+    ['409 seller_not_active after an uncertain attempt', { status: 409, code: 'seller_not_active', ...sticky }, 'uncertain'],
+    ['400 EMPTY_SALE, first attempt', { status: 400, code: 'EMPTY_SALE', ...fresh }, 'refused'],
+    ['409 OUT_OF_STOCK after an uncertain attempt', { status: 409, code: 'OUT_OF_STOCK', ...sticky }, 'refused'],
+    ['409 SALE_CLOSED after an uncertain attempt', { status: 409, code: 'SALE_CLOSED', ...sticky }, 'refused'],
+    ['422 TENDERED_SHORT after an uncertain attempt', { status: 422, code: 'TENDERED_SHORT', ...sticky }, 'refused'],
+  ]
+  for (const [name, input, verdict] of rows) {
+    test(name, () => expect(classifySaleResponse(input)).toBe(verdict))
+  }
 })

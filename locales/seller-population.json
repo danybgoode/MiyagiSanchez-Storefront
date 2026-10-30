@@ -1456,20 +1456,21 @@
         "s_ce15ad6bc8530898",
         "s_52a18f3a764e4517",
         "s_44de42c372e42794",
-        "s_2ccfa5f624fd4c26",
+        "s_5ad6184f78f2a3bf",
         "s_b5fa51d564a9d880",
-        "s_615f110a4479faf6",
+        "s_5c9617491fe3087e",
         "s_11d1fe9ee2f3ed84",
         "s_b17e2d61f133a0dd",
         "s_f44cddb1bb0325b6",
         "s_c04994c6176e1ce6",
         "s_c989e10bc67ee8be",
+        "s_659c5da3a09c406c",
         "s_fcb99775d674466c",
         "s_916ecffd702d5690",
         "s_393dce59ad1b0d3c",
         "s_a9254c5f812829af",
         "s_7aa9ea49fb320d5e",
-        "s_0b799bfc02dba8e1",
+        "s_b2961fa5829de50c",
         "s_553f5b2ff5d004f1",
         "s_d6a7762c4346177a",
         "s_e37736329cadeb79",
@@ -1481,7 +1482,7 @@
         "s_0d8a87529fa23067",
         "s_dab91b7247e2d05d",
         "s_4d4bf7098750e7ea",
-        "s_5f10b0848e8f0416",
+        "s_9b9789415b763cbe",
         "s_69ca69d01ec26010"
       ]
     },
@@ -3310,10 +3311,6 @@
       "source": "3 · Logo y fotos"
     },
     {
-      "key": "s_0b799bfc02dba8e1",
-      "source": "Sin conexión. Toca «Listo» otra vez cuando vuelva la señal: no se cobra doble."
-    },
-    {
       "key": "s_0bbc7f1e927d6731",
       "source": "Secciones"
     },
@@ -4324,10 +4321,6 @@
     {
       "key": "s_2cc75fb13c94d362",
       "source": "Trae tu catálogo de Shopify a tu tienda Miyagi. Revisa la lista y el reporte de paridad antes de importar."
-    },
-    {
-      "key": "s_2ccfa5f624fd4c26",
-      "source": "La venta sigue en proceso. Toca «Listo» otra vez en unos segundos."
     },
     {
       "key": "s_2cdc8232ef747f45",
@@ -5670,6 +5663,10 @@
       "source": "Comunicación"
     },
     {
+      "key": "s_5ad6184f78f2a3bf",
+      "source": "La venta sigue en proceso. {0}"
+    },
+    {
       "key": "s_5b18ea19eb2d7e0e",
       "source": "Próximo cobro:"
     },
@@ -5742,6 +5739,10 @@
       "source": "Recolección en mano"
     },
     {
+      "key": "s_5c9617491fe3087e",
+      "source": "Mostramos hasta 200 productos de cada tipo. La búsqueda solo filtra los que ya cargaron; si no ves uno, ajusta su estado en Catálogo."
+    },
+    {
       "key": "s_5c99bb00345fad45",
       "source": "No tienes pedidos pendientes de enviar."
     },
@@ -5806,10 +5807,6 @@
       "source": "Suscripciones"
     },
     {
-      "key": "s_5f10b0848e8f0416",
-      "source": "{0} Toca «Listo» otra vez: no se cobra doble."
-    },
-    {
       "key": "s_5f7f0e5a278375d6",
       "source": "No se pudo contactar al servicio de IA. Inténtalo de nuevo."
     },
@@ -5844,10 +5841,6 @@
     {
       "key": "s_611950b9f7a03884",
       "source": "Usar este evento"
-    },
-    {
-      "key": "s_615f110a4479faf6",
-      "source": "Mostramos tus primeros 200 productos. Escribe el nombre para encontrar los demás."
     },
     {
       "key": "s_616d57eb200198a2",
@@ -5996,6 +5989,10 @@
     {
       "key": "s_6545759f25926a21",
       "source": "← Cambiar medidas"
+    },
+    {
+      "key": "s_659c5da3a09c406c",
+      "source": "Quedó una venta sin confirmar. {0}"
     },
     {
       "key": "s_65b6a84a6dc3259e",
@@ -7710,6 +7707,10 @@
       "source": "Pega aquí el objeto JSON completo: { \"miyagi_setup_version\": \"1\", \"profile\": {…}, \"config\": {…}, \"catalog\": [...] }"
     },
     {
+      "key": "s_9b9789415b763cbe",
+      "source": "{0} El total es {1}."
+    },
+    {
       "key": "s_9bb4d087a3379410",
       "source": "Tarjeta, OXXO, saldo MP, meses sin intereses"
     },
@@ -8472,6 +8473,10 @@
     {
       "key": "s_b289d6c8922cca1f",
       "source": "registrar costo"
+    },
+    {
+      "key": "s_b2961fa5829de50c",
+      "source": "Sin conexión. {0}"
     },
     {
       "key": "s_b29c9c8c29435bc0",

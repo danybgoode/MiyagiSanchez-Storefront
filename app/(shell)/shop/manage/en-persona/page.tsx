@@ -46,23 +46,25 @@ export default async function EnPersonaPage() {
     )
   }
 
-  const res = await fetch(
-    `${MEDUSA_BASE}/store/sellers/me/products?status=activo&sort=title&limit=${COUNTER_PRODUCT_LIMIT}`,
-    {
-      headers: { 'x-publishable-api-key': PUB_KEY, Authorization: `Bearer ${jwt}` },
-      cache: 'no-store',
-    },
+  // The route's `status=activo` means active AND in stock AND not made-to-order, so it would hide
+  // made-to-order products (and sold-out ones, which the counter shows disabled). No single value
+  // covers "all active", so ask for the three active shapes and merge.
+  type Page = { listings?: Parameters<typeof toCounterProducts>[0]; products?: Parameters<typeof toCounterProducts>[1]; count?: number }
+  const pages = await Promise.all(
+    ['activo', 'sobre_pedido', 'agotado'].map(async (status): Promise<Page> => {
+      const res = await fetch(
+        `${MEDUSA_BASE}/store/sellers/me/products?status=${status}&sort=title&limit=${COUNTER_PRODUCT_LIMIT}`,
+        { headers: { 'x-publishable-api-key': PUB_KEY, Authorization: `Bearer ${jwt}` }, cache: 'no-store' },
+      )
+      if (!res.ok) throw new Error('No se pudieron cargar tus productos.')
+      return (await res.json()) as Page
+    }),
   )
-  if (!res.ok) throw new Error('No se pudieron cargar tus productos.')
-  const data = (await res.json()) as {
-    listings?: Parameters<typeof toCounterProducts>[0]
-    products?: Parameters<typeof toCounterProducts>[1]
-    count?: number
-  }
+  const listings = pages.flatMap((p) => p.listings ?? [])
+  const rawProducts = pages.flatMap((p) => p.products ?? [])
+  const truncated = pages.some((p) => (p.count ?? 0) > COUNTER_PRODUCT_LIMIT)
 
-  const products = toCounterProducts(data.listings ?? [], data.products ?? [])
-  const truncated = (data.count ?? products.length) > COUNTER_PRODUCT_LIMIT
-
+  const products = toCounterProducts(listings, rawProducts).sort((a, b) => a.title.localeCompare(b.title, 'es'))
   return (
     <div className="max-w-5xl mx-auto px-4 pt-4 pb-40 md:pb-24">
       <SellerBreadcrumb />

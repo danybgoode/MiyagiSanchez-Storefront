@@ -8,6 +8,9 @@
  *    a sale, and the whole payload (id + lines + tendered) is frozen in `pendingRef`.
  *  - A retry re-sends that frozen payload verbatim, so a lost response, a flaky signal or a
  *    double tap is a server-side REPLAY of the same sale, never a second order.
+ *  - Whether an id may be RELEASED is decided by `classifySaleResponse` (lib/in-person/sale-response.ts),
+ *    by an allow-list of backend codes, never by HTTP status, with a sticky rule once any attempt
+ *    was uncertain. The frozen sale is mirrored in sessionStorage so a reload keeps the same id.
  *  - After an UNCERTAIN failure (no connection, a 5xx, a claim still in progress) the sale
  *    stays frozen and the cart is locked — editing it would change the payload under the
  *    same id (`CLIENT_ID_REUSED`) or, worse, record a second sale while the first may exist.
@@ -21,7 +24,7 @@
  */
 
 import Image from 'next/image'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { useSellerFormat } from '@/app/components/SellerFormatProvider'
@@ -44,6 +47,7 @@ import {
   type PadKey,
   type SaleLine,
 } from '@/lib/in-person/counter-cart'
+import { classifySaleResponse } from '@/lib/in-person/sale-response'
 import { isSellable, matchesQuery, type CounterProduct, type CounterVariant } from '@/lib/in-person/counter-catalog'
 
 type Stage = 'shop' | 'cash' | 'done'
@@ -52,6 +56,8 @@ interface FrozenSale {
   clientId: string
   lines: SaleLine[]
   tenderedCents: number | null
+  /** Some attempt of THIS sale was uncertain, so the order may already exist (sticky rule). */
+  uncertain: boolean
 }
 
 interface SaleDone {
@@ -62,19 +68,23 @@ interface SaleDone {
 
 type SaleOutcome =
   | { kind: 'ok'; done: SaleDone }
-  | { kind: 'refused'; message: string }
+  | { kind: 'refused'; message: string; serverTotalCents: number | null }
   | { kind: 'uncertain'; message: string }
 
 const PAD_KEYS: PadKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del']
 const QUICK_BILLS = [50, 100, 200, 500, 1000]
 const IN_PROGRESS_RETRIES = 3
 const IN_PROGRESS_WAIT_MS = 2000
+const REQUEST_TIMEOUT_MS = 30_000
+const STORAGE_KEY = 'ms.en-persona.frozen-sale'
+const RETRY_HINT = 'Toca «Reintentar»: no se cobra doble.'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
- * POST the frozen sale. Pure transport: it decides only "recorded", "definitely not
- * recorded" or "unknown", which is what tells the caller whether the id may be dropped.
+ * POST the frozen sale and classify the answer. All the "may the id be released" logic is in
+ * `classifySaleResponse`; this is only transport. `sale.uncertain` is updated in place so the
+ * caller can persist it.
  */
 async function postSale(sale: FrozenSale): Promise<SaleOutcome> {
   const body = JSON.stringify({
@@ -86,9 +96,15 @@ async function postSale(sale: FrozenSale): Promise<SaleOutcome> {
   for (let attempt = 0; attempt <= IN_PROGRESS_RETRIES; attempt += 1) {
     let res: Response
     try {
-      res = await fetch('/api/shop/en-persona/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+      res = await fetch('/api/shop/en-persona/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
     } catch {
-      return { kind: 'uncertain', message: 'Sin conexión. Toca «Listo» otra vez cuando vuelva la señal: no se cobra doble.' }
+      sale.uncertain = true
+      return { kind: 'uncertain', message: `Sin conexión. ${RETRY_HINT}` }
     }
     const json = (await res.json().catch(() => null)) as {
       order_id?: string
@@ -97,30 +113,51 @@ async function postSale(sale: FrozenSale): Promise<SaleOutcome> {
       replayed?: boolean
       code?: string
       message?: string
+      details?: { total_cents?: number } | null
     } | null
 
-    if (res.ok && json?.order_id && Number.isSafeInteger(json.total_cents)) {
-      return {
-        kind: 'ok',
-        done: { totalCents: json.total_cents as number, changeCents: json.change_cents ?? 0, replayed: json.replayed === true },
-      }
+    const hasOrder = !!json?.order_id && Number.isSafeInteger(json.total_cents)
+    const verdict = classifySaleResponse({ status: res.status, code: json?.code, hasOrder, hadUncertainAttempt: sale.uncertain })
+    if (verdict === 'recorded') {
+      return { kind: 'ok', done: { totalCents: json!.total_cents as number, changeCents: json!.change_cents ?? 0, replayed: json!.replayed === true } }
     }
-    if (res.status === 409 && json?.code === 'IN_PROGRESS') {
+    if (verdict === 'retry_in_progress') {
+      // A claim exists, so from here on the order may exist.
+      sale.uncertain = true
       if (attempt < IN_PROGRESS_RETRIES) {
         await sleep(IN_PROGRESS_WAIT_MS)
         continue
       }
-      return { kind: 'uncertain', message: 'La venta sigue en proceso. Toca «Listo» otra vez en unos segundos.' }
+      return { kind: 'uncertain', message: `La venta sigue en proceso. ${RETRY_HINT}` }
     }
     const message = json?.message ?? 'No pudimos registrar la venta.'
-    // 5xx (except the "commerce not configured" refusal, which happens before anything is recorded)
-    // and an OK response we could not read mean the order MAY exist — keep the id.
-    if (res.ok || (res.status >= 500 && json?.code !== 'MX_COMMERCE_UNCONFIGURED')) {
-      return { kind: 'uncertain', message: `${message} Toca «Listo» otra vez: no se cobra doble.` }
+    if (verdict === 'refused') {
+      const total = json?.details?.total_cents
+      return { kind: 'refused', message, serverTotalCents: Number.isSafeInteger(total) ? (total as number) : null }
     }
-    return { kind: 'refused', message }
+    sale.uncertain = true
+    return { kind: 'uncertain', message: `${message} ${RETRY_HINT}` }
   }
-  return { kind: 'uncertain', message: 'La venta sigue en proceso. Toca «Listo» otra vez en unos segundos.' }
+  sale.uncertain = true
+  return { kind: 'uncertain', message: `La venta sigue en proceso. ${RETRY_HINT}` }
+}
+
+function readStored(): { sale: FrozenSale; cart: CounterCart; padText: string } | null {
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const v = JSON.parse(raw)
+    if (typeof v?.sale?.clientId !== 'string' || !Array.isArray(v.sale.lines) || !Array.isArray(v.cart?.lines) || typeof v.padText !== 'string') return null
+    return v
+  } catch {
+    return null
+  }
+}
+function writeStored(value: { sale: FrozenSale; cart: CounterCart; padText: string } | null) {
+  try {
+    if (value) window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+    else window.sessionStorage.removeItem(STORAGE_KEY)
+  } catch { /* private window / blocked storage: the in-memory freeze still holds */ }
 }
 
 function stockLabel(variants: CounterVariant[]): string {
@@ -145,6 +182,26 @@ export default function CounterClient({ products: initialProducts, truncated }: 
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<SaleDone | null>(null)
   const pendingRef = useRef<FrozenSale | null>(null)
+
+  // A reload after an uncertain outcome restores the SAME frozen sale (id + payload), so the
+  // merchant retries it instead of re-ringing the cart under a new id.
+  useEffect(() => {
+    let cancelled = false
+    // Deferred a tick: sessionStorage is only readable after mount (SSR has none), and the
+    // restore is a one-shot sync from that external store.
+    queueMicrotask(() => {
+      const stored = readStored()
+      if (!stored || cancelled) return
+      pendingRef.current = stored.sale
+      setCart(stored.cart)
+      setPadText(stored.padText)
+      setUncertain(true)
+      setStage('cash')
+      setSheetOpen(true)
+      setError(`Quedó una venta sin confirmar. ${RETRY_HINT}`)
+    })
+    return () => { cancelled = true }
+  }, [])
 
   const total = cartTotalCents(cart)
   const units = cartUnits(cart)
@@ -183,6 +240,7 @@ export default function CounterClient({ products: initialProducts, truncated }: 
 
   function resetSale() {
     pendingRef.current = null
+    writeStored(null)
     setCart(clearCart())
     setPadText('')
     setUncertain(false)
@@ -196,7 +254,7 @@ export default function CounterClient({ products: initialProducts, truncated }: 
     if (!canSubmit) return
     // First press mints the id and freezes the payload; every retry re-sends that exact payload.
     if (!pendingRef.current) {
-      pendingRef.current = { clientId: crypto.randomUUID(), lines: toSaleLines(cart), tenderedCents: tendered }
+      pendingRef.current = { clientId: crypto.randomUUID(), lines: toSaleLines(cart), tenderedCents: tendered, uncertain: false }
     }
     const sale = pendingRef.current
     setInFlight(true)
@@ -206,6 +264,7 @@ export default function CounterClient({ products: initialProducts, truncated }: 
 
     if (outcome.kind === 'ok') {
       pendingRef.current = null
+      writeStored(null)
       setUncertain(false)
       setDone(outcome.done)
       setStage('done')
@@ -224,11 +283,14 @@ export default function CounterClient({ products: initialProducts, truncated }: 
     if (outcome.kind === 'refused') {
       // Nothing was recorded: drop the frozen sale so the merchant can fix the cart.
       pendingRef.current = null
+      writeStored(null)
       setUncertain(false)
       setStage('shop')
-    } else {
-      setUncertain(true)
+      setError(outcome.serverTotalCents !== null ? `${outcome.message} El total es ${money(outcome.serverTotalCents)}.` : outcome.message)
+      return
     }
+    writeStored({ sale, cart, padText })
+    setUncertain(true)
     setError(outcome.message)
   }
 
@@ -251,7 +313,7 @@ export default function CounterClient({ products: initialProducts, truncated }: 
         />
       </div>
       {truncated && (
-        <p className="text-xs text-[var(--color-muted)] mt-2">Mostramos tus primeros 200 productos. Escribe el nombre para encontrar los demás.</p>
+        <p className="text-xs text-[var(--color-muted)] mt-2">Mostramos hasta 200 productos de cada tipo. La búsqueda solo filtra los que ya cargaron; si no ves uno, ajusta su estado en Catálogo.</p>
       )}
 
       {products.length === 0 ? (

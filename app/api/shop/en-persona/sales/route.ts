@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     console.error('[en-persona/sales] backend unreachable:', err instanceof Error ? err.message : String(err))
     // 502 + a code the counter treats as «retry with the SAME client_id».
     return NextResponse.json(
-      { code: 'BACKEND_UNREACHABLE', message: 'No hay conexión con la tienda. Toca «Listo» otra vez: no se cobra doble.' },
+      { code: 'BACKEND_UNREACHABLE', message: 'No hay conexión con la tienda. Toca «Reintentar»: no se cobra doble.' },
       { status: 502 },
     )
   }
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   try {
     json = JSON.parse(text)
   } catch {
-    json = { code: 'BAD_UPSTREAM', message: 'La tienda respondió algo inesperado. Toca «Listo» otra vez.' }
+    json = { code: 'BAD_UPSTREAM', message: 'La tienda respondió algo inesperado. Toca «Reintentar».' }
     return NextResponse.json(json, { status: upstream.status >= 400 ? upstream.status : 502 })
   }
   return NextResponse.json(json, { status: upstream.status })
