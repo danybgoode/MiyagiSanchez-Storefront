@@ -1405,7 +1405,7 @@
         {
           "icon": "iconoir-shop",
           "title": "Your shop, at your address",
-          "body": "A free link ready to share. If you want, your subdomain ({subdomainYearly}) or your own domain ({customDomainYearly})."
+          "body": "Pick your subdomain ({subdomainYearly}) or connect your own domain ({customDomainYearly})."
         },
         {
           "icon": "iconoir-percentage",

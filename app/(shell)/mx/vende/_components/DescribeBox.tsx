@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
@@ -8,6 +8,7 @@ import { Banner } from '@/components/feedback/Banner'
 import { MAX_DESCRIPTION_CHARS } from '@/lib/prompt-to-shop/constants'
 import { characterCounter, DESCRIBE_COPY } from '@/lib/prompt-to-shop/copy'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
+import { nextTypewriterStep, TYPEWRITER_START, typewriterText, type TypewriterStep } from '@/lib/prompt-to-shop/typewriter'
 import TurnstileWidget from '@/app/(shell)/p2s/_components/TurnstileWidget'
 
 // The taking-shape screen carries the whole canvas (theme, illustrations, stream reader). It is needed only after a
@@ -18,9 +19,32 @@ const TakingShape = dynamic(loadShaping, { ssr: false })
 const warmShaping = () => { void loadShaping() }
 
 /**
+ * The placeholder that types out an example, deletes it and types the next. It runs only while the box is empty,
+ * starts after hydration (the server renders the static placeholder), and stays still for reduced motion.
+ */
+function useRotatingPlaceholder(lines: readonly string[], active: boolean): string | null {
+  const [step, setStep] = useState<TypewriterStep | null>(null)
+  useEffect(() => {
+    if (!active || lines.length === 0) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    let current = TYPEWRITER_START
+    let timer: ReturnType<typeof setTimeout>
+    const tick = () => {
+      const next = nextTypewriterStep(lines, current)
+      current = next.step
+      setStep(current)
+      timer = setTimeout(tick, next.delay)
+    }
+    timer = setTimeout(tick, 600)
+    return () => clearTimeout(timer)
+  }, [lines, active])
+  return active && step ? typewriterText(lines, step) : null
+}
+
+/**
  * The describe box — prompt-to-shop's front door (epic S2.2).
  *
- * One label, one textarea, three tappable examples and one button: the merchant starts by describing, not by
+ * One label, one textarea (its placeholder types examples out), a rail of tappable examples and one button: the merchant starts by describing, not by
  * filling forms. It lives in the `/mx/vende` hero and at the top of the `/sell` first run.
  *
  * Submitting does NOT navigate first: it swaps this box for the taking-shape screen (S2.3), which owns the request,
@@ -44,6 +68,7 @@ export default function DescribeBox({
   const [token, setToken] = useState<string | null>(null)
   const [shaping, setShaping] = useState<{ description: string; token: string } | null>(null)
 
+  const rotating = useRotatingPlaceholder(DESCRIBE_COPY.rotatingExamples, text.length === 0 && !shaping)
   const trimmed = text.trim()
   const ready = trimmed.length > 0 && text.length <= MAX_DESCRIPTION_CHARS && !!token && !!siteKey
 
@@ -83,7 +108,7 @@ export default function DescribeBox({
         rows={3}
         maxLength={MAX_DESCRIPTION_CHARS}
         value={text}
-        placeholder={DESCRIBE_COPY.placeholder}
+        placeholder={rotating ?? DESCRIBE_COPY.placeholder}
         onFocus={warmShaping}
         onChange={(e) => setText(e.target.value)}
         style={{ resize: 'vertical', minHeight: 84 }}

@@ -950,10 +950,12 @@ function AiChannelSection({
       className="card-panel"
       style={{ padding: 'var(--s-6)', background: 'var(--bg-sunk)', marginBottom: 'var(--s-10)' }}
     >
-      <span className="badge badge-agent" style={{ marginBottom: 'var(--s-4)' }}>
-        <i className="iconoir-sparks" aria-hidden="true" style={{ marginRight: 'var(--s-2)' }} />
-        {aiChannel.eyebrow}
-      </span>
+      {aiChannel.eyebrow ? (
+        <span className="badge badge-agent" style={{ marginBottom: 'var(--s-4)' }}>
+          <i className="iconoir-sparks" aria-hidden="true" style={{ marginRight: 'var(--s-2)' }} />
+          {aiChannel.eyebrow}
+        </span>
+      ) : null}
       <h2
         id={`${pageId}-ai-channel-title`}
         className="t-h2"
@@ -967,7 +969,7 @@ function AiChannelSection({
       <ol
         style={{
           margin: 0,
-          marginBottom: 'var(--s-5)',
+          marginBottom: aiChannel.note ? 'var(--s-5)' : 0,
           padding: 0,
           listStyle: 'none',
           display: 'grid',
@@ -1004,19 +1006,22 @@ function AiChannelSection({
           </li>
         ))}
       </ol>
-      <p
-        className="t-small"
-        style={{
-          margin: 0,
-          color: 'var(--agent)',
-          background: 'var(--agent-soft)',
-          borderLeft: '4px solid var(--agent)',
-          borderRadius: 'var(--r-md)',
-          padding: 'var(--s-3) var(--s-4)',
-        }}
-      >
-        {aiChannel.note}
-      </p>
+      {/* The copy blanks the eyebrow and note today; an empty one must not leave a tinted, padded band. */}
+      {aiChannel.note ? (
+        <p
+          className="t-small"
+          style={{
+            margin: 0,
+            color: 'var(--agent)',
+            background: 'var(--agent-soft)',
+            borderLeft: '4px solid var(--agent)',
+            borderRadius: 'var(--r-md)',
+            padding: 'var(--s-3) var(--s-4)',
+          }}
+        >
+          {aiChannel.note}
+        </p>
+      ) : null}
     </section>
   )
 }
