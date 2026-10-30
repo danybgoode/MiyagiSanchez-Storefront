@@ -73,6 +73,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // A payment link's pay page and its pay action are per-opener and live (state, price): never cached
+        // by the CDN or the browser (in-person-sales S4.2, D15).
+        source: '/pagar/:path*',
+        headers: [{ key: 'Cache-Control', value: 'private, no-store' }],
+      },
+      {
         // The embeddable widget loader is included via <script> from any site, so
         // it must be CORS-open and cacheable. (07 · Embeddable Widget, Sprint 2.)
         source: '/embed.js',

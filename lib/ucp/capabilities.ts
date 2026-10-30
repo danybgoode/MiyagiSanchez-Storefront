@@ -135,6 +135,9 @@ export const MCP_SELLER_TOOLS = [
   'create_listing',
   'list_my_listings',
   'get_share_kit',             // share-kit S3.3 — catalog link, PDF link, Meta feed URL (token-scoped)
+  'create_payment_link',       // in-person-sales S4.4 — payment links (token-scoped)
+  'list_payment_links',        // in-person-sales S4.4 (token-scoped)
+  'cancel_payment_link',       // in-person-sales S4.4 (token-scoped)
   'list_wall_entries',         // living-shop S6.3 — the storefront Wall (token-scoped)
   'create_wall_entry',         // living-shop S6.3 (token-scoped)
   'update_wall_entry',         // living-shop S6.3 (token-scoped)
@@ -196,6 +199,7 @@ export const UCP_CAPABILITIES = [
   'support_widget',      // Buy Me a Coffee-style guest support contributions
   'mcp_server',
   'seller_configuration', // get/patch_store_configuration (token-scoped, Sprint 4)
+  'seller_payment_links', // create/list/cancel_payment_link — in-person-sales S4.4 (token-scoped)
   'seller_orders',        // list_orders — ml-orders-native S3 · US-9 (token-scoped)
   'seller_onboarding',    // Onboarding 0 — published setup spec + emit prompt (get_setup_spec)
   'seller_domain_subscription', // custom-domain SKU — entitlement + checkout over MCP, recurring + one-time cadence (token-scoped)

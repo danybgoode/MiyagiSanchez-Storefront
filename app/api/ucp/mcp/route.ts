@@ -23,6 +23,8 @@
  *   get_shop              Seller profile + their listings
  */
 
+import { filterLinksByState, formatLinkForAgent, mapCancelLinkArgs, mapCreateLinkArgs, type AgentLinkView } from '@/lib/in-person/payment-link-mcp'
+import { internalLinkCall } from '@/lib/in-person/payment-link-backend'
 import { NextRequest, NextResponse } from 'next/server'
 import { toUcpListing } from '@/lib/ucp/schema'
 import { getPriceGrid } from '@/lib/listings'
@@ -520,6 +522,33 @@ const TOOLS = [
     name: 'get_share_kit',
     description: "SELLER TOOL. Get YOUR OWN shop's share kit: the catalog page link (and its short form), the catalog PDF link, and the Meta product-feed URL for Instagram Shopping and WhatsApp Business catalogs, with how many products the feed leaves out and why. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop — another shop's slug is never reachable. Mexico shops only. Hand the links to your human, or post them for them.",
     inputSchema: { type: 'object', properties: {} },
+  },
+  // ── Payment links (in-person-sales S4.4, D16) ───────────────────────────────
+  {
+    name: 'create_payment_link',
+    description: "SELLER TOOL. Create a payment link on YOUR OWN shop that anyone can open to pay, for products or for any amount. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop — another shop is never reachable. Mexico shops only. kind='products' needs `lines` ([{variant_id, quantity}], from YOUR OWN catalog; the price is the catalog price) and `uses` 'single' (default) or 'multi'. kind='amount' needs `concept` (3-80 letters) and `amount_mxn` in pesos ($10 to $50,000) and is single-use. `expires_in_days` is 1 to 30 (default 7). Returns the link with its full URL and its short mschz.org URL; hand it to your human or post it.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['products', 'amount'] },
+        lines: { type: 'array', items: { type: 'object', properties: { variant_id: { type: 'string' }, quantity: { type: 'integer', minimum: 1, maximum: 999 } }, required: ['variant_id', 'quantity'] } },
+        uses: { type: 'string', enum: ['single', 'multi'] },
+        concept: { type: 'string' },
+        amount_mxn: { type: 'number', description: 'Pesos, not centavos.' },
+        expires_in_days: { type: 'integer', minimum: 1, maximum: 30 },
+      },
+      required: ['kind'],
+    },
+  },
+  {
+    name: 'list_payment_links',
+    description: "SELLER TOOL. List YOUR OWN shop's payment links with their state (pending, paid, expired, cancelled), URLs and how many orders paid each. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop. Optionally filter by `state`.",
+    inputSchema: { type: 'object', properties: { state: { type: 'string', enum: ['pending', 'paid', 'expired', 'cancelled'] } } },
+  },
+  {
+    name: 'cancel_payment_link',
+    description: "SELLER TOOL. Cancel one of YOUR OWN shop's payment links so it can no longer be paid. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop. A payment already made is not undone. Get link_id from list_payment_links.",
+    inputSchema: { type: 'object', properties: { link_id: { type: 'string' } }, required: ['link_id'] },
   },
   // ── Living Shop — the Wall (epic 07, Story 6.3) ─────────────────────────────
   // Four tools, one validator: these share `lib/wall/validate.ts` with the human
@@ -3290,6 +3319,47 @@ async function handleTestTelegram(args: Record<string, unknown>, authHeader?: st
   return { content: [{ type: 'text', text: '✅ Mensaje de prueba enviado a tu Telegram.' }] }
 }
 
+/**
+ * Payment-link tools (in-person-sales S4.4, D16). The shop is the one `resolveToolShop` returns for the
+ * token and nothing else (a slug argument is never read); the backend internal route validates with the
+ * same core as the web, so the answers' codes and messages are surfaced as they are.
+ */
+async function paymentLinkTool(
+  name: 'create_payment_link' | 'list_payment_links' | 'cancel_payment_link',
+  args: Record<string, unknown>,
+  authHeader?: string | null,
+) {
+  const agentAuth = await resolveToolShop(authHeader, args, name)
+  if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
+  const slug = agentAuth.shop.slug
+  if (!slug) return { isError: true, content: [{ type: 'text', text: 'Tu tienda no tiene un identificador (slug) configurado.' }] }
+  const fail = (r: { status: number; body: { code?: string; message?: string } }) => ({
+    isError: true,
+    content: [{ type: 'text', text: `${r.body.message ?? `Error ${r.status}`}${r.body.code ? ` (${r.body.code})` : ''}` }],
+  })
+
+  if (name === 'create_payment_link') {
+    const mapped = mapCreateLinkArgs(args)
+    if (!mapped.ok) return { isError: true, content: [{ type: 'text', text: mapped.message }] }
+    const r = await internalLinkCall('POST', '/internal/sellers/payment-links', slug, mapped.body)
+    if (!r.ok) return fail(r)
+    const link = formatLinkForAgent(r.body.payment_link as AgentLinkView)
+    return { content: [{ type: 'text', text: `Link creado: ${link.short_url}\n(${link.url})` }, { type: 'text', text: JSON.stringify({ payment_link: link }, null, 2) }] }
+  }
+  if (name === 'list_payment_links') {
+    const r = await internalLinkCall('GET', '/internal/sellers/payment-links', slug)
+    if (!r.ok) return fail(r)
+    const links = filterLinksByState((r.body.payment_links ?? []) as AgentLinkView[], args.state).map(formatLinkForAgent)
+    if (links.length === 0) return { content: [{ type: 'text', text: 'No tienes links de cobro que coincidan.' }] }
+    return { content: [{ type: 'text', text: `## Tus links de cobro (${links.length})` }, { type: 'text', text: JSON.stringify({ payment_links: links }, null, 2) }] }
+  }
+  const id = mapCancelLinkArgs(args)
+  if (!id.ok) return { isError: true, content: [{ type: 'text', text: id.message }] }
+  const r = await internalLinkCall('POST', `/internal/sellers/payment-links/${encodeURIComponent(id.id)}/cancel`, slug, {})
+  if (!r.ok) return fail(r)
+  return { content: [{ type: 'text', text: 'Link cancelado: ya no se puede pagar.' }, { type: 'text', text: JSON.stringify({ payment_link: formatLinkForAgent(r.body.payment_link as AgentLinkView) }, null, 2) }] }
+}
+
 async function handleListOrders(args: Record<string, unknown>, authHeader?: string | null) {
   const agentAuth = await resolveToolShop(authHeader, args, 'list_orders')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
@@ -4633,6 +4703,9 @@ async function handleMcpMethod(
       case 'link_telegram':             { const r = await handleLinkTelegram(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'unlink_telegram':           { const r = await handleUnlinkTelegram(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'test_telegram':             { const r = await handleTestTelegram(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
+      case 'create_payment_link':
+      case 'list_payment_links':
+      case 'cancel_payment_link':       { const r = await paymentLinkTool(name, args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'list_orders':               { const r = await handleListOrders(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'list_manuscript_submissions': { const r = await handleListManuscriptSubmissions(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'review_submission':        { const r = await handleReviewSubmission(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }

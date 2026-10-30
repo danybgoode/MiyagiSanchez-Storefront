@@ -58,7 +58,7 @@ export const NOT_FOUND_TARGET = `${PLATFORM_ORIGIN}/404`
  * Deliberately excludes session-bound/private surfaces (checkout, account,
  * /shop/manage, /admin, API routes) — nothing shareable lives there.
  */
-export const PASSTHROUGH_PREFIXES = new Set(['g', 'e', 'v', 's', 'l'])
+export const PASSTHROUGH_PREFIXES = new Set(['g', 'e', 'v', 's', 'l', 'pagar'])
 
 /** The short domain merchants should share (mschz.org/<prefix>/…). */
 export const SHORTLINK_ORIGIN = `https://${SHORTLINK_HOSTS[0]}`
