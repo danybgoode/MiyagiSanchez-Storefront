@@ -3333,7 +3333,7 @@ async function paymentLinkTool(
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
   const slug = agentAuth.shop.slug
   if (!slug) return { isError: true, content: [{ type: 'text', text: 'Tu tienda no tiene un identificador (slug) configurado.' }] }
-  const fail = (r: { status: number; body: Record<string, any> }) => ({
+  const fail = (r: { status: number; body: { code?: string; message?: string } }) => ({
     isError: true,
     content: [{ type: 'text', text: `${r.body.message ?? `Error ${r.status}`}${r.body.code ? ` (${r.body.code})` : ''}` }],
   })
@@ -3343,7 +3343,7 @@ async function paymentLinkTool(
     if (!mapped.ok) return { isError: true, content: [{ type: 'text', text: mapped.message }] }
     const r = await internalLinkCall('POST', '/internal/sellers/payment-links', slug, mapped.body)
     if (!r.ok) return fail(r)
-    const link = formatLinkForAgent(r.body.payment_link)
+    const link = formatLinkForAgent(r.body.payment_link as AgentLinkView)
     return { content: [{ type: 'text', text: `Link creado: ${link.short_url}\n(${link.url})` }, { type: 'text', text: JSON.stringify({ payment_link: link }, null, 2) }] }
   }
   if (name === 'list_payment_links') {
@@ -3357,7 +3357,7 @@ async function paymentLinkTool(
   if (!id.ok) return { isError: true, content: [{ type: 'text', text: id.message }] }
   const r = await internalLinkCall('POST', `/internal/sellers/payment-links/${encodeURIComponent(id.id)}/cancel`, slug, {})
   if (!r.ok) return fail(r)
-  return { content: [{ type: 'text', text: 'Link cancelado: ya no se puede pagar.' }, { type: 'text', text: JSON.stringify({ payment_link: formatLinkForAgent(r.body.payment_link) }, null, 2) }] }
+  return { content: [{ type: 'text', text: 'Link cancelado: ya no se puede pagar.' }, { type: 'text', text: JSON.stringify({ payment_link: formatLinkForAgent(r.body.payment_link as AgentLinkView) }, null, 2) }] }
 }
 
 async function handleListOrders(args: Record<string, unknown>, authHeader?: string | null) {

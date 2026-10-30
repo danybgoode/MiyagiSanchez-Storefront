@@ -12,14 +12,28 @@ import { payStartBody, type PayChoice } from './payment-link'
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const INTERNAL_SECRET = process.env.MEDUSA_INTERNAL_SECRET ?? ''
 
+import type { ManualPayment } from './counter-checkout'
+import type { AgentLinkView } from './payment-link-mcp'
+
+/** The union of fields the payment-link backend routes answer with; every one optional. */
+export interface LinkJson {
+  code?: string
+  message?: string
+  cart_id?: string
+  redirect_url?: string
+  manual_payment?: ManualPayment | null
+  payment_link?: AgentLinkView & { state?: string; shop?: { slug?: string; name?: string; logo_url?: string | null }; [k: string]: unknown }
+  payment_links?: AgentLinkView[]
+}
+
 export interface LinkError { code?: string; message?: string }
 
-export async function readJson(res: Response): Promise<Record<string, any>> {
-  return ((await res.json().catch(() => ({}))) ?? {}) as Record<string, any>
+export async function readJson(res: Response): Promise<LinkJson> {
+  return ((await res.json().catch(() => ({}))) ?? {}) as LinkJson
 }
 
 /** The public link for the pay page. */
-export async function getPublicLink(token: string): Promise<{ status: number; body: Record<string, any> }> {
+export async function getPublicLink(token: string): Promise<{ status: number; body: LinkJson }> {
   try {
     const res = await backendFetch(`/store/payment-links/${encodeURIComponent(token)}`)
     return { status: res.status, body: await readJson(res) }
@@ -70,7 +84,7 @@ export async function internalLinkCall(
   path: string,
   slug: string,
   body?: unknown,
-): Promise<{ ok: boolean; status: number; body: Record<string, any> }> {
+): Promise<{ ok: boolean; status: number; body: LinkJson }> {
   if (!INTERNAL_SECRET) return { ok: false, status: 503, body: { message: 'Internal secret not configured.' } }
   try {
     const res = await fetch(`${MEDUSA_BASE}${path}?seller_slug=${encodeURIComponent(slug)}`, {

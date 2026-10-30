@@ -24,7 +24,7 @@ export default function PayClient({ token, choices }: { token: string; choices: 
         signal: AbortSignal.timeout(40_000),
       })
       const json = (await res.json().catch(() => null)) as { redirect_url?: string; manual_payment?: ManualPayment; message?: string; code?: string } | null
-      if (res.ok && json?.redirect_url) { window.location.href = json.redirect_url; return }
+      if (res.ok && json?.redirect_url) { window.location.assign(json.redirect_url); return }
       if (res.ok && json?.manual_payment) { setManual(json.manual_payment); return }
       setKind(payFailureKind(json?.code))
       setError(json?.message ?? 'No pudimos preparar el pago. Inténtalo de nuevo.')
