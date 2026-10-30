@@ -243,7 +243,6 @@ function OrderCard({
             <span className="flex-shrink-0 flex items-center gap-1">
               {mlBadge && <StatusBadge token="promo">{mlBadge}</StatusBadge>}
               {counterBadge && <StatusBadge token="info">{counterBadge}</StatusBadge>}
-              
               <StatusBadge token={statusToken}>{badgeLabel}</StatusBadge>
             </span>
           </div>

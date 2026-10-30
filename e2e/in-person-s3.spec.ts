@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { test, expect } from '@playwright/test'
-import { applyResponse, dismiss, emptyQueue, enqueue, needsAttention, nextToSend, pendingCount, sanitizeEntries, backoffMs } from '../lib/in-person/sale-queue'
+import { applyResponse, dismiss, emptyQueue, enqueue, needsAttention, nextToSend, pendingCount, sanitizeEntries, backoffMs, diffQueues, retryParked, wakeAll, QUEUE_PARK_CODES } from '../lib/in-person/sale-queue'
+import { cacheOwnerAction } from '../lib/in-person/counter-cache'
 import { isOversold, oversoldLines, oversoldSummary } from '../lib/in-person/oversold'
 
 /** In-person sales · Sprint 3 — offline cash queue, worker scope, oversell flag. */
@@ -42,20 +43,54 @@ test.describe('sale-queue', () => {
 
   test('a definite refusal parks the sale in needs_attention, never deletes it', () => {
     const { queue, verdict } = applyResponse(mk(), 'c1', { status: 422, code: 'VARIANT_NOT_OWNED', message: 'No es tuyo' }, T0)
-    expect(verdict).toBe('refused')
+    expect(verdict).toBe('parked')
     expect(needsAttention(queue)).toHaveLength(1)
     expect(needsAttention(queue)[0].message).toBe('No es tuyo')
     expect(pendingCount(queue)).toBe(0)
     expect(nextToSend(queue, T0 + 10 ** 9)).toBeNull()
   })
 
-  test('sticky rule: an entry that was ever uncertain is not parked by a pre-claim refusal', () => {
-    const afterFlake = applyResponse(mk(), 'c1', { status: null }, T0).queue
-    const r = applyResponse(afterFlake, 'c1', { status: 401, code: 'UNAUTHENTICATED' }, T0 + 10 ** 6)
-    expect(r.verdict).toBe('uncertain')
-    expect(r.queue.entries[0].status).toBe('pending')
-    // but a post-claim refusal does park it
-    expect(applyResponse(afterFlake, 'c1', { status: 409, code: 'SALE_CLOSED' }, T0 + 10 ** 6).queue.entries[0].status).toBe('needs_attention')
+  test('a transient refusal is retried later, never parked (an expired session must not park a whole queue)', () => {
+    for (const res of [
+      { status: 401, code: 'UNAUTHENTICATED' }, { status: 409, code: 'seller_not_active' }, { status: 404, code: 'SELLER_NOT_FOUND' },
+      { status: 503, code: 'MX_COMMERCE_UNCONFIGURED' }, { status: 503, code: 'RETRY_SAME_ID' }, { status: 409, code: 'IN_PROGRESS' },
+      { status: 500 }, { status: 400 }, { status: null },
+    ]) {
+      const r = applyResponse(mk(), 'c1', res, T0)
+      expect(r.verdict, JSON.stringify(res)).toBe('retry')
+      expect(r.queue.entries[0].status).toBe('pending')
+    }
+    // a whole queue hit by the same 401 stays pending
+    let q = enqueue(mk('a'), { client_id: 'b', lines, tendered_cents: null, total_cents: 1 }, T0)
+    for (const id of ['a', 'b']) q = applyResponse(q, id, { status: 401, code: 'UNAUTHENTICATED' }, T0).queue
+    expect(needsAttention(q)).toHaveLength(0)
+  })
+
+  test('only never-succeed codes park, and they are exactly the agreed list', () => {
+    expect([...QUEUE_PARK_CODES].sort()).toEqual([
+      'CLIENT_ID_REUSED', 'EMPTY_SALE', 'INVALID_BODY', 'INVALID_CLIENT_ID', 'INVALID_EMAIL', 'INVALID_KIND', 'INVALID_LINE', 'INVALID_QUANTITY',
+      'INVALID_SOLD_AT', 'INVALID_TENDERED', 'IN_PERSON_MX_ONLY', 'KIND_NOT_AVAILABLE', 'OFFLINE_NOT_CASH', 'SALE_CLOSED', 'TENDERED_NOT_CASH',
+      'TENDERED_SHORT', 'TOO_MANY_LINES', 'VARIANT_NOT_OWNED',
+    ].sort())
+  })
+
+  test('«Reintentar» puts a parked sale back to pending, due now, same payload; wakeAll makes everything due', () => {
+    const parked = applyResponse(mk(), 'c1', { status: 422, code: 'EMPTY_SALE' }, T0).queue
+    const back = retryParked(parked, 'c1', T0 + 50)
+    expect(back.entries[0]).toMatchObject({ status: 'pending', next_attempt_at: T0 + 50, message: null, client_id: 'c1', lines })
+    expect(retryParked(mk(), 'c1', T0 + 50).entries[0].next_attempt_at).toBe(T0) // pending entries untouched
+    const backedOff = applyResponse(mk(), 'c1', { status: null }, T0).queue
+    expect(nextToSend(backedOff, T0 + 1)).toBeNull()
+    expect(nextToSend(wakeAll(backedOff, T0 + 1), T0 + 1)?.client_id).toBe('c1')
+  })
+
+  test('diffQueues yields per-entry writes, so a store is never cleared and rewritten', () => {
+    const a = mk('a'); const ab = enqueue(a, { client_id: 'b', lines, tendered_cents: null, total_cents: 1 }, T0)
+    expect(diffQueues(a, ab)).toEqual({ put: [ab.entries[1]], remove: [] })
+    expect(diffQueues(ab, a)).toEqual({ put: [], remove: ['b'] })
+    expect(diffQueues(ab, ab)).toEqual({ put: [], remove: [] })
+    const changed = applyResponse(ab, 'a', { status: null }, T0).queue
+    expect(diffQueues(ab, changed).put.map((e) => e.client_id)).toEqual(['a'])
   })
 
   test('a flaky reconnect resending the same entry twice sends the SAME client_id and payload', () => {
@@ -95,7 +130,7 @@ test.describe('counter service-worker scope', () => {
     expect(handle(PAGE, '', 'navigate', O, 'GET')).toBe(true)
     expect(handle(`${PAGE}/`, '', 'navigate', O, 'GET')).toBe(true)
     expect(handle(`${O}/_next/static/chunks/a.js`, PAGE, 'no-cors', O, 'GET')).toBe(true)
-    expect(handle(`${PAGE}?_rsc=1`, PAGE, 'cors', O, 'GET')).toBe(true)
+    expect(handle(PAGE, PAGE, 'cors', O, 'GET')).toBe(true)
   })
   test('the negation: other pages, other pages\' assets, API calls, cross-origin, non-GET, no referrer', () => {
     expect(handle(`${O}/shop/manage/orders`, '', 'navigate', O, 'GET')).toBe(false)
@@ -104,18 +139,34 @@ test.describe('counter service-worker scope', () => {
     expect(handle(`${O}/_next/static/chunks/a.js`, `${O}/shop/manage/orders`, 'no-cors', O, 'GET')).toBe(false)
     expect(handle(`${O}/api/shop/en-persona/sales/abc`, PAGE, 'cors', O, 'GET')).toBe(false)
     expect(handle(`${O}/api/anything`, `${O}/l/1`, 'cors', O, 'GET')).toBe(false)
+    expect(handle(`${PAGE}?_rsc=1`, PAGE, 'cors', O, 'GET')).toBe(false)
+    expect(handle(`${O}/_next/image?url=%2Fa.png&w=64&q=75`, PAGE, 'no-cors', O, 'GET')).toBe(false)
+    expect(handle(`${O}/shop/manage/orders?_rsc=1`, PAGE, 'cors', O, 'GET')).toBe(false)
+    expect(handle(`${O}/shop/manage/orders`, PAGE, 'cors', O, 'GET')).toBe(false)
     expect(handle('https://cdn.example.com/x.js', PAGE, 'no-cors', O, 'GET')).toBe(false)
     expect(handle(`${O}/api/shop/en-persona/sales`, PAGE, 'cors', O, 'POST')).toBe(false)
     expect(handle(`${O}/_next/static/a.js`, '', 'no-cors', O, 'GET')).toBe(false)
     expect(handle(`${O}/_next/static/a.js`, 'https://evil.example/shop/manage/en-persona', 'no-cors', O, 'GET')).toBe(false)
     expect(handle('not a url', PAGE, 'navigate', O, 'GET')).toBe(false)
   })
-  test('sw.js defers to the helper and answers nothing else itself', () => {
+  test('the site-wide sw.js stays push-only; the counter has its own scoped worker', () => {
     const sw = readFileSync(path.resolve(import.meta.dirname, '../public/sw.js'), 'utf8')
-    expect(sw).toContain("importScripts('/counter-scope.js')")
-    expect(sw).toMatch(/shouldHandleCounterRequest\([^)]*\)\) return/)
+    expect(sw).not.toContain("'fetch'")
+    expect(sw).not.toContain('importScripts')
     expect(sw).toContain("addEventListener('push'")
     expect(sw).toContain("addEventListener('notificationclick'")
+    const own = readFileSync(path.resolve(import.meta.dirname, '../public/counter-sw.js'), 'utf8')
+    expect(own).toContain("importScripts('/counter-scope.js')")
+    expect(own).toMatch(/shouldHandleCounterRequest\([^)]*\)\) return/)
+    expect(own).toMatch(/const CACHE = 'ms-counter-v\d+'/)
+    expect(own).toContain('caches.delete')
+    const client = readFileSync(path.resolve(import.meta.dirname, '../app/(shell)/shop/manage/en-persona/CounterClient.tsx'), 'utf8')
+    expect(client).toContain("register('/counter-sw.js', { scope: '/shop/manage/en-persona' })")
+  })
+  test('cache owner: a different seller on the same browser purges the counter cache', () => {
+    expect(cacheOwnerAction('sel_1', 'sel_1')).toBe('keep')
+    expect(cacheOwnerAction('sel_1', 'sel_2')).toBe('purge')
+    expect(cacheOwnerAction(null, 'sel_2')).toBe('claim')
   })
 })
 

@@ -5402,6 +5402,9 @@
     "s_b6bc8a3dbd87021b": "sales to upload",
     "s_c07b050f090bb93d": "Could not upload a sale of",
     "s_c4a482534579c47d": "Card and transfer need signal.",
-    "s_ff85c3a64eb93046": "No signal and this browser cannot save sales: wait for a signal."
+    "s_ff85c3a64eb93046": "No signal and this browser cannot save sales: wait for a signal.",
+    "s_4b20d162ed7a5267": "If you discard this sale it is lost: it will not be recorded in Orders. Discard it?",
+    "s_5d81e12652744b8c": "We could not save the sale on this phone. Tap «Retry» when you have signal.",
+    "s_acbbd429ad47a5dc": "We could not save the sale on this phone. Do not treat it as charged."
   }
 }

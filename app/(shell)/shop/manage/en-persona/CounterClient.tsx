@@ -55,8 +55,9 @@ import {
 import { classifySaleResponse } from '@/lib/in-person/sale-response'
 import type { CounterKind, ManualPayment, SaleState } from '@/lib/in-person/counter-checkout'
 import { parseStoredSale } from '@/lib/in-person/stored-sale'
-import { applyResponse, dismiss, emptyQueue, enqueue, needsAttention, nextToSend, pendingCount, type SaleQueue } from '@/lib/in-person/sale-queue'
-import { idbLoad, idbSave } from '@/lib/in-person/sale-queue-idb'
+import { applyResponse, diffQueues, dismiss, emptyQueue, enqueue, needsAttention, nextToSend, pendingCount, retryParked, wakeAll, type SaleQueue } from '@/lib/in-person/sale-queue'
+import { cacheOwnerAction, COUNTER_CACHE_PREFIX, COUNTER_OWNER_KEY } from '@/lib/in-person/counter-cache'
+import { idbApply, idbLoad } from '@/lib/in-person/sale-queue-idb'
 import { buildReceiptText } from '@/lib/in-person/receipt'
 import { cancelVerdict, LEAVE_PENDING_NOTE, screenForState, UNVERIFIED_MESSAGE } from '@/lib/in-person/sale-screen'
 import { buildWhatsAppShareLink, shopShortLink } from '@/lib/share-link'
@@ -117,6 +118,31 @@ const RETRY_HINT = 'Toca «Reintentar»: no se cobra doble.'
 
 /** Clock read for event handlers (kept out of the render path). */
 const clock = () => Date.now()
+/**
+ * Set up the counter's own worker (scope limited to this page) and the offline cache.
+ * Order matters on a shared phone: if the cache belongs to another seller it is deleted BEFORE
+ * anything else, then this seller is recorded as owner.
+ */
+async function setupCounterWorker(sellerId: string) {
+  try {
+    let owner: string | null = null
+    try { owner = window.localStorage.getItem(COUNTER_OWNER_KEY) } catch { /* no storage: purge to be safe below */ }
+    const action = cacheOwnerAction(owner, sellerId)
+    if (action !== 'keep' && 'caches' in window) {
+      const names = await caches.keys()
+      await Promise.all(names.filter((n) => n.startsWith(COUNTER_CACHE_PREFIX)).map((n) => caches.delete(n)))
+    }
+    try { window.localStorage.setItem(COUNTER_OWNER_KEY, sellerId) } catch { /* ignore */ }
+    if (!('serviceWorker' in navigator)) return
+    await navigator.serviceWorker.register('/counter-sw.js', { scope: '/shop/manage/en-persona' })
+    const reg = await navigator.serviceWorker.ready
+    // First visit works offline after one online load: hand the worker what this page loaded.
+    const urls = [location.pathname, ...performance.getEntriesByType('resource').map((r) => r.name)]
+      .filter((u) => { try { return new URL(u, location.origin).origin === location.origin } catch { return false } })
+    reg.active?.postMessage({ type: 'precache', page: location.href, urls })
+  } catch { /* no worker: the counter still works online */ }
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
@@ -219,7 +245,7 @@ function stockLabel(variants: CounterVariant[]): string {
   return units > 0 ? `Quedan ${units}` : 'Agotado'
 }
 
-export default function CounterClient({ products: initialProducts, truncated, shopName, shopSlug }: { products: CounterProduct[]; truncated: boolean; shopName: string; shopSlug: string }) {
+export default function CounterClient({ products: initialProducts, truncated, shopName, shopSlug, sellerId }: { products: CounterProduct[]; truncated: boolean; shopName: string; shopSlug: string; sellerId: string }) {
   const fmt = useSellerFormat()
   const money = (cents: number) => fmt.money(cents, 'MXN')
 
@@ -244,6 +270,7 @@ export default function CounterClient({ products: initialProducts, truncated, sh
   const [online, setOnline] = useState(true)
   const queueRef = useRef<SaleQueue>(emptyQueue())
   const syncing = useRef(false)
+  const alive = useRef(true)
   const [receipt, setReceipt] = useState<{ lines: CounterCart['lines']; totalCents: number; method: CounterKind } | null>(null)
   const pendingRef = useRef<FrozenSale | null>(null)
 
@@ -274,64 +301,105 @@ export default function CounterClient({ products: initialProducts, truncated, sh
     return () => { cancelled = true }
   }, [])
 
-  function commitQueue(next: SaleQueue) {
+  /**
+   * Write the change to IndexedDB FIRST (per-entry put/delete, never a clear), then show it.
+   * False when the write failed: the caller must not say «Venta guardada» and must keep its
+   * frozen sale. Memory only changes after the store accepted it.
+   */
+  async function commitQueue(next: SaleQueue): Promise<boolean> {
+    const prev = queueRef.current
+    const ok = await idbApply(sellerId, diffQueues(prev, next))
+    if (!ok) { setStorage('unavailable'); return false }
     queueRef.current = next
     setQueue(next)
-    void idbSave(next.entries).then((ok) => { if (!ok) setStorage('unavailable') })
+    return true
   }
 
-  /** Upload every due entry, one at a time. An entry leaves only when the backend returns its order. */
+  /** The store is the truth (another tab may have added or finished entries): re-read it. */
+  async function reloadQueue(): Promise<boolean> {
+    const entries = await idbLoad(sellerId)
+    if (entries === null) { setStorage('unavailable'); return false }
+    if (!alive.current) return false
+    setStorage('ready')
+    queueRef.current = { entries }
+    setQueue({ entries })
+    return true
+  }
+
+  /**
+   * Upload every due entry, one at a time. An entry leaves only when the backend returns its
+   * order. The pass stops at the FIRST retry-later answer (no signal, expired session, 5xx):
+   * hammering the rest would only burn attempts. Serialised across tabs with Web Locks.
+   */
+  async function syncPass() {
+    if (!(await reloadQueue())) return
+    for (let guard = 0; guard < 200 && alive.current; guard += 1) {
+      const entry = nextToSend(queueRef.current, clock())
+      if (!entry) break
+      let res: { status: number | null; code?: string | null; hasOrder?: boolean; message?: string | null }
+      try {
+        const r = await fetch('/api/shop/en-persona/sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: entry.client_id, kind: 'cash', lines: entry.lines, tendered_cents: entry.tendered_cents, offline: true, sold_at: entry.sold_at }),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+        const j = (await r.json().catch(() => null)) as { order_id?: string; total_cents?: number; code?: string; message?: string } | null
+        res = { status: r.status, code: j?.code, hasOrder: !!j?.order_id && Number.isSafeInteger(j?.total_cents), message: j?.message }
+      } catch {
+        res = { status: null }
+      }
+      const { queue: next, verdict } = applyResponse(queueRef.current, entry.client_id, res, clock())
+      await commitQueue(next)
+      if (verdict === 'retry') break
+    }
+  }
+
   async function syncQueue() {
     if (syncing.current) return
     syncing.current = true
     try {
-      for (let guard = 0; guard < 200; guard += 1) {
-        const entry = nextToSend(queueRef.current, clock())
-        if (!entry) break
-        let res: { status: number | null; code?: string | null; hasOrder?: boolean; message?: string | null }
-        try {
-          const r = await fetch('/api/shop/en-persona/sales', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ client_id: entry.client_id, kind: 'cash', lines: entry.lines, tendered_cents: entry.tendered_cents, offline: true, sold_at: entry.sold_at }),
-            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-          })
-          const j = (await r.json().catch(() => null)) as { order_id?: string; total_cents?: number; code?: string; message?: string } | null
-          res = { status: r.status, code: j?.code, hasOrder: !!j?.order_id && Number.isSafeInteger(j?.total_cents), message: j?.message }
-        } catch {
-          res = { status: null }
-        }
-        commitQueue(applyResponse(queueRef.current, entry.client_id, res, clock()).queue)
-        if (res.status === null) break // no signal: stop, the next trigger retries
-      }
-    } finally {
+      const locks = (navigator as Navigator & { locks?: { request: (name: string, cb: () => Promise<void>) => Promise<void> } }).locks
+      if (locks) await locks.request(`ms-en-persona-sync:${sellerId}`, syncPass)
+      else await syncPass()
+    } catch { /* a failed pass is just a later pass */ } finally {
       syncing.current = false
     }
   }
 
-  // Load the queue (survives reloads), track connectivity, register the worker, sync on load / online / every 30 s.
+  // Load the queue (survives reloads), track connectivity, set up the counter worker, sync on
+  // load / online / focus / every 30 s while online.
   useEffect(() => {
-    let cancelled = false
-    const goOnline = () => { setOnline(true); void syncQueue() }
+    alive.current = true
+    const goOnline = () => {
+      setOnline(true)
+      // Backoff grown while offline is meaningless now: everything pending is due at once.
+      void reloadQueue().then((ok) => ok && commitQueue(wakeAll(queueRef.current, clock()))).then(() => syncQueue())
+    }
     const goOffline = () => setOnline(false)
+    const refresh = () => { if (document.visibilityState === 'visible') void reloadQueue() }
     queueMicrotask(() => {
-      if (cancelled) return
+      if (!alive.current) return
       setOnline(navigator.onLine)
-      idbLoad().then((entries) => {
-        if (cancelled) return
-        if (entries === null) { setStorage('unavailable'); return }
-        setStorage('ready')
-        queueRef.current = { entries }
-        setQueue({ entries })
-        void syncQueue()
-      })
+      void setupCounterWorker(sellerId)
+      void reloadQueue().then((ok) => { if (ok) void syncQueue() })
     })
-    try { void navigator.serviceWorker?.register('/sw.js').catch(() => {}) } catch { /* no worker: online-only is fine */ }
     window.addEventListener('online', goOnline)
     window.addEventListener('offline', goOffline)
-    const timer = setInterval(() => { if (pendingCount(queueRef.current) > 0) void syncQueue() }, 30_000)
-    return () => { cancelled = true; clearInterval(timer); window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline) }
-    // syncQueue only touches refs and stable setters.
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    const timer = setInterval(() => {
+      if (navigator.onLine && pendingCount(queueRef.current) > 0) void syncQueue()
+    }, 30_000)
+    return () => {
+      alive.current = false
+      clearInterval(timer)
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+    // The handlers only touch refs and stable setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -446,7 +514,10 @@ export default function CounterClient({ products: initialProducts, truncated, sh
       if (!canQueue) { setError('Sin señal y este navegador no puede guardar ventas. Espera a tener señal.'); return }
       if (!pendingRef.current) {
         const entryId = crypto.randomUUID()
-        commitQueue(enqueue(queueRef.current, { client_id: entryId, lines: toSaleLines(cart), tendered_cents: tendered, total_cents: total }, clock()))
+        setInFlight(true)
+        const saved = await commitQueue(enqueue(queueRef.current, { client_id: entryId, lines: toSaleLines(cart), tendered_cents: tendered, total_cents: total }, clock()))
+        setInFlight(false)
+        if (!saved) { setError('No pudimos guardar la venta en este teléfono. No la entregues como cobrada.'); return }
         finishSale({ clientId: entryId, lines: toSaleLines(cart), tenderedCents: tendered, kind: 'cash', uncertain: false }, { totalCents: total, changeCents: cash?.change_cents ?? 0, replayed: false, queued: true })
         return
       }
@@ -496,7 +567,14 @@ export default function CounterClient({ products: initialProducts, truncated, sh
     if (outcome.kind === 'uncertain' && outcome.network && sale.kind === 'cash' && canQueue) {
       // The signal dropped mid-send: the order MAY exist. Queue the SAME frozen sale (same id,
       // marked uncertain) so the upload is a replay, and let the merchant carry on.
-      commitQueue(enqueue(queueRef.current, { client_id: sale.clientId, lines: sale.lines, tendered_cents: sale.tenderedCents, total_cents: total, uncertain: true }, clock()))
+      const saved = await commitQueue(enqueue(queueRef.current, { client_id: sale.clientId, lines: sale.lines, tendered_cents: sale.tenderedCents, total_cents: total, uncertain: true }, clock()))
+      if (!saved) {
+        // Not stored: keep the frozen sale (and its sessionStorage copy) so «Reintentar» resumes it.
+        writeStored({ sale, cart, padText })
+        setUncertain(true)
+        setError('No pudimos guardar la venta en este teléfono. Toca «Reintentar» cuando tengas señal.')
+        return
+      }
       finishSale(sale, { totalCents: total, changeCents: cash?.change_cents ?? 0, replayed: false, queued: true })
       return
     }
@@ -656,7 +734,19 @@ export default function CounterClient({ products: initialProducts, truncated, sh
           {parked.map((e) => (
             <div key={e.client_id} className="mt-2 flex items-start justify-between gap-2">
               <p className="text-[var(--color-danger)]">No se pudo subir una venta de {money(e.total_cents)}: {e.message}</p>
-              <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => commitQueue(dismiss(queueRef.current, e.client_id))}>Descartar</Button>
+              <span className="flex flex-shrink-0">
+                <Button variant="secondary" size="sm" className="min-h-[44px]" onClick={() => { void commitQueue(retryParked(queueRef.current, e.client_id, clock())).then(() => syncQueue()) }}>Reintentar</Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="min-h-[44px]"
+                  onClick={() => {
+                    if (window.confirm('Si descartas esta venta se pierde: no quedará registrada en Pedidos. ¿Descartarla?')) void commitQueue(dismiss(queueRef.current, e.client_id))
+                  }}
+                >
+                  Descartar
+                </Button>
+              </span>
             </div>
           ))}
         </div>

@@ -5,7 +5,7 @@ self.addEventListener('push', (event) => {
   let data = {}
   try {
     data = event.data ? event.data.json() : {}
-  } catch (e) {
+  } catch {
     data = {}
   }
   const title = data.title || 'Miyagi Sánchez'
@@ -33,33 +33,5 @@ self.addEventListener('notificationclick', (event) => {
       }
       return self.clients.openWindow(url)
     }),
-  )
-})
-
-/* Counter offline support (in-person-sales S3.1, D11). Network first with a cached fallback,
-   and ONLY for the counter page and the same-origin GETs that page makes. The decision lives in
-   counter-scope.js; any request it rejects returns here without respondWith, so every other
-   navigation and request is exactly as it was. The page that made a subresource request is read
-   from the request referrer (synchronous: respondWith cannot wait for clients.get, and calling
-   it for every request would put the worker in front of the whole site). */
-importScripts('/counter-scope.js')
-const COUNTER_CACHE = 'ms-counter-v1'
-
-self.addEventListener('install', () => { self.skipWaiting() })
-self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()) })
-
-self.addEventListener('fetch', (event) => {
-  const req = event.request
-  if (!self.shouldHandleCounterRequest(req.url, req.referrer, req.mode, self.location.origin, req.method)) return
-  event.respondWith(
-    fetch(req)
-      .then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone()
-          event.waitUntil(caches.open(COUNTER_CACHE).then((c) => c.put(req, copy)).catch(() => {}))
-        }
-        return res
-      })
-      .catch(() => caches.match(req).then((hit) => hit || Response.error())),
   )
 })

@@ -9,12 +9,14 @@
  *    resend is a replay of the same sale on the server (D4), never a second order.
  *  - An entry leaves the queue ONLY when the backend returned its order (verdict 'recorded').
  *  - A network failure or a 5xx keeps the entry and backs off. Never dropped.
- *  - A DEFINITE refusal does not delete the sale either: it moves to `needs_attention`, where
- *    the merchant sees it and decides. Whether a refusal is definite is the S1 classifier's
- *    call, including its sticky rule (an entry that was ever uncertain may already exist, so
- *    only the post-claim codes can park it).
+ *  - A refusal parks the sale in `needs_attention` ONLY when the code means this payload can
+ *    never succeed (QUEUE_PARK_CODES). Anything that a later attempt could fix — an expired
+ *    session (the counter's ~60 s Clerk token is usually stale when signal returns), a shop
+ *    status blip, a 5xx — is retry-later with backoff. Parking on UNAUTHENTICATED once parked a
+ *    whole queue of never-recorded sales in a single pass. This is deliberately NOT the live
+ *    counter's classifier: that one decides whether a client_id may be RELEASED; this one
+ *    decides whether a stored sale is hopeless.
  */
-import { classifySaleResponse, type SaleVerdict } from './sale-response'
 import type { SaleLine } from './counter-cart'
 
 export interface QueueEntry {
@@ -75,18 +77,28 @@ export function nextToSend(q: SaleQueue, now: number): QueueEntry | null {
 export const pendingCount = (q: SaleQueue): number => q.entries.filter((e) => e.status === 'pending').length
 export const needsAttention = (q: SaleQueue): QueueEntry[] => q.entries.filter((e) => e.status === 'needs_attention')
 
+/** Codes that can never succeed for this payload; the merchant must look at the sale. */
+export const QUEUE_PARK_CODES: ReadonlySet<string> = new Set([
+  'VARIANT_NOT_OWNED', 'INVALID_BODY', 'INVALID_CLIENT_ID', 'INVALID_KIND', 'INVALID_LINE', 'INVALID_QUANTITY',
+  'INVALID_TENDERED', 'INVALID_SOLD_AT', 'INVALID_EMAIL', 'EMPTY_SALE', 'TOO_MANY_LINES', 'KIND_NOT_AVAILABLE',
+  'OFFLINE_NOT_CASH', 'TENDERED_NOT_CASH', 'CLIENT_ID_REUSED', 'SALE_CLOSED', 'TENDERED_SHORT', 'IN_PERSON_MX_ONLY',
+])
+
+export type QueueVerdict = 'recorded' | 'parked' | 'retry'
+
 export interface SendResponse { status: number | null; code?: string | null; hasOrder?: boolean; message?: string | null }
 
 /** Apply the outcome of one send. The verdict comes from the S1 classifier, never re-derived here. */
-export function applyResponse(q: SaleQueue, clientId: string, res: SendResponse, now: number): { queue: SaleQueue; verdict: SaleVerdict | null } {
+export function applyResponse(q: SaleQueue, clientId: string, res: SendResponse, now: number): { queue: SaleQueue; verdict: QueueVerdict | null } {
   const entry = q.entries.find((e) => e.client_id === clientId)
   if (!entry) return { queue: q, verdict: null }
-  const verdict = classifySaleResponse({ status: res.status, code: res.code, hasOrder: res.hasOrder, hadUncertainAttempt: entry.uncertain })
+  const recorded = res.status !== null && res.status >= 200 && res.status < 300 && res.hasOrder === true
+  const verdict: QueueVerdict = recorded ? 'recorded' : res.code && QUEUE_PARK_CODES.has(res.code) ? 'parked' : 'retry'
   const replace = (next: QueueEntry | null): SaleQueue => ({
     entries: q.entries.flatMap((e) => (e.client_id !== clientId ? [e] : next ? [next] : [])),
   })
   if (verdict === 'recorded') return { queue: replace(null), verdict }
-  if (verdict === 'refused') {
+  if (verdict === 'parked') {
     return { queue: replace({ ...entry, status: 'needs_attention', attempts: entry.attempts + 1, message: res.message ?? 'No se pudo subir esta venta.' }), verdict }
   }
   const attempts = entry.attempts + 1
@@ -94,6 +106,24 @@ export function applyResponse(q: SaleQueue, clientId: string, res: SendResponse,
     queue: replace({ ...entry, attempts, uncertain: true, next_attempt_at: now + backoffMs(attempts), message: res.message ?? null }),
     verdict,
   }
+}
+
+/** «Reintentar» on a parked sale: back to pending, due now. Same id, same payload. */
+export function retryParked(q: SaleQueue, clientId: string, now: number): SaleQueue {
+  return { entries: q.entries.map((e) => (e.client_id === clientId && e.status === 'needs_attention' ? { ...e, status: 'pending' as const, next_attempt_at: now, message: null } : e)) }
+}
+
+/** Signal is back: every pending entry is due at once (backoff grown while offline is meaningless). */
+export function wakeAll(q: SaleQueue, now: number): SaleQueue {
+  return { entries: q.entries.map((e) => (e.status === 'pending' ? { ...e, next_attempt_at: now } : e)) }
+}
+
+/** What changed between two queues, as per-entry writes (the store is never cleared and rewritten). */
+export function diffQueues(prev: SaleQueue, next: SaleQueue): { put: QueueEntry[]; remove: string[] } {
+  const before = new Map(prev.entries.map((e) => [e.client_id, JSON.stringify(e)]))
+  const put = next.entries.filter((e) => before.get(e.client_id) !== JSON.stringify(e))
+  const keep = new Set(next.entries.map((e) => e.client_id))
+  return { put, remove: prev.entries.filter((e) => !keep.has(e.client_id)).map((e) => e.client_id) }
 }
 
 /** The merchant explicitly dismissed a parked sale. The only way an entry leaves without an order. */

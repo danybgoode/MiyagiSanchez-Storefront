@@ -5402,6 +5402,9 @@
     "s_b6bc8a3dbd87021b": "ventas por subir",
     "s_c07b050f090bb93d": "No se pudo subir una venta de",
     "s_c4a482534579c47d": "Tarjeta y transferencia necesitan señal.",
-    "s_ff85c3a64eb93046": "Sin señal y este navegador no puede guardar ventas: espera a tener señal."
+    "s_ff85c3a64eb93046": "Sin señal y este navegador no puede guardar ventas: espera a tener señal.",
+    "s_4b20d162ed7a5267": "Si descartas esta venta se pierde: no quedará registrada en Pedidos. ¿Descartarla?",
+    "s_5d81e12652744b8c": "No pudimos guardar la venta en este teléfono. Toca «Reintentar» cuando tengas señal.",
+    "s_acbbd429ad47a5dc": "No pudimos guardar la venta en este teléfono. No la entregues como cobrada."
   }
 }

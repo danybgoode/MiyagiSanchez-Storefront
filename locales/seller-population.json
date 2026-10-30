@@ -1474,6 +1474,8 @@
         "s_11d1fe9ee2f3ed84",
         "s_e77c6b92f2b79407",
         "s_cee16cee78ea7e30",
+        "s_acbbd429ad47a5dc",
+        "s_5d81e12652744b8c",
         "s_87901f2495f629a0",
         "s_c07b050f090bb93d",
         "s_b17e2d61f133a0dd",
@@ -1488,6 +1490,7 @@
         "s_393dce59ad1b0d3c",
         "s_a9254c5f812829af",
         "s_ada3e0224eac73f0",
+        "s_4b20d162ed7a5267",
         "s_7aa9ea49fb320d5e",
         "s_d54c8eb58f7b2966",
         "s_b2961fa5829de50c",
@@ -5230,6 +5233,10 @@
       "source": "No se pudo actualizar la sincronización. Vuelve a intentarlo."
     },
     {
+      "key": "s_4b20d162ed7a5267",
+      "source": "Si descartas esta venta se pierde: no quedará registrada en Pedidos. ¿Descartarla?"
+    },
+    {
       "key": "s_4b85161684564aad",
       "source": "Todavía no tienes eventos."
     },
@@ -5828,6 +5835,10 @@
     {
       "key": "s_5d6e022e6a4edf6e",
       "source": "No pudimos iniciar el pago. Vuelve a intentarlo."
+    },
+    {
+      "key": "s_5d81e12652744b8c",
+      "source": "No pudimos guardar la venta en este teléfono. Toca «Reintentar» cuando tengas señal."
     },
     {
       "key": "s_5d83c4c048f2806c",
@@ -8376,6 +8387,10 @@
     {
       "key": "s_acba6507b5ed5f28",
       "source": "Puedes agregar hasta cuatro."
+    },
+    {
+      "key": "s_acbbd429ad47a5dc",
+      "source": "No pudimos guardar la venta en este teléfono. No la entregues como cobrada."
     },
     {
       "key": "s_acc2e245d5b9518a",

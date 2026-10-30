@@ -6,13 +6,14 @@
  */
 import { sanitizeEntries, type QueueEntry } from './sale-queue'
 
-const DB_NAME = 'ms-en-persona'
+/** One database per signed-in seller: a shared phone never shows or uploads another seller's sales. */
+const dbName = (sellerId: string) => `ms-en-persona:${sellerId}`
 const STORE = 'queue'
 
-function open(): Promise<IDBDatabase> {
+function open(sellerId: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') return reject(new Error('indexedDB unavailable'))
-    const req = indexedDB.open(DB_NAME, 1)
+    const req = indexedDB.open(dbName(sellerId), 1)
     req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'client_id' })
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error ?? new Error('indexedDB open failed'))
@@ -21,9 +22,9 @@ function open(): Promise<IDBDatabase> {
 }
 
 /** null when storage is unavailable (distinct from an empty queue). */
-export async function idbLoad(): Promise<QueueEntry[] | null> {
+export async function idbLoad(sellerId: string): Promise<QueueEntry[] | null> {
   try {
-    const db = await open()
+    const db = await open(sellerId)
     try {
       return await new Promise<QueueEntry[]>((resolve, reject) => {
         const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAll()
@@ -36,16 +37,20 @@ export async function idbLoad(): Promise<QueueEntry[] | null> {
   }
 }
 
-/** Make the store equal to `entries` in one transaction. False when it could not be written. */
-export async function idbSave(entries: QueueEntry[]): Promise<boolean> {
+/**
+ * Apply per-entry writes in one transaction. NEVER clear-and-rewrite: another tab or a remounted
+ * counter may have added entries this memory has not seen, and a clear would erase them.
+ */
+export async function idbApply(sellerId: string, change: { put: QueueEntry[]; remove: string[] }): Promise<boolean> {
+  if (change.put.length === 0 && change.remove.length === 0) return true
   try {
-    const db = await open()
+    const db = await open(sellerId)
     try {
       return await new Promise<boolean>((resolve) => {
         const tx = db.transaction(STORE, 'readwrite')
         const store = tx.objectStore(STORE)
-        store.clear()
-        for (const e of entries) store.put(e)
+        for (const e of change.put) store.put(e)
+        for (const id of change.remove) store.delete(id)
         tx.oncomplete = () => resolve(true)
         tx.onerror = () => resolve(false)
         tx.onabort = () => resolve(false)

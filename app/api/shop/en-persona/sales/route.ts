@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     kind,
     lines: body.lines,
     ...(isRemote ? {} : { tendered_cents: body.tendered_cents }),
-    // Offline cash upload (S3): the backend validates both and refuses them for any other kind.
+    // Offline cash upload (S3): the backend validates both (offline cash only; sold_at is bounded there).
     ...(body.offline === true ? { offline: true } : {}),
     ...(typeof body.sold_at === 'string' ? { sold_at: body.sold_at } : {}),
     buyer_email: body.buyer_email,
