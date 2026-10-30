@@ -1651,6 +1651,15 @@
         "mx": "Mexico marketplace",
         "us": "United States",
         "en": "English"
+      },
+      "marketplaceBonus": {
+        "title": "And you also appear in the marketplace",
+        "body": "Your products are also published in the Miyagi Sánchez marketplace: one more shop window, at no cost.",
+        "ctaLabel": "Explore the marketplace"
+      },
+      "buyerLink": {
+        "question": "Here to shop?",
+        "label": "Explore the marketplace"
       }
     },
     "creadores": {

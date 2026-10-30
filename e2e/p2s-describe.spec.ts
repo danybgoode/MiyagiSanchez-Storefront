@@ -11,7 +11,10 @@ import { characterCounter, DESCRIBE_COPY } from '../lib/prompt-to-shop/copy'
 const ROOT = process.cwd()
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 const es = JSON.parse(read('locales/es.json')) as { sellerAcquisition: { anchor: { heroTitle: string; metadata: { title: string; description: string } } } }
-const HERO = 'Describe tu negocio. En segundos tienes tienda, compradores en el marketplace y una IA que la atiende — sin comisión.'
+// root-shop-builder-home S2.1 (product owner, 10-29): the line leads with the shop, not with marketplace
+// buyers — buyer traffic is still small, so "compradores en el marketplace" over-promised. Still one line
+// for the hero and the description (prompt-to-shop's contract), just a truer one.
+const HERO = 'Describe tu negocio. En segundos tienes tu tienda en línea, lista para cobrar y compartir — sin comisión.'
 
 test('the box asks «Cuéntanos qué vendes», offers three examples (one of them tamales), and counts to the limit', () => {
   expect(DESCRIBE_COPY.label).toBe('Cuéntanos qué vendes')

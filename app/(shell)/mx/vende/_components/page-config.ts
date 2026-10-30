@@ -22,6 +22,7 @@ import {
 import { buildSkuPriceTable, computeBundleRow, type PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { SUBDOMAIN_PRICE_YEARLY_MXN } from '@/lib/subdomain-pricing'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
+import { marketBasePath } from '@/lib/markets'
 import type { SellerAcquisitionPageConfig, LandingCallout } from './SellerAcquisitionSections'
 
 type QueryParams = Record<string, string | string[] | undefined | null>
@@ -76,10 +77,21 @@ export function buildAnchorPageConfig(
     aiChannel: copy.aiChannel,
     // Anchor replaces its social-proof stats block with the premium-features grid.
     premiumFeatures: page.premiumFeatures,
+    // root-shop-builder-home D11 — the anchor (now `/`) leads with what a merchant GETS, so its proof
+    // block is "Lo que te llevas". Its prices are `{token}`s (pricing-page D8), filled from the one
+    // pricing catalog here so no MXN figure is ever hand-typed into copy.
+    proofPoints: page.proofPoints.map((point) => ({ ...point, body: fillFixedPricingTokens(point.body, 'es') })),
+    sectionOrder: 'anchor',
+    marketplaceBonus: {
+      title: page.marketplaceBonus.title,
+      body: page.marketplaceBonus.body,
+      cta: { label: page.marketplaceBonus.ctaLabel, href: marketBasePath('mx'), testId: 'vende-marketplace-bonus' },
+    },
+    buyerLink: { question: page.buyerLink.question, label: page.buyerLink.label, href: marketBasePath('mx') },
     // pricing-page D10 — a link to /mx/precios in the sections, never the hero (prompt-to-shop owns it).
     pricingCallout: {
       title: copy.shared.pricingCallout.title,
-      body: copy.shared.pricingCallout.body,
+      body: fillFixedPricingTokens(copy.shared.pricingCallout.body, 'es'),
       cta: { label: copy.shared.pricingCallout.ctaLabel, href: '/mx/precios', testId: 'vende-pricing-callout' },
     },
     personaRouter: {
