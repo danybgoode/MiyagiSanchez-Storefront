@@ -78,7 +78,9 @@ function sourceFilesBelow(relativeDir: string): string[] {
 function stripComments(source: string): string {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, ' '))
+    // `(?<!:)`: the `//` in `https://` is a URL, not a comment. Without it every absolute link
+    // was blanked before the scan saw it (fresh reviewer on PR #454 reproduced the miss).
+    .replace(/(?<!:)\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, ' '))
 }
 
 /** String and template literals only — a link target, never prose. */
@@ -159,6 +161,18 @@ test.describe('seller-landing link population', () => {
     expect(isStaleLandingLink('/api/vende/fundadoras/apply')).toBe(false)
     expect(isStaleLandingLink('con las guías de /vende/migracion y súbela')).toBe(false)
     expect(isStaleLandingLink('/vendedores')).toBe(false)
+  })
+
+  test('the sweep sees absolute URLs and still ignores real comments', () => {
+    // Runs the SWEEP's own preprocessing, not just the predicate — the predicate fixtures above
+    // never passed through stripComments, which is how the absolute-URL blind spot hid.
+    const scan = (src: string) =>
+      stripComments(src).split('\n').some((line) => STALE_MX_ANCHOR.test(line) || stringLiteralsIn(line).some(isStaleLandingLink))
+    expect(scan("const a = 'https://miyagisanchez.com/mx/vende'")).toBe(true)
+    expect(scan('<a href="https://miyagisanchez.com/mx/vende">')).toBe(true)
+    expect(scan('- https://miyagisanchez.com/mx/vende — qué es')).toBe(true)
+    expect(scan('// we used to link https://miyagisanchez.com/mx/vende here')).toBe(false)
+    expect(scan("const ok = 'https://miyagisanchez.com/mx/vende/creadores'")).toBe(false)
   })
 
   test('the scan actually reaches the three files the move missed', () => {

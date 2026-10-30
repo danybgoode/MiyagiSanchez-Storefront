@@ -139,6 +139,17 @@ test.describe('a Spanish browser is left alone', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX')
   })
 
+  test('the English link on / is a real choice: it lands on /en and stays there', async ({ page }) => {
+    // A plain link bounced every es-MX phone straight back: /en hops a Spanish browser to / unless
+    // a choice is stored. The strip's link stores it (reviewer finding on PR #454).
+    await page.goto('/')
+    expect(await settledPath(page)).toBe('/')
+    await page.getByTestId('root-market-link-en').click()
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 10_000 }).toBe('/en')
+    expect(await settledPath(page)).toBe('/en')
+    await expect(page.getByTestId('market-selector')).toBeVisible()
+  })
+
   test('/en hops back to the Spanish document, which is now the shop builder', async ({ page }) => {
     await page.goto('/en')
     expect(await settledPath(page)).toBe('/')

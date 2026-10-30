@@ -27,6 +27,7 @@ test.describe('seller acquisition · anchor page', () => {
     await page.getByTestId('vende-prompt-copy').click()
     const clipboard = await page.evaluate(() => navigator.clipboard.readText())
     expect(clipboard).toContain('https://miyagisanchez.com/')
+    expect(clipboard).not.toContain('/mx/vende')
     expect(clipboard).toContain('Mercado Libre')
     expect(clipboard).toContain('Shopify')
 

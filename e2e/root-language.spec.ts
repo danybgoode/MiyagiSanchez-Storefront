@@ -66,6 +66,12 @@ test.describe('rootLanguageRedirect · one hop, never a loop', () => {
   test('moves a visitor only toward the document they can read', () => {
     expect(rootLanguageRedirect({ current: 'es', languages: ['en-US'] })).toBe('/en')
     expect(rootLanguageRedirect({ current: 'en', languages: ['es-MX'] })).toBe('/')
+    // …which is why the strip's English link must store the choice, under the switcher's own key.
+    const key = /const CHOICE_KEY = '([^']+)'/
+    const switcherKey = key.exec(source('app/(site)/RootLanguageSwitch.tsx'))?.[1]
+    expect(switcherKey).toBeTruthy()
+    expect(key.exec(source('app/(site)/RootEnglishLink.tsx'))?.[1]).toBe(switcherKey)
+    expect(source('app/(site)/RootEnglishLink.tsx')).toContain('localStorage.setItem(CHOICE_KEY')
   })
 
   test('a visitor already on their language is left alone', () => {

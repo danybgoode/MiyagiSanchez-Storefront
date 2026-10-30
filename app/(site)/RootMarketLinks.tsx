@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { marketBasePath } from '@/lib/markets'
-import { ROOT_LANGUAGE_PATHS } from '@/lib/root-language'
+import RootEnglishLink from './RootEnglishLink'
 
 type MarketLinksCopy = { label: string; mx: string; us: string; en: string }
 
@@ -12,15 +12,15 @@ type MarketLinksCopy = { label: string; mx: string; us: string; en: string }
  * document at `/en` (which still renders the full picker). It lives in this page rather than in
  * `PlatformShell` so no other page's chrome changes.
  *
- * `hrefLang="en"` on the English link is the honest annotation — it is a different-language
- * document — even though `/` itself carries no hreflang pair any more (D3).
+ * The English link is `RootEnglishLink`, a client island, because it must store the choice that
+ * stops `/en` from hopping a Spanish browser straight back here.
  */
 export default function RootMarketLinks({ copy }: { copy: MarketLinksCopy }) {
   const links = [
     { href: marketBasePath('mx'), label: copy.mx, testId: 'root-market-link-mx' },
     { href: marketBasePath('us'), label: copy.us, testId: 'root-market-link-us' },
-    { href: ROOT_LANGUAGE_PATHS.en, label: copy.en, testId: 'root-market-link-en', hrefLang: 'en' },
   ]
+  const linkStyle = { color: 'var(--fg-muted)', textDecoration: 'underline', textUnderlineOffset: 3 }
 
   return (
     <nav
@@ -40,17 +40,12 @@ export default function RootMarketLinks({ copy }: { copy: MarketLinksCopy }) {
     >
       <span>{copy.label}</span>
       {links.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          hrefLang={link.hrefLang}
-          data-testid={link.testId}
-          prefetch={false}
-          style={{ color: 'var(--fg-muted)', textDecoration: 'underline', textUnderlineOffset: 3 }}
-        >
+        <Link key={link.href} href={link.href} data-testid={link.testId} prefetch={false} style={linkStyle}>
           {link.label}
         </Link>
       ))}
+      {/* A client island: the click stores the language choice, or `/en` hops es-MX phones back. */}
+      <RootEnglishLink label={copy.en} style={linkStyle} />
     </nav>
   )
 }
