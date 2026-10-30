@@ -39,7 +39,7 @@ import type { SellerLocale } from './seller-locale'
  */
 const NAV_LABELS = {
   es: {
-    operar: 'Operar', resumen: 'Resumen', pedidos: 'Pedidos', ofertas: 'Ofertas',
+    operar: 'Operar', resumen: 'Resumen', pedidos: 'Pedidos', ofertas: 'Ofertas', venderEnPersona: 'Vender en persona',
     catalogo: 'Catálogo', anuncios: 'Anuncios', colecciones: 'Colecciones',
     canales: 'Canales', mercadoLibre: 'Mercado Libre', importar: 'Importar catálogo',
     crecer: 'Crecer', cupones: 'Cupones', suscripciones: 'Suscripciones',
@@ -48,7 +48,7 @@ const NAV_LABELS = {
     miTienda: 'Mi tienda',
   },
   en: {
-    operar: 'Operate', resumen: 'Overview', pedidos: 'Orders', ofertas: 'Offers',
+    operar: 'Operate', resumen: 'Overview', pedidos: 'Orders', ofertas: 'Offers', venderEnPersona: 'Sell in person',
     catalogo: 'Catalog', anuncios: 'Listings', colecciones: 'Collections',
     canales: 'Channels', mercadoLibre: 'Mercado Libre', importar: 'Import catalog',
     crecer: 'Grow', cupones: 'Coupons', suscripciones: 'Subscriptions',
@@ -140,6 +140,9 @@ export const SELLER_NAV: SellerNavGroup[] = [
       { key: 'resumen', label: 'Resumen', href: '/shop/manage', icon: 'iconoir-dashboard-dots' },
       { key: 'pedidos', label: 'Pedidos', href: '/shop/manage/orders', icon: 'iconoir-package' },
       { key: 'ofertas', label: 'Ofertas', href: '/shop/manage/offers', icon: 'iconoir-hand-cash' },
+      // In-person sales S1.3: the counter. Appended LAST so the indices the mobile bar and
+      // the "Más" sheet slice by (Resumen 0, Pedidos 1, Ofertas 2) do not move.
+      { key: 'vender', label: 'Vender en persona', href: '/shop/manage/en-persona', icon: 'iconoir-smartphone-device' },
     ],
   },
   {
@@ -209,7 +212,7 @@ export const SELLER_NAV_MOBILE_PRIMARY: SellerNavEntry[] = [
  * guard, which asserts this against `SELLER_NAV` itself).
  */
 export const SELLER_NAV_MOBILE_OVERFLOW_GROUPS: SellerNavMobileOverflowGroup[] = [
-  { key: 'operar', label: 'Operar', entries: [SELLER_NAV[0].entries[2]] }, // Ofertas
+  { key: 'operar', label: 'Operar', entries: SELLER_NAV[0].entries.slice(2) }, // Ofertas, Vender en persona
   { key: 'catalogo', label: 'Catálogo', entries: SELLER_NAV[1].entries.slice(1) }, // Colecciones, Canales, Mercado Libre, Importar catálogo
   { key: 'crecer', label: 'Crecer', entries: SELLER_NAV[2].entries, layout: 'grid' },
   { key: 'configuracion', label: 'Configuración', entries: SELLER_NAV[3].entries },

@@ -59,6 +59,8 @@
     "app/(shell)/shop/manage/convocatoria/campanas/CampaignsManager.tsx",
     "app/(shell)/shop/manage/convocatoria/campanas/page.tsx",
     "app/(shell)/shop/manage/convocatoria/page.tsx",
+    "app/(shell)/shop/manage/en-persona/CounterClient.tsx",
+    "app/(shell)/shop/manage/en-persona/page.tsx",
     "app/(shell)/shop/manage/eventos/EventsManager.tsx",
     "app/(shell)/shop/manage/eventos/[id]/EventRosterClient.tsx",
     "app/(shell)/shop/manage/eventos/[id]/page.tsx",
@@ -1436,6 +1438,59 @@
         "s_bbeb7c6db8759ca0",
         "s_272dc6384bfcba0c",
         "s_ce55323a6d44e2c2"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/en-persona/CounterClient.tsx",
+      "keys": [
+        "s_ddc801f086ab9a53",
+        "s_ac2c1a27f1812f5a",
+        "s_8b165cc0eec9ce0e",
+        "s_d50a3d4468356132",
+        "s_2cfb3269b4a0144c",
+        "s_82c10fd2159cee3e",
+        "s_aeccae342e4bd0a7",
+        "s_8b4e93e928dfd6ca",
+        "s_22fac51606a2a1aa",
+        "s_2a88d492dd01e575",
+        "s_ce15ad6bc8530898",
+        "s_52a18f3a764e4517",
+        "s_44de42c372e42794",
+        "s_2ccfa5f624fd4c26",
+        "s_b5fa51d564a9d880",
+        "s_615f110a4479faf6",
+        "s_11d1fe9ee2f3ed84",
+        "s_b17e2d61f133a0dd",
+        "s_f44cddb1bb0325b6",
+        "s_c04994c6176e1ce6",
+        "s_c989e10bc67ee8be",
+        "s_fcb99775d674466c",
+        "s_916ecffd702d5690",
+        "s_393dce59ad1b0d3c",
+        "s_a9254c5f812829af",
+        "s_7aa9ea49fb320d5e",
+        "s_0b799bfc02dba8e1",
+        "s_553f5b2ff5d004f1",
+        "s_d6a7762c4346177a",
+        "s_e37736329cadeb79",
+        "s_950a79942dd65710",
+        "s_c9b3c38247f744e1",
+        "s_4ed786ebd4f83bae",
+        "s_a7eed74001b1cfd3",
+        "s_ebda66b3f2fc0d8d",
+        "s_0d8a87529fa23067",
+        "s_dab91b7247e2d05d",
+        "s_4d4bf7098750e7ea",
+        "s_5f10b0848e8f0416",
+        "s_69ca69d01ec26010"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/en-persona/page.tsx",
+      "keys": [
+        "s_bd55d163dd6fdd3f",
+        "s_3514ff7ca623eb2e",
+        "s_d3d3da8a9512d83f"
       ]
     },
     {
@@ -3255,6 +3310,10 @@
       "source": "3 · Logo y fotos"
     },
     {
+      "key": "s_0b799bfc02dba8e1",
+      "source": "Sin conexión. Toca «Listo» otra vez cuando vuelva la señal: no se cobra doble."
+    },
+    {
       "key": "s_0bbc7f1e927d6731",
       "source": "Secciones"
     },
@@ -3289,6 +3348,10 @@
     {
       "key": "s_0d81bad4c059cd3b",
       "source": "El pago está en custodia y aún no se cobra — se anulará la retención, sin movimiento de dinero."
+    },
+    {
+      "key": "s_0d8a87529fa23067",
+      "source": "Venta registrada"
     },
     {
       "key": "s_0d8aeea5d38a9599",
@@ -3453,6 +3516,10 @@
     {
       "key": "s_11b431de1a28e274",
       "source": "Ver mi tienda"
+    },
+    {
+      "key": "s_11d1fe9ee2f3ed84",
+      "source": "No encontramos productos con ese nombre."
     },
     {
       "key": "s_11dd9bb53954bbe7",
@@ -4203,6 +4270,10 @@
       "source": "Redes sociales"
     },
     {
+      "key": "s_2a88d492dd01e575",
+      "source": "Empezar otra venta sin reintentar"
+    },
+    {
       "key": "s_2aada964ca90b664",
       "source": "No se pudo cambiar."
     },
@@ -4255,6 +4326,10 @@
       "source": "Trae tu catálogo de Shopify a tu tienda Miyagi. Revisa la lista y el reporte de paridad antes de importar."
     },
     {
+      "key": "s_2ccfa5f624fd4c26",
+      "source": "La venta sigue en proceso. Toca «Listo» otra vez en unos segundos."
+    },
+    {
       "key": "s_2cdc8232ef747f45",
       "source": "Nuevo post de contenido"
     },
@@ -4265,6 +4340,10 @@
     {
       "key": "s_2ce5d57569b08041",
       "source": "Tamaño:"
+    },
+    {
+      "key": "s_2cfb3269b4a0144c",
+      "source": "Buscar producto"
     },
     {
       "key": "s_2d161effab0ebc73",
@@ -4503,6 +4582,10 @@
       "source": "Siempre visible"
     },
     {
+      "key": "s_3514ff7ca623eb2e",
+      "source": "Vender en persona todavía no está disponible para tiendas fuera de México."
+    },
+    {
       "key": "s_351a3c7df421a1ca",
       "source": "Clases, reparaciones…"
     },
@@ -4609,6 +4692,10 @@
     {
       "key": "s_38e755041ee3e78f",
       "source": "Volver a mi Resumen"
+    },
+    {
+      "key": "s_393dce59ad1b0d3c",
+      "source": "Regresar"
     },
     {
       "key": "s_39b683aafc5bfd77",
@@ -4943,6 +5030,10 @@
       "source": "Sin resultados para estos filtros"
     },
     {
+      "key": "s_44de42c372e42794",
+      "source": "Falta"
+    },
+    {
       "key": "s_44e33fcac55db21e",
       "source": "Detalles del evento"
     },
@@ -5199,6 +5290,10 @@
       "source": "Distribución:"
     },
     {
+      "key": "s_4ed786ebd4f83bae",
+      "source": "Transferencia"
+    },
+    {
       "key": "s_4ee221f4442c3f91",
       "source": "El comprador verá &quot;Sobre pedido&quot; y este tiempo de envío estimado. Nunca se marca como agotado."
     },
@@ -5325,6 +5420,10 @@
     {
       "key": "s_52969396c54f799b",
       "source": "⚠ Con reporte"
+    },
+    {
+      "key": "s_52a18f3a764e4517",
+      "source": "Exacto"
     },
     {
       "key": "s_52e7a0299ba59e10",
@@ -5707,6 +5806,10 @@
       "source": "Suscripciones"
     },
     {
+      "key": "s_5f10b0848e8f0416",
+      "source": "{0} Toca «Listo» otra vez: no se cobra doble."
+    },
+    {
       "key": "s_5f7f0e5a278375d6",
       "source": "No se pudo contactar al servicio de IA. Inténtalo de nuevo."
     },
@@ -5741,6 +5844,10 @@
     {
       "key": "s_611950b9f7a03884",
       "source": "Usar este evento"
+    },
+    {
+      "key": "s_615f110a4479faf6",
+      "source": "Mostramos tus primeros 200 productos. Escribe el nombre para encontrar los demás."
     },
     {
       "key": "s_616d57eb200198a2",
@@ -6049,6 +6156,10 @@
     {
       "key": "s_69c78c81184219b5",
       "source": "🗓️ Anual"
+    },
+    {
+      "key": "s_69ca69d01ec26010",
+      "source": "¿Con cuánto te pagan?"
     },
     {
       "key": "s_69cbb062527cc781",
@@ -6611,6 +6722,10 @@
       "source": "Cambio a"
     },
     {
+      "key": "s_7aa9ea49fb320d5e",
+      "source": "Si la venta ya se registró, aparecerá en Pedidos. ¿Empezar otra venta?"
+    },
+    {
       "key": "s_7b0d1c60251740d4",
       "source": "Máx. ${0}"
     },
@@ -6809,6 +6924,10 @@
     {
       "key": "s_82bc1acdaf403304",
       "source": "Activo en checkout"
+    },
+    {
+      "key": "s_82c10fd2159cee3e",
+      "source": "Cambio"
     },
     {
       "key": "s_82df91b2ff74e531",
@@ -7059,6 +7178,10 @@
       "source": "Actualizado"
     },
     {
+      "key": "s_8b165cc0eec9ce0e",
+      "source": "Aún no tienes productos activos para vender."
+    },
+    {
       "key": "s_8b2be0570867f900",
       "source": "En \"Custom records\" → \"Manage custom records\" → \"Create new record\""
     },
@@ -7267,6 +7390,10 @@
       "source": "⭐ Elite"
     },
     {
+      "key": "s_916ecffd702d5690",
+      "source": "Quitar {0}"
+    },
+    {
       "key": "s_91dc387a0690f2a8",
       "source": "No se pudo crear la colección."
     },
@@ -7361,6 +7488,10 @@
     {
       "key": "s_94bf66cef76e2012",
       "source": "ya aplicado(s)"
+    },
+    {
+      "key": "s_950a79942dd65710",
+      "source": "Toca un producto para agregarlo."
     },
     {
       "key": "s_952b2d4d85c6e2f1",
@@ -7947,6 +8078,10 @@
       "source": "Trae tus publicaciones activas para revisarlas antes de importar."
     },
     {
+      "key": "s_a7eed74001b1cfd3",
+      "source": "Vaciar"
+    },
+    {
       "key": "s_a7f542b9171c674a",
       "source": "Tu contraoferta"
     },
@@ -8121,6 +8256,10 @@
     {
       "key": "s_ac1f4653f2c1574e",
       "source": "Error al generar la etiqueta."
+    },
+    {
+      "key": "s_ac2c1a27f1812f5a",
+      "source": "Agregar uno de {0}"
     },
     {
       "key": "s_ac3f091ca34109c5",
@@ -8301,6 +8440,10 @@
     {
       "key": "s_b163ca53185e8c49",
       "source": "Cita de recolección"
+    },
+    {
+      "key": "s_b17e2d61f133a0dd",
+      "source": "Nueva venta"
     },
     {
       "key": "s_b1a875ccb32b44b0",
@@ -8651,6 +8794,10 @@
       "source": "Todos"
     },
     {
+      "key": "s_bd55d163dd6fdd3f",
+      "source": "Vender en persona"
+    },
+    {
       "key": "s_bd8ef92709551832",
       "source": "Conecta tu cuenta para sincronizar tu catálogo e inventario."
     },
@@ -8733,6 +8880,10 @@
     {
       "key": "s_c030d66ab86078ac",
       "source": "Desactivado en Mercado Libre."
+    },
+    {
+      "key": "s_c04994c6176e1ce6",
+      "source": "Publica un producto con precio en pesos y aparecerá aquí."
     },
     {
       "key": "s_c04ba9d41c1d1cf1",
@@ -9027,6 +9178,10 @@
       "source": "Eliminar"
     },
     {
+      "key": "s_c989e10bc67ee8be",
+      "source": "Quedan {0}"
+    },
+    {
       "key": "s_c997b0c5e1549be1",
       "source": "Elige cómo te pagan"
     },
@@ -9185,6 +9340,10 @@
     {
       "key": "s_cde954a27cb0688f",
       "source": "Sin conexión al subir imagen."
+    },
+    {
+      "key": "s_ce15ad6bc8530898",
+      "source": "Esta venta ya estaba registrada; no se duplicó."
     },
     {
       "key": "s_ce344a418127968f",
@@ -9379,6 +9538,10 @@
       "source": "NotebookLM"
     },
     {
+      "key": "s_d3d3da8a9512d83f",
+      "source": "Vender en persona — Mi tienda"
+    },
+    {
       "key": "s_d40d2d7a5581cacd",
       "source": "Buscar por título o SKU…"
     },
@@ -9477,6 +9640,10 @@
     {
       "key": "s_d6a36439e1788972",
       "source": "Un consultor de Miyagi te contactará directamente para revisar tu caso."
+    },
+    {
+      "key": "s_d6a7762c4346177a",
+      "source": "Sin monto: se registra el total exacto."
     },
     {
       "key": "s_d6c171e0b6b65d7b",
@@ -9589,6 +9756,10 @@
     {
       "key": "s_da9dbf58396406c0",
       "source": "Desplázate hasta \"Registros CNAME\" → clic en \"Agregar\""
+    },
+    {
+      "key": "s_dab91b7247e2d05d",
+      "source": "Ver venta"
     },
     {
       "key": "s_dad23a2f4ecaa11e",
@@ -9849,6 +10020,10 @@
     {
       "key": "s_e3586e7aa9c152f3",
       "source": "Ingresa tu guía propia o de mensajería local"
+    },
+    {
+      "key": "s_e37736329cadeb79",
+      "source": "Tarjeta o Mercado Pago"
     },
     {
       "key": "s_e3860c9440091cc6",
@@ -10113,6 +10288,10 @@
     {
       "key": "s_ebafc028a7b9d319",
       "source": "Ver historial"
+    },
+    {
+      "key": "s_ebda66b3f2fc0d8d",
+      "source": "Venta"
     },
     {
       "key": "s_ec14343f15badbd3",
@@ -10617,6 +10796,10 @@
     {
       "key": "s_fc927f05fcfa9f86",
       "source": "Método:"
+    },
+    {
+      "key": "s_fcb99775d674466c",
+      "source": "Quitar uno de {0}"
     },
     {
       "key": "s_fcd5c32df9119c7e",
