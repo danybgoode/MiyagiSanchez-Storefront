@@ -8,7 +8,7 @@ import { ROOT_LANGUAGE_PATHS } from '@/lib/root-language'
  *
  * `/en` still runs `RootLanguageSwitch`, which moves a Spanish-language browser back to `/`
  * unless a choice is stored under `ms.rootLanguage`. A plain link therefore bounced every es-MX
- * phone straight back to the page it came from (the fresh reviewer on PR #454 caught it): the
+ * phone straight back to the page it came from (the fresh reviewer on Storefront PR 454 caught it): the
  * link looked dead. Writing the same key the switcher writes makes this a real choice, and `/en`
  * itself is untouched (product-owner decision 10-29).
  *
