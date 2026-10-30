@@ -3,9 +3,16 @@ name: CI
 # Deterministic pre-merge gate (Roadmap/WAYS-OF-WORKING.md → Review & merge):
 #   lint             — eslint on the files THIS branch changed (incremental by design)
 #   typecheck-build  — tsc --noEmit + next build, on the PR branch code
-#   prep             — resolve the PR's Vercel preview once
-#   e2e              — four sharded Playwright API gates against that preview
-#   e2e-browser      — non-blocking browser smokes against that preview
+#   prep             — resolve the PR's Vercel preview once        ┐ only when the PR is
+#   e2e              — four sharded Playwright API gates against it ├ labelled `e2e-preview`
+#   e2e-browser      — non-blocking browser smokes against it       ┘ (see below)
+#
+# Why the preview jobs need a label (2026-10-30): every push used to run ~500 specs x 4 shards against
+# the Vercel preview, ~3-4.5k function invocations per run. 34 runs on 2026-10-28 burned the Vercel
+# Hobby account's Active CPU, and Vercel paused EVERY project on the account (goldenfrijoles.com,
+# panfleto.com.mx). Lint, type-check and the build-artifact specs still run on every push. Add the
+# label when a PR is ready for its preview check; to run it again, remove the label and add it back.
+# Next step: run the api suite against `next start` inside the runner, off Vercel entirely.
 #
 # Why poll the Vercel API instead of the `deployment_status` event: a workflow
 # triggered by `deployment_status` runs the file from the DEFAULT branch, so it
@@ -15,10 +22,12 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A label event gets its own group, so adding ANY label never cancels a push's gate run, and a
+  # push never cancels a preview run that was asked for.
+  group: ci-${{ github.ref }}-${{ github.event.action == 'labeled' && format('label-{0}', github.event.label.name) || 'push' }}
   cancel-in-progress: true
 
 jobs:
@@ -29,6 +38,7 @@ jobs:
   # Same incremental shape as doc-format.mjs's swept-paths allow-list. See scripts/lint-changed.mjs.
   lint:
     name: Lint (changed files)
+    if: github.event.action != 'labeled'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,6 +60,7 @@ jobs:
 
   typecheck-build:
     name: Type-check + build
+    if: github.event.action != 'labeled'
     runs-on: ubuntu-latest
     # Browser-public (publishable) build vars only — these already ship in the
     # production bundle. No server secrets: every commerce route is dynamic, so
@@ -92,6 +103,8 @@ jobs:
 
   prep:
     name: Resolve Vercel preview
+    # Metered on the shared Vercel quota: only on request (header comment).
+    if: github.event.action == 'labeled' && github.event.label.name == 'e2e-preview'
     runs-on: ubuntu-latest
     outputs:
       playwright_base_url: ${{ steps.preview.outputs.playwright_base_url }}
