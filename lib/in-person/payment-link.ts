@@ -82,14 +82,21 @@ export function linkStateLabel(state: string): string {
 }
 
 /**
- * The badge a link row shows. A single-use link paid by direct transfer stays `pending` until the
- * seller confirms the money, but its order already exists: that is «Pago por confirmar», not
+ * The badge a link row shows. A link whose buyer chose direct transfer stays `pending` until the
+ * seller confirms the money, but its order already exists (`pending_order_ids`, never `paid_order_ids`): that is «Pago por confirmar», not
  * «Esperando pago», so the seller knows to look in Pedidos.
  */
-export function linkBadge(link: Pick<LinkView, 'state' | 'paid_order_ids'>): { label: string; token: 'info' | 'success' | 'warning' | 'neutral' | 'danger' } {
-  if (link.state === 'pending' && link.paid_order_ids.length > 0) return { label: 'Pago por confirmar', token: 'warning' }
+export function linkBadge(link: Pick<LinkView, 'state' | 'pending_order_ids'>): { label: string; token: 'info' | 'success' | 'warning' | 'neutral' | 'danger' } {
+  if (link.state === 'pending' && (link.pending_order_ids ?? []).length > 0) return { label: 'Pago por confirmar', token: 'warning' }
   const token = ({ pending: 'info', paid: 'success', expired: 'neutral', cancelled: 'danger' } as const)[link.state as LinkState] ?? 'neutral'
   return { label: linkStateLabel(link.state), token }
+}
+
+/** What «Cancelar» answered. LINK_PAID means a payment landed first: say so and refresh, never "cancelled". */
+export function cancelOutcome(input: { ok: boolean; code?: string; message?: string }): { kind: 'cancelled' | 'paid' | 'error'; message: string | null } {
+  if (input.ok) return { kind: 'cancelled', message: null }
+  if (input.code === 'LINK_PAID') return { kind: 'paid', message: 'Este cobro ya se pagó' }
+  return { kind: 'error', message: input.message ?? 'No pudimos cancelar el link.' }
 }
 
 /** Only a link that can still be paid can be cancelled. */
@@ -106,7 +113,10 @@ export interface LinkView {
   uses: string
   expires_at: string
   state: string
+  /** Real money only. */
   paid_order_ids: string[]
+  /** Transfers awaiting the seller's «Ya me llegó»; not money yet. */
+  pending_order_ids?: string[]
   lines: Array<{ variant_id: string; quantity: number }> | null
 }
 
@@ -182,7 +192,8 @@ export function payStartBody(choice: PayChoice['id'], manualSubType: 'clabe' | '
  * to 31 minutes), anything else is a plain retry with the same button.
  */
 export function payFailureKind(code: string | undefined): 'closed' | 'busy' | 'retry' {
-  if (code === 'LINK_PAID' || code === 'LINK_EXPIRED' || code === 'LINK_CANCELLED') return 'closed'
+  // LINK_AWAITING_CONFIRMATION: a transfer on this link waits for the shop; closed for now, no retry.
+  if (code === 'LINK_PAID' || code === 'LINK_EXPIRED' || code === 'LINK_CANCELLED' || code === 'LINK_AWAITING_CONFIRMATION') return 'closed'
   if (code === 'LINK_BUSY') return 'busy'
   return 'retry'
 }

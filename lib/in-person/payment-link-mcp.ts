@@ -48,6 +48,7 @@ export interface AgentLinkView {
   expires_at: string
   state: string
   paid_order_ids: string[]
+  pending_order_ids?: string[]
 }
 
 /** The link as an agent hands it to a person: the id, state, and both URLs. The token itself stays inside the URL. */
@@ -61,6 +62,7 @@ export function formatLinkForAgent(link: AgentLinkView) {
     uses: link.uses,
     expires_at: link.expires_at,
     paid_orders: link.paid_order_ids.length,
+    pending_confirmation: (link.pending_order_ids ?? []).length,
     url: linkUrl(link.token),
     short_url: linkShortUrl(link.token),
   }

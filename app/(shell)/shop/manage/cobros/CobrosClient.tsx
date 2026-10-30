@@ -8,7 +8,7 @@ import { useSellerFormat } from '@/app/components/SellerFormatProvider'
 import { isSellable, matchesQuery, type CounterProduct } from '@/lib/in-person/counter-catalog'
 import { MAX_QUANTITY } from '@/lib/in-person/counter-cart'
 import {
-  buildLinkBody, extraPayments, isLinkCancellable, linkBadge, linkShortUrl, linkTitle, linkUrl, linkWhatsAppUrl,
+  buildLinkBody, cancelOutcome, extraPayments, isLinkCancellable, linkBadge, linkShortUrl, linkTitle, linkUrl, linkWhatsAppUrl,
   LINK_DEFAULT_DAYS, LINK_MAX_DAYS, type LinkView,
 } from '@/lib/in-person/payment-link'
 
@@ -102,8 +102,9 @@ export default function CobrosClient({ products, shopName }: { products: Counter
     if (!window.confirm('Quien abra este link ya no podrá pagar. ¿Cancelarlo?')) return
     try {
       const res = await fetch(`/api/shop/cobros/links/${link.id}/cancel`, { method: 'POST', signal: AbortSignal.timeout(20_000) })
-      const json = (await res.json().catch(() => null)) as { message?: string } | null
-      if (!res.ok) setListError(json?.message ?? 'No pudimos cancelar el link.')
+      const json = (await res.json().catch(() => null)) as { message?: string; code?: string } | null
+      const out = cancelOutcome({ ok: res.ok, code: json?.code, message: json?.message })
+      setListError(out.message)
       await loadLinks()
     } catch { setListError('Sin conexión. No pudimos cancelar el link.') }
   }

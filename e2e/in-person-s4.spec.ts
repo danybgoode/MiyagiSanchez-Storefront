@@ -3,7 +3,7 @@ import path from 'node:path'
 import { test, expect } from '@playwright/test'
 import {
   buildLinkBody, extraPayments, isLinkCancellable, isLinkToken, linkShortUrl, linkStateLabel, linkTitle, linkUrl, linkWhatsAppUrl,
-  payChoices, payFailureKind, linkBadge, payScreen, payStartBody, shouldRebuildCart,
+  payChoices, payFailureKind, linkBadge, cancelOutcome, payScreen, payStartBody, shouldRebuildCart,
 } from '../lib/in-person/payment-link'
 import { runPayFlow, type PayFlowDeps } from '../lib/in-person/payment-link-flow'
 import { filterLinksByState, formatLinkForAgent, mapCancelLinkArgs, mapCreateLinkArgs, pesosToCents } from '../lib/in-person/payment-link-mcp'
@@ -93,7 +93,7 @@ test.describe('pay page state to screen', () => {
 
 test.describe('link busy, closed and pending-confirmation', () => {
   test('closed codes close the page, LINK_BUSY offers a retry, the rest retry plainly', () => {
-    for (const c of ['LINK_PAID', 'LINK_EXPIRED', 'LINK_CANCELLED']) expect(payFailureKind(c)).toBe('closed')
+    for (const c of ['LINK_PAID', 'LINK_EXPIRED', 'LINK_CANCELLED', 'LINK_AWAITING_CONFIRMATION']) expect(payFailureKind(c)).toBe('closed')
     expect(payFailureKind('LINK_BUSY')).toBe('busy')
     for (const c of ['CHECKOUT_START_FAILED', undefined, 'CART_CHANGED']) expect(payFailureKind(c)).toBe('retry')
   })
@@ -108,10 +108,19 @@ test.describe('link busy, closed and pending-confirmation', () => {
     expect(carts).toBe(1)
   })
   test('a pending single-use link with an order reads «Pago por confirmar»; otherwise the plain state', () => {
-    expect(linkBadge({ state: 'pending', paid_order_ids: ['o1'] }).label).toBe('Pago por confirmar')
-    expect(linkBadge({ state: 'pending', paid_order_ids: [] }).label).toBe('Esperando pago')
-    expect(linkBadge({ state: 'paid', paid_order_ids: ['o1'] })).toEqual({ label: 'Pagado', token: 'success' })
-    expect(linkBadge({ state: 'cancelled', paid_order_ids: ['o1'] }).label).toBe('Cancelado')
+    expect(linkBadge({ state: 'pending', pending_order_ids: ['o1'] }).label).toBe('Pago por confirmar')
+    expect(linkBadge({ state: 'pending', pending_order_ids: [] }).label).toBe('Esperando pago')
+    expect(linkBadge({ state: 'pending' }).label).toBe('Esperando pago')
+    // paid_order_ids is real money only: it never makes a pending link «por confirmar»
+    expect(linkBadge({ state: 'pending', pending_order_ids: [], ...({ paid_order_ids: ['o1'] } as object) }).label).toBe('Esperando pago')
+    expect(linkBadge({ state: 'paid', pending_order_ids: ['o1'] })).toEqual({ label: 'Pagado', token: 'success' })
+    expect(linkBadge({ state: 'cancelled', pending_order_ids: ['o1'] }).label).toBe('Cancelado')
+  })
+  test('cancel: LINK_PAID says it was paid and refreshes, a plain failure shows its message', () => {
+    expect(cancelOutcome({ ok: true })).toEqual({ kind: 'cancelled', message: null })
+    expect(cancelOutcome({ ok: false, code: 'LINK_PAID', message: 'x' })).toEqual({ kind: 'paid', message: 'Este cobro ya se pagó' })
+    expect(cancelOutcome({ ok: false, message: 'Falló' })).toEqual({ kind: 'error', message: 'Falló' })
+    expect(cancelOutcome({ ok: false }).kind).toBe('error')
   })
 })
 

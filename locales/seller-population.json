@@ -1261,7 +1261,6 @@
         "s_f834061e3863469f",
         "s_833c6d15975a15ca",
         "s_9ecaefcced7b6b47",
-        "s_c870c231600ffec1",
         "s_3843e95072e875c4",
         "s_770722c00d98367d",
         "s_f598138f026c1d91",
@@ -9398,10 +9397,6 @@
     {
       "key": "s_c86955191958a8d0",
       "source": "Tiempo de procesamiento"
-    },
-    {
-      "key": "s_c870c231600ffec1",
-      "source": "No pudimos cancelar el link."
     },
     {
       "key": "s_c87c76276fde7b6f",
