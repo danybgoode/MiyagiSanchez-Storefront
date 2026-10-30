@@ -257,6 +257,10 @@ export default function CounterClient({ products: initialProducts, truncated }: 
       pendingRef.current = { clientId: crypto.randomUUID(), lines: toSaleLines(cart), tenderedCents: tendered, uncertain: false }
     }
     const sale = pendingRef.current
+    // Persist BEFORE sending, marked uncertain: if the page reloads while this request is
+    // in flight, the server may have recorded the sale, so the reloaded counter must
+    // resume THIS id, never re-ring the cart under a new one (codex re-review, #458).
+    writeStored({ sale: { ...sale, uncertain: true }, cart, padText })
     setInFlight(true)
     setError(null)
     const outcome = await postSale(sale)
