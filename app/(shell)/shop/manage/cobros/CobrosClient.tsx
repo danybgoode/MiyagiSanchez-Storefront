@@ -8,7 +8,7 @@ import { useSellerFormat } from '@/app/components/SellerFormatProvider'
 import { isSellable, matchesQuery, type CounterProduct } from '@/lib/in-person/counter-catalog'
 import { MAX_QUANTITY } from '@/lib/in-person/counter-cart'
 import {
-  buildLinkBody, cancelOutcome, extraPayments, isLinkCancellable, linkBadge, linkShortUrl, linkTitle, linkUrl, linkWhatsAppUrl,
+  buildLinkBody, cancelOutcome, visibleNotices, extraPayments, isLinkCancellable, linkBadge, linkShortUrl, linkTitle, linkUrl, linkWhatsAppUrl,
   LINK_DEFAULT_DAYS, LINK_MAX_DAYS, type LinkView,
 } from '@/lib/in-person/payment-link'
 
@@ -63,6 +63,8 @@ export default function CobrosClient({ products, shopName }: { products: Counter
   const [created, setCreated] = useState<{ link: LinkView; what: string } | null>(null)
   const [links, setLinks] = useState<LinkView[] | null>(null)
   const [listError, setListError] = useState<string | null>(null)
+  // Kept apart from listError: the refresh after a cancel must not erase why the cancel failed.
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   const variants = useMemo(() => products.flatMap((p) => p.variants.map((v) => ({ p, v }))), [products])
   const visible = useMemo(() => variants.filter(({ p }) => matchesQuery(p.title, query)), [variants, query])
@@ -100,13 +102,14 @@ export default function CobrosClient({ products, shopName }: { products: Counter
 
   async function cancel(link: LinkView) {
     if (!window.confirm('Quien abra este link ya no podrá pagar. ¿Cancelarlo?')) return
+    setCancelError(null)
     try {
       const res = await fetch(`/api/shop/cobros/links/${link.id}/cancel`, { method: 'POST', signal: AbortSignal.timeout(20_000) })
       const json = (await res.json().catch(() => null)) as { message?: string; code?: string } | null
       const out = cancelOutcome({ ok: res.ok, code: json?.code, message: json?.message })
-      setListError(out.message)
+      setCancelError(out.message)
       await loadLinks()
-    } catch { setListError('Sin conexión. No pudimos cancelar el link.') }
+    } catch { setCancelError('Sin conexión. No pudimos cancelar el link.') }
   }
 
   return (
@@ -179,7 +182,7 @@ export default function CobrosClient({ products, shopName }: { products: Counter
       {created && <LinkResult link={created.link} shopName={shopName} what={created.what} />}
 
       <h2 className="text-lg font-bold mt-8 mb-2">Tus links</h2>
-      {listError && <p role="alert" className="text-sm text-[var(--color-danger)]">{listError}</p>}
+      {visibleNotices(cancelError, listError).map((m) => <p key={m} role="alert" className="text-sm text-[var(--color-danger)]">{m}</p>)}
       {links === null && !listError && <p className="text-sm text-[var(--color-muted)]">Cargando…</p>}
       {links !== null && links.length === 0 && <p className="text-sm text-[var(--color-muted)]">Todavía no has creado links.</p>}
       <ul className="list-none p-0 flex flex-col gap-2">

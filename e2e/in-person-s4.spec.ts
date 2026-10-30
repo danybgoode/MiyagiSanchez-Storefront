@@ -3,7 +3,7 @@ import path from 'node:path'
 import { test, expect } from '@playwright/test'
 import {
   buildLinkBody, extraPayments, isLinkCancellable, isLinkToken, linkShortUrl, linkStateLabel, linkTitle, linkUrl, linkWhatsAppUrl,
-  payChoices, payFailureKind, payPrecheck, linkBadge, cancelOutcome, payScreen, payStartBody, shouldRebuildCart,
+  payChoices, payFailureKind, payPrecheck, visibleNotices, linkBadge, cancelOutcome, payScreen, payStartBody, shouldRebuildCart,
 } from '../lib/in-person/payment-link'
 import { ATTEMPT_TTL_MS, attemptKey, parseAttempt, resumeDecision, usableAttempt } from '../lib/in-person/pay-attempt'
 import { shouldLoadAnalytics } from '../lib/analytics-gating'
@@ -188,10 +188,17 @@ test.describe('privacy and tooling nits', () => {
     expect(shouldLoadAnalytics({ hostname: 'miyagisanchez.com', pathname: '/pagarx' })).toBe(true)
     expect(shouldLoadAnalytics({ hostname: 'miyagisanchez.com', pathname: '/shop/manage/cobros' })).toBe(true)
   })
-  test('list_payment_links is a read tool for viewers; create and cancel are not', () => {
-    expect(PARTNER_READ_TOOLS.has('list_payment_links')).toBe(true)
-    expect(PARTNER_READ_TOOLS.has('create_payment_link')).toBe(false)
-    expect(PARTNER_READ_TOOLS.has('cancel_payment_link')).toBe(false)
+  test('no payment-link tool is a viewer read: the list carries bearer pay URLs a viewer could use to start a transfer', () => {
+    for (const t of ['list_payment_links', 'create_payment_link', 'cancel_payment_link']) expect(PARTNER_READ_TOOLS.has(t), t).toBe(false)
+  })
+  test('a cancel failure survives the list refresh: separate notices, shown together, not duplicated', () => {
+    expect(visibleNotices('No se pudo cancelar', null)).toEqual(['No se pudo cancelar'])
+    expect(visibleNotices('No se pudo cancelar', 'No pudimos cargar tus links.')).toEqual(['No se pudo cancelar', 'No pudimos cargar tus links.'])
+    expect(visibleNotices('x', 'x')).toEqual(['x'])
+    expect(visibleNotices(null, null)).toEqual([])
+    const src = readFileSync(path.resolve(import.meta.dirname, '../app/(shell)/shop/manage/cobros/CobrosClient.tsx'), 'utf8')
+    const load = src.slice(src.indexOf('const loadLinks'), src.indexOf('useEffect(() => { queueMicrotask'))
+    expect(load).not.toContain('setCancelError')
   })
   test('the internal call never hands a raw error to the agent', () => {
     const src = readFileSync(path.resolve(import.meta.dirname, '../lib/in-person/payment-link-backend.ts'), 'utf8')

@@ -100,6 +100,14 @@ export function cancelOutcome(input: { ok: boolean; code?: string; message?: str
   return { kind: 'error', message: input.message ?? 'No pudimos cancelar el link.' }
 }
 
+/**
+ * The messages the links list shows. A cancel failure and a list-load failure are separate notices:
+ * the refresh that follows a cancel must not wipe the reason the cancel failed.
+ */
+export function visibleNotices(cancelError: string | null, loadError: string | null): string[] {
+  return [cancelError, loadError].filter((m, i, all): m is string => !!m && all.indexOf(m) === i)
+}
+
 /** Only a link that can still be paid can be cancelled. */
 export function isLinkCancellable(state: string): boolean {
   return state === 'pending'
