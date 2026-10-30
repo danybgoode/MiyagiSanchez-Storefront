@@ -1458,7 +1458,9 @@
         "s_8b4e93e928dfd6ca",
         "s_95e9e61bf82d86c0",
         "s_22fac51606a2a1aa",
+        "s_def20d787de04f86",
         "s_2a88d492dd01e575",
+        "s_3f3f7d88e05abb17",
         "s_00ab58b5710afc33",
         "s_ce15ad6bc8530898",
         "s_52a18f3a764e4517",
@@ -1472,6 +1474,7 @@
         "s_cee16cee78ea7e30",
         "s_87901f2495f629a0",
         "s_b17e2d61f133a0dd",
+        "s_2f011b34f9e2c544",
         "s_1946aa7238ea73b9",
         "s_c04994c6176e1ce6",
         "s_f8905a9f419b3eca",
@@ -1494,6 +1497,7 @@
         "s_a7eed74001b1cfd3",
         "s_ebda66b3f2fc0d8d",
         "s_0d8a87529fa23067",
+        "s_2fd5a3edfca23c16",
         "s_dab91b7247e2d05d",
         "s_2354f259a738a375",
         "s_4d4bf7098750e7ea",
@@ -4451,6 +4455,10 @@
       "source": "Pendiente"
     },
     {
+      "key": "s_2f011b34f9e2c544",
+      "source": "Pago sin confirmar"
+    },
+    {
       "key": "s_2f4dc96c367462d5",
       "source": "Migrar desde Shopify — Configuración"
     },
@@ -4473,6 +4481,10 @@
     {
       "key": "s_2fc306215473d88c",
       "source": "Analíticas — Mi tienda"
+    },
+    {
+      "key": "s_2fd5a3edfca23c16",
+      "source": "Ver en Pedidos"
     },
     {
       "key": "s_2fd77dee2b9ee2fa",
@@ -4925,6 +4937,10 @@
     {
       "key": "s_3f2c16e1a661e94f",
       "source": "Conectado como @"
+    },
+    {
+      "key": "s_3f3f7d88e05abb17",
+      "source": "Entendido"
     },
     {
       "key": "s_3f7a2a0a7f88363d",
@@ -9969,6 +9985,10 @@
     {
       "key": "s_decfb20b489003fa",
       "source": "Sal en la revista impresa de tu ciudad"
+    },
+    {
+      "key": "s_def20d787de04f86",
+      "source": "El comprador ya está pagando. Espera unos segundos."
     },
     {
       "key": "s_df1f75906bad6539",

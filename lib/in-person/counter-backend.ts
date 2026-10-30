@@ -62,14 +62,19 @@ export function buildOrchestrateDeps(args: {
           body: JSON.stringify(startCheckoutBody(kind, sellerId, provider, subType)),
         })
         if (!res.ok) {
-          console.error('[en-persona] start-checkout refused', res.status, await res.text().catch(() => ''))
-          return { ok: false as const }
+          const text = await res.text().catch(() => '')
+          console.error('[en-persona] start-checkout refused', res.status, text)
+          let code: string | undefined
+          try { code = (JSON.parse(text) as { code?: string }).code } catch { /* not JSON */ }
+          if (res.status === 409 && code === 'CHECKOUT_EXISTS') return { ok: false as const, reason: 'exists' as const }
+          if (res.status === 409 && code === 'SALE_CLOSED') return { ok: false as const, reason: 'closed' as const }
+          return { ok: false as const, reason: 'failed' as const }
         }
         const json = (await res.json()) as { manual_payment?: ManualPayment | null }
         return { ok: true as const, manual_payment: json.manual_payment ?? null }
       } catch (err) {
         console.error('[en-persona] start-checkout failed:', err instanceof Error ? err.message : String(err))
-        return { ok: false as const }
+        return { ok: false as const, reason: 'failed' as const }
       }
     },
     async completeCart() {

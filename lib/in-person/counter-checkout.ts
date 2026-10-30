@@ -16,7 +16,7 @@
 export type CounterKind = 'cash' | 'card' | 'transfer'
 export type CardProvider = 'mercadopago' | 'stripe'
 
-export type SaleState = 'awaiting_payment' | 'pending_confirmation' | 'paid' | 'cancelled' | 'failed'
+export type SaleState = 'awaiting_payment' | 'pending_confirmation' | 'paid' | 'cancelled' | 'failed' | 'unverified'
 
 export interface SaleStatus {
   client_id?: string
@@ -83,7 +83,11 @@ export function manualFromSellerMetadata(metadata: unknown): ManualPayment {
 
 export interface OrchestrateDeps {
   getStatus(): Promise<SaleStatus | null>
-  startCheckout(): Promise<{ ok: true; manual_payment: ManualPayment | null } | { ok: false }>
+  /**
+   * `exists`: the backend says a checkout is already open (409 CHECKOUT_EXISTS) — fine, use it.
+   * `closed`: the claim is no longer awaiting payment (409 SALE_CLOSED) — the cancelled path.
+   */
+  startCheckout(): Promise<{ ok: true; manual_payment: ManualPayment | null } | { ok: false; reason: 'exists' | 'closed' | 'failed' }>
   completeCart(): Promise<boolean>
   manualFallback(): Promise<ManualPayment | null>
   /** Best effort: close a sale we could not make payable. True when the backend confirmed it. */
@@ -111,7 +115,14 @@ export async function makeSalePayable(kind: 'card' | 'transfer', deps: Orchestra
   const alreadyStarted = status.checkout_url !== null
   if (!alreadyStarted) {
     const started = await deps.startCheckout()
-    if (!started.ok) {
+    if (!started.ok && started.reason === 'closed') {
+      return { ok: false, httpStatus: 409, code: 'SALE_CLOSED', message: 'Esta venta ya no se puede cobrar. Puedes volver a cobrarla.' }
+    }
+    if (!started.ok && started.reason === 'exists') {
+      // A checkout is already open (a racing retry): do NOT open another, just use it.
+      manual = null
+      status = (await deps.getStatus()) ?? status
+    } else if (!started.ok) {
       // The sale is claimed but cannot be paid. Close it if we can, so it does not linger
       // as a payable-looking claim; a confirmed close is a definite "not recorded".
       if (await deps.cancelSale()) {
@@ -119,8 +130,10 @@ export async function makeSalePayable(kind: 'card' | 'transfer', deps: Orchestra
       }
       return START_FAILED
     }
-    manual = started.manual_payment
-    status = (await deps.getStatus()) ?? status
+    else {
+      manual = started.manual_payment
+      status = (await deps.getStatus()) ?? status
+    }
   }
 
   if (kind === 'card') {

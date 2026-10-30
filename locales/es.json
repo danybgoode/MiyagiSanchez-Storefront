@@ -5388,6 +5388,10 @@
     "s_da8af4a7afbefe76": "Por origen",
     "s_dac3440089332961": "Tus datos de pago están en Ajustes.",
     "s_e77c6b92f2b79407": "No pudimos cancelar el cobro: el QR todavía podría pagarse. Sigue esperando o intenta cancelar otra vez.",
-    "s_f8905a9f419b3eca": "Que lo escanee con su celular y pague ahí"
+    "s_f8905a9f419b3eca": "Que lo escanee con su celular y pague ahí",
+    "s_2f011b34f9e2c544": "Pago sin confirmar",
+    "s_2fd5a3edfca23c16": "Ver en Pedidos",
+    "s_3f3f7d88e05abb17": "Entendido",
+    "s_def20d787de04f86": "El comprador ya está pagando. Espera unos segundos."
   }
 }

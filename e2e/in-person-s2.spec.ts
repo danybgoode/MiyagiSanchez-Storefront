@@ -9,6 +9,7 @@ import {
   type SaleStatus,
 } from '../lib/in-person/counter-checkout'
 import { classifySaleResponse } from '../lib/in-person/sale-response'
+import { cancelVerdict, screenForState } from '../lib/in-person/sale-screen'
 import { COUNTER_PLACEHOLDER_EMAIL, isRealBuyerEmail, shouldEmailBuyer, shouldNotifySellerOfSale } from '../lib/in-person/notify-policy'
 import { filterBySource, inPersonBadgeLabel, presentSources, summarizeBySource } from '../lib/in-person/order-source'
 import { buildReceiptText } from '../lib/in-person/receipt'
@@ -19,13 +20,13 @@ const status = (over: Partial<SaleStatus> = {}): SaleStatus => ({
   state: 'awaiting_payment', order_id: null, cart_id: 'cart_1', checkout_url: null, total_cents: 24000, ...over,
 })
 
-function fakeDeps(reads: SaleStatus[], opts: { startOk?: boolean; completeOk?: boolean; cancelOk?: boolean } = {}) {
+function fakeDeps(reads: SaleStatus[], opts: { startOk?: boolean; startReason?: 'exists' | 'closed' | 'failed'; completeOk?: boolean; cancelOk?: boolean } = {}) {
   const calls = { start: 0, complete: 0, cancel: 0, read: 0, manualFallback: 0 }
   const deps: OrchestrateDeps = {
     async getStatus() { const s = reads[Math.min(calls.read, reads.length - 1)]; calls.read += 1; return s },
     async startCheckout() {
       calls.start += 1
-      return opts.startOk === false ? { ok: false } : { ok: true, manual_payment: { spei: { clabe: '012345678901234567', bank_name: 'BBVA', account_holder: 'Ana' }, dimo: null } }
+      return opts.startOk === false ? { ok: false as const, reason: opts.startReason ?? 'failed' } : { ok: true, manual_payment: { spei: { clabe: '012345678901234567', bank_name: 'BBVA', account_holder: 'Ana' }, dimo: null } }
     },
     async completeCart() { calls.complete += 1; return opts.completeOk !== false },
     async manualFallback() { calls.manualFallback += 1; return { spei: null, dimo: { phone: '5512345678' } } },
@@ -71,6 +72,48 @@ test.describe('counter-checkout · card QR', () => {
     expect(!open.ok && open.code).toBe('CHECKOUT_START_FAILED')
     // the retryable code must NOT release the client id
     expect(classifySaleResponse({ status: 502, code: 'CHECKOUT_START_FAILED', hadUncertainAttempt: false })).toBe('uncertain')
+  })
+})
+
+test.describe('counter-checkout · start-checkout refusals (security review)', () => {
+  test('CHECKOUT_EXISTS reuses the open checkout: no second start, no cancel, the url is read back', async () => {
+    const { deps, calls } = fakeDeps([status(), status({ checkout_url: 'https://pay.example/abc' })], { startOk: false, startReason: 'exists' })
+    const r = await makeSalePayable('card', deps)
+    expect(calls.start).toBe(1)
+    expect(calls.cancel).toBe(0)
+    expect(r.ok && r.status.checkout_url).toBe('https://pay.example/abc')
+  })
+  test('SALE_CLOSED is the cancelled path: a definite refusal, and nothing else is called', async () => {
+    const { deps, calls } = fakeDeps([status()], { startOk: false, startReason: 'closed' })
+    const r = await makeSalePayable('card', deps)
+    expect(!r.ok && r.code).toBe('SALE_CLOSED')
+    expect(calls.cancel + calls.complete).toBe(0)
+    expect(classifySaleResponse({ status: 409, code: 'SALE_CLOSED', hadUncertainAttempt: true })).toBe('refused')
+  })
+  test('CHECKOUT_EXISTS on a transfer still completes the cart once and takes the CLABE from settings', async () => {
+    const { deps, calls } = fakeDeps([status(), status({ checkout_url: 'u' }), status({ state: 'pending_confirmation', order_id: 'order_9' })], { startOk: false, startReason: 'exists' })
+    const r = await makeSalePayable('transfer', deps)
+    expect(calls.complete).toBe(1)
+    expect(r.ok && r.manual_payment?.dimo?.phone).toBe('5512345678')
+  })
+})
+
+test.describe('sale-screen · what a state may show', () => {
+  test('only paid is paid; unverified is its own warning, never paid', () => {
+    expect(screenForState('paid')).toBe('paid')
+    expect(screenForState('unverified')).toBe('unverified')
+    expect(screenForState('cancelled')).toBe('released')
+    expect(screenForState('failed')).toBe('released')
+    expect(screenForState('awaiting_payment')).toBe('waiting')
+    expect(screenForState('pending_confirmation')).toBe('waiting')
+  })
+  test('a cancel only cancels on an explicit cancelled; PAYMENT_IN_PROGRESS and CANCEL_FAILED keep waiting', () => {
+    expect(cancelVerdict({ ok: true, state: 'cancelled' })).toBe('cancelled')
+    expect(cancelVerdict({ ok: true, state: 'paid' })).toBe('paid')
+    expect(cancelVerdict({ ok: true, state: 'unverified' })).toBe('unverified')
+    expect(cancelVerdict({ ok: false, code: 'PAYMENT_IN_PROGRESS' })).toBe('keep_waiting')
+    expect(cancelVerdict({ ok: false, code: 'CANCEL_FAILED' })).toBe('keep_waiting')
+    expect(cancelVerdict({ ok: true, state: 'awaiting_payment' })).toBe('keep_waiting')
   })
 })
 

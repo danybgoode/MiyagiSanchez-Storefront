@@ -55,10 +55,11 @@ import {
 import { classifySaleResponse } from '@/lib/in-person/sale-response'
 import type { CounterKind, ManualPayment, SaleState } from '@/lib/in-person/counter-checkout'
 import { buildReceiptText } from '@/lib/in-person/receipt'
+import { cancelVerdict, screenForState, UNVERIFIED_MESSAGE } from '@/lib/in-person/sale-screen'
 import { buildWhatsAppShareLink, shopShortLink } from '@/lib/share-link'
 import { isSellable, matchesQuery, type CounterProduct, type CounterVariant } from '@/lib/in-person/counter-catalog'
 
-type Stage = 'shop' | 'cash' | 'qr' | 'transfer' | 'done'
+type Stage = 'shop' | 'cash' | 'qr' | 'transfer' | 'unverified' | 'done'
 
 interface FrozenSale {
   clientId: string
@@ -254,7 +255,7 @@ export default function CounterClient({ products: initialProducts, truncated, sh
       if (stored.active) {
         // The backend already holds this sale: resume waiting on it, do not resend.
         setActive(stored.active)
-        setStage(stored.active.kind === 'card' ? 'qr' : 'transfer')
+        setStage(stored.active.state === 'unverified' ? 'unverified' : stored.active.kind === 'card' ? 'qr' : 'transfer')
         return
       }
       setUncertain(true)
@@ -327,6 +328,19 @@ export default function CounterClient({ products: initialProducts, truncated, sh
     setError(message)
   }
 
+  /**
+   * A card sale whose order did NOT go through the card processor. NEVER paid: warn, stop
+   * polling (waitingId goes null), keep the sale recorded so a reload shows the warning.
+   */
+  function markUnverified(sale: FrozenSale, current: ActiveRemote) {
+    const next = { ...current, state: 'unverified' as const }
+    writeStored({ sale, cart, padText, active: next })
+    setActive(next)
+    setQrImage(null)
+    setStage('unverified')
+    setSheetOpen(true)
+  }
+
   /** The money is confirmed: show «Venta registrada», refresh local stock, drop the freeze. */
   function finishSale(sale: FrozenSale, result: SaleDone) {
     pendingRef.current = null
@@ -374,11 +388,16 @@ export default function CounterClient({ products: initialProducts, truncated, sh
     }
     if (outcome.kind === 'ok' && outcome.remote) {
       const remote = outcome.remote
-      if (remote.state === 'paid') {
+      const screen = screenForState(remote.state)
+      if (screen === 'paid') {
         finishSale(sale, { totalCents: remote.totalCents, changeCents: 0, replayed: true })
         return
       }
-      if (remote.state === 'cancelled' || remote.state === 'failed') {
+      if (screen === 'unverified') {
+        markUnverified(sale, remote)
+        return
+      }
+      if (screen === 'released') {
         releaseSale('Esta venta ya no está disponible. Puedes volver a cobrarla.')
         return
       }
@@ -402,7 +421,7 @@ export default function CounterClient({ products: initialProducts, truncated, sh
 
   // Poll the backend every 3 s while a card QR / transfer waits. The answer is Medusa's, set
   // by the provider webhook: this component never decides "paid" itself.
-  const waitingId = active?.clientId ?? null
+  const waitingId = active && active.state !== 'unverified' ? active.clientId : null
   useEffect(() => {
     if (!waitingId) return
     let stopped = false
@@ -414,9 +433,12 @@ export default function CounterClient({ products: initialProducts, truncated, sh
         if (stopped || !st.state) return
         const sale = pendingRef.current
         if (!sale) return
-        if (st.state === 'paid') {
+        const screen = screenForState(st.state)
+        if (screen === 'paid') {
           finishSale(sale, { totalCents: st.total_cents ?? active?.totalCents ?? 0, changeCents: 0, replayed: false })
-        } else if (st.state === 'cancelled' || st.state === 'failed') {
+        } else if (screen === 'unverified') {
+          if (active) markUnverified(sale, { ...active, orderId: st.order_id ?? active.orderId })
+        } else if (screen === 'released') {
           releaseSale(st.state === 'cancelled' ? 'El cobro se canceló o venció. No se registró ningún pago.' : 'No se pudo completar el cobro. No se registró ningún pago.')
         } else if (active && (st.order_id ?? null) !== active.orderId) {
           const next = { ...active, orderId: st.order_id ?? null, state: st.state }
@@ -450,11 +472,17 @@ export default function CounterClient({ products: initialProducts, truncated, sh
     setError(null)
     try {
       const res = await fetch(`/api/shop/en-persona/sales/${sale.clientId}/cancel`, { method: 'POST', signal: AbortSignal.timeout(30_000) })
-      const json = (await res.json().catch(() => null)) as { state?: SaleState; message?: string; total_cents?: number } | null
-      if (res.ok && json?.state === 'paid') {
-        finishSale(sale, { totalCents: json.total_cents ?? active?.totalCents ?? 0, changeCents: 0, replayed: false })
-      } else if (res.ok && json?.state === 'cancelled') {
+      const json = (await res.json().catch(() => null)) as { state?: SaleState; message?: string; code?: string; total_cents?: number; order_id?: string | null } | null
+      const verdict = cancelVerdict({ ok: res.ok, code: json?.code, state: json?.state })
+      if (verdict === 'paid') {
+        finishSale(sale, { totalCents: json?.total_cents ?? active?.totalCents ?? 0, changeCents: 0, replayed: false })
+      } else if (verdict === 'unverified' && active) {
+        markUnverified(sale, { ...active, orderId: json?.order_id ?? active.orderId })
+      } else if (verdict === 'cancelled') {
         releaseSale(null)
+      } else if (json?.code === 'PAYMENT_IN_PROGRESS') {
+        // The buyer is paying right now: keep the screen and keep polling.
+        setError(json.message ?? 'El comprador ya está pagando. Espera unos segundos.')
       } else {
         // CANCEL_FAILED: the provider checkout may still be payable — say so and keep waiting.
         setError(res.status === 502 || !res.ok
@@ -652,6 +680,18 @@ export default function CounterClient({ products: initialProducts, truncated, sh
               {error && <p role="alert" className="text-sm text-[var(--color-danger)] mt-3">{error}</p>}
               <Button variant="secondary" size="lg" className="w-full mt-4 min-h-[52px]" loading={inFlight} onClick={cancelWaitingSale}>
                 Cancelar
+              </Button>
+            </div>
+          ) : stage === 'unverified' ? (
+            <div className="text-center py-2">
+              <i className="iconoir-warning-triangle text-5xl text-[var(--color-danger)]" aria-hidden />
+              <h2 className="text-xl font-bold mt-2">Pago sin confirmar</h2>
+              <p role="alert" className="mt-2">{UNVERIFIED_MESSAGE}</p>
+              <a className="btn btn-secondary btn-lg w-full mt-6 min-h-[52px] justify-center" href={active?.orderId ? `/shop/manage/orders/${active.orderId}` : '/shop/manage/orders'}>
+                Ver en Pedidos
+              </a>
+              <Button variant="ghost" className="w-full mt-2 min-h-[44px]" onClick={resetSale}>
+                Entendido
               </Button>
             </div>
           ) : stage === 'transfer' && active ? (
