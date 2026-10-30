@@ -18,11 +18,11 @@ export default async function PagoListoPage({ searchParams }: { searchParams: Pr
   return (
     <main className="max-w-md mx-auto px-4 py-16 text-center">
       <i className={`${cancelled ? 'iconoir-xmark' : 'iconoir-check-circle'} text-5xl ${cancelled ? 'text-[var(--color-muted)]' : 'text-[var(--color-success)]'}`} aria-hidden />
-      <h1 className="text-2xl font-bold mt-3">{cancelled ? 'No se hizo el pago' : 'Gracias por tu pago'}</h1>
+      <h1 className="text-2xl font-bold mt-3">{cancelled ? 'No se hizo el pago' : 'Listo'}</h1>
       <p className="text-[var(--color-muted)] mt-2">
         {cancelled
           ? 'No te cobramos nada. Si quieres pagar, pídele a la tienda que te muestre el código otra vez.'
-          : 'La tienda ya recibe tu pago. Si tienes dudas, pregúntale a quien te atendió.'}
+          : 'La tienda confirmará tu pago en un momento. Si tienes dudas, pregúntale a quien te atendió.'}
       </p>
       <Link href="/" className="btn btn-secondary mt-6 inline-flex">Ir a Miyagi Sánchez</Link>
     </main>

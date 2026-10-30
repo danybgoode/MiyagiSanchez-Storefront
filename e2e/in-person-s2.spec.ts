@@ -10,8 +10,9 @@ import {
 } from '../lib/in-person/counter-checkout'
 import { classifySaleResponse } from '../lib/in-person/sale-response'
 import { cancelVerdict, screenForState } from '../lib/in-person/sale-screen'
-import { COUNTER_PLACEHOLDER_EMAIL, isRealBuyerEmail, shouldEmailBuyer, shouldNotifySellerOfSale } from '../lib/in-person/notify-policy'
+import { COUNTER_PLACEHOLDER_EMAIL, isRealBuyerEmail, shouldEmailBuyer, shouldNotifySellerOfSale, telegramBuyerLabel } from '../lib/in-person/notify-policy'
 import { filterBySource, inPersonBadgeLabel, presentSources, summarizeBySource } from '../lib/in-person/order-source'
+import { parseStoredSale } from '../lib/in-person/stored-sale'
 import { buildReceiptText } from '../lib/in-person/receipt'
 
 /** In-person sales · Sprint 2 — the rules that must hold without a network. */
@@ -253,4 +254,30 @@ test('receipt text lists the shop, items, total, date and method', () => {
     lines: [{ title: 'Taza', variantTitle: 'Chica', quantity: 2, lineTotal: '$240' }],
   })
   expect(text).toBe(['Recibo de Barro Vivo', '30 oct 2026', '', '2 x Taza (Chica): $240', '', 'Total: $240', 'Pago: Transferencia', 'Gracias por tu compra'].join('\n'))
+})
+
+test.describe('notify-policy · the admin Telegram notice', () => {
+  test('a counter sale never carries the buyer address; other orders keep it', () => {
+    expect(telegramBuyerLabel({ source: 'in_person' }, 'ana@example.com')).toBe('comprador en mostrador')
+    expect(telegramBuyerLabel({}, 'ana@example.com')).toBe('ana@example.com')
+    expect(telegramBuyerLabel({}, null)).toBe('comprador')
+    expect(telegramBuyerLabel(undefined, null, 'anunciante')).toBe('anunciante')
+  })
+})
+
+test.describe('stored-sale · restoring from sessionStorage', () => {
+  const base = { sale: { clientId: 'c1', lines: [], tenderedCents: null, uncertain: true }, cart: { lines: [] }, padText: '' }
+  test('a sale saved by the S1 build (no kind) restores as cash', () => {
+    expect(parseStoredSale<{ sale: { kind: string } }>(JSON.stringify(base))?.sale.kind).toBe('cash')
+  })
+  test('a known kind is kept; an unknown one falls back to cash', () => {
+    expect(parseStoredSale<{ sale: { kind: string } }>(JSON.stringify({ ...base, sale: { ...base.sale, kind: 'transfer' } }))?.sale.kind).toBe('transfer')
+    expect(parseStoredSale<{ sale: { kind: string } }>(JSON.stringify({ ...base, sale: { ...base.sale, kind: 'bitcoin' } }))?.sale.kind).toBe('cash')
+  })
+  test('garbage and half-written entries are refused, not crashed on', () => {
+    expect(parseStoredSale('')).toBeNull()
+    expect(parseStoredSale(null)).toBeNull()
+    expect(parseStoredSale('{not json')).toBeNull()
+    expect(parseStoredSale(JSON.stringify({ sale: { clientId: 'c1' } }))).toBeNull()
+  })
 })

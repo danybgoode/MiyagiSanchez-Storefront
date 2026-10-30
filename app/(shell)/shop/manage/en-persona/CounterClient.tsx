@@ -54,6 +54,7 @@ import {
 } from '@/lib/in-person/counter-cart'
 import { classifySaleResponse } from '@/lib/in-person/sale-response'
 import type { CounterKind, ManualPayment, SaleState } from '@/lib/in-person/counter-checkout'
+import { parseStoredSale } from '@/lib/in-person/stored-sale'
 import { buildReceiptText } from '@/lib/in-person/receipt'
 import { cancelVerdict, screenForState, UNVERIFIED_MESSAGE } from '@/lib/in-person/sale-screen'
 import { buildWhatsAppShareLink, shopShortLink } from '@/lib/share-link'
@@ -194,11 +195,7 @@ async function postSale(sale: FrozenSale): Promise<SaleOutcome> {
 
 function readStored(): StoredSale | null {
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const v = JSON.parse(raw)
-    if (typeof v?.sale?.clientId !== 'string' || !Array.isArray(v.sale.lines) || !Array.isArray(v.cart?.lines) || typeof v.padText !== 'string') return null
-    return v
+    return parseStoredSale<StoredSale>(window.sessionStorage.getItem(STORAGE_KEY))
   } catch {
     return null
   }

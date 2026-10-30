@@ -27,7 +27,7 @@ import { markListingPurchased } from '@/lib/offer-state'
 import { deliverOrderWebhook } from '@/lib/ucp/webhooks'
 import { tg } from '@/lib/telegram'
 import { upsertOrderMirror } from '@/lib/order-mirror'
-import { shouldEmailBuyer, shouldNotifySellerOfSale } from '@/lib/in-person/notify-policy'
+import { shouldEmailBuyer, shouldNotifySellerOfSale, telegramBuyerLabel } from '@/lib/in-person/notify-policy'
 import { dispatchToBuyer } from '@/lib/notifications/dispatch'
 import { buildBuyerMessage } from '@/lib/notifications/buyer-messages'
 import { isEnabled } from '@/lib/flags'
@@ -594,7 +594,7 @@ async function handleMedusaMpPayment({
 
   // 4. Telegram admin alert
   const amtFmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(amountCents / 100)
-  tg.salePaid(amtFmt, productId || 'Producto', buyerEmail ?? 'comprador', 'mercadopago')
+  tg.salePaid(amtFmt, productId || 'Producto', telegramBuyerLabel({ source }, buyerEmail), 'mercadopago')
 
   // 5. Emails (best-effort via Medusa listing fetch)
   // In-person (D7): no seller sale email for a sale the merchant rang up, and a counter order only

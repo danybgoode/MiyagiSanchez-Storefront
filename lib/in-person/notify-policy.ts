@@ -38,3 +38,12 @@ export function shouldEmailBuyer(meta: Meta, email: string | null | undefined): 
   if (typeof email !== 'string' || email.trim() === '') return false
   return isInPersonSource(meta) ? isRealBuyerEmail(email) : true
 }
+
+/**
+ * The buyer label the admin Telegram sale notice gets. For a counter sale it is neutral: the
+ * buyer's address is personal data about someone standing at a stall, and the notice does not
+ * need it. Every other order keeps today's label.
+ */
+export function telegramBuyerLabel(meta: Meta, email: string | null | undefined, fallback = 'comprador'): string {
+  return isInPersonSource(meta) ? 'comprador en mostrador' : email ?? fallback
+}

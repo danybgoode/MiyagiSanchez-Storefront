@@ -23,7 +23,7 @@ import { tg, escapeHtml } from '@/lib/telegram'
 import { transferToSeller } from '@/lib/stripe-subscriptions'
 import { getR2DigitalSignedUrl, isR2DigitalConfigured } from '@/lib/r2'
 import { upsertOrderMirror } from '@/lib/order-mirror'
-import { shouldEmailBuyer, shouldNotifySellerOfSale } from '@/lib/in-person/notify-policy'
+import { shouldEmailBuyer, shouldNotifySellerOfSale, telegramBuyerLabel } from '@/lib/in-person/notify-policy'
 import { isVerifiedCustomDomain } from '@/lib/custom-domain'
 import { handlePrintAdPaid } from '@/lib/print-server'
 import { maybeRewardReferralOnOrder } from '@/lib/referrals'
@@ -492,7 +492,7 @@ async function handleMedusaCheckoutComplete(session: Stripe.Checkout.Session) {
 
   // 4. Telegram admin alert
   const amountFmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: currency }).format(amountTotal / 100)
-  tg.salePaid(amountFmt, product_id ?? 'Producto', buyerEmail ?? 'comprador', 'stripe')
+  tg.salePaid(amountFmt, product_id ?? 'Producto', telegramBuyerLabel(session.metadata, buyerEmail), 'stripe')
 
   // 5. Fetch Medusa listing for email context (best-effort)
   // In-person (D7): the seller is never told about a sale they rang up themselves, and a counter
