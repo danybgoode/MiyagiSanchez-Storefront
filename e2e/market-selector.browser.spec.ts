@@ -91,9 +91,17 @@ for (const viewport of [
     const onVercelPreview = /\.vercel\.app$/.test(new URL(BASE_URL).hostname)
     const PREVIEW_BYPASS_CORS = /blocked by CORS policy|net::ERR_FAILED/
 
+    // 3c. THE TURNSTILE WIDGET'S OWN FRAME. Since root-shop-builder-home, `/` mounts the
+    //     prompt-to-shop describe box, whose bot check is Cloudflare Turnstile in an iframe. That
+    //     frame logs its own CSP and debug messages to the console intermittently (1 run in 4),
+    //     and Playwright surfaces iframe console output on the page. Filtered by the message's
+    //     SOURCE, never by its text: anything logged by our own origin still fails the spec.
+    const TURNSTILE_FRAME = /^https:\/\/challenges\.cloudflare\.com\//
+
     page.on('console', (message) => {
       const text = message.text()
       if (message.type() !== 'error') return
+      if (TURNSTILE_FRAME.test(message.location().url ?? '')) return
       if (RESOURCE_LOAD_FAILURE.test(text)) return
       if (onVercelPreview && PREVIEW_BYPASS_CORS.test(text)) return
       jsErrors.push(text)
