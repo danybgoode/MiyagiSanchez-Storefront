@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { SellerBreadcrumb } from '../SellerBreadcrumb'
 import { manualPaymentStateFromOrder, manualPaymentBadge, whoActsNext } from '@/lib/manual-payment-state'
 import { mlOrderBadgeLabel } from '@/lib/ml-order-badge'
+import { filterBySource, inPersonBadgeLabel, orderSourceLabel, presentSources, type OrderSource } from '@/lib/in-person/order-source'
 import { orderStatusToToken } from '@/lib/status-badge'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Banner } from '@/components/feedback/Banner'
@@ -198,6 +199,7 @@ function OrderCard({
   const isUnpaidManual = manualState === 'pending_payment' || manualState === 'buyer_reported_paid'
   const badgeLabel = manualState === 'buyer_reported_paid' ? manualPaymentBadge(manualState) : statusLabel
   const mlBadge = mlOrderBadgeLabel(order)
+  const counterBadge = inPersonBadgeLabel(order.source)
 
   return (
     <div className="flex items-center gap-2">
@@ -238,6 +240,7 @@ function OrderCard({
             </p>
             <span className="flex-shrink-0 flex items-center gap-1">
               {mlBadge && <StatusBadge token="promo">{mlBadge}</StatusBadge>}
+              {counterBadge && <StatusBadge token="info">{counterBadge}</StatusBadge>}
               <StatusBadge token={statusToken}>{badgeLabel}</StatusBadge>
             </span>
           </div>
@@ -304,6 +307,7 @@ export default function OrdersInbox({
   const router = useRouter()
   const [filter, setFilter] = useState<FilterTab>('pending')
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [sourceFilter, setSourceFilter] = useState<OrderSource | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [previewBusy, setPreviewBusy] = useState<BulkTargetStatus | null>(null)
   const [bulkApplying, setBulkApplying] = useState(false)
@@ -337,9 +341,12 @@ export default function OrdersInbox({
     return Array.from(seen).sort((a, b) => a.localeCompare(b))
   }, [initialOrders])
 
-  const displayedOrders = tagFilter
+  const tagFilteredOrders = tagFilter
     ? statusFilteredOrders.filter(o => (o.tags ?? []).includes(tagFilter))
     : statusFilteredOrders
+  // Source filter (in-person-sales S2.3): shown only when the inbox holds more than one source.
+  const sources = useMemo(() => presentSources(initialOrders), [initialOrders])
+  const displayedOrders = filterBySource(tagFilteredOrders, sourceFilter)
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -477,6 +484,27 @@ export default function OrdersInbox({
                   {t.count}
                 </span>
               )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Source filter (in-person-sales S2.3) */}
+      {sources.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 mb-5" role="group" aria-label="Filtrar por origen">
+          {sources.map(src => (
+            <button
+              key={src}
+              type="button"
+              onClick={() => setSourceFilter(prev => (prev === src ? null : src))}
+              aria-pressed={sourceFilter === src}
+              className={`text-xs px-2.5 py-1 rounded-[var(--r-pill)] font-medium transition-colors min-h-[32px] ${
+                sourceFilter === src
+                  ? 'bg-[var(--color-accent)] text-white'
+                  : 'bg-[var(--bg-sunk)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
+              }`}
+            >
+              {orderSourceLabel(src)}
             </button>
           ))}
         </div>

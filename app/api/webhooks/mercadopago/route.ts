@@ -27,6 +27,7 @@ import { markListingPurchased } from '@/lib/offer-state'
 import { deliverOrderWebhook } from '@/lib/ucp/webhooks'
 import { tg } from '@/lib/telegram'
 import { upsertOrderMirror } from '@/lib/order-mirror'
+import { shouldEmailBuyer, shouldNotifySellerOfSale, telegramBuyerLabel } from '@/lib/in-person/notify-policy'
 import { dispatchToBuyer } from '@/lib/notifications/dispatch'
 import { buildBuyerMessage } from '@/lib/notifications/buyer-messages'
 import { isEnabled } from '@/lib/flags'
@@ -388,6 +389,7 @@ export async function POST(req: NextRequest) {
       shippingCurrency: mpMeta.shipping_currency,
       shippingDeliveryEstimate: mpMeta.shipping_delivery_estimate,
       shippingDeliveryLabel: mpMeta.shipping_delivery_label,
+      source: mpMeta.source,
       amountCents,
       currency,
       buyerEmail,
@@ -506,6 +508,7 @@ async function handleMedusaMpPayment({
   shippingCurrency,
   shippingDeliveryEstimate,
   shippingDeliveryLabel,
+  source,
   amountCents,
   currency,
   buyerEmail,
@@ -525,6 +528,8 @@ async function handleMedusaMpPayment({
   shippingCurrency?: string
   shippingDeliveryEstimate?: string
   shippingDeliveryLabel?: string
+  /** Provider metadata `source` stamped by start-checkout on a server-built cart (e.g. in_person). */
+  source?: string
   amountCents: number
   currency: string
   buyerEmail: string | null
@@ -589,10 +594,13 @@ async function handleMedusaMpPayment({
 
   // 4. Telegram admin alert
   const amtFmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(amountCents / 100)
-  tg.salePaid(amtFmt, productId || 'Producto', buyerEmail ?? 'comprador', 'mercadopago')
+  tg.salePaid(amtFmt, productId || 'Producto', telegramBuyerLabel({ source }, buyerEmail), 'mercadopago')
 
   // 5. Emails (best-effort via Medusa listing fetch)
-  if (productId && buyerEmail) {
+  // In-person (D7): no seller sale email for a sale the merchant rang up, and a counter order only
+  // emails a buyer address that is real.
+  const sourceMeta = { source }
+  if (productId && shouldEmailBuyer(sourceMeta, buyerEmail)) {
     const listingInfo = await getMedusaListing(productId)
     if (listingInfo) {
       // Own-channel: when the order came from a VERIFIED custom domain, brand the
@@ -677,7 +685,7 @@ async function handleMedusaMpPayment({
       )
 
       // ── Seller email ──────────────────────────────────────────────────────
-      if (listingInfo.seller_clerk_id) {
+      if (listingInfo.seller_clerk_id && shouldNotifySellerOfSale(sourceMeta)) {
         const sellerOrderUrl2 = `${SITE_URL2}/shop/manage/orders/${medusaOrderId ?? cartId}`
         getSellerEmail(listingInfo.seller_clerk_id)
           .then(sellerEmail => {

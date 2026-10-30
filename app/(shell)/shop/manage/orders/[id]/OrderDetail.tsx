@@ -22,6 +22,7 @@ import {
 } from '@/lib/pickup-appointment'
 import { ticketQrPath, type EventTicket } from '@/lib/event-ticket-state'
 import { isMlOrder, mlOrderBadgeLabel } from '@/lib/ml-order-badge'
+import { inPersonBadgeLabel } from '@/lib/in-person/order-source'
 import { formatRentalBookingLines, type RentalBookingLike, type RentalBookingState } from '@/lib/rental-booking'
 import { addTag as addTagLocal, removeTag as removeTagLocal } from '@/lib/order-tags'
 import { orderStatusToToken, returnStatusToToken } from '@/lib/status-badge'
@@ -734,6 +735,7 @@ export default function OrderDetail({ order }: OrderDetailProps) {
   const statusLabel = STATUS_LABEL[currentStatus] ?? STATUS_LABEL.paid
   const statusToken  = orderStatusToToken(currentStatus)
   const mlBadge = mlOrderBadgeLabel(order)
+  const counterBadge = inPersonBadgeLabel(order.source)
 
   async function updateStatus(newStatus: string) {
     setUpdatingStatus(true)
@@ -965,6 +967,7 @@ export default function OrderDetail({ order }: OrderDetailProps) {
                 {mlBadge}
               </StatusBadge>
             )}
+            {counterBadge && <StatusBadge token="info">{counterBadge}</StatusBadge>}
             {orderMeta.channel === 'custom_domain' && (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-[var(--r-pill)]"

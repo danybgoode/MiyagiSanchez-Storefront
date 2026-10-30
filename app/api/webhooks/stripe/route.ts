@@ -23,6 +23,7 @@ import { tg, escapeHtml } from '@/lib/telegram'
 import { transferToSeller } from '@/lib/stripe-subscriptions'
 import { getR2DigitalSignedUrl, isR2DigitalConfigured } from '@/lib/r2'
 import { upsertOrderMirror } from '@/lib/order-mirror'
+import { shouldEmailBuyer, shouldNotifySellerOfSale, telegramBuyerLabel } from '@/lib/in-person/notify-policy'
 import { isVerifiedCustomDomain } from '@/lib/custom-domain'
 import { handlePrintAdPaid } from '@/lib/print-server'
 import { maybeRewardReferralOnOrder } from '@/lib/referrals'
@@ -491,10 +492,12 @@ async function handleMedusaCheckoutComplete(session: Stripe.Checkout.Session) {
 
   // 4. Telegram admin alert
   const amountFmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: currency }).format(amountTotal / 100)
-  tg.salePaid(amountFmt, product_id ?? 'Producto', buyerEmail ?? 'comprador', 'stripe')
+  tg.salePaid(amountFmt, product_id ?? 'Producto', telegramBuyerLabel(session.metadata, buyerEmail), 'stripe')
 
   // 5. Fetch Medusa listing for email context (best-effort)
-  if (product_id && buyerEmail) {
+  // In-person (D7): the seller is never told about a sale they rang up themselves, and a counter
+  // order only emails a buyer address that is real.
+  if (product_id && shouldEmailBuyer(session.metadata, buyerEmail)) {
     const listingInfo = await getMedusaListing(product_id)
     if (listingInfo) {
       // Own-channel: when the order came from a VERIFIED custom domain, brand the
@@ -581,7 +584,7 @@ async function handleMedusaCheckoutComplete(session: Stripe.Checkout.Session) {
       // ── Seller notification (orders group: email + push, through the seam) ──
       // Default-on parity: the same fulfillment-branch email still fires unless
       // "Pedidos → Email" is off. The closure preserves the exact branch choice.
-      if (listingInfo.seller_clerk_id) {
+      if (listingInfo.seller_clerk_id && shouldNotifySellerOfSale(session.metadata)) {
         const sellerOrderUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://miyagisanchez.com'}/shop/manage/orders/${medusaOrderId ?? cart_id}`
         void dispatchToSeller(listingInfo.seller_clerk_id, {
           group: 'orders',

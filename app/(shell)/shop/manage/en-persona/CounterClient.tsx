@@ -19,8 +19,13 @@
  *    sale with a new id.
  *  - «Listo» is disabled while a request is in flight.
  *
- * Money is integer centavos end to end (`lib/in-person/counter-cart.ts`). Cards and
- * transfers arrive in Sprint 2, so those buttons are visible and disabled.
+ * CARD AND TRANSFER (S2): the same frozen-sale discipline. A card sale shows the checkout QR and
+ * waits; "paid" appears ONLY when the backend status (read from Medusa, set by the provider
+ * webhook) says `paid` — never on a client signal. A transfer shows the shop's CLABE / DiMo and
+ * waits for «Ya me llegó», which uses the existing confirm-payment flow. The waiting sale is
+ * mirrored in sessionStorage with its id, so a reload resumes polling the same sale.
+ *
+ * Money is integer centavos end to end (`lib/in-person/counter-cart.ts`).
  */
 
 import Image from 'next/image'
@@ -48,14 +53,20 @@ import {
   type SaleLine,
 } from '@/lib/in-person/counter-cart'
 import { classifySaleResponse } from '@/lib/in-person/sale-response'
+import type { CounterKind, ManualPayment, SaleState } from '@/lib/in-person/counter-checkout'
+import { parseStoredSale } from '@/lib/in-person/stored-sale'
+import { buildReceiptText } from '@/lib/in-person/receipt'
+import { cancelVerdict, LEAVE_PENDING_NOTE, screenForState, UNVERIFIED_MESSAGE } from '@/lib/in-person/sale-screen'
+import { buildWhatsAppShareLink, shopShortLink } from '@/lib/share-link'
 import { isSellable, matchesQuery, type CounterProduct, type CounterVariant } from '@/lib/in-person/counter-catalog'
 
-type Stage = 'shop' | 'cash' | 'done'
+type Stage = 'shop' | 'cash' | 'qr' | 'transfer' | 'unverified' | 'done'
 
 interface FrozenSale {
   clientId: string
   lines: SaleLine[]
   tenderedCents: number | null
+  kind: CounterKind
   /** Some attempt of THIS sale was uncertain, so the order may already exist (sticky rule). */
   uncertain: boolean
 }
@@ -66,8 +77,29 @@ interface SaleDone {
   replayed: boolean
 }
 
+/** A card / transfer sale that exists and is waiting for money (or for «Ya me llegó»). */
+interface ActiveRemote {
+  /** The frozen sale's client_id, so the poll and a reload resume the SAME sale. */
+  clientId: string
+  kind: 'card' | 'transfer'
+  totalCents: number
+  checkoutUrl: string | null
+  manual: ManualPayment | null
+  orderId: string | null
+  state: SaleState
+}
+
+interface StoredSale {
+  sale: FrozenSale
+  cart: CounterCart
+  padText: string
+  /** Present once the backend accepted a card / transfer sale: resume polling instead of resending. */
+  active?: ActiveRemote
+}
+
 type SaleOutcome =
-  | { kind: 'ok'; done: SaleDone }
+  | { kind: 'ok'; done: SaleDone; remote: null }
+  | { kind: 'ok'; done: null; remote: ActiveRemote }
   | { kind: 'refused'; message: string; serverTotalCents: number | null }
   | { kind: 'uncertain'; message: string }
 
@@ -89,9 +121,9 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 async function postSale(sale: FrozenSale): Promise<SaleOutcome> {
   const body = JSON.stringify({
     client_id: sale.clientId,
-    kind: 'cash',
+    kind: sale.kind,
     lines: sale.lines,
-    tendered_cents: sale.tenderedCents,
+    ...(sale.kind === 'cash' ? { tendered_cents: sale.tenderedCents } : {}),
   })
   for (let attempt = 0; attempt <= IN_PROGRESS_RETRIES; attempt += 1) {
     let res: Response
@@ -114,12 +146,31 @@ async function postSale(sale: FrozenSale): Promise<SaleOutcome> {
       code?: string
       message?: string
       details?: { total_cents?: number } | null
+      cart_id?: string
+      state?: SaleState
+      checkout_url?: string | null
+      manual_payment?: ManualPayment | null
     } | null
 
-    const hasOrder = !!json?.order_id && Number.isSafeInteger(json.total_cents)
+    const hasOrder = (sale.kind === 'cash' ? !!json?.order_id : !!(json?.order_id || json?.cart_id)) && Number.isSafeInteger(json?.total_cents)
     const verdict = classifySaleResponse({ status: res.status, code: json?.code, hasOrder, hadUncertainAttempt: sale.uncertain })
     if (verdict === 'recorded') {
-      return { kind: 'ok', done: { totalCents: json!.total_cents as number, changeCents: json!.change_cents ?? 0, replayed: json!.replayed === true } }
+      if (sale.kind === 'cash') {
+        return { kind: 'ok', done: { totalCents: json!.total_cents as number, changeCents: json!.change_cents ?? 0, replayed: json!.replayed === true }, remote: null }
+      }
+      return {
+        kind: 'ok',
+        done: null,
+        remote: {
+          clientId: sale.clientId,
+          kind: sale.kind as 'card' | 'transfer',
+          totalCents: json!.total_cents as number,
+          checkoutUrl: json!.checkout_url ?? null,
+          manual: json!.manual_payment ?? null,
+          orderId: json!.order_id ?? null,
+          state: json!.state ?? 'awaiting_payment',
+        },
+      }
     }
     if (verdict === 'retry_in_progress') {
       // A claim exists, so from here on the order may exist.
@@ -142,18 +193,14 @@ async function postSale(sale: FrozenSale): Promise<SaleOutcome> {
   return { kind: 'uncertain', message: `La venta sigue en proceso. ${RETRY_HINT}` }
 }
 
-function readStored(): { sale: FrozenSale; cart: CounterCart; padText: string } | null {
+function readStored(): StoredSale | null {
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const v = JSON.parse(raw)
-    if (typeof v?.sale?.clientId !== 'string' || !Array.isArray(v.sale.lines) || !Array.isArray(v.cart?.lines) || typeof v.padText !== 'string') return null
-    return v
+    return parseStoredSale<StoredSale>(window.sessionStorage.getItem(STORAGE_KEY))
   } catch {
     return null
   }
 }
-function writeStored(value: { sale: FrozenSale; cart: CounterCart; padText: string } | null) {
+function writeStored(value: StoredSale | null) {
   try {
     if (value) window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value))
     else window.sessionStorage.removeItem(STORAGE_KEY)
@@ -166,7 +213,7 @@ function stockLabel(variants: CounterVariant[]): string {
   return units > 0 ? `Quedan ${units}` : 'Agotado'
 }
 
-export default function CounterClient({ products: initialProducts, truncated }: { products: CounterProduct[]; truncated: boolean }) {
+export default function CounterClient({ products: initialProducts, truncated, shopName, shopSlug }: { products: CounterProduct[]; truncated: boolean; shopName: string; shopSlug: string }) {
   const fmt = useSellerFormat()
   const money = (cents: number) => fmt.money(cents, 'MXN')
 
@@ -181,6 +228,11 @@ export default function CounterClient({ products: initialProducts, truncated }: 
   const [uncertain, setUncertain] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<SaleDone | null>(null)
+  const [active, setActive] = useState<ActiveRemote | null>(null)
+  const [frozenKind, setFrozenKind] = useState<CounterKind | null>(null)
+  const [qrImage, setQrImage] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [receipt, setReceipt] = useState<{ lines: CounterCart['lines']; totalCents: number; method: CounterKind } | null>(null)
   const pendingRef = useRef<FrozenSale | null>(null)
 
   // A reload after an uncertain outcome restores the SAME frozen sale (id + payload), so the
@@ -193,11 +245,18 @@ export default function CounterClient({ products: initialProducts, truncated }: 
       const stored = readStored()
       if (!stored || cancelled) return
       pendingRef.current = stored.sale
+      setFrozenKind(stored.sale.kind)
       setCart(stored.cart)
       setPadText(stored.padText)
-      setUncertain(true)
-      setStage('cash')
       setSheetOpen(true)
+      if (stored.active) {
+        // The backend already holds this sale: resume waiting on it, do not resend.
+        setActive(stored.active)
+        setStage(stored.active.state === 'unverified' ? 'unverified' : stored.active.kind === 'card' ? 'qr' : 'transfer')
+        return
+      }
+      setUncertain(true)
+      setStage(stored.sale.kind === 'cash' ? 'cash' : 'shop')
       setError(`Quedó una venta sin confirmar. ${RETRY_HINT}`)
     })
     return () => { cancelled = true }
@@ -205,7 +264,7 @@ export default function CounterClient({ products: initialProducts, truncated }: 
 
   const total = cartTotalCents(cart)
   const units = cartUnits(cart)
-  const locked = uncertain || inFlight || stage === 'done'
+  const locked = uncertain || inFlight || stage === 'done' || active !== null
   const tendered = padTextToCents(padText)
   const cash = tendered === null ? null : cashResult(total, tendered)
   // Blank pad = the exact total (the backend treats an absent tender as "no change owed").
@@ -241,61 +300,233 @@ export default function CounterClient({ products: initialProducts, truncated }: 
   function resetSale() {
     pendingRef.current = null
     writeStored(null)
+    setFrozenKind(null)
     setCart(clearCart())
     setPadText('')
     setUncertain(false)
     setError(null)
     setDone(null)
+    setActive(null)
+    setQrImage(null)
+    setReceipt(null)
     setStage('shop')
     setSheetOpen(false)
   }
 
-  async function submitSale() {
-    if (!canSubmit) return
+  /** The sale was closed without being paid (cancelled / failed): unfreeze, keep the cart. */
+  function releaseSale(message: string | null) {
+    pendingRef.current = null
+    writeStored(null)
+    setFrozenKind(null)
+    setActive(null)
+    setQrImage(null)
+    setUncertain(false)
+    setStage('shop')
+    setError(message)
+  }
+
+  /**
+   * A card sale whose order did NOT go through the card processor. NEVER paid: warn, stop
+   * polling (waitingId goes null), keep the sale recorded so a reload shows the warning.
+   */
+  function markUnverified(sale: FrozenSale, current: ActiveRemote) {
+    const next = { ...current, state: 'unverified' as const }
+    writeStored({ sale, cart, padText, active: next })
+    setActive(next)
+    setQrImage(null)
+    setStage('unverified')
+    setSheetOpen(true)
+  }
+
+  /** The money is confirmed: show «Venta registrada», refresh local stock, drop the freeze. */
+  function finishSale(sale: FrozenSale, result: SaleDone) {
+    pendingRef.current = null
+    writeStored(null)
+    setFrozenKind(null)
+    setActive(null)
+    setQrImage(null)
+    setUncertain(false)
+    setReceipt({ lines: cart.lines, totalCents: result.totalCents, method: sale.kind })
+    setDone(result)
+    setStage('done')
+    // Show the stock the sale just used without a reload; the server stays the source of truth.
+    const sold = new Map(sale.lines.map((l) => [l.variant_id, l.quantity]))
+    setProducts((current) =>
+      current.map((p) => ({
+        ...p,
+        variants: p.variants.map((v) =>
+          v.available !== null && sold.has(v.variantId) ? { ...v, available: Math.max(0, v.available - (sold.get(v.variantId) ?? 0)) } : v,
+        ),
+      })),
+    )
+  }
+
+  async function submitSale(kind: CounterKind) {
+    if (inFlight || cart.lines.length === 0) return
+    if (kind === 'cash' && !canSubmit) return
     // First press mints the id and freezes the payload; every retry re-sends that exact payload.
     if (!pendingRef.current) {
-      pendingRef.current = { clientId: crypto.randomUUID(), lines: toSaleLines(cart), tenderedCents: tendered, uncertain: false }
+      pendingRef.current = { clientId: crypto.randomUUID(), lines: toSaleLines(cart), tenderedCents: kind === 'cash' ? tendered : null, kind, uncertain: false }
     }
     const sale = pendingRef.current
+    setFrozenKind(sale.kind)
     // Persist BEFORE sending, marked uncertain: if the page reloads while this request is
     // in flight, the server may have recorded the sale, so the reloaded counter must
-    // resume THIS id, never re-ring the cart under a new one (codex re-review, PR 458).
+    // resume THIS id, never re-ring the cart under a new one (codex re-review).
     writeStored({ sale: { ...sale, uncertain: true }, cart, padText })
     setInFlight(true)
     setError(null)
     const outcome = await postSale(sale)
     setInFlight(false)
 
-    if (outcome.kind === 'ok') {
-      pendingRef.current = null
-      writeStored(null)
+    if (outcome.kind === 'ok' && outcome.done) {
+      finishSale(sale, outcome.done)
+      return
+    }
+    if (outcome.kind === 'ok' && outcome.remote) {
+      const remote = outcome.remote
+      const screen = screenForState(remote.state)
+      if (screen === 'paid') {
+        finishSale(sale, { totalCents: remote.totalCents, changeCents: 0, replayed: true })
+        return
+      }
+      if (screen === 'unverified') {
+        markUnverified(sale, remote)
+        return
+      }
+      if (screen === 'released') {
+        releaseSale('Esta venta ya no está disponible. Puedes volver a cobrarla.')
+        return
+      }
+      // The backend holds the sale now: keep the id, wait for the money.
+      sale.uncertain = true
+      writeStored({ sale, cart, padText, active: remote })
       setUncertain(false)
-      setDone(outcome.done)
-      setStage('done')
-      // Show the stock the sale just used without a reload; the server stays the source of truth.
-      const sold = new Map(sale.lines.map((l) => [l.variant_id, l.quantity]))
-      setProducts((current) =>
-        current.map((p) => ({
-          ...p,
-          variants: p.variants.map((v) =>
-            v.available !== null && sold.has(v.variantId) ? { ...v, available: Math.max(0, v.available - (sold.get(v.variantId) ?? 0)) } : v,
-          ),
-        })),
-      )
+      setActive(remote)
+      setStage(remote.kind === 'card' ? 'qr' : 'transfer')
       return
     }
     if (outcome.kind === 'refused') {
       // Nothing was recorded: drop the frozen sale so the merchant can fix the cart.
-      pendingRef.current = null
-      writeStored(null)
-      setUncertain(false)
-      setStage('shop')
-      setError(outcome.serverTotalCents !== null ? `${outcome.message} El total es ${money(outcome.serverTotalCents)}.` : outcome.message)
+      releaseSale(outcome.serverTotalCents !== null ? `${outcome.message} El total es ${money(outcome.serverTotalCents)}.` : outcome.message)
       return
     }
     writeStored({ sale, cart, padText })
     setUncertain(true)
     setError(outcome.message)
+  }
+
+  // Poll the backend every 3 s while a card QR / transfer waits. The answer is Medusa's, set
+  // by the provider webhook: this component never decides "paid" itself.
+  const waitingId = active && active.state !== 'unverified' ? active.clientId : null
+  useEffect(() => {
+    if (!waitingId) return
+    let stopped = false
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/shop/en-persona/sales/${waitingId}`, { signal: AbortSignal.timeout(10_000) })
+        if (!res.ok || stopped) return
+        const st = (await res.json()) as { state?: SaleState; order_id?: string | null; checkout_url?: string | null; total_cents?: number }
+        if (stopped || !st.state) return
+        const sale = pendingRef.current
+        if (!sale) return
+        const screen = screenForState(st.state)
+        if (screen === 'paid') {
+          finishSale(sale, { totalCents: st.total_cents ?? active?.totalCents ?? 0, changeCents: 0, replayed: false })
+        } else if (screen === 'unverified') {
+          if (active) markUnverified(sale, { ...active, orderId: st.order_id ?? active.orderId })
+        } else if (screen === 'released') {
+          releaseSale(st.state === 'cancelled' ? 'El cobro se canceló o venció. No se registró ningún pago.' : 'No se pudo completar el cobro. No se registró ningún pago.')
+        } else if (active && (st.order_id ?? null) !== active.orderId) {
+          const next = { ...active, orderId: st.order_id ?? null, state: st.state }
+          setActive(next)
+          writeStored({ sale, cart, padText, active: next })
+        }
+      } catch { /* a missed poll is just a longer wait */ }
+    }
+    const timer = setInterval(tick, 3000)
+    return () => { stopped = true; clearInterval(timer) }
+    // finishSale/releaseSale close over current state on purpose; the poll restarts only per sale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingId])
+
+  // The checkout URL as a QR, drawn in the browser (the `qrcode` chunk loads only when a card sale waits).
+  const qrUrl = stage === 'qr' ? active?.checkoutUrl ?? null : null
+  useEffect(() => {
+    if (!qrUrl) return
+    let cancelled = false
+    import('qrcode')
+      .then((mod) => mod.toDataURL(qrUrl, { margin: 1, width: 480, errorCorrectionLevel: 'M' }))
+      .then((url) => { if (!cancelled) setQrImage(url) })
+      .catch(() => { if (!cancelled) setQrImage(null) })
+    return () => { cancelled = true }
+  }, [qrUrl])
+
+  /** Transfer exit: clear the counter WITHOUT cancelling. The order stays in Pedidos, pending payment. */
+  function leavePending() {
+    resetSale()
+  }
+
+  async function cancelWaitingSale() {
+    const sale = pendingRef.current
+    if (!sale || inFlight) return
+    setInFlight(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/shop/en-persona/sales/${sale.clientId}/cancel`, { method: 'POST', signal: AbortSignal.timeout(30_000) })
+      const json = (await res.json().catch(() => null)) as { state?: SaleState; message?: string; code?: string; total_cents?: number; order_id?: string | null } | null
+      const verdict = cancelVerdict({ ok: res.ok, code: json?.code, state: json?.state })
+      if (verdict === 'paid') {
+        finishSale(sale, { totalCents: json?.total_cents ?? active?.totalCents ?? 0, changeCents: 0, replayed: false })
+      } else if (verdict === 'unverified' && active) {
+        markUnverified(sale, { ...active, orderId: json?.order_id ?? active.orderId })
+      } else if (verdict === 'cancelled') {
+        releaseSale(null)
+      } else if (verdict === 'leave_pending') {
+        leavePending()
+      } else if (json?.code === 'PAYMENT_IN_PROGRESS') {
+        // The buyer is paying right now: keep the screen and keep polling.
+        setError(json.message ?? 'El comprador ya está pagando. Espera unos segundos.')
+      } else {
+        // CANCEL_FAILED: the provider checkout may still be payable — say so and keep waiting.
+        setError(res.status === 502 || !res.ok
+          ? 'No pudimos cancelar el cobro: el QR todavía podría pagarse. Sigue esperando o intenta cancelar otra vez.'
+          : 'No se pudo cancelar. Intenta otra vez.')
+      }
+    } catch {
+      setError('No pudimos cancelar el cobro: el QR todavía podría pagarse. Sigue esperando o intenta cancelar otra vez.')
+    } finally {
+      setInFlight(false)
+    }
+  }
+
+  /** «Ya me llegó»: the existing seller confirm-payment flow. Nothing confirms a transfer by itself. */
+  async function confirmTransfer() {
+    const sale = pendingRef.current
+    if (!sale || !active?.orderId || inFlight) return
+    setInFlight(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/orders/${active.orderId}/confirm-payment`, { method: 'PATCH', signal: AbortSignal.timeout(30_000) })
+      if (res.ok) {
+        finishSale(sale, { totalCents: active.totalCents, changeCents: 0, replayed: false })
+      } else {
+        const json = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
+        setError(json?.message ?? json?.error ?? 'No pudimos confirmar el pago. Intenta otra vez.')
+      }
+    } catch {
+      setError('Sin conexión. Intenta confirmar otra vez.')
+    } finally {
+      setInFlight(false)
+    }
+  }
+
+  async function copyClabe(value: string) {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard blocked: the number is on screen to type */ }
   }
 
   function abandonUncertainSale() {
@@ -412,9 +643,93 @@ export default function CounterClient({ products: initialProducts, truncated }: 
                 <p className="text-3xl font-bold mt-4">Cambio {money(done.changeCents)}</p>
               )}
               {done.replayed && <p className="text-sm text-[var(--color-muted)] mt-3">Esta venta ya estaba registrada; no se duplicó.</p>}
-              <Button variant="primary" size="lg" className="w-full mt-6 min-h-[52px]" onClick={resetSale}>
+              {receipt && (
+                <a
+                  className="btn btn-secondary btn-lg w-full mt-6 min-h-[52px] justify-center"
+                  href={buildWhatsAppShareLink(
+                    buildReceiptText({
+                      shopName,
+                      lines: receipt.lines.map((l) => ({ title: l.title, variantTitle: l.variantTitle, quantity: l.quantity, lineTotal: money(lineTotalCents(l)) })),
+                      total: money(receipt.totalCents),
+                      date: fmt.date(new Date(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                      method: receipt.method,
+                    }),
+                    shopShortLink(shopSlug) ?? 'https://miyagisanchez.com',
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <i className="iconoir-send" aria-hidden /> Mandar recibo
+                </a>
+              )}
+              <Button variant="primary" size="lg" className="w-full mt-3 min-h-[52px]" onClick={resetSale}>
                 Nueva venta
               </Button>
+            </div>
+          ) : stage === 'qr' && active ? (
+            <div className="text-center">
+              <h2 className="text-lg font-bold">Cobro con tarjeta</h2>
+              <p className="text-2xl font-bold mt-1">{money(active.totalCents)}</p>
+              <div className="mx-auto mt-3 w-64 h-64 max-w-full rounded-[var(--r-md)] border border-[var(--color-border)] bg-white flex items-center justify-center">
+                {qrImage ? (
+                  // A data URL generated in the browser: next/image has nothing to optimise here.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={qrImage} alt="Código QR para pagar con tarjeta" width={256} height={256} className="w-full h-full" />
+                ) : (
+                  <span className="text-sm text-[var(--color-muted)]">Preparando el código…</span>
+                )}
+              </div>
+              <p className="mt-3">Que lo escanee con su celular y pague ahí</p>
+              <p className="mt-2 text-[var(--color-muted)]" aria-live="polite">Esperando el pago…</p>
+              {error && <p role="alert" className="text-sm text-[var(--color-danger)] mt-3">{error}</p>}
+              <Button variant="secondary" size="lg" className="w-full mt-4 min-h-[52px]" loading={inFlight} onClick={cancelWaitingSale}>
+                Cancelar
+              </Button>
+            </div>
+          ) : stage === 'unverified' ? (
+            <div className="text-center py-2">
+              <i className="iconoir-warning-triangle text-5xl text-[var(--color-danger)]" aria-hidden />
+              <h2 className="text-xl font-bold mt-2">Pago sin confirmar</h2>
+              <p role="alert" className="mt-2">{UNVERIFIED_MESSAGE}</p>
+              <a className="btn btn-secondary btn-lg w-full mt-6 min-h-[52px] justify-center" href={active?.orderId ? `/shop/manage/orders/${active.orderId}` : '/shop/manage/orders'}>
+                Ver en Pedidos
+              </a>
+              <Button variant="ghost" className="w-full mt-2 min-h-[44px]" onClick={resetSale}>
+                Entendido
+              </Button>
+            </div>
+          ) : stage === 'transfer' && active ? (
+            <div>
+              <h2 className="text-lg font-bold">Transferencia</h2>
+              <p className="text-3xl font-bold mt-1">{money(active.totalCents)}</p>
+              {active.manual?.spei && (
+                <div className="mt-3 rounded-[var(--r-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] p-3">
+                  <div className="text-sm text-[var(--color-muted)]">CLABE</div>
+                  <div className="text-xl font-bold tracking-wide break-all">{active.manual.spei.clabe}</div>
+                  {active.manual.spei.bank_name && <div className="text-sm mt-1">{active.manual.spei.bank_name}</div>}
+                  {active.manual.spei.account_holder && <div className="text-sm">{active.manual.spei.account_holder}</div>}
+                  <Button variant="secondary" className="mt-2 min-h-[44px]" onClick={() => copyClabe(active.manual!.spei!.clabe)}>
+                    <i className="iconoir-copy" aria-hidden /> {copied ? 'Copiado' : 'Copiar CLABE'}
+                  </Button>
+                </div>
+              )}
+              {active.manual?.dimo && (
+                <div className="mt-3 rounded-[var(--r-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] p-3">
+                  <div className="text-sm text-[var(--color-muted)]">DiMo</div>
+                  <div className="text-xl font-bold">{active.manual.dimo.phone}</div>
+                </div>
+              )}
+              {!active.manual?.spei && !active.manual?.dimo && (
+                <p className="text-sm text-[var(--color-muted)] mt-3">Tus datos de pago están en Ajustes.</p>
+              )}
+              {error && <p role="alert" className="text-sm text-[var(--color-danger)] mt-3">{error}</p>}
+              <Button variant="primary" size="lg" className="w-full mt-4 min-h-[52px]" loading={inFlight} disabled={!active.orderId} onClick={confirmTransfer}>
+                Ya me llegó
+              </Button>
+              <Button variant="secondary" className="w-full mt-2 min-h-[44px]" disabled={inFlight} onClick={leavePending}>
+                Dejar pendiente
+              </Button>
+              <p className="text-sm text-[var(--color-muted)] mt-2">{LEAVE_PENDING_NOTE}</p>
             </div>
           ) : stage === 'cash' ? (
             <div>
@@ -464,7 +779,7 @@ export default function CounterClient({ products: initialProducts, truncated }: 
 
               {error && <p role="alert" className="text-sm text-[var(--color-danger)] mt-3">{error}</p>}
 
-              <Button variant="primary" size="lg" className="w-full mt-4 min-h-[52px]" loading={inFlight} disabled={!canSubmit} onClick={submitSale}>
+              <Button variant="primary" size="lg" className="w-full mt-4 min-h-[52px]" loading={inFlight} disabled={!canSubmit} onClick={() => submitSale('cash')}>
                 {uncertain ? 'Reintentar' : 'Listo'}
               </Button>
               {uncertain ? (
@@ -522,19 +837,28 @@ export default function CounterClient({ products: initialProducts, truncated }: 
 
               {error && <p role="alert" className="text-sm text-[var(--color-danger)] mt-3">{error}</p>}
 
-              <div className="flex flex-col gap-2 mt-4">
-                <Button variant="primary" size="lg" className="w-full min-h-[52px]" disabled={cart.lines.length === 0 || locked} onClick={() => { setPadText(''); setStage('cash') }}>
-                  <i className="iconoir-cash" aria-hidden /> Efectivo
-                </Button>
-                <Button variant="secondary" size="lg" className="w-full min-h-[52px] justify-between" disabled>
-                  <span><i className="iconoir-credit-card" aria-hidden /> Tarjeta o Mercado Pago</span>
-                  <span className="text-xs">Próximamente</span>
-                </Button>
-                <Button variant="secondary" size="lg" className="w-full min-h-[52px] justify-between" disabled>
-                  <span><i className="iconoir-bank" aria-hidden /> Transferencia</span>
-                  <span className="text-xs">Próximamente</span>
-                </Button>
-              </div>
+              {uncertain && frozenKind && frozenKind !== 'cash' ? (
+                <div className="flex flex-col gap-2 mt-4">
+                  <Button variant="primary" size="lg" className="w-full min-h-[52px]" loading={inFlight} onClick={() => submitSale(frozenKind)}>
+                    Reintentar
+                  </Button>
+                  <Button variant="ghost" className="w-full min-h-[44px]" disabled={inFlight} onClick={abandonUncertainSale}>
+                    Empezar otra venta sin reintentar
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 mt-4">
+                  <Button variant="primary" size="lg" className="w-full min-h-[52px]" disabled={cart.lines.length === 0 || locked} onClick={() => { setPadText(''); setStage('cash') }}>
+                    <i className="iconoir-cash" aria-hidden /> Efectivo
+                  </Button>
+                  <Button variant="secondary" size="lg" className="w-full min-h-[52px]" loading={inFlight} disabled={cart.lines.length === 0 || locked} onClick={() => submitSale('card')}>
+                    <i className="iconoir-credit-card" aria-hidden /> Tarjeta o Mercado Pago
+                  </Button>
+                  <Button variant="secondary" size="lg" className="w-full min-h-[52px]" loading={inFlight} disabled={cart.lines.length === 0 || locked} onClick={() => submitSale('transfer')}>
+                    <i className="iconoir-bank" aria-hidden /> Transferencia
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </Sheet>

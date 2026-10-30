@@ -12,7 +12,9 @@
  */
 
 export type ProfitEventType = 'revenue' | 'ml_fee' | 'shipping_cost' | 'cogs_snapshot'
-export type ProfitSource = 'mercadolibre' | 'native'
+// Mirrors the backend ledger's LedgerSource (in-person-sales D17): counter sales and payment links are
+// native Medusa orders that carry their own source.
+export type ProfitSource = 'mercadolibre' | 'native' | 'in_person' | 'payment_link'
 
 export interface ProfitEvent {
   id: string
