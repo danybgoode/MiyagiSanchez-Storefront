@@ -31,7 +31,7 @@ test.describe('the root leads with the shop, not the marketplace', () => {
     expect(points).toMatch(/0% de comisión/)
     expect(points).toMatch(/catálogo/i)
     expect(points).toMatch(/PDF/)
-    expect(points).toMatch(/feed/)
+    expect(points).toMatch(/Instagram/)
     expect(points).toMatch(/guía/i)
   })
 
@@ -45,6 +45,16 @@ test.describe('the root leads with the shop, not the marketplace', () => {
     expect(anchor.pricingCallout?.body).toMatch(/0% de comisión/)
     expect(anchor.pricingCallout?.body).toMatch(/\$[\d,]+ MXN al año/)
     expect(anchor.pricingCallout?.cta.href).toBe('/mx/precios')
+  })
+
+  test('nothing on the page contradicts the published prices or overclaims the draft', () => {
+    // The "included" grid used to list the domain as free while "Lo que te llevas" prices it; and
+    // before signing up a draft can only be renamed, recoloured or regenerated (prompt-to-shop
+    // access.ts), so the step must not promise free editing. Both caught by the fresh reviewer.
+    const included = anchor.premiumFeatures?.items.map((i) => `${i.label} ${i.sub}`).join('\n') ?? ''
+    expect(included).not.toMatch(/dominio/i)
+    expect(anchor.premiumFeatures?.lead).not.toMatch(/marketplace/i)
+    expect(anchor.steps[1].body).not.toMatch(/como quieras/)
   })
 
   test('the steps describe the flow the page actually runs: describe, watch it take shape, keep it', () => {

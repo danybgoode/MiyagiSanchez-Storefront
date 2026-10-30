@@ -1279,7 +1279,7 @@
         {
           "icon": "iconoir-share-android",
           "title": "Tu catálogo para compartir",
-          "body": "Un link de catálogo para WhatsApp, un PDF para mandar o imprimir, y un feed para Instagram y Facebook."
+          "body": "Un link de catálogo para WhatsApp, un PDF para mandar o imprimir, y tu catálogo conectado a Instagram y WhatsApp."
         },
         {
           "icon": "iconoir-check-circle",
@@ -1343,7 +1343,7 @@
         },
         {
           "title": "Mira tu tienda tomar forma",
-          "body": "En segundos ves tu tienda con nombre, textos y productos de ejemplo. Cámbiala como quieras."
+          "body": "En segundos ves tu tienda con nombre, textos y productos de ejemplo. Cámbiale el nombre o el color, o pide otra versión."
         },
         {
           "title": "Quédatela y publica",
@@ -1355,7 +1355,7 @@
       "socialStats": [],
       "premiumFeatures": {
         "title": "Todo esto ya viene incluido",
-        "lead": "Funciones que en otras plataformas pagas aparte — aquí son parte del marketplace.",
+        "lead": "Funciones que en otras plataformas pagas aparte — aquí vienen incluidas en tu tienda.",
         "items": [
           {
             "icon": "iconoir-qr-code",
@@ -1383,9 +1383,9 @@
             "sub": "Descuentos y códigos para tus campañas."
           },
           {
-            "icon": "iconoir-globe",
-            "label": "Tu dominio, subdominio o widget",
-            "sub": "Tu marca en cualquier canal."
+            "icon": "iconoir-list",
+            "label": "Colecciones",
+            "sub": "Agrupa tus productos para que te encuentren más rápido."
           }
         ]
       },
