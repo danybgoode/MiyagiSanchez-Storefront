@@ -135,6 +135,7 @@ export const MCP_SELLER_TOOLS = [
   'create_listing',
   'list_my_listings',
   'get_share_kit',             // share-kit S3.3 — catalog link, PDF link, Meta feed URL (token-scoped)
+  'get_business_plan',         // business-infrastructure S3 — «Tu plan», read-only (token-scoped)
   'create_payment_link',       // in-person-sales S4.4 — payment links (token-scoped)
   'list_payment_links',        // in-person-sales S4.4 (token-scoped)
   'cancel_payment_link',       // in-person-sales S4.4 (token-scoped)

@@ -158,7 +158,7 @@ export default function PlanClient({ inputs, updatedAt, gaps, children }: { inpu
         ))}
       </section>
 
-      <section className="card-panel grid gap-2" style={{ padding: 'var(--s-4)' }} data-testid="plan-capacity">
+      <section id="plan-capacity" className="card-panel grid gap-2" style={{ padding: 'var(--s-4)' }} data-testid="plan-capacity">
         <h2 className="t-h4" style={{ margin: 0 }}>{PLAN_COPY.capacityTitle} <SourceTag source={inputs.capacity?.resource.source} /></h2>
         <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{PLAN_COPY.capacityHint}</p>
         <div className="grid grid-cols-2 gap-2">

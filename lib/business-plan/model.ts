@@ -180,8 +180,12 @@ export type Gap =
   | { kind: 'price'; offer: string; title: string }
   | { kind: 'cost'; offer: string; title: string }
   | { kind: 'minutes'; offer: string; title: string }
+  /** How many sell a month — only asked when the plan cannot tell demand from fine without it (engine.ts). */
+  | { kind: 'units'; offer: string; title: string }
   | { kind: 'capacity' }
   | { kind: 'goal' }
+  /** Nothing to sell in the plan yet. */
+  | { kind: 'offers' }
 
 /** The offers the plan counts (retired ones are kept, not counted). */
 export function activeOffers(inputs: BusinessInputs): OfferInput[] {
@@ -191,6 +195,7 @@ export function activeOffers(inputs: BusinessInputs): OfferInput[] {
 export function gapsOf(inputs: BusinessInputs): Gap[] {
   const gaps: Gap[] = []
   const active = activeOffers(inputs)
+  if (!active.length) gaps.push({ kind: 'offers' })
   if (!inputs.goal_cents) gaps.push({ kind: 'goal' })
   for (const o of active) {
     if (!o.price_cents) gaps.push({ kind: 'price', offer: o.key, title: o.title })

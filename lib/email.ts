@@ -14,6 +14,8 @@ import { isRenderableArtworkUrl, isImageLikeArtworkUrl } from '@/lib/personaliza
 import { formatRentalBookingLines, type RentalBookingLike } from '@/lib/rental-booking'
 import { NUDGE_COPY, NUDGE_STEP_COPY } from '@/lib/prompt-to-shop/copy'
 import type { NudgeDay, NudgeStep } from '@/lib/prompt-to-shop/nudges'
+import { CHECKIN_COPY } from '@/lib/business-plan/copy'
+import type { CheckinMessage } from '@/lib/business-plan/checkin'
 import {
   resolveFoundingOperatorInvitationOutcome,
   type FoundingOperatorInvitationOutcome,
@@ -509,6 +511,24 @@ export async function sendP2sNudge(ctx: { to: string; shopName: string; step: Nu
     cta(NUDGE_COPY.cta, `${SITE}/sell/armar`),
     p(esc(NUDGE_COPY.footer)),
   ].join(''), undefined, undefined, 'es', `p2s-nudge/${ctx.draftId}/${ctx.day}`)
+}
+
+/**
+ * The monthly business check-in (business-infrastructure S3.4): last month's sales against the merchant's plan, and
+ * the plan's first move. Every figure arrives from the engine (`decideCheckin`); this only lays it out. Idempotency key
+ * = row + period, so a retried run cannot email twice for the same month.
+ */
+export async function sendBusinessCheckin(ctx: { to: string; shopName: string; rowId: string; message: CheckinMessage; nextText: string | null }): Promise<EmailSendResult> {
+  const shopName = plainLine(ctx.shopName) || 'Tu tienda'
+  const m = ctx.message
+  return sendWithResult(ctx.to, CHECKIN_COPY.subject(shopName, m.month), [
+    h1(CHECKIN_COPY.heading(m.month)),
+    p(esc(CHECKIN_COPY.sold(m.month, m.sold))),
+    p(esc(m.needed != null ? CHECKIN_COPY.versus(m.needed, m.sold) : CHECKIN_COPY.noGoal)),
+    ...(ctx.nextText ? [p(`<strong>${esc(CHECKIN_COPY.next)}</strong> ${esc(ctx.nextText)}`)] : []),
+    cta(CHECKIN_COPY.cta, `${SITE}/shop/manage/plan`),
+    p(esc(CHECKIN_COPY.footer)),
+  ].join(''), undefined, undefined, 'es', `business-checkin/${ctx.rowId}/${m.period}`)
 }
 
 /** General account welcome. Shop-specific language belongs to the claim receipt. */
