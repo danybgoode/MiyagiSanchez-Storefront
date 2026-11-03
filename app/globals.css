@@ -1505,9 +1505,16 @@ html[data-platform-theme] .platform-main-shell::before {
   opacity: 1;
 }
 
-.platform-main-shell > :not(.platform-theme-spot) {
-  position: relative;
-  z-index: 1;
+/* Lifts page content above the ::before pattern. It lives in a LAYER on purpose: unlayered, it beat Tailwind's
+   `@layer utilities`, so every direct child of the main shell that asked for `fixed` or `sticky` silently became
+   `relative`. Prompt-to-shop's «Quedármela» bar stopped sticking and its sign-up sheet rendered in page flow below the
+   button, unreachable by scrolling (business-infrastructure S1.1, 2026-11-03). In `components`, an explicit position
+   or z-index utility wins and everything else still gets this default. */
+@layer components {
+  .platform-main-shell > :not(.platform-theme-spot) {
+    position: relative;
+    z-index: 1;
+  }
 }
 
 .platform-theme-spot {

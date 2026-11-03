@@ -100,6 +100,9 @@ jobs:
         run: npx playwright test e2e/sentry-replay-build.spec.ts e2e/buyer-route-vendor-manifest.spec.ts e2e/perf-budget.spec.ts e2e/collapsible-description-native.spec.ts e2e/excerpt-panel-native.spec.ts e2e/cuenta-menu-native.spec.ts e2e/ai-agent-button-native.spec.ts --project=api --grep 'S3\.[1-4]'
       - name: In-person counter specs
         run: npx playwright test e2e/in-person-counter-cart.spec.ts e2e/in-person-s2.spec.ts e2e/in-person-s3.spec.ts e2e/in-person-s4.spec.ts --project=api
+      - name: Business infrastructure specs
+        # Pure specs (no network): they run on every push, not only on a labelled preview run.
+        run: npx playwright test e2e/p2s-keep-sheet.spec.ts e2e/tabbar-visibility.spec.ts --project=api
 
   prep:
     name: Resolve Vercel preview

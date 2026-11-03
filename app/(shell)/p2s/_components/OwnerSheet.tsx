@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import BodyPortal from '@/components/ui/BodyPortal'
 import { CHECKLIST_COPY } from '@/lib/prompt-to-shop/copy'
 
 /**
  * A bottom sheet over the kept-shop canvas (epic prompt-to-shop S4.1). Every checklist item opens one of these on
  * the canvas — never a separate form page. Same shape as the keep sheet: Escape and the backdrop close it, focus
- * goes to the close button, and the page under it stops scrolling while it is open.
+ * goes to the close button, and the page under it stops scrolling while it is open. Mounted on `document.body`
+ * (`BodyPortal`): inside the page's isolated main shell it could never cover the header and the tab bar.
  */
 export default function OwnerSheet({
   title,
@@ -36,7 +38,8 @@ export default function OwnerSheet({
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" data-testid={testId}>
+    <BodyPortal>
+    <div className="fixed inset-0 flex items-end justify-center" style={{ zIndex: 'var(--z-overlay)' }} data-testid={testId}>
       <button
         type="button"
         aria-label={CHECKLIST_COPY.close}
@@ -71,5 +74,6 @@ export default function OwnerSheet({
         {children}
       </div>
     </div>
+    </BodyPortal>
   )
 }
