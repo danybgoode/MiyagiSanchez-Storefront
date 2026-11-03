@@ -1,5 +1,6 @@
 'use client'
 
+import NumbersCard from './NumbersCard'
 import { BUSINESS_SHAPES, SHAPE_DEFAULTS, rerunShape, shapeOf } from '@/lib/business-shape'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -267,6 +268,7 @@ export default function OwnerCanvas({
           </div>
         ) : null}
       </div>
+      <NumbersCard numbers={blocks.numbers} catalog={blocks.catalog} />
     </div>
   ) : null
 

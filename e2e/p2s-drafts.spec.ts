@@ -17,6 +17,7 @@ const goodText = {
   identity: JSON.stringify({ name: 'Tamales La Abuela', tagline: 'Tamales de masa madre', description: 'Hechos a mano.', accent_color: '#8a3b12', accent_alternates: ['#1f6f5c', '#2f4b8a', '#6b2f6b'], theme_preset: 'terracota' }),
   words: JSON.stringify({ announcement: 'Pedidos con un día de anticipación.', headline: 'Como los de casa', about: 'Somos una familia poblana.' }),
   catalog: JSON.stringify({ products: [1, 2, 3, 4].map((n) => ({ title: `Tamal número ${n}`, price: 30 + n, category: 'otros' })) }),
+  numbers: JSON.stringify({ offers: [0, 1, 2, 3].map((index) => ({ index, unit_cost: 12, minutes_per_unit: 15 })), capacity: { resource: 'la olla', hours_per_month: 120 }, fixed_costs: [{ label: 'Gas', monthly: 900 }] }),
 }
 
 type Spend = { data: unknown; error: unknown }
@@ -55,12 +56,12 @@ test('a new draft streams exactly three blocks and done, each saved before it is
   expect(result.mintedDevice).toBe(true)
   expect(result.deviceId).toBe(DEVICE)
   const events = await drain(result)
-  expect(events.map((e) => e.event)).toEqual(['block', 'block', 'block', 'done'])
-  expect(events.slice(0, 3).map((e) => (e.data as BlockEvent).key)).toEqual(['identity', 'words', 'catalog'])
-  expect(events[3].data).toEqual({ draft_id: DRAFT, versions_left: 2 })
+  expect(events.map((e) => e.event)).toEqual(['block', 'block', 'block', 'block', 'done'])
+  expect(events.slice(0, 4).map((e) => (e.data as BlockEvent).key)).toEqual(['identity', 'words', 'catalog', 'numbers'])
+  expect(events[4].data).toEqual({ draft_id: DRAFT, versions_left: 2 })
   expect(trace).toEqual([
     'turnstile', 'burst', 'spend', 'create',
-    'model:identity', 'save:identity@1', 'model:words', 'save:words@1', 'model:catalog', 'save:catalog@1',
+    'model:identity', 'save:identity@1', 'model:words', 'save:words@1', 'model:catalog', 'save:catalog@1', 'model:numbers', 'save:numbers@1',
   ])
 })
 
@@ -160,13 +161,13 @@ test('a phone that hangs up mid-stream still gets every block saved', async () =
   let sent = 0
   // After the first frame the controller is closed: every later send throws, as ReadableStream does.
   await expect(result.run(() => { if (sent++ > 0) throw new TypeError('Invalid state: Controller is already closed') })).resolves.toBeUndefined()
-  expect(trace.filter((t) => t.startsWith('save:'))).toEqual(['save:identity@1', 'save:words@1', 'save:catalog@1'])
+  expect(trace.filter((t) => t.startsWith('save:'))).toEqual(['save:identity@1', 'save:words@1', 'save:catalog@1', 'save:numbers@1'])
 })
 
 test('a re-run saves under ITS version, so a superseded run cannot write into the newer one', async () => {
   const { deps, trace } = fakes({ spendAnswer: { data: { ok: true, reason: null, versions_used: 3 }, error: null } })
   await drain(await handleCreateDraft({ body: { draft_id: DRAFT, turnstile_token: 'tok' }, deviceCookie: DEVICE }, deps))
-  expect(trace.filter((t) => t.startsWith('save:'))).toEqual(['save:identity@3', 'save:words@3', 'save:catalog@3'])
+  expect(trace.filter((t) => t.startsWith('save:'))).toEqual(['save:identity@3', 'save:words@3', 'save:catalog@3', 'save:numbers@3'])
 })
 
 test('every function in the migration is revoked from anon and authenticated, not only PUBLIC', () => {

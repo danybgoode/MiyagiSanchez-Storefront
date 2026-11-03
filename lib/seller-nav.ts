@@ -44,7 +44,7 @@ const NAV_LABELS = {
     canales: 'Canales', mercadoLibre: 'Mercado Libre', importar: 'Importar catálogo',
     crecer: 'Crecer', cupones: 'Cupones', suscripciones: 'Suscripciones',
     contenido: 'Contenido', eventos: 'Eventos', sorteos: 'Sorteos',
-    analiticas: 'Analíticas', ganancias: 'Ganancias', configuracion: 'Configuración',
+    analiticas: 'Analíticas', ganancias: 'Ganancias', tuPlan: 'Tu plan', configuracion: 'Configuración',
     miTienda: 'Mi tienda',
   },
   en: {
@@ -53,7 +53,7 @@ const NAV_LABELS = {
     canales: 'Channels', mercadoLibre: 'Mercado Libre', importar: 'Import catalog',
     crecer: 'Grow', cupones: 'Coupons', suscripciones: 'Subscriptions',
     contenido: 'Content', eventos: 'Events', sorteos: 'Giveaways',
-    analiticas: 'Analytics', ganancias: 'Earnings', configuracion: 'Settings',
+    analiticas: 'Analytics', ganancias: 'Earnings', tuPlan: 'Your plan', configuracion: 'Settings',
     miTienda: 'My shop',
   },
 } as const
@@ -177,6 +177,9 @@ export const SELLER_NAV: SellerNavGroup[] = [
       // nav-side (catalog-management S5 · Story 5.1 — R13) so a seller never taps
       // into that 404 in the first place.
       { key: 'ganancias', label: 'Ganancias', href: '/shop/manage/profit', icon: 'iconoir-coins', flag: 'ops.profit_enabled' },
+      // business-infrastructure S2/S3: the shop's numbers and the plan built on them. Not flagged (WAYS-OF-WORKING:
+      // no new flags); it reads the profit ledger but works without it, naming what it could not read.
+      { key: 'plan', label: 'Tu plan', href: '/shop/manage/plan', icon: 'iconoir-stats-report' },
     ],
   },
   {

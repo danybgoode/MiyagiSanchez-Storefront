@@ -14,6 +14,7 @@
  * Pure: the reads are injected (`ReadDeps`), so the spec drives every case with fakes and no database.
  */
 
+import { coerceNumbers } from './numbers'
 import { readDeviceId } from './handler'
 import type { ExampleRow, IdentityBlock, WordsBlock } from './blocks'
 import type { DraftBlocks } from './view'
@@ -66,7 +67,7 @@ const str = (v: unknown) => typeof v === 'string'
  * Stored jsonb → typed blocks. A block that is not the shape we wrote reads as "not landed" instead of crashing the
  * page: a corrupt row must show a placeholder, never a 500.
  */
-export function coerceBlocks(row: Pick<SharedDraftRow, 'identity' | 'words' | 'catalog' | 'block_status'>): DraftBlocks {
+export function coerceBlocks(row: Pick<SharedDraftRow, 'identity' | 'words' | 'catalog' | 'block_status'> & { numbers?: unknown }): DraftBlocks {
   const i = row.identity
   const w = row.words
   const c = row.catalog
@@ -88,7 +89,8 @@ export function coerceBlocks(row: Pick<SharedDraftRow, 'identity' | 'words' | 'c
     identity,
     words,
     catalog,
-    block_status: { identity: pick('identity'), words: pick('words'), catalog: pick('catalog') },
+    numbers: coerceNumbers(row.numbers, catalog ?? []),
+    block_status: { identity: pick('identity'), words: pick('words'), catalog: pick('catalog'), numbers: pick('numbers') },
   }
 }
 

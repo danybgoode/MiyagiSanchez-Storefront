@@ -25,6 +25,7 @@ const goodIdentity = {
   accent_color: '#8a3b12', accent_alternates: ['#1f6f5c', '#2f4b8a', '#6b2f6b'], theme_preset: 'terracota',
 }
 const goodWords = { announcement: 'Pedidos por WhatsApp con un día de anticipación.', headline: 'Tamales como los de casa', about: 'Somos una familia poblana.' }
+const goodNumbers = { offers: [0, 1, 2, 3].map((index) => ({ index, unit_cost: 12, minutes_per_unit: 20 })), capacity: { resource: 'la vaporera', hours_per_month: 100 }, fixed_costs: [] }
 const goodCatalog = {
   products: [
     { title: 'Tamal verde de pollo', description: 'Salsa verde.', price: 35, category: 'otros' },
@@ -146,7 +147,7 @@ test('a thrown model call is a failed attempt, not a crash', async () => {
 
 test('each block is saved BEFORE it is sent, in identity → words → catalog order', async () => {
   const trace: string[] = []
-  const texts = { identity: goodIdentity, words: goodWords, catalog: goodCatalog }
+  const texts = { identity: goodIdentity, words: goodWords, catalog: goodCatalog, numbers: goodNumbers }
   const outcome = await generateDraft(DESCRIPTION, {
     callModel: async (req) => { trace.push(`model:${req.block}`); return { ok: true, text: JSON.stringify(texts[req.block]) } },
     saveBlock: async (e: BlockEvent) => { trace.push(`save:${e.key}`); return true },
@@ -157,12 +158,13 @@ test('each block is saved BEFORE it is sent, in identity → words → catalog o
     'model:identity', 'save:identity', 'emit:identity',
     'model:words', 'save:words', 'emit:words',
     'model:catalog', 'save:catalog', 'emit:catalog',
+    'model:numbers', 'save:numbers', 'emit:numbers',
   ])
 })
 
 test('the words prompt uses the GENERATED name, not the fallback one', async () => {
   const prompts: string[] = []
-  const texts = { identity: goodIdentity, words: goodWords, catalog: goodCatalog }
+  const texts = { identity: goodIdentity, words: goodWords, catalog: goodCatalog, numbers: goodNumbers }
   await generateDraft(DESCRIPTION, {
     callModel: async (req) => { prompts.push(req.body.contents[0].parts[0].text); return { ok: true, text: JSON.stringify(texts[req.block]) } },
     saveBlock: async () => true,

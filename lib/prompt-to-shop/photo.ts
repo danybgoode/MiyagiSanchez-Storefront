@@ -37,6 +37,7 @@
  * Pure: every effect is injected, so `e2e/p2s-photo.spec.ts` drives the order with a trace and no network.
  */
 
+import { DEFAULT_SHAPE, SHAPE_DEFAULTS, type BusinessShape } from '../business-shape'
 import { CATALOG_CATEGORY_KEYS, validateRows, type CatalogImportRow } from '../catalog-import'
 import type { CategoryKey } from '../types'
 import { P2S_LIMITS, decidePhotoSpend, photosLeft, photosLeftCopy } from './allowance'
@@ -197,7 +198,28 @@ export const PHOTO_MAX_ATTEMPTS = 2
 
 // ── Analyse ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export type OwnerLookup = { kind: 'ok'; draftId: string; sellerId: string; shopName: string | null } | { kind: 'none' } | { kind: 'unavailable' }
+export type OwnerLookup =
+  | {
+      kind: 'ok'
+      draftId: string
+      sellerId: string
+      shopName: string | null
+      /** The kept shop's business shape (business-infrastructure D1); absent on older callers = products. */
+      shape?: BusinessShape
+    }
+  | { kind: 'none' }
+  | { kind: 'unavailable' }
+
+/**
+ * The row a confirm creates, fitted to the shop (business-infrastructure D4, amended): its listing type is the SHOP's
+ * (a services shop's photo becomes a service, not a product — review finding on PR #466). The example's estimated
+ * cost is NOT written into Medusa as COGS: an AI guess stored as the product's cost would read back as measured. The
+ * product carries the example it replaced in its metadata instead (`createProduct`'s `exampleTitle`), and the business
+ * model keeps that estimate labelled «estimado» until the merchant types their own.
+ */
+export function fitRowToShop(row: CatalogImportRow, shape: BusinessShape | undefined): CatalogImportRow {
+  return { ...row, listing_type: SHAPE_DEFAULTS[shape ?? DEFAULT_SHAPE].listingType }
+}
 
 export interface AnalyzeDeps {
   /** The user's kept draft AND a Medusa seller that is the shop it became. */
@@ -436,7 +458,8 @@ export interface ConfirmDeps {
   spend: () => Promise<{ data: unknown; error: unknown }>
   /** A product this nonce already created (a `paid` retry after a create that did land). `unavailable` = could not tell. */
   findCreated: (nonce: string) => Promise<string | null | 'unavailable'>
-  createProduct: (row: CatalogImportRow, imageUrl: string, nonce: string) => Promise<{ ok: true; productId: string } | { ok: false; message: string | null }>
+  /** `exampleTitle` = the draft example this product replaces, kept on the product so the plan can carry its estimate. */
+  createProduct: (row: CatalogImportRow, imageUrl: string, nonce: string, exampleTitle: string | null) => Promise<{ ok: true; productId: string } | { ok: false; message: string | null }>
   log?: (line: Record<string, unknown>) => void
   now: () => Date
 }
@@ -543,7 +566,7 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
   // create — one Medusa draft product (bounded by CREATE_TIMEOUT_MS in photo-server.ts).
   let created: { ok: true; productId: string } | { ok: false; message: string | null }
   try {
-    created = await deps.createProduct(row, imageUrl, nonce)
+    created = await deps.createProduct(fitRowToShop(row, owner.shape), imageUrl, nonce, replace?.title ?? null)
   } catch {
     created = { ok: false, message: null }
   }

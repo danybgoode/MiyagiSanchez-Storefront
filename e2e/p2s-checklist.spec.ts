@@ -102,7 +102,7 @@ test('a kept draft whose examples were all replaced shows no examples — not a 
   expect(view.pending.catalog).toBe(false)
   expect(view.cards).toEqual([])
   // The ledger key does not leak into the block statuses.
-  expect(Object.keys(blocks.block_status).sort()).toEqual(['catalog', 'identity', 'words'])
+  expect(Object.keys(blocks.block_status).sort()).toEqual(['catalog', 'identity', 'numbers', 'words'])
   // A never-generated catalog is still pending.
   expect(draftView('d', coerceBlocks({ identity, words: null, catalog: null, block_status: {} })).pending.catalog).toBe(true)
   // Each example card carries its position, which «Cambiar por mi foto» sends with its title.

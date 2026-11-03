@@ -5,6 +5,7 @@
  * caller's Clerk token. Never `fetch()` our own `/api/sell/import`: a server-side request has no session cookie.
  */
 
+import { shapeOf } from '@/lib/business-shape'
 import 'server-only'
 import { db } from '@/lib/supabase'
 import { checkRateLimit } from '@/lib/ratelimit'
@@ -45,7 +46,7 @@ export async function resolvePhotoOwner(userId: string, clerkJwt: string): Promi
   const seller = await lookupSeller(clerkJwt)
   if (seller.state === 'unavailable') return { kind: 'unavailable' }
   if (seller.state === 'absent' || seller.seller.id !== kept.sellerId) return { kind: 'none' }
-  return { kind: 'ok', draftId: kept.id, sellerId: kept.sellerId, shopName: kept.blocks.identity?.name ?? null }
+  return { kind: 'ok', draftId: kept.id, sellerId: kept.sellerId, shopName: kept.blocks.identity?.name ?? null, shape: shapeOf(kept.blocks.identity) }
 }
 
 /** This month's photos used: a read of the ledger row. `null` when the read failed (three states, never "0"). */
@@ -233,14 +234,15 @@ export function confirmDeps(userId: string, clerkJwt: string): ConfirmDeps {
       return { data, error }
     },
     findCreated: (nonce) => findByNonce(clerkJwt, nonce),
-    createProduct: (row, imageUrl, nonce) =>
+    createProduct: (row, imageUrl, nonce, exampleTitle) =>
       createSellerProduct(
         clerkJwt,
         buildCreateBody(row, [{ url: imageUrl, alt: row.title }], {
           status: 'draft',
           // Medusa handles are globally unique: a second create for the same suggestion fails instead of duplicating.
           handle: `p2s-${nonce}`,
-          metadata: { p2s_nonce: nonce, created_via: 'p2s_photo' },
+          // `p2s_example`: the draft example this replaced — the business model carries its estimate (D4, amended).
+          metadata: { p2s_nonce: nonce, created_via: 'p2s_photo', ...(exampleTitle ? { p2s_example: exampleTitle.slice(0, 120) } : {}) },
         }),
         undefined,
         { timeoutMs: CREATE_TIMEOUT_MS },
