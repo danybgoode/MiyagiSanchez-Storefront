@@ -13,6 +13,7 @@ import { validateConfig, type StoreConfigManifest } from '../settings-import'
 import { contrastRatio } from '../platform-theme'
 import { THEME_PRESETS } from '../shop-settings/theme-presets'
 import type { CategoryKey } from '../types'
+import { DEFAULT_SHAPE, SHAPE_DEFAULTS, isBusinessShape, type BusinessShape } from '../business-shape'
 
 export const BLOCK_KEYS = ['identity', 'words', 'catalog'] as const
 export type BlockKey = (typeof BLOCK_KEYS)[number]
@@ -50,6 +51,11 @@ export interface IdentityBlock {
   /** Three more accents the canvas offers as one-tap alternates (S2.4). */
   accent_alternates: [string, string, string]
   theme_preset: string
+  /**
+   * What kind of business this is (business-infrastructure D1). Optional on the type because drafts written before
+   * shapes existed do not carry it; `shapeOf()` reads it with the `products` default. A generated identity always has it.
+   */
+  shape?: BusinessShape
 }
 
 export interface WordsBlock {
@@ -115,6 +121,9 @@ export function validateIdentity(value: unknown): BlockParse<'identity'> {
   if (!GENERATABLE_PRESETS.includes(preset)) issues.push('theme_preset desconocido')
   const state = text(value.state, 60) ?? undefined
   const city = text(value.city, 60) ?? undefined
+  // An unknown or missing shape does not fail the block: it is the default, which the canvas shows and the merchant
+  // changes in one tap. Failing it would spend a retry (and the merchant's wait) on the one field they can fix.
+  const shape: BusinessShape = isBusinessShape(value.shape) ? value.shape : DEFAULT_SHAPE
   if (issues.length) return { ok: false, issues }
 
   const identity: IdentityBlock = {
@@ -122,6 +131,7 @@ export function validateIdentity(value: unknown): BlockParse<'identity'> {
     accent_color: value.accent_color as string,
     accent_alternates: alternates as [string, string, string],
     theme_preset: preset,
+    shape,
   }
   // The platform's own validator has the last word on everything it knows how to check.
   const report = validateConfig({ profile: profileOf(identity) })
@@ -150,7 +160,7 @@ export function validateWords(value: unknown): BlockParse<'words'> {
  * drops any image the model sent: the example must show an illustration (D10), and an invented image URL is the
  * one thing `buildSetupPrompt` already forbids.
  */
-export function validateCatalog(value: unknown): BlockParse<'catalog'> {
+export function validateCatalog(value: unknown, shape: BusinessShape = DEFAULT_SHAPE): BlockParse<'catalog'> {
   const rows = isObj(value) && Array.isArray(value.products) ? value.products : Array.isArray(value) ? value : null
   if (!rows) return { ok: false, issues: ['catalog no trae products'] }
   if (rows.length < EXAMPLE_ROWS_MIN) return { ok: false, issues: [`menos de ${EXAMPLE_ROWS_MIN} productos`] }
@@ -161,7 +171,10 @@ export function validateCatalog(value: unknown): BlockParse<'catalog'> {
   }
   const unpriced = valid.filter((s) => typeof s.row.price !== 'number' || s.row.price <= 0)
   if (unpriced.length) return { ok: false, issues: ['cada ejemplo necesita un precio sugerido'] }
-  return { ok: true, data: valid.map((s) => markExample(s.row)) }
+  // The listing type is the SHAPE's, whatever the model wrote: a tutor's examples are services even if the model said
+  // "product", and a shop is one kind of business (D2).
+  const listing_type = SHAPE_DEFAULTS[shape].listingType
+  return { ok: true, data: valid.map((s) => markExample({ ...s.row, listing_type })) }
 }
 
 export function markExample(row: CatalogImportRow): ExampleRow {
@@ -172,10 +185,10 @@ export function illustrationFor(category: unknown): IllustrationKey {
   return (CATALOG_CATEGORY_KEYS as string[]).includes(category as string) ? (category as IllustrationKey) : 'otros'
 }
 
-export function validateBlock<K extends BlockKey>(key: K, value: unknown): BlockParse<K> {
+export function validateBlock<K extends BlockKey>(key: K, value: unknown, shape: BusinessShape = DEFAULT_SHAPE): BlockParse<K> {
   if (key === 'identity') return validateIdentity(value) as BlockParse<K>
   if (key === 'words') return validateWords(value) as BlockParse<K>
-  return validateCatalog(value) as BlockParse<K>
+  return validateCatalog(value, shape) as BlockParse<K>
 }
 
 /** The identity as the platform's `profile` — what S3.2 hands to `planSetupApply` on keep. */
@@ -210,7 +223,7 @@ export function fallbackName(description: string): string {
   return base.slice(0, 60)
 }
 
-export function fallbackIdentity(description: string): IdentityBlock {
+export function fallbackIdentity(description: string, shape: BusinessShape = DEFAULT_SHAPE): IdentityBlock {
   const [accent, ...alternates] = FALLBACK_ACCENTS
   return {
     name: fallbackName(description),
@@ -219,6 +232,7 @@ export function fallbackIdentity(description: string): IdentityBlock {
     accent_color: accent,
     accent_alternates: alternates as [string, string, string],
     theme_preset: 'papel',
+    shape,
   }
 }
 
@@ -230,12 +244,16 @@ export function fallbackWords(identity: Pick<IdentityBlock, 'name'>): WordsBlock
   }
 }
 
-export function fallbackCatalog(): ExampleRow[] {
-  const rows: CatalogImportRow[] = [
-    { title: 'Producto de ejemplo uno', description: 'Cambia este ejemplo por tu producto.', price: 150, category: 'otros' },
-    { title: 'Producto de ejemplo dos', description: 'Cambia este ejemplo por tu producto.', price: 250, category: 'otros' },
-    { title: 'Producto de ejemplo tres', description: 'Cambia este ejemplo por tu producto.', price: 350, category: 'otros' },
-    { title: 'Producto de ejemplo cuatro', description: 'Cambia este ejemplo por tu producto.', price: 450, category: 'otros' },
-  ]
+export function fallbackCatalog(shape: BusinessShape = DEFAULT_SHAPE): ExampleRow[] {
+  const d = SHAPE_DEFAULTS[shape]
+  const one = d.noun.one[0].toUpperCase() + d.noun.one.slice(1)
+  const ordinals = ['uno', 'dos', 'tres', 'cuatro'] as const
+  const rows: CatalogImportRow[] = ordinals.map((n, i) => ({
+    title: `${one} de ejemplo ${n}`,
+    description: `Cambia este ejemplo por tu ${d.noun.one}.`,
+    price: 150 + i * 100,
+    category: d.fallbackCategory,
+    listing_type: d.listingType,
+  }))
   return rows.map(markExample)
 }

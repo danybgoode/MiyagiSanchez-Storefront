@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { shapeOf } from '@/lib/business-shape'
 import { sellerLandingPath } from '@/lib/seller-acquisition'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
@@ -87,6 +88,7 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
         market={seller?.market ?? 'mx'}
         chooser={readChooserState((guideShop?.metadata as { settings?: CobrosSettings } | null)?.settings)}
         correosAvailable={correosAvailable}
+        shape={shapeOf(kept.blocks.identity)}
       />
     )
   }

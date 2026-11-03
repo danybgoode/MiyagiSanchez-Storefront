@@ -41,6 +41,7 @@
  * Pure: every effect is an injected dependency, so the spec drives each branch with fakes and reads the trace.
  */
 
+import { SHAPE_DEFAULTS, shapeOf } from '../business-shape'
 import type { EnsureShopResult, ShopCreateInput } from '../ensure-shop'
 import type { StoreConfigManifest } from '../settings-import'
 import { coerceBlocks } from './access'
@@ -112,11 +113,18 @@ export function shopInputFrom(identity: IdentityBlock): ShopCreateInput {
 }
 
 /**
- * The manifest a keep applies: `profile` and nothing else. Not `catalog` (the examples stay in the draft), not
- * `support` (enabling it provisions a Medusa product), not `presentation` or `policies` (nothing generated them).
+ * The manifest a keep applies: `profile`, plus «Entrega acordada» switched on for a business that meets its buyers
+ * (food, services, made-to-order, rentals — `SHAPE_DEFAULTS[shape].handDelivery`, business-infrastructure D2). Not
+ * `catalog` (the examples stay in the draft), not `support` (enabling it provisions a Medusa product), not
+ * `presentation` or `policies` (nothing generated them). The shipping key goes through the same `validateConfig` /
+ * `applyStoreConfig` path as the profile: no new write.
  */
 export function manifestFrom(identity: IdentityBlock, words: WordsBlock | null): StoreConfigManifest {
-  return { profile: profileOf(identity, words ?? undefined) }
+  const handDelivery = SHAPE_DEFAULTS[shapeOf(identity)].handDelivery
+  return {
+    profile: profileOf(identity, words ?? undefined),
+    ...(handDelivery ? { shipping: { local_pickup: true } } : {}),
+  }
 }
 
 export interface ClaimInput {

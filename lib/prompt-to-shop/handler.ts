@@ -13,6 +13,7 @@
 import { decideSpend, deviceSubject, P2S_LIMITS, type SpendDecision } from './allowance'
 import { MAX_DESCRIPTION_CHARS } from './blocks'
 import { isTone, type Tone } from './prompts'
+import { isBusinessShape, type BusinessShape } from '../business-shape'
 import { generateDraft, type BlockEvent, type ModelRequest, type ModelResult } from './planner'
 import type { TurnstileVerdict } from './turnstile'
 
@@ -79,6 +80,8 @@ export interface ParsedBody {
   turnstileToken: unknown
   /** Optional voice for the words block («Otra versión» → cercano / formal / divertido). Absent = the default. */
   tone: Tone | null
+  /** Optional business shape the merchant picked («Tipo de negocio»). Absent = the model decides. */
+  shape: BusinessShape | null
 }
 
 /** Pure. A new draft needs a description; a re-run needs a draft id and may bring a new description. */
@@ -92,7 +95,9 @@ export function parseDraftsBody(body: unknown): ParsedBody | null {
   if (!draftId && !description) return null
   // A tone is a closed enum: anything else is a malformed body, not a hint to guess at.
   if (b.tone !== undefined && b.tone !== null && !isTone(b.tone)) return null
-  return { description, draftId, turnstileToken: b.turnstile_token, tone: b.tone ?? null }
+  // Same rule for the shape: it is stated to the model outside the data tags, so only our own enum may arrive.
+  if (b.shape !== undefined && b.shape !== null && !isBusinessShape(b.shape)) return null
+  return { description, draftId, turnstileToken: b.turnstile_token, tone: b.tone ?? null, shape: b.shape ?? null }
 }
 
 export function readDeviceId(cookieValue: string | undefined | null): string | null {
@@ -174,7 +179,7 @@ export async function handleCreateDraft(
           saveBlock: (event) => deps.saveBlock(draftId, deviceId, version, event),
           emit: (event) => send('block', event),
           log: (line) => deps.log?.({ event: 'block', draft_id: draftId, ...line }),
-        }, { tone: parsed.tone ?? undefined })
+        }, { tone: parsed.tone ?? undefined, shape: parsed.shape ?? undefined })
         if (outcome.ok) send('done', { draft_id: draftId, versions_left: versionsLeft })
         else send('error', { message: P2S_COPY.unavailable, block: outcome.failedBlock })
       } catch (e) {

@@ -28,6 +28,7 @@ export default function CobrosChooser({
   market,
   initial,
   correosAvailable,
+  ships = true,
   draftId,
   onSaved,
 }: {
@@ -36,6 +37,11 @@ export default function CobrosChooser({
   initial: ChooserState
   /** The platform's Correos switch (`shipping.correos_enabled`), read on the server. */
   correosAvailable: boolean
+  /**
+   * Whether this kind of business sends parcels at all (`SHAPE_DEFAULTS[shape].ships`, business-infrastructure D2).
+   * When false, Correos is not offered — unless it is already on, so the merchant can still switch it off here.
+   */
+  ships?: boolean
   /** The kept draft, for the funnel. */
   draftId: string | null
   onSaved?: () => void
@@ -177,6 +183,7 @@ export default function CobrosChooser({
           <Toggle on={state.handDelivery} busy={busy === 'hand'} disabled={!!busy} onToggle={(v) => void save('hand', handDeliveryPatch(v), { handDelivery: v })} />
         </Choice>
 
+        {ships || state.correos ? (
         <Choice mark={<i className="iconoir-mail" aria-hidden="true" style={{ fontSize: 22 }} />} name={COBROS_COPY.correosName} lead={COBROS_COPY.correosLead} on={state.correos && correosAvailable && state.hasOrigin} testId="p2s-choice-correos">
           {!correosAvailable ? (
             <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COBROS_COPY.correosUnavailable}</p>
@@ -192,6 +199,7 @@ export default function CobrosChooser({
             </>
           )}
         </Choice>
+        ) : null}
 
         {manualCarrier ? (
           <Choice mark={<i className="iconoir-delivery-truck" aria-hidden="true" style={{ fontSize: 22 }} />} name={COBROS_COPY.manualCarrierName} lead={COBROS_COPY.manualCarrierLead} on testId="p2s-choice-manual-carrier" />
