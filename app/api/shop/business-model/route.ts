@@ -25,6 +25,10 @@ const COPY = {
 const fail = (status: number, code: keyof typeof COPY) => NextResponse.json({ error: COPY[code], code }, { status })
 
 export async function POST(req: NextRequest) {
+  // JSON only. A cross-site <form> can only send form encodings or text/plain, and a cross-origin JSON fetch needs a
+  // preflight this route never grants: with the Clerk session cookie (SameSite=Lax) and the `updated_at` precondition,
+  // this closes the forged-edit path the security pass raised on PR #467 (defence in depth, not the only guard).
+  if (!(req.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return fail(415, 'invalid')
   const edit = parsePlanEdit(await req.json().catch(() => null))
   if (!edit) return fail(400, 'invalid')
 

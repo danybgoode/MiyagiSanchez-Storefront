@@ -12,6 +12,8 @@ import {
 import { productsFrom, salesFrom, windowMonths } from '../lib/business-plan/sales'
 import { applyPlanEdit, parsePlanEdit } from '../lib/business-plan/edit'
 import type { ProfitEvent, ProfitOrderInfo } from '../lib/profit'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 // business-infrastructure S2.1 + S2.3 — one business model per shop, every input with its source (epic D6, D7, D11).
 
@@ -270,4 +272,12 @@ test('re-sending a section does not launder estimates: only what changed becomes
   expect(next.fixed_costs[1].monthly_cents).toMatchObject({ value: 45000, source: 'told' })
   expect(next.capacity?.resource.source).toBe('estimated')
   expect(next.capacity?.hours_per_month).toMatchObject({ value: 100, source: 'told' })
+})
+
+test('the edit route: JSON only, seller from the caller\'s own token, conditional write — in that order', () => {
+  const src = readFileSync(join(process.cwd(), 'app/api/shop/business-model/route.ts'), 'utf8')
+  const order = ["startsWith('application/json')", 'parsePlanEdit(', 'await auth()', 'await getMySeller()', 'readModel(seller.id)', 'row.updated_at !== edit.updated_at', 'writeInputs(row, next)']
+  const at = order.map((s) => src.indexOf(s))
+  expect(at.every((i) => i > -1)).toBe(true)
+  expect([...at].sort((a, b) => a - b)).toEqual(at)
 })
