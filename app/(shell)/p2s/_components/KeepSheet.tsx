@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } fro
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
+import BodyPortal from '@/components/ui/BodyPortal'
 import LazySignUp from '@/app/components/clerk-lazy/LazySignUp'
 import { mailDraftLink } from '@/lib/prompt-to-shop/client'
 import { KEEP_COPY } from '@/lib/prompt-to-shop/copy'
@@ -137,7 +138,8 @@ export default function KeepSheet({
       </div>
 
       {open && !signedIn ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" data-testid="p2s-keep-sheet">
+        <BodyPortal>
+        <div className="fixed inset-0 flex items-end justify-center" style={{ zIndex: 'var(--z-overlay)' }} data-testid="p2s-keep-sheet">
           <button
             type="button"
             aria-label={KEEP_COPY.close}
@@ -180,6 +182,7 @@ export default function KeepSheet({
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--s-3, 12px)' }}>{mailForm}</div>
           </div>
         </div>
+        </BodyPortal>
       ) : null}
     </>
   )
