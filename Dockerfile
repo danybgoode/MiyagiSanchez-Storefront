@@ -1,6 +1,6 @@
 # MiyagiSanchez-Storefront (Next.js 16) — the standalone production image, built as
 # ghcr.io/danybgoode/miyagisanchez-storefront by .github/workflows/image-arm64.yml and run on the Oracle VM.
-# Build context is this directory (apps/miyagisanchez), NOT the monorepo root:
+# Build context is this directory (apps/storefront), NOT the monorepo root:
 #   docker build -t ghcr.io/danybgoode/miyagisanchez-storefront:local .
 #
 # `output: 'standalone'` (next.config.ts) traces the deps each route actually

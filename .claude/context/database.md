@@ -4,7 +4,7 @@
 
 **Medusa Postgres** (`apps/backend`) — commerce data: products, vendors, carts, orders, payments, fulfillment, returns, subscriptions. Access via Medusa Store API or Admin API. Never query this directly from the frontend.
 
-**Supabase** (`apps/miyagisanchez`) — non-commerce marketplace data that Medusa has no concept of. The tables below are ALL that should be in Supabase.
+**Supabase** (`apps/storefront`) — non-commerce marketplace data that Medusa has no concept of. The tables below are ALL that should be in Supabase.
 
 ---
 
