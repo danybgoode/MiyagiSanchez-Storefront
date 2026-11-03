@@ -1,5 +1,6 @@
 'use client'
 
+import BodyPortal from '@/components/ui/BodyPortal'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
@@ -70,7 +71,8 @@ export default function TakingShape({
   const view = draftView(draftId ?? 'nuevo', blocks)
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto" style={{ background: 'var(--bg)' }} data-testid="p2s-taking-shape">
+    <BodyPortal>
+    <div className="fixed inset-0 overflow-y-auto" style={{ zIndex: 'var(--z-overlay)', background: 'var(--bg)' }} data-testid="p2s-taking-shape">
       <div className="max-w-2xl mx-auto px-4 pt-6 pb-4">
         <h2 className="t-h3" style={{ letterSpacing: 0, marginBottom: 'var(--s-3)' }}>{SHAPING_COPY.title}</h2>
         <ul role="status" aria-live="polite" className="grid gap-1.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -96,5 +98,6 @@ export default function TakingShape({
       </div>
       <ShopCanvas view={view} mode="shaping" />
     </div>
+    </BodyPortal>
   )
 }

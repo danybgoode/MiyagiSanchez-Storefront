@@ -94,7 +94,7 @@ export function isBottomTabActive(key: BottomTabKey, pathname: string): boolean 
  * conversation, and the publish wizard.
  *
  * Detail routes only — the `/l` and `/messages` *index* pages keep the bar.
- *   true  → /l/<id>, /checkout[...], /messages/<id>, /sell[...]
+ *   true  → /l/<id>, /checkout[...], /messages/<id>, /sell[...], /p2s[...]
  *   false → /l, /l?…, /messages, /, /account, …
  *
  * `/l` is one of the market-cutover's prefixed families (`lib/market-url.ts` —
@@ -115,6 +115,9 @@ export function shouldHideTabBar(pathname: string): boolean {
   // Whole-section flows: the base or anything under it.
   if (path === '/checkout' || path.startsWith('/checkout/')) return true
   if (path === '/sell' || path.startsWith('/sell/')) return true
+  // Prompt-to-shop's canvas keeps «Quedármela» in a bar stuck to the bottom of the screen; the installed app's tab bar
+  // (fixed, z 100) would sit on top of it (business-infrastructure S1.1 review).
+  if (path === '/p2s' || path.startsWith('/p2s/')) return true
   return false
 }
 

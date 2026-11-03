@@ -17,6 +17,9 @@ test.describe('tabbar · shouldHideTabBar', () => {
     expect(shouldHideTabBar('/messages/conv_42')).toBe(true) // open conversation
     expect(shouldHideTabBar('/sell')).toBe(true)
     expect(shouldHideTabBar('/sell/edit')).toBe(true)
+    // Prompt-to-shop's canvas: its keep bar is stuck to the bottom of the screen (business-infrastructure S1.1).
+    expect(shouldHideTabBar('/p2s/7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607')).toBe(true)
+    expect(shouldHideTabBar('/p2sx')).toBe(false)
   })
 
   test('stays visible on index routes and the rest of the app', () => {

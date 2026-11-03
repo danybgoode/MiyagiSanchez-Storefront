@@ -18,7 +18,7 @@ const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '')
 
 /** The `@layer` name enclosing `index` in `css`, or null when the position is unlayered. Brace-counting is enough for
  *  this file: it has no braces inside strings. */
-export function enclosingLayer(css: string, index: number): string | null {
+function enclosingLayer(css: string, index: number): string | null {
   const stack: Array<string | null> = []
   const re = /(@layer\s+([\w-]+)\s*\{)|(\{)|(\})/g
   let m: RegExpExecArray | null
@@ -33,7 +33,9 @@ export function enclosingLayer(css: string, index: number): string | null {
 
 test('every rule that positions the main shell\'s children is layered, so position utilities win', () => {
   const css = stripComments(read('app/globals.css'))
-  const rule = /\.platform-main-shell\s*>[^{]*\{[^}]*\bposition\s*:/g
+  // `position` OR `z-index`: an unlayered z-index on these children would silently override every `z-*` utility the
+  // same way the position did.
+  const rule = /\.platform-main-shell\s*>[^{]*\{[^}]*\b(?:position|z-index)\s*:/g
   const hits = [...css.matchAll(rule)]
   // Guard the population, not the one rule we found: any such rule, now or later, must sit in a layer below utilities.
   expect(hits.length).toBeGreaterThan(0)
@@ -50,12 +52,12 @@ test('the layer helper tells layered from unlayered', () => {
   expect(enclosingLayer(css, css.indexOf('.d'))).toBeNull()
 })
 
-for (const file of ['app/(shell)/p2s/_components/KeepSheet.tsx', 'app/(shell)/p2s/_components/OwnerSheet.tsx']) {
+for (const file of ['app/(shell)/p2s/_components/KeepSheet.tsx', 'app/(shell)/p2s/_components/OwnerSheet.tsx', 'app/(shell)/p2s/_components/TakingShape.tsx']) {
   test(`${file.split('/').pop()} mounts its overlay on document.body, above the isolated main shell`, () => {
     const src = read(file)
     expect(src).toMatch(/import BodyPortal from '@\/components\/ui\/BodyPortal'/)
     // The fixed overlay is the portal's first child, and it asks for the overlay z-index, not a page-local one.
-    expect(src).toMatch(/<BodyPortal>\s*<div className="fixed inset-0[^"]*"\s+style=\{\{ zIndex: 'var\(--z-overlay\)' \}\}/)
+    expect(src).toMatch(/<BodyPortal>\s*<div className="fixed inset-0[^"]*"\s+style=\{\{ zIndex: 'var\(--z-overlay\)'/)
   })
 }
 
