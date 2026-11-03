@@ -9,7 +9,7 @@ A catalog-population pipeline for **miyagisanchez.com** — a Mexican marketplac
 ## Repo location
 
 ```
-/Users/cosmo/dobby/medusa-bonsai/apps/miyagisanchez/
+/Users/cosmo/dobby/miyagisanchez-product/apps/storefront/
 ```
 
 Key files:

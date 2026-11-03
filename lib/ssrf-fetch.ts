@@ -29,7 +29,7 @@
  * epic, only a TRANSITIVE dependency of this package — hoisted from the
  * workspace root's node_modules (currently resolving to whatever version a
  * sibling package happens to need). Node 22 (the deployed Cloud Run image's
- * runtime, apps/miyagisanchez PR 289) has its OWN bundled `undici` backing
+ * runtime, apps/storefront PR 289) has its OWN bundled `undici` backing
  * the global `fetch`, which is a different major than the hoisted one — so a
  * dispatcher built from a directly-imported `Agent` could silently mismatch
  * the dispatcher type the global `fetch` expects. Adding `undici` as a

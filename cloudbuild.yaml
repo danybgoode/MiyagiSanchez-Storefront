@@ -1,7 +1,7 @@
 # CI/CD: build the Next.js frontend image and deploy to Cloud Run on every
 # push to main. Wired via a Cloud Build trigger on the miyagisanchezcommerce
 # repo (see infra/gcp/cicd-setup-frontend.sh). Build context is this repo
-# root (= apps/miyagisanchez). Cloned from apps/backend/cloudbuild.yaml's shape.
+# root (= apps/storefront). Cloned from apps/backend/cloudbuild.yaml's shape.
 #
 # The deploy step only swaps the image — env vars, secrets, SA and scaling
 # were set once by infra/gcp/deploy-frontend.sh and Cloud Run preserves them
