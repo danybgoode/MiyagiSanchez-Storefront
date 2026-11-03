@@ -66,7 +66,7 @@ export const SUMMARY_COPY = {
   },
   move: (m: Move, pesos: (cents: number) => string): { title: string; action: string } => {
     switch (m.kind) {
-      case 'reprice': return { title: `Sube «${m.title}» de ${pesos(m.from_cents)} a ${pesos(m.to_cents)} (+${pesos(m.gain_per_unit_cents)} por pieza)`, action: 'Revisar precio' }
+      case 'reprice': return { title: `Sube «${m.title}» de ${pesos(m.from_cents)} a ${pesos(m.to_cents)} (+${pesos(m.gain_per_unit_cents)} por pieza, antes de comisiones)`, action: 'Cambiar precio' }
       case 'pause': return { title: `Pausa «${m.title}»: cada venta te cuesta ${pesos(m.loss_per_unit_cents)}`, action: 'Abrir producto' }
       case 'push': return { title: m.per_hour_cents != null ? `Empuja «${m.title}»: ${pesos(m.per_hour_cents)} por hora de tu límite` : `Empuja «${m.title}»: ${pesos(m.contribution_cents)} por venta`, action: 'Compartir' }
       case 'grow_demand': return { title: `Consigue ${m.extra_units} ventas más al mes`, action: 'Compartir catálogo' }

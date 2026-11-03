@@ -23,6 +23,7 @@
  *   get_shop              Seller profile + their listings
  */
 
+import { readShopFresh } from '@/lib/listings'
 import { readInputs as readBusinessInputs } from '@/lib/business-plan/model'
 import { computePlan as computeBusinessPlan } from '@/lib/business-plan/engine'
 import { explainTemplate as explainPlanTemplate } from '@/lib/business-plan/explain'
@@ -2844,14 +2845,20 @@ async function handleGetShareKit(args: Record<string, unknown>, authHeader?: str
 async function handleGetBusinessPlan(args: Record<string, unknown>, authHeader?: string | null) {
   const agentAuth = await resolveToolShop(authHeader, args, 'get_business_plan')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
+  // The model is keyed by the MEDUSA seller id; the token resolves the marketplace shop, so the seller is looked up by
+  // the shop's own slug, and the row must also belong to the shop's owner (PR #468 review: slugs change, owners may
+  // hold more than one shop — never fall back to "the only row").
+  const read = agentAuth.shop.slug ? await readShopFresh(agentAuth.shop.slug) : null
+  const sellerId = read?.state === 'resolved' ? read.shop.id : null
+  if (!sellerId) return { isError: true, content: [{ type: 'text', text: 'No pudimos leer el plan ahora. Inténtalo de nuevo.' }] }
   const { data, error } = await db
     .from('business_models')
     .select('inputs, shop_slug, updated_at')
+    .eq('seller_id', sellerId)
     .eq('clerk_user_id', agentAuth.shop.clerk_user_id)
-    .order('updated_at', { ascending: false })
+    .maybeSingle()
   if (error) return { isError: true, content: [{ type: 'text', text: 'No pudimos leer el plan ahora. Inténtalo de nuevo.' }] }
-  const rows = (data ?? []) as Array<{ inputs: unknown; shop_slug: string | null; updated_at: string }>
-  const row = rows.find((r) => r.shop_slug === agentAuth.shop.slug) ?? (rows.length === 1 ? rows[0] : null)
+  const row = data as { inputs: unknown; shop_slug: string | null; updated_at: string } | null
   if (!row) {
     return { content: [{ type: 'text', text: 'Esta tienda aún no tiene plan. La persona dueña lo abre en https://miyagisanchez.com/shop/manage/plan y desde ahí se arma.' }] }
   }

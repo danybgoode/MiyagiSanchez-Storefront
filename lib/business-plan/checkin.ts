@@ -30,8 +30,12 @@ export function monthName(period: string): string {
   return MONTHS_ES[Number(period.slice(5, 7)) - 1] ?? period
 }
 
-/** MXN units sold in `period` (revenue events, a line counted once). */
-export function unitsInPeriod(events: ProfitEvent[], orders: ProfitOrderInfo[], period: string): number {
+/**
+ * MXN units sold in `period` (revenue events, a line counted once). `null` = the ledger is INCOMPLETE: an in-period
+ * revenue event whose order line is missing (the backend degrades to `orders: []` when its enrichment fails). That is
+ * "could not tell", never zero — a confident "you sold 0" would be emailed and the month claimed (PR #468 review).
+ */
+export function unitsInPeriod(events: ProfitEvent[], orders: ProfitOrderInfo[], period: string): number | null {
   const qty = new Map<string, number>()
   for (const o of orders) for (const it of o.items) if (typeof it.quantity === 'number' && it.quantity > 0) qty.set(it.id, it.quantity)
   const counted = new Set<string>()
@@ -40,7 +44,7 @@ export function unitsInPeriod(events: ProfitEvent[], orders: ProfitOrderInfo[], 
     if (e.event_type !== 'revenue' || !e.order_line_id || (e.currency_code ?? '').toLowerCase() !== 'mxn') continue
     if (!e.captured_at.startsWith(period) || counted.has(e.order_line_id)) continue
     const q = qty.get(e.order_line_id)
-    if (!q) continue
+    if (!q) return null
     counted.add(e.order_line_id)
     units += q
   }
@@ -120,12 +124,16 @@ export async function runCheckinCron(
   const rows = await deps.readRows()
   if (!rows) return { status: 503, body: { ok: false, error: 'unavailable' } }
 
-  let sent = 0, skipped = 0, unavailable = 0, failed = 0
+  let sent = 0, skipped = 0, unavailable = 0, failed = 0, read = 0
   for (const row of rows) {
     if (row.last_checkin_period === period) { skipped += 1; continue }
+    // A shop with nothing in its plan is skipped before any read: no network call, no false "unavailable".
+    if (!activeOffers(readInputs(row.inputs)).length) { skipped += 1; continue }
     const ledger = await deps.readLedger(row.seller_id)
-    if (!ledger) { unavailable += 1; continue }
-    const decision = decideCheckin(row, unitsInPeriod(ledger.events, ledger.orders, period), now)
+    const units = ledger ? unitsInPeriod(ledger.events, ledger.orders, period) : null
+    if (units === null) { unavailable += 1; continue }
+    read += 1
+    const decision = decideCheckin(row, units, now)
     if (decision.kind === 'skip') { skipped += 1; continue }
     if (!(await deps.claim(row.id, period))) { skipped += 1; continue }
     try {
@@ -137,6 +145,11 @@ export async function runCheckinCron(
       failed += 1
       deps.log?.({ event: 'checkin_send_failed', row: row.id, error: e instanceof Error ? e.message : String(e) })
     }
+  }
+  // Every merchant it should have written to could not be read: a run that could not look is a 503 in the timer's
+  // log, never a green day that sent nothing (AGENTS rule 5; PR #468 review — an unset internal secret looks like this).
+  if (unavailable > 0 && read === 0) {
+    return { status: 503, body: { ok: false, error: 'unavailable' } }
   }
   return { status: 200, body: { ok: true, period, sent, skipped, unavailable, failed } }
 }

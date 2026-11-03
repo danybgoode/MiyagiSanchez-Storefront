@@ -23,10 +23,14 @@ export function allowedNumbers(plan: Plan): Set<string> {
   const out = new Set<string>()
   const add = (n: number | null | undefined) => { if (n != null && Number.isFinite(n)) out.add(String(Math.round(n))) }
   const addCents = (c: number | null | undefined) => { if (c != null) add(c / 100) }
-  addCents(plan.fixed_cents); addCents(plan.goal_cents); addCents(plan.avg_contribution_cents); addCents(plan.current_profit_cents)
+  addCents(plan.fixed_cents); addCents(plan.goal_cents); addCents(plan.current_profit_cents)
+  // Signed figures are WRITTEN unsigned ("te cuesta $60"); `numbersIn` never captures a minus (PR #468 review).
+  if (plan.avg_contribution_cents != null) addCents(Math.abs(plan.avg_contribution_cents))
   if (plan.current_profit_cents != null) addCents(Math.abs(plan.current_profit_cents))
   add(plan.breakeven_units); add(plan.needed_units); add(plan.capacity_units); add(plan.current_units)
   for (const o of plan.offers) {
+    // A title can carry digits ("Pastel 2 kg"); repeating the title is not inventing a figure.
+    for (const n of numbersIn(o.title)) out.add(n)
     addCents(o.price_cents); addCents(o.cost_cents); addCents(o.contribution_cents); addCents(o.contribution_per_hour_cents)
     add(o.minutes); add(o.units_per_month)
     if (o.margin_pct != null) add(o.margin_pct * 100)
@@ -45,9 +49,10 @@ export function allowedNumbers(plan: Plan): Set<string> {
 
 /** The numbers a text contains, normalised: thousands separators and currency signs removed, decimals rounded. */
 export function numbersIn(text: string): string[] {
-  const found = text.match(/\d[\d,.\s]*\d|\d/g) ?? []
+  // Separators only BETWEEN digit groups of three ("15,000"), never a list ("12, 15 y 20" is three numbers).
+  const found = text.match(/\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?/g) ?? []
   return found.map((raw) => {
-    const t = raw.replace(/\s/g, '')
+    const t = raw
     // "15,000" / "15.000" thousands vs "12.5" decimals: a separator followed by exactly 3 digits is a thousands mark.
     const normalised = /^\d{1,3}([.,]\d{3})+$/.test(t) ? t.replace(/[.,]/g, '') : t.replace(/,/g, '')
     const n = Number(normalised)
@@ -65,7 +70,7 @@ export function guardExplanation(text: unknown, plan: Plan): string | null {
 
 export function moveSentence(m: Move): string {
   switch (m.kind) {
-    case 'reprice': return `Sube «${m.title}» de ${pesos(m.from_cents)} a ${pesos(m.to_cents)}: ganas ${pesos(m.gain_per_unit_cents)} más por pieza.`
+    case 'reprice': return `Sube «${m.title}» de ${pesos(m.from_cents)} a ${pesos(m.to_cents)} (antes de comisiones): ganas ${pesos(m.gain_per_unit_cents)} más por pieza.`
     case 'pause': return `Pausa «${m.title}»: cada venta te cuesta ${pesos(m.loss_per_unit_cents)}.`
     case 'push': return m.per_hour_cents != null
       ? `Empuja «${m.title}»: te deja ${pesos(m.per_hour_cents)} por hora de tu límite.`
@@ -80,7 +85,9 @@ export function explainTemplate(plan: Plan): string {
   const parts: string[] = []
   const c = plan.constraint
   if (c.kind === 'inputs') parts.push('Aún no podemos decirte cuánto vender: falta un número.')
-  else if (c.kind === 'losing') parts.push(`Hoy, en promedio, cada venta te cuesta ${pesos(-c.avg_contribution_cents)}: vender más no ayuda hasta cambiar precios o costos.`)
+  else if (c.kind === 'losing') parts.push(c.avg_contribution_cents === 0
+    ? 'Hoy, en promedio, cada venta no te deja nada: vender más no ayuda hasta cambiar precios o costos.'
+    : `Hoy, en promedio, cada venta te cuesta ${pesos(Math.abs(c.avg_contribution_cents))}: vender más no ayuda hasta cambiar precios o costos.`)
   else {
     if (plan.goal_cents != null && plan.needed_units != null) parts.push(`Para ganar ${pesos(plan.goal_cents)} al mes necesitas unas ${plan.needed_units} ventas.`)
     if (plan.breakeven_units != null && plan.fixed_cents > 0) parts.push(`Con ${plan.breakeven_units} cubres tus costos fijos.`)

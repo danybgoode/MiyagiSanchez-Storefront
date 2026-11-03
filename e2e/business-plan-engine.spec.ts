@@ -67,7 +67,7 @@ test('the CAPACITY constraint: push what earns most per HOUR, reprice thin margi
   const reprice = plan.moves.find((m) => m.kind === 'reprice')!
   // the price comes from the Profit Analyzer's own solver, never a second formula
   const solved = solveForPrice({ cogsCents: 1400, shippingCents: 0, fixedFeeCents: 0, feePct: 0, targetMarginPct: PLAN_TARGET_MARGIN_PCT })
-  expect(reprice).toMatchObject({ offer: 'p:tamal', from_cents: 2000, to_cents: solved.achievable ? solved.priceCents : -1, href: '/shop/manage/profit' })
+  expect(reprice).toMatchObject({ offer: 'p:tamal', from_cents: 2000, to_cents: solved.achievable ? solved.priceCents : -1, href: '/sell/edit/tamal' })
   // the push is the best earner PER HOUR (plates: $171/h vs tamal at $72/h)
   expect(plan.moves.find((m) => m.kind === 'push')).toMatchObject({ offer: 'p:plato' })
   expect(plan.moves.length).toBeLessThanOrEqual(3)
@@ -94,7 +94,7 @@ test('missing inputs are NAMED, never guessed: no costs, no goal, no sales', () 
   expect(noGoal.constraint).toEqual({ kind: 'inputs', gap: { kind: 'goal' } })
   expect(noGoal.breakeven_units).not.toBeNull()
 
-  const noSales = computePlan(cook({ offers: cook().offers.map(({ units_per_month: _u, ...o }) => o) }))
+  const noSales = computePlan(cook({ offers: cook().offers.map((o) => ({ ...o, units_per_month: undefined })) }))
   expect(noSales.current_units).toBeNull()
   expect(noSales.constraint).toMatchObject({ kind: 'inputs', gap: { kind: 'units' } })
 
@@ -141,4 +141,47 @@ test('under a capacity limit the push is the best earner per HOUR, not per sale 
   }))
   expect(plan.constraint.kind).toBe('capacity')
   expect(plan.moves.find((m) => m.kind === 'push')).toMatchObject({ offer: 'p:plato' })
+})
+
+test('capacity is COMPARED before anything is said about it: a missing time names the gap, never "your limit is enough"', () => {
+  const plan = computePlan(cook({ offers: [cook().offers[0], { ...cook().offers[1], minutes_per_unit: undefined }] }))
+  expect(plan.capacity_units).toBeNull()
+  expect(plan.constraint).toMatchObject({ kind: 'inputs', gap: { kind: 'minutes', offer: 'p:tamal' } })
+  expect(explainTemplate(plan)).not.toContain('Tu límite alcanza')
+  const noCapacity = computePlan(cook({ capacity: undefined }))
+  expect(noCapacity.constraint).toEqual({ kind: 'inputs', gap: { kind: 'capacity' } })
+})
+
+test('an EXAMPLE is never repriced; a product\'s reprice opens its own editor, before fees', () => {
+  const plan = computePlan(cook({
+    capacity: { resource: { value: 'la estufa', source: 'told', at: AT }, hours_per_month: told(1) },
+    offers: [{ key: 'ex:0', title: 'Ejemplo', price_cents: told(2000), unit_cost_cents: told(1900), minutes_per_unit: told(10), units_per_month: told(5) }],
+  }))
+  expect(plan.moves.some((m) => m.kind === 'reprice')).toBe(false)
+  expect(explainTemplate(computePlan(cook({ capacity: { resource: { value: 'x', source: 'told', at: AT }, hours_per_month: told(10) }, offers: [{ ...cook().offers[1], price_cents: told(2000), units_per_month: told(30) }, cook().offers[0]] })))).toContain('antes de comisiones')
+})
+
+test('the guard: a losing plan\'s unsigned loss, digits in a title and a plain list are not invented figures', () => {
+  const losing = computePlan(cook({ offers: [{ key: 'p:m', title: 'Pastel 2 kg', price_cents: told(20000), unit_cost_cents: told(26000), minutes_per_unit: told(60), units_per_month: told(10) }] }))
+  const t = explainTemplate(losing)
+  expect(t).toContain('te cuesta $60')
+  expect(guardExplanation(t, losing)).toBe(t)
+  expect(guardExplanation('Tu «Pastel 2 kg» te cuesta $60 por venta.', losing)).not.toBeNull()
+  expect(numbersIn('vendes 12, 15 y 20')).toEqual(['12', '15', '20'])
+  const zero = computePlan(cook({ offers: [{ key: 'p:z', title: 'Z', price_cents: told(1000), unit_cost_cents: told(1000), minutes_per_unit: told(5), units_per_month: told(3) }] }))
+  expect(explainTemplate(zero)).not.toContain('$-0')
+})
+
+test('a losing plan: the AVERAGE loss (not any one product\'s) is written unsigned and passes the guard', () => {
+  const plan = computePlan(cook({
+    offers: [
+      { key: 'p:a', title: 'A', price_cents: told(10000), unit_cost_cents: told(16000), minutes_per_unit: told(30), units_per_month: told(10) },
+      { key: 'p:b', title: 'B', price_cents: told(10000), unit_cost_cents: told(12000), minutes_per_unit: told(30), units_per_month: told(10) },
+    ],
+  }))
+  // losses of $60 and $20, equal volume → the average sale loses $40, which no single move or offer states
+  expect(plan.constraint).toEqual({ kind: 'losing', avg_contribution_cents: -4000 })
+  const t = explainTemplate(plan)
+  expect(t).toContain('te cuesta $40')
+  expect(guardExplanation(t, plan)).toBe(t)
 })

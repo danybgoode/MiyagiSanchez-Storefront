@@ -100,3 +100,27 @@ test('wiring: a registered message, a header-only secret, a daily timer, the int
   expect(server).toContain('/internal/profit/ledger?seller_id=')
   expect(server).toContain(".or(`last_checkin_period.is.null,last_checkin_period.neq.${period}`)")
 })
+
+test('an INCOMPLETE ledger (revenue with no order line) is "could not tell" — never a confident zero, never claimed', async () => {
+  expect(unitsInPeriod([ev('l9', '2026-10-05T00:00:00Z')], [], '2026-10')).toBeNull()
+  expect(unitsInPeriod([], [], '2026-10')).toBe(0)
+  const { deps, trace } = fakes({ readRows: async () => [row()], readLedger: async () => ({ events: [ev('l9', '2026-10-05T00:00:00Z')], orders: [] }) })
+  const r = await runCheckinCron({ authorised: true }, deps)
+  // every merchant it should have read was unreadable → the run is a 503, and nothing was claimed
+  expect(r).toEqual({ status: 503, body: { ok: false, error: 'unavailable' } })
+  expect(trace.some((t) => t.startsWith('claim:'))).toBe(false)
+})
+
+test('a shop with nothing in its plan is skipped BEFORE any ledger read', async () => {
+  const { deps, trace } = fakes({ readRows: async () => [row({ inputs: { offers: [], fixed_costs: [] } })] })
+  expect((await runCheckinCron({ authorised: true }, deps)).body).toMatchObject({ skipped: 1, sent: 0 })
+  // no ledger read, no claim, no send
+  expect(trace).toEqual([])
+})
+
+test('the server surfaces the email\'s own result (dispatch swallows channel errors), and only reads rows still due', () => {
+  const server = readFileSync(join(process.cwd(), 'lib/business-plan/checkin-server.ts'), 'utf8')
+  expect(server).toContain('if (!r.ok) emailFailed = r.reason')
+  expect(server).toContain('if (emailFailed) throw new Error(`email ${emailFailed}`)')
+  expect(server).toMatch(/readRows: async \(\) => \{[\s\S]*last_checkin_period\.is\.null,last_checkin_period\.neq\./)
+})

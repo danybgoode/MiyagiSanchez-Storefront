@@ -47,7 +47,7 @@ export default function PlanSummary({ plan, explanation }: { plan: Plan; explana
         <div className="grid gap-1">
           <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{SUMMARY_COPY.movesLead}</p>
           <ul className="grid gap-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {plan.moves.map((m, i) => <MoveRow key={i} move={m} />)}
+            {plan.moves.map((m) => <MoveRow key={`${m.kind}:${'offer' in m ? m.offer : ''}`} move={m} />)}
           </ul>
         </div>
       ) : null}

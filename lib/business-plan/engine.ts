@@ -155,13 +155,15 @@ function decideConstraint(p: {
   if (p.avg_contribution_cents == null) return { kind: 'inputs', gap: firstGap(['offers', 'price', 'cost']) ?? { kind: 'offers' } }
   if (!p.positive) return { kind: 'losing', avg_contribution_cents: p.avg_contribution_cents }
   if (p.needed_units == null) return { kind: 'inputs', gap: firstGap(['goal']) ?? { kind: 'goal' } }
-  if (p.capacity_units != null && p.needed_units > p.capacity_units) {
+  // Capacity must be COMPARED before anything is said about it: with no limit or a missing time, "your limit is
+  // enough" would be a guess (D8; PR #468 review). Name the number instead.
+  if (p.capacity_units == null) return { kind: 'inputs', gap: firstGap(['capacity', 'minutes']) ?? { kind: 'capacity' } }
+  if (p.needed_units > p.capacity_units) {
     return { kind: 'capacity', needed_units: p.needed_units, capacity_units: p.capacity_units }
   }
   if (p.current_units == null) {
     // Without today's sales we cannot tell demand from fine. Say which number to fill; never assume zero sales.
     const unitsGap: Gap | null = p.offers[0] ? { kind: 'units', offer: p.offers[0].key, title: p.offers[0].title } : null
-    if (p.capacity_units == null) return { kind: 'inputs', gap: firstGap(['capacity', 'minutes']) ?? { kind: 'capacity' } }
     return { kind: 'inputs', gap: unitsGap ?? { kind: 'capacity' } }
   }
   if (p.current_units < p.needed_units) return { kind: 'demand', needed_units: p.needed_units, current_units: p.current_units }
@@ -187,7 +189,8 @@ function decideMoves(p: { offers: OfferEconomics[]; constraint: Constraint; inpu
   // 2. Reprice: a margin killer always; an under-40% margin when capacity binds (you cannot sell more, so earn more).
   const repriceLine = p.constraint.kind === 'capacity' ? UNDERPRICED_MARGIN_THRESHOLD_PCT : MARGIN_KILLER_THRESHOLD_PCT
   const reprices = p.offers
-    .filter((o) => o.margin_pct != null && o.contribution_cents != null && o.contribution_cents >= 0 && o.margin_pct < repriceLine && o.cost_cents != null && o.price_cents != null)
+    // Only real products: an example has no price to change yet (its move is to become a product).
+    .filter((o) => productId(o.key) && o.margin_pct != null && o.contribution_cents != null && o.contribution_cents >= 0 && o.margin_pct < repriceLine && o.cost_cents != null && o.price_cents != null)
     .map((o) => ({ o, to: repriceTo(o.cost_cents as number) }))
     .filter((r): r is { o: OfferEconomics; to: number } => r.to != null && r.to > (r.o.price_cents as number))
     .sort((a, b) => (b.to - (b.o.price_cents as number)) * Math.max(1, b.o.units_per_month ?? 1) - (a.to - (a.o.price_cents as number)) * Math.max(1, a.o.units_per_month ?? 1))
@@ -195,7 +198,9 @@ function decideMoves(p: { offers: OfferEconomics[]; constraint: Constraint; inpu
     moves.push({
       kind: 'reprice', offer: o.key, title: o.title, from_cents: o.price_cents as number, to_cents: to,
       gain_per_unit_cents: to - (o.price_cents as number),
-      href: productId(o.key) ? '/shop/manage/profit' : '/sell/armar',
+      // The product's own editor changes its price for any product; «Ganancias» only shows a price card for SKUs that
+      // already sold (PR #468 review).
+      href: editHref(o),
     })
   }
 
@@ -217,7 +222,8 @@ function decideMoves(p: { offers: OfferEconomics[]; constraint: Constraint; inpu
   } else if (c.kind === 'demand') {
     moves.push({ kind: 'grow_demand', extra_units: c.needed_units - c.current_units, href: '/shop/manage/comparte' })
     const top = best('per_unit')
-    if (top) moves.push({ kind: 'push', offer: top.key, title: top.title, contribution_cents: top.contribution_cents as number, per_hour_cents: top.contribution_per_hour_cents, href: '/shop/manage/comparte' })
+    // Demand binds, not the resource: the push is "per sale", never "per hour of your limit".
+    if (top) moves.push({ kind: 'push', offer: top.key, title: top.title, contribution_cents: top.contribution_cents as number, per_hour_cents: null, href: '/shop/manage/comparte' })
   } else if (c.kind === 'inputs') {
     moves.unshift({ kind: 'fill_input', gap: c.gap, href: PLAN_HREF })
   }

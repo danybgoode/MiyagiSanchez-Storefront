@@ -30,6 +30,9 @@ export async function explanationFor(
   const hash = inputsHash(inputs)
   const cached = row.explanation as { hash?: unknown; text?: unknown } | null
   if (cached && cached.hash === hash) {
+    // A cached REJECT (text null) for these same inputs: the template, with no new call. Regenerate only when the
+    // inputs change (D10) — otherwise a text the guard always refuses would spend on every page view (PR #468 review).
+    if (cached.text === null) return template
     // Re-guard on read: a cached text must still match the plan these inputs produce today.
     const ok = guardExplanation(cached.text, plan)
     if (ok) return { text: ok, source: 'model' }
@@ -49,8 +52,8 @@ export async function explanationFor(
     generationConfig: { temperature: 0.4, maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'minimal' } },
   })
   const text = result.ok ? guardExplanation(result.text, plan) : null
-  if (!text) return template
-  // Best effort: a lost cache write costs one more call next visit, never a wrong text.
+  // Cache the outcome either way (a reject as text null). Best effort: a lost cache write costs one more call next
+  // visit, never a wrong text. Writes only `explanation`, never `updated_at` (no false «another tab» 409).
   await db.from('business_models').update({ explanation: { hash, text } }).eq('id', row.id)
-  return { text, source: 'model' }
+  return text ? { text, source: 'model' } : template
 }
