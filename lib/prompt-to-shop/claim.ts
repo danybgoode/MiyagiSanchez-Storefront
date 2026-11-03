@@ -7,8 +7,9 @@
  * read back with `.select()` (supabase-js reports no error for an UPDATE that matched nothing).
  *
  * Apply is `ensureShop` + `applyStoreConfig` IN-PROCESS (never `fetch()` to our own authed route: the cookie does
- * not travel server-side, team memory / PR 244), with ONLY the `profile` block built from the draft's identity and
- * words. The catalog examples never leave the draft: there is no import, no product and no support block here, and
+ * not travel server-side, team memory / PR 244), with the `profile` block built from the draft's identity and words,
+ * plus `shipping.local_pickup` for a business that meets its buyers (business-infrastructure D2, `manifestFrom`). The
+ * catalog examples never leave the draft: there is no import, no product and no support block here, and
  * `e2e/p2s-claim.spec.ts` asserts that on the effect trace and on the source.
  *
  * Decisions this module encodes (each one spec-covered):
