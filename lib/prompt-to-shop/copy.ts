@@ -107,6 +107,10 @@ export const OWNER_COPY = {
     { value: 'formal', label: 'Formal' },
     { value: 'divertido', label: 'Divertido' },
   ],
+  shapeLabel: 'Tipo de negocio',
+  /** The picker's first option keeps the shape the shop has now. */
+  shapeSame: (label: string) => `${label} (el de ahora)`,
+  shapeHint: 'Si no es tu tipo de negocio, elige otro y pide otra versión: la tienda se arma para ese tipo.',
   share: 'Compartir vista previa',
   shareCopied: 'Enlace copiado',
   shareHint: 'Quien tenga este enlace podrá ver tu tienda, pero no cambiarla.',

@@ -52,7 +52,7 @@ export function parseSseFrames(buffer: string): { frames: StreamFrame[]; rest: s
   return { frames, rest }
 }
 
-export type DraftRequestBody = { description?: string; draft_id?: string; turnstile_token: string; tone?: string }
+export type DraftRequestBody = { description?: string; draft_id?: string; turnstile_token: string; tone?: string; shape?: string }
 
 export type DraftOutcome =
   /** The server said no, in plain es-MX, with no stream. `message` is the server's own text, verbatim. */

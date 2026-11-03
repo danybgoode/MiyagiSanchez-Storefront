@@ -1,5 +1,6 @@
 'use client'
 
+import { BUSINESS_SHAPES, SHAPE_DEFAULTS, rerunShape, shapeOf } from '@/lib/business-shape'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
@@ -53,7 +54,8 @@ export default function OwnerCanvas({
   const [versionsLeft, setVersionsLeft] = useState(initialVersionsLeft)
   const [token, setToken] = useState<string | null>(null)
   const [tone, setTone] = useState('')
-  const [rerun, setRerun] = useState<{ token: string; tone: string } | null>(null)
+  const [shape, setShape] = useState('')
+  const [rerun, setRerun] = useState<{ token: string; tone: string; shape: string } | null>(null)
   const [resetKey, setResetKey] = useState(0)
   const [copied, setCopied] = useState<'idle' | 'copied' | 'manual'>('idle')
   const chain = useRef<Promise<void>>(Promise.resolve())
@@ -109,6 +111,7 @@ export default function OwnerCanvas({
   // The preview shows the name as it is typed; storage catches up on the debounce.
   const view = draftView(draftId, blocks.identity && name.trim() ? { ...blocks, identity: { ...blocks.identity, name: name.trim() } } : blocks)
   const outOfVersions = versionsLeft <= 0
+  const currentShape = shapeOf(blocks.identity)
 
   if (rerun) {
     return (
@@ -116,6 +119,7 @@ export default function OwnerCanvas({
         draftId={draftId}
         turnstileToken={rerun.token}
         tone={rerun.tone || undefined}
+        shape={rerun.shape || undefined}
         onBack={() => {
           setRerun(null)
           setToken(null)
@@ -190,6 +194,9 @@ export default function OwnerCanvas({
 
         {can('version') ? (
           <div className="grid gap-2" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--s-3)' }}>
+            <p className="t-small" style={{ margin: 0 }} data-testid="p2s-shape">
+              {OWNER_COPY.shapeLabel}: <strong>{SHAPE_DEFAULTS[currentShape].label}</strong>
+            </p>
             <p className="t-small" style={{ margin: 0, fontWeight: 600 }} data-testid="p2s-versions-left">{versionsLeftCopy(versionsLeft)}</p>
             {!outOfVersions ? (
               <>
@@ -201,6 +208,18 @@ export default function OwnerCanvas({
                       <option key={t.value} value={t.value}>{t.label}</option>
                     ))}
                   </select>
+                </div>
+                <div className="grid gap-1">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="p2s-shape-pick" className="t-small">{OWNER_COPY.shapeLabel}</label>
+                    <select id="p2s-shape-pick" className="input" style={{ width: 'auto' }} value={shape} onChange={(e) => setShape(e.target.value)} data-testid="p2s-shape-pick">
+                      <option value="">{OWNER_COPY.shapeSame(SHAPE_DEFAULTS[currentShape].label)}</option>
+                      {BUSINESS_SHAPES.filter((s) => s !== currentShape).map((s) => (
+                        <option key={s} value={s}>{SHAPE_DEFAULTS[s].label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{OWNER_COPY.shapeHint}</p>
                 </div>
                 {siteKey ? <TurnstileWidget siteKey={siteKey} onToken={setToken} resetKey={resetKey} /> : null}
                 {!token && siteKey ? <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{OWNER_COPY.verifyNeeded}</p> : null}
@@ -215,8 +234,9 @@ export default function OwnerCanvas({
                     onClick={() => {
                       if (!token) return
                       // Funnel step 3 (S5.3): the first «Otra versión» on this draft.
-                      trackFunnel('p2s_version_requested', draftId, { tone: tone || null })
-                      setRerun({ token, tone })
+                      const asked = rerunShape(shape, currentShape)
+                      trackFunnel('p2s_version_requested', draftId, { tone: tone || null, shape: asked })
+                      setRerun({ token, tone, shape: asked })
                     }}
                     data-testid="p2s-another-version"
                   >

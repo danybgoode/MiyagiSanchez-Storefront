@@ -1,5 +1,6 @@
 'use client'
 
+import { offersCorreos, type BusinessShape } from '@/lib/business-shape'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
@@ -28,6 +29,7 @@ export default function CobrosChooser({
   market,
   initial,
   correosAvailable,
+  shape,
   draftId,
   onSaved,
 }: {
@@ -36,6 +38,12 @@ export default function CobrosChooser({
   initial: ChooserState
   /** The platform's Correos switch (`shipping.correos_enabled`), read on the server. */
   correosAvailable: boolean
+  /**
+   * What kind of business this is (business-infrastructure D2): a business that sends no parcels is not offered
+   * Correos (`offersCorreos`). REQUIRED on purpose — an optional prop let a second render site compile without it and
+   * keep offering Correos to food and service shops (review finding on PR #466).
+   */
+  shape: BusinessShape
   /** The kept draft, for the funnel. */
   draftId: string | null
   onSaved?: () => void
@@ -177,6 +185,7 @@ export default function CobrosChooser({
           <Toggle on={state.handDelivery} busy={busy === 'hand'} disabled={!!busy} onToggle={(v) => void save('hand', handDeliveryPatch(v), { handDelivery: v })} />
         </Choice>
 
+        {offersCorreos(shape, state.correos) ? (
         <Choice mark={<i className="iconoir-mail" aria-hidden="true" style={{ fontSize: 22 }} />} name={COBROS_COPY.correosName} lead={COBROS_COPY.correosLead} on={state.correos && correosAvailable && state.hasOrigin} testId="p2s-choice-correos">
           {!correosAvailable ? (
             <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COBROS_COPY.correosUnavailable}</p>
@@ -192,6 +201,7 @@ export default function CobrosChooser({
             </>
           )}
         </Choice>
+        ) : null}
 
         {manualCarrier ? (
           <Choice mark={<i className="iconoir-delivery-truck" aria-hidden="true" style={{ fontSize: 22 }} />} name={COBROS_COPY.manualCarrierName} lead={COBROS_COPY.manualCarrierLead} on testId="p2s-choice-manual-carrier" />

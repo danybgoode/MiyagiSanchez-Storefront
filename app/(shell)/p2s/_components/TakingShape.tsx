@@ -28,6 +28,7 @@ export default function TakingShape({
   turnstileToken,
   draftId,
   tone,
+  shape,
   onBack,
   onDone,
 }: {
@@ -36,6 +37,8 @@ export default function TakingShape({
   /** Set for a re-run on an owned draft («Otra versión»); absent for a first generation. */
   draftId?: string
   tone?: string
+  /** The business shape the merchant picked for a re-run (business-infrastructure D3); absent = the model decides. */
+  shape?: string
   onBack: () => void
   /** Overrides the default navigation to the owner canvas (used when «Otra versión» runs in place). */
   onDone?: (result: { draftId: string; versionsLeft: number }) => void
@@ -49,7 +52,7 @@ export default function TakingShape({
     if (started.current) return
     started.current = true
     void runDraftRequest(
-      { turnstile_token: turnstileToken, ...(description ? { description } : {}), ...(draftId ? { draft_id: draftId } : {}), ...(tone ? { tone } : {}) },
+      { turnstile_token: turnstileToken, ...(description ? { description } : {}), ...(draftId ? { draft_id: draftId } : {}), ...(tone ? { tone } : {}), ...(shape ? { shape } : {}) },
       (event) =>
         setBlocks((prev) => ({
           ...prev,

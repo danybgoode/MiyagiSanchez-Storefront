@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { DEFAULT_SHAPE, shapeOf } from '@/lib/business-shape'
 import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
@@ -51,6 +52,7 @@ export default async function CobrosPage() {
           market={seller.market}
           initial={readChooserState(settings)}
           correosAvailable={correosAvailable}
+          shape={kept && kept !== 'unavailable' ? shapeOf(kept.blocks.identity) : DEFAULT_SHAPE}
           draftId={draftId}
         />
       ) : (

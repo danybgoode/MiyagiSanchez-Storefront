@@ -102,7 +102,7 @@ jobs:
         run: npx playwright test e2e/in-person-counter-cart.spec.ts e2e/in-person-s2.spec.ts e2e/in-person-s3.spec.ts e2e/in-person-s4.spec.ts --project=api
       - name: Business infrastructure specs
         # Pure specs (no network): they run on every push, not only on a labelled preview run.
-        run: npx playwright test e2e/p2s-keep-sheet.spec.ts e2e/tabbar-visibility.spec.ts --project=api
+        run: npx playwright test e2e/p2s-keep-sheet.spec.ts e2e/tabbar-visibility.spec.ts e2e/p2s-shape.spec.ts e2e/p2s-claim.spec.ts --project=api
 
   prep:
     name: Resolve Vercel preview

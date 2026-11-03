@@ -21,6 +21,7 @@ import {
   type IdentityBlock,
 } from './blocks'
 import { RESPONSE_SCHEMAS, catalogPrompt, identityPrompt, wordsPrompt, type Tone } from './prompts'
+import { shapeOf, type BusinessShape } from '../business-shape'
 
 export interface ModelRequest {
   block: BlockKey
@@ -53,12 +54,12 @@ export interface PlannerDeps {
 
 export const MAX_ATTEMPTS_PER_BLOCK = 2
 
-export function buildBlockRequest(key: BlockKey, description: string, identity?: IdentityBlock, tone?: Tone): ModelRequest {
-  const id = identity ?? fallbackIdentity(description)
+export function buildBlockRequest(key: BlockKey, description: string, identity?: IdentityBlock, tone?: Tone, shapeHint?: BusinessShape): ModelRequest {
+  const id = identity ?? fallbackIdentity(description, shapeHint)
   const prompt =
-    key === 'identity' ? identityPrompt(description)
+    key === 'identity' ? identityPrompt(description, shapeHint)
     : key === 'words' ? wordsPrompt(description, id, tone)
-    : catalogPrompt(description, id)
+    : catalogPrompt(description, id, shapeOf(id))
   return {
     block: key,
     body: {
@@ -79,10 +80,10 @@ export function buildBlockRequest(key: BlockKey, description: string, identity?:
   }
 }
 
-function fallbackFor<K extends BlockKey>(key: K, description: string, identity: IdentityBlock | undefined): BlockData[K] {
-  if (key === 'identity') return fallbackIdentity(description) as BlockData[K]
-  if (key === 'words') return fallbackWords(identity ?? fallbackIdentity(description)) as BlockData[K]
-  return fallbackCatalog() as BlockData[K]
+function fallbackFor<K extends BlockKey>(key: K, description: string, identity: IdentityBlock | undefined, shapeHint?: BusinessShape): BlockData[K] {
+  if (key === 'identity') return fallbackIdentity(description, shapeHint) as BlockData[K]
+  if (key === 'words') return fallbackWords(identity ?? fallbackIdentity(description, shapeHint)) as BlockData[K]
+  return fallbackCatalog(identity ? shapeOf(identity) : shapeHint) as BlockData[K]
 }
 
 /** One block: up to two model attempts, then the fallback. Never throws for a model failure. */
@@ -92,9 +93,10 @@ export async function generateBlock<K extends BlockKey>(
   identity: IdentityBlock | undefined,
   deps: Pick<PlannerDeps, 'callModel' | 'log' | 'now'>,
   tone?: Tone,
+  shapeHint?: BusinessShape,
 ): Promise<BlockEvent<K>> {
   const now = deps.now ?? Date.now
-  const req = buildBlockRequest(key, description, identity, tone)
+  const req = buildBlockRequest(key, description, identity, tone, shapeHint)
   for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_BLOCK; attempt++) {
     const started = now()
     let result: ModelResult
@@ -103,16 +105,20 @@ export async function generateBlock<K extends BlockKey>(
     } catch (e) {
       result = { ok: false, error: e instanceof Error ? e.message : 'call failed' }
     }
-    const parsed = result.ok && result.text ? validateBlock(key, parseModelJson(result.text)) : null
+    const parsed = result.ok && result.text ? validateBlock(key, parseModelJson(result.text), identity ? shapeOf(identity) : shapeHint) : null
     deps.log?.({
       block: key, attempt, ms: now() - started, ok: !!parsed?.ok,
       prompt_tokens: result.promptTokens ?? null, output_tokens: result.outputTokens ?? null,
       ...(result.ok ? {} : { error: result.error }),
       ...(parsed && !parsed.ok ? { issues: parsed.issues.slice(0, 5) } : {}),
     })
-    if (parsed?.ok) return { key, status: 'ok', data: parsed.data as BlockData[K] }
+    if (parsed?.ok) {
+      // The merchant's own pick wins over the model's (D3): a re-run asked for this shape, so the shop IS this shape.
+      const data = key === 'identity' && shapeHint ? ({ ...(parsed.data as IdentityBlock), shape: shapeHint } as BlockData[K]) : (parsed.data as BlockData[K])
+      return { key, status: 'ok', data }
+    }
   }
-  return { key, status: 'fallback', data: fallbackFor(key, description, identity) }
+  return { key, status: 'fallback', data: fallbackFor(key, description, identity, shapeHint) }
 }
 
 export type GenerationOutcome = { ok: true; events: BlockEvent[] } | { ok: false; reason: 'save_failed'; failedBlock: BlockKey }
@@ -122,11 +128,11 @@ export type GenerationOutcome = { ok: true; events: BlockEvent[] } | { ok: false
  * land stops the run there: emitting a block the draft does not hold would show the merchant a shop that a reload
  * cannot bring back.
  */
-export async function generateDraft(description: string, deps: PlannerDeps, options: { tone?: Tone } = {}): Promise<GenerationOutcome> {
+export async function generateDraft(description: string, deps: PlannerDeps, options: { tone?: Tone; shape?: BusinessShape } = {}): Promise<GenerationOutcome> {
   const events: BlockEvent[] = []
   let identity: IdentityBlock | undefined
   for (const key of BLOCK_KEYS) {
-    const event = await generateBlock(key, description, identity, deps, options.tone)
+    const event = await generateBlock(key, description, identity, deps, options.tone, options.shape)
     if (key === 'identity') identity = event.data as IdentityBlock
     const saved = await deps.saveBlock(event)
     if (!saved) return { ok: false, reason: 'save_failed', failedBlock: key }
