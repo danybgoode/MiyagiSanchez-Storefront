@@ -37,6 +37,7 @@ const REAL_MANAGE_ROUTES = new Set([
   '/shop/manage/catalogo',
   '/shop/manage/analytics',
   '/shop/manage/profit',
+  '/shop/manage/plan',
   '/shop/manage/collections',
   '/shop/manage/canal-propio',
   '/shop/manage/promotions',
@@ -140,7 +141,7 @@ test.describe('seller-mode · SELLER_NAV config', () => {
     expect(SELLER_NAV[0].entries.map(e => e.label)).toEqual(['Resumen', 'Pedidos', 'Ofertas', 'Vender en persona', 'Cobrar con un link'])
     expect(SELLER_NAV[1].entries.map(e => e.label)).toEqual(['Anuncios', 'Colecciones', 'Canales', 'Mercado Libre', 'Importar catálogo'])
     expect(SELLER_NAV[2].entries.map(e => e.label)).toEqual([
-      'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas', 'Ganancias',
+      'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas', 'Ganancias', 'Tu plan',
     ])
     expect(SELLER_NAV[3].entries.map(e => e.label)).toEqual(['Mi tienda', 'Configuración'])
   })
@@ -168,10 +169,10 @@ test.describe('seller-mode · filterNavByEnabledFlags (R13 flag-safe nav parity)
     const filtered = filterNavByEnabledFlags(SELLER_NAV, new Set<FlagKey>())
     const allLabels = filtered.flatMap(g => g.entries.map(e => e.label))
     expect(allLabels).not.toContain('Ganancias')
-    // Nothing else in Crecer was dropped — the group itself survives (6 of 7 left).
+    // Nothing else in Crecer was dropped — the group itself survives (7 of 8 left; «Tu plan» is not flagged).
     const crecer = filtered.find(g => g.key === 'crecer')
     expect(crecer?.entries.map(e => e.label)).toEqual([
-      'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas',
+      'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas', 'Tu plan',
     ])
   })
 
@@ -179,7 +180,7 @@ test.describe('seller-mode · filterNavByEnabledFlags (R13 flag-safe nav parity)
     const filtered = filterNavByEnabledFlags(SELLER_NAV, new Set<FlagKey>(['ops.profit_enabled']))
     const crecer = filtered.find(g => g.key === 'crecer')
     expect(crecer?.entries.map(e => e.label)).toEqual([
-      'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas', 'Ganancias',
+      'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas', 'Ganancias', 'Tu plan',
     ])
   })
 

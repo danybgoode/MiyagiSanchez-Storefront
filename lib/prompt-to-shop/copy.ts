@@ -61,6 +61,7 @@ export const NARRATION = [
   { key: 'identity', label: 'Colores' },
   { key: 'words', label: 'Textos' },
   { key: 'catalog', label: 'Productos de ejemplo' },
+  { key: 'numbers', label: 'Tus números' },
 ] as const
 
 export const SHAPING_COPY = {
@@ -77,6 +78,7 @@ export const FALLBACK_NOTE = {
   identity: 'Usamos un nombre provisional; puedes cambiarlo',
   words: 'Usamos textos provisionales; prueba «Otra versión» para otros',
   catalog: 'Usamos productos de ejemplo genéricos; prueba «Otra versión» para otros',
+  numbers: 'Aún no estimamos tus números; podrás llenarlos al quedarte con tu tienda',
 } as const
 
 // ── The canvas (S2.3 renders it empty-then-filling; S2.4 and S2.5 add the controls) ─────────────────────────────
@@ -365,4 +367,19 @@ export const NUDGE_COPY = {
   cta: 'Seguir armando mi tienda',
   footer: 'Te escribimos porque empezaste a armar tu tienda. Puedes apagar estos recordatorios en Mi tienda → Configuración → Notificaciones.',
   pushTitle: (shopName: string) => `${shopName}: te falta un paso`,
+} as const
+
+/** «Tus números» on the owner's canvas (business-infrastructure S2.2). */
+export const NUMBERS_COPY = {
+  title: 'Tus números',
+  privateNote: 'Solo tú los ves. Son estimaciones para empezar; tú los corriges.',
+  estimated: 'estimado',
+  offerLine: (cost: string, price: string | null, left: string | null, minutes: number) =>
+    price && left
+      ? `te cuesta ${cost}, lo vendes en ${price}: te quedan ${left}. Toma ${minutes} min.`
+      : `te cuesta ${cost}. Toma ${minutes} min.`,
+  capacity: (resource: string, hours: number) => `Tu límite: ${resource}, unas ${hours} horas al mes.`,
+  fixed: (list: string) => `Costos fijos al mes: ${list}.`,
+  missing: 'Aún no estimamos tus números. Los llenas al quedarte con tu tienda.',
+  later: 'Al quedarte con tu tienda, en «Tu plan» cambias cada número y te decimos cuánto vender para ganar lo que quieres.',
 } as const

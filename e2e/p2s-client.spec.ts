@@ -94,9 +94,9 @@ test('the request is a same-origin JSON POST carrying the one-shot token', async
   expect(JSON.parse(String(seen!.init.body))).toEqual({ description: 'x', turnstile_token: 'tok' })
 })
 
-test('narration: four lines in the contract\'s order, name and colours both come from the identity block', () => {
-  expect(NARRATION.map((n) => n.label)).toEqual(['Nombre', 'Colores', 'Textos', 'Productos de ejemplo'])
-  expect(NARRATION.map((n) => n.key)).toEqual(['identity', 'identity', 'words', 'catalog'])
+test('narration: five lines in the contract\'s order, name and colours both come from the identity block', () => {
+  expect(NARRATION.map((n) => n.label)).toEqual(['Nombre', 'Colores', 'Textos', 'Productos de ejemplo', 'Tus números'])
+  expect(NARRATION.map((n) => n.key)).toEqual(['identity', 'identity', 'words', 'catalog', 'numbers'])
 })
 
 test('the screen reads the stream itself (no EventSource), starts once, and rides the real canvas', () => {

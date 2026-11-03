@@ -8,6 +8,7 @@
  * Pure: strings and plain objects only.
  */
 
+import { NUMBERS_SCHEMA } from './numbers'
 import { CATALOG_CATEGORY_KEYS } from '../catalog-import'
 import { EXAMPLE_SETUP, SETUP_LANGUAGE_DIRECTIVE } from '../setup-spec'
 import { EXAMPLE_ROWS_MAX, EXAMPLE_ROWS_MIN, GENERATABLE_PRESETS, type BlockKey, type IdentityBlock } from './blocks'
@@ -148,6 +149,7 @@ export const RESPONSE_SCHEMAS: Record<BlockKey, Record<string, unknown>> = {
     },
     required: ['announcement', 'headline', 'about'],
   },
+  numbers: NUMBERS_SCHEMA,
   catalog: {
     type: 'OBJECT',
     properties: {

@@ -67,14 +67,14 @@ test('example cards carry EJEMPLO, an illustration, and an es-MX suggested price
 
 test('a block that has not landed is a placeholder, never invented content', () => {
   const empty = draftView(DRAFT, { identity: null, words: null, catalog: null, block_status: {} })
-  expect(empty.pending).toEqual({ identity: true, words: true, catalog: true })
+  expect(empty.pending).toEqual({ identity: true, words: true, catalog: true, numbers: true })
   expect(empty).toMatchObject({ name: null, headline: null, announcement: null, cards: null })
   expect(empty.shop.name).toBe('')
   expect(empty.theme).toEqual(resolveTheme({}))
   expect(empty.accent).toBe('var(--color-accent)')
 
   const half = draftView(DRAFT, { identity, words: null, catalog: null, block_status: { identity: 'ok' } })
-  expect(half.pending).toEqual({ identity: false, words: true, catalog: true })
+  expect(half.pending).toEqual({ identity: false, words: true, catalog: true, numbers: true })
   expect(half.name).toBe('Tamales La Abuela')
   expect(half.headline).toBeNull()
 })
@@ -84,7 +84,7 @@ test('a fallback block is flagged so the canvas can say so; a placeholder is not
     identity: fallbackIdentity('Vendo velas'), words: fallbackWords({ name: 'Velas' }), catalog: fallbackCatalog(),
     block_status: { identity: 'fallback', words: 'ok', catalog: 'fallback' },
   })
-  expect(fb.fallback).toEqual({ identity: true, words: false, catalog: true })
+  expect(fb.fallback).toEqual({ identity: true, words: false, catalog: true, numbers: false })
   const none = draftView(DRAFT, { identity: null, words: null, catalog: null, block_status: { identity: 'fallback' } })
   expect(none.fallback.identity).toBe(false)
 })

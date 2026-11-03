@@ -126,7 +126,7 @@ export function draftsDeps(ip: string): DraftsDeps {
     startVersion: async (draft, deviceId, description, versionsUsed) => {
       const { data, error } = await db
         .from('shop_drafts')
-        .update({ description, versions_used: versionsUsed, identity: null, words: null, catalog: null, block_status: {}, updated_at: new Date().toISOString() })
+        .update({ description, versions_used: versionsUsed, identity: null, words: null, catalog: null, numbers: null, block_status: {}, updated_at: new Date().toISOString() })
         .eq('id', draft.id)
         .eq('device_id', deviceId)
         .is('claimed_by', null)

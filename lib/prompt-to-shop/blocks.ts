@@ -8,6 +8,7 @@
  * Pure: no I/O, no `next/*`, so the `api` spec runner imports it directly.
  */
 
+import { validateNumbers, type ExampleRef, type NumbersBlock } from './numbers'
 import { CATALOG_CATEGORY_KEYS, validateRows, type CatalogImportRow } from '../catalog-import'
 import { validateConfig, type StoreConfigManifest } from '../settings-import'
 import { contrastRatio } from '../platform-theme'
@@ -15,7 +16,7 @@ import { THEME_PRESETS } from '../shop-settings/theme-presets'
 import type { CategoryKey } from '../types'
 import { DEFAULT_SHAPE, SHAPE_DEFAULTS, isBusinessShape, type BusinessShape } from '../business-shape'
 
-export const BLOCK_KEYS = ['identity', 'words', 'catalog'] as const
+export const BLOCK_KEYS = ['identity', 'words', 'catalog', 'numbers'] as const
 export type BlockKey = (typeof BLOCK_KEYS)[number]
 export type BlockStatus = 'ok' | 'fallback'
 
@@ -69,7 +70,7 @@ export interface WordsBlock {
 /** A draft-only row: `CatalogImportRow` has no example field, and `MiyagiSetupFile` is not widened for it. */
 export type ExampleRow = CatalogImportRow & { example: true; illustration: IllustrationKey }
 
-export type BlockData = { identity: IdentityBlock; words: WordsBlock; catalog: ExampleRow[] }
+export type BlockData = { identity: IdentityBlock; words: WordsBlock; catalog: ExampleRow[]; numbers: NumbersBlock }
 
 export type BlockParse<K extends BlockKey> = { ok: true; data: BlockData[K] } | { ok: false; issues: string[] }
 
@@ -185,9 +186,15 @@ export function illustrationFor(category: unknown): IllustrationKey {
   return (CATALOG_CATEGORY_KEYS as string[]).includes(category as string) ? (category as IllustrationKey) : 'otros'
 }
 
-export function validateBlock<K extends BlockKey>(key: K, value: unknown, shape: BusinessShape = DEFAULT_SHAPE): BlockParse<K> {
+export function validateBlock<K extends BlockKey>(
+  key: K,
+  value: unknown,
+  shape: BusinessShape = DEFAULT_SHAPE,
+  examples: ExampleRef[] = [],
+): BlockParse<K> {
   if (key === 'identity') return validateIdentity(value) as BlockParse<K>
   if (key === 'words') return validateWords(value) as BlockParse<K>
+  if (key === 'numbers') return validateNumbers(value, examples) as BlockParse<K>
   return validateCatalog(value, shape) as BlockParse<K>
 }
 
