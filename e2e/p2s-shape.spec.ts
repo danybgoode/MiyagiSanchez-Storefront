@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { BUSINESS_SHAPES, DEFAULT_SHAPE, SHAPE_DEFAULTS, isBusinessShape, shapeOf } from '../lib/business-shape'
+import { BUSINESS_SHAPES, DEFAULT_SHAPE, SHAPE_DEFAULTS, isBusinessShape, offersCorreos, rerunShape, shapeOf } from '../lib/business-shape'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { CATALOG_CATEGORY_KEYS, IMPORT_LISTING_TYPES } from '../lib/catalog-import'
 import { fallbackCatalog, fallbackIdentity, validateCatalog, validateIdentity } from '../lib/prompt-to-shop/blocks'
 import { manifestFrom } from '../lib/prompt-to-shop/claim'
-import { parseDraftsBody } from '../lib/prompt-to-shop/handler'
+import { handleCreateDraft, parseDraftsBody, type DraftsDeps } from '../lib/prompt-to-shop/handler'
 import { buildBlockRequest, generateDraft, type ModelRequest } from '../lib/prompt-to-shop/planner'
 import { RESPONSE_SCHEMAS, catalogPrompt, identityPrompt } from '../lib/prompt-to-shop/prompts'
 import { validateConfig } from '../lib/settings-import'
@@ -114,15 +116,17 @@ test('the merchant\'s pick wins over the model\'s, and the catalog follows it', 
     },
     saveBlock: async () => true,
     emit: () => {},
-  }, { shape: 'food' })
+  }, { shape: 'services' })
   expect(outcome.ok).toBe(true)
   if (!outcome.ok) return
   const identity = outcome.events[0].data as { shape?: string }
-  expect(identity.shape).toBe('food')
+  expect(identity.shape).toBe('services')
   const catalogReq = seen.find((r) => r.block === 'catalog')!
-  expect(catalogReq.body.contents[0].parts[0].text).toContain(SHAPE_DEFAULTS.food.catalogHint)
+  expect(catalogReq.body.contents[0].parts[0].text).toContain(SHAPE_DEFAULTS.services.catalogHint)
+  // The model's rows say "product"; a services shop's examples must come out as services (review: a food pick would
+  // pass this vacuously, because food's listing type is also "product").
   const catalog = outcome.events[2].data as Array<{ listing_type?: string }>
-  expect(catalog.every((r) => r.listing_type === 'product')).toBe(true)
+  expect(catalog.map((r) => r.listing_type)).toEqual(['service', 'service', 'service', 'service'])
 })
 
 test('keeping a shop that meets its buyers switches «Entrega acordada» on, through the platform validator', () => {
@@ -133,4 +137,59 @@ test('keeping a shop that meets its buyers switches «Entrega acordada» on, thr
   // A products shop keeps today's manifest exactly: profile only.
   const products = manifestFrom(fallbackIdentity('ropa de paca'), null)
   expect(Object.keys(products)).toEqual(['profile'])
+})
+
+test('Correos is offered only to a business that sends parcels — or where it is already on, so it can be switched off', () => {
+  expect(offersCorreos('products', false)).toBe(true)
+  expect(offersCorreos('made_to_order', false)).toBe(true)
+  for (const s of ['food', 'services', 'rentals', 'digital'] as const) {
+    expect(offersCorreos(s, false), s).toBe(false)
+    expect(offersCorreos(s, true), s).toBe(true)
+  }
+  // Every render site passes the shape: the prop is required, and both pages that mount the chooser send it.
+  const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
+  expect(src('app/(shell)/p2s/_components/CobrosChooser.tsx')).toMatch(/^\s+shape: BusinessShape$/m)
+  expect(src('app/(shell)/p2s/_components/KeptShop.tsx')).toContain('shape={shape}')
+  expect(src('app/(shell)/sell/armar/cobros/page.tsx')).toMatch(/shape=\{kept && kept !== 'unavailable' \? shapeOf\(kept\.blocks\.identity\)/)
+})
+
+test('a re-run always asks for a shape: the merchant\'s new pick, else the shape the shop has now', () => {
+  expect(rerunShape('', 'food')).toBe('food')
+  expect(rerunShape('services', 'food')).toBe('services')
+  expect(rerunShape('nonsense', 'rentals')).toBe('rentals')
+  const canvas = readFileSync(join(process.cwd(), 'app/(shell)/p2s/_components/OwnerCanvas.tsx'), 'utf8')
+  expect(canvas).toContain('const asked = rerunShape(shape, currentShape)')
+  expect(canvas).toContain('setRerun({ token, tone, shape: asked })')
+})
+
+test('the handler hands the parsed shape to the planner, without moving the order', async () => {
+  const DRAFT = '7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607'
+  const DEVICE = '0b9e8c1e-3c2a-4d8e-9a51-6f1f2b3c4d5e'
+  const trace: string[] = []
+  let identityPromptText = ''
+  let catalogPromptText = ''
+  const deps: DraftsDeps = {
+    verifyTurnstile: async () => { trace.push('turnstile'); return { ok: true } },
+    burstAllowed: async () => { trace.push('burst'); return true },
+    spend: async () => { trace.push('spend'); return { data: { ok: true, reason: null, versions_used: 2 }, error: null } },
+    findOwnedDraft: async () => { trace.push('find'); return { id: DRAFT, description: 'vendo tamales' } },
+    createDraft: async () => null,
+    startVersion: async () => { trace.push('version'); return true },
+    saveBlock: async () => true,
+    refund: async () => {},
+    callModel: async (req) => {
+      const text = req.body.contents[0].parts[0].text
+      if (req.block === 'identity') { identityPromptText = text; return { ok: true, text: JSON.stringify({ ...GOOD_IDENTITY, shape: 'products' }) } }
+      if (req.block === 'catalog') { catalogPromptText = text; return { ok: true, text: JSON.stringify({ products: rows(4) }) } }
+      return { ok: false, error: 'not needed' }
+    },
+    modelConfigured: true,
+    newDeviceId: () => DEVICE,
+  }
+  const result = await handleCreateDraft({ body: { draft_id: DRAFT, shape: 'food', turnstile_token: 't' }, deviceCookie: DEVICE }, deps)
+  if (result.kind !== 'stream') throw new Error('expected a stream')
+  await result.run(() => {})
+  expect(trace).toEqual(['turnstile', 'burst', 'find', 'spend', 'version'])
+  expect(identityPromptText).toContain('usa exactamente "food"')
+  expect(catalogPromptText).toContain(SHAPE_DEFAULTS.food.catalogHint)
 })

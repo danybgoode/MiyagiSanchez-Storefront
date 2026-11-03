@@ -1,6 +1,6 @@
 'use client'
 
-import { BUSINESS_SHAPES, SHAPE_DEFAULTS, shapeOf } from '@/lib/business-shape'
+import { BUSINESS_SHAPES, SHAPE_DEFAULTS, rerunShape, shapeOf } from '@/lib/business-shape'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
@@ -234,8 +234,9 @@ export default function OwnerCanvas({
                     onClick={() => {
                       if (!token) return
                       // Funnel step 3 (S5.3): the first «Otra versión» on this draft.
-                      trackFunnel('p2s_version_requested', draftId, { tone: tone || null, shape: shape || null })
-                      setRerun({ token, tone, shape })
+                      const asked = rerunShape(shape, currentShape)
+                      trackFunnel('p2s_version_requested', draftId, { tone: tone || null, shape: asked })
+                      setRerun({ token, tone, shape: asked })
                     }}
                     data-testid="p2s-another-version"
                   >

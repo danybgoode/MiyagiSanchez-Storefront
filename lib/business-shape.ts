@@ -103,6 +103,23 @@ export const SHAPE_DEFAULTS: Record<BusinessShape, ShapeDefaults> = {
   },
 }
 
+/**
+ * Whether the cobros chooser offers Correos to this shop. A business that sends no parcels is not offered it — unless
+ * it is already on, so the merchant can still switch it off where they see it.
+ */
+export function offersCorreos(shape: BusinessShape, alreadyOn: boolean): boolean {
+  return SHAPE_DEFAULTS[shape].ships || alreadyOn
+}
+
+/**
+ * The shape a re-run («Otra versión») asks for: the merchant's new pick, or else the shape the shop HAS — never
+ * nothing. Sending nothing would let the model decide again from the same sentence and quietly undo a correction the
+ * merchant already made (and the keep's delivery defaults with it). Review finding on PR #466.
+ */
+export function rerunShape(picked: string, current: BusinessShape): BusinessShape {
+  return isBusinessShape(picked) ? picked : current
+}
+
 /** One line per shape for the identity prompt: the model picks the key that fits. */
 export function shapeChoicesForPrompt(): string {
   return BUSINESS_SHAPES.map((s) => `"${s}" (${SHAPE_DEFAULTS[s].label.toLowerCase()})`).join(', ')

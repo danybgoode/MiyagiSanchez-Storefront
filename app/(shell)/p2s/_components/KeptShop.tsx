@@ -1,6 +1,6 @@
 'use client'
 
-import { SHAPE_DEFAULTS, type BusinessShape } from '@/lib/business-shape'
+import type { BusinessShape } from '@/lib/business-shape'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -220,7 +220,7 @@ export default function KeptShop({
               market={market}
               initial={chooser}
               correosAvailable={correosAvailable}
-              ships={SHAPE_DEFAULTS[shape].ships}
+              shape={shape}
               draftId={draftId}
               onSaved={() => router.refresh()}
             />
