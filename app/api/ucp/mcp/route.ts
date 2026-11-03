@@ -23,6 +23,9 @@
  *   get_shop              Seller profile + their listings
  */
 
+import { readInputs as readBusinessInputs } from '@/lib/business-plan/model'
+import { computePlan as computeBusinessPlan } from '@/lib/business-plan/engine'
+import { explainTemplate as explainPlanTemplate } from '@/lib/business-plan/explain'
 import { filterLinksByState, formatLinkForAgent, mapCancelLinkArgs, mapCreateLinkArgs, type AgentLinkView } from '@/lib/in-person/payment-link-mcp'
 import { internalLinkCall } from '@/lib/in-person/payment-link-backend'
 import { NextRequest, NextResponse } from 'next/server'
@@ -521,6 +524,12 @@ const TOOLS = [
   {
     name: 'get_share_kit',
     description: "SELLER TOOL. Get YOUR OWN shop's share kit: the catalog page link (and its short form), the catalog PDF link, and the Meta product-feed URL for Instagram Shopping and WhatsApp Business catalogs, with how many products the feed leaves out and why. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop — another shop's slug is never reachable. Mexico shops only. Hand the links to your human, or post them for them.",
+    inputSchema: { type: 'object', properties: {} },
+  },
+  // ── Business plan (business-infrastructure S3, D16) ─────────────────────────
+  {
+    name: 'get_business_plan',
+    description: "SELLER TOOL. Read YOUR OWN shop's business plan («Tu plan»): every input with where it came from (estimated · told by the merchant · measured from sales), the computed volume needed for the owner's monthly goal, break-even, what the limiting resource allows, current sales, which constraint binds (capacity, demand, losing money, or a missing input) and up to three ranked moves, each a link to the page that does it. Read-only: nothing changes. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop. The plan is as of the merchant's last visit to «Tu plan».",
     inputSchema: { type: 'object', properties: {} },
   },
   // ── Payment links (in-person-sales S4.4, D16) ───────────────────────────────
@@ -2827,6 +2836,35 @@ async function handleGetShareKit(args: Record<string, unknown>, authHeader?: str
   return { content: [{ type: 'text', text: lines.join('\n') }, { type: 'text', text: JSON.stringify(kit, null, 2) }] }
 }
 
+/**
+ * get_business_plan (business-infrastructure S3, D16). The shop comes from `resolveToolShop` alone; the plan is the
+ * engine's output over the stored model (as of the merchant's last visit — a live merge needs their own session).
+ * Read-only.
+ */
+async function handleGetBusinessPlan(args: Record<string, unknown>, authHeader?: string | null) {
+  const agentAuth = await resolveToolShop(authHeader, args, 'get_business_plan')
+  if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
+  const { data, error } = await db
+    .from('business_models')
+    .select('inputs, shop_slug, updated_at')
+    .eq('clerk_user_id', agentAuth.shop.clerk_user_id)
+    .order('updated_at', { ascending: false })
+  if (error) return { isError: true, content: [{ type: 'text', text: 'No pudimos leer el plan ahora. Inténtalo de nuevo.' }] }
+  const rows = (data ?? []) as Array<{ inputs: unknown; shop_slug: string | null; updated_at: string }>
+  const row = rows.find((r) => r.shop_slug === agentAuth.shop.slug) ?? (rows.length === 1 ? rows[0] : null)
+  if (!row) {
+    return { content: [{ type: 'text', text: 'Esta tienda aún no tiene plan. La persona dueña lo abre en https://miyagisanchez.com/shop/manage/plan y desde ahí se arma.' }] }
+  }
+  const inputs = readBusinessInputs(row.inputs)
+  const plan = computeBusinessPlan(inputs)
+  return {
+    content: [
+      { type: 'text', text: explainPlanTemplate(plan) },
+      { type: 'text', text: JSON.stringify({ shop_slug: agentAuth.shop.slug, as_of: row.updated_at, inputs, plan }, null, 2) },
+    ],
+  }
+}
+
 async function handleListMyCollections(args: Record<string, unknown>, authHeader?: string | null) {
   const agentAuth = await resolveToolShop(authHeader, args, 'list_my_collections')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
@@ -4689,6 +4727,7 @@ async function handleMcpMethod(
       case 'update_wall_entry':         { const r = await handleUpdateWallEntry(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'delete_wall_entry':         { const r = await handleDeleteWallEntry(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'get_share_kit':             { const r = await handleGetShareKit(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
+      case 'get_business_plan':         { const r = await handleGetBusinessPlan(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'list_my_collections':       { const r = await handleListMyCollections(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'create_collection':         { const r = await handleCreateCollection(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'update_collection':         { const r = await handleUpdateCollection(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }

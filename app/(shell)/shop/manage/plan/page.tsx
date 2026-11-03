@@ -6,6 +6,9 @@ import { gapsOf } from '@/lib/business-plan/model'
 import { Banner } from '@/components/feedback/Banner'
 import { PLAN_COPY } from '@/lib/business-plan/copy'
 import PlanClient from './PlanClient'
+import PlanSummary from './PlanSummary'
+import { computePlan } from '@/lib/business-plan/engine'
+import { explanationFor } from '@/lib/business-plan/explain-server'
 
 export const metadata = { title: 'Tu plan — Mi tienda' }
 export const dynamic = 'force-dynamic'
@@ -34,6 +37,9 @@ export default async function PlanPage() {
     )
   }
 
+  const plan = computePlan(loaded.row.inputs)
+  const explanation = await explanationFor(loaded.row, loaded.row.inputs, plan, { clerkUserId: userId, shopName: seller.name })
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 grid gap-4" data-testid="plan-page">
       <div className="grid gap-1">
@@ -43,7 +49,9 @@ export default async function PlanPage() {
       {loaded.unavailable.length ? (
         <Banner variant="warning">{PLAN_COPY.couldNotRead(loaded.unavailable)}</Banner>
       ) : null}
-      <PlanClient inputs={loaded.row.inputs} updatedAt={loaded.row.updated_at} gaps={gapsOf(loaded.row.inputs)} />
+      <PlanClient inputs={loaded.row.inputs} updatedAt={loaded.row.updated_at} gaps={gapsOf(loaded.row.inputs)}>
+        <PlanSummary plan={plan} explanation={explanation} />
+      </PlanClient>
     </div>
   )
 }

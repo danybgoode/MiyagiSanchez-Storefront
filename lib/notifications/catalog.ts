@@ -110,6 +110,11 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     sender: 'sendP2sNudge', origin: 'lib/prompt-to-shop/nudges-server.ts', group: 'onboarding',
   },
   {
+    key: 'shop.business_checkin', trigger: 'El día 1 de cada mes (o en la primera semana si no se pudo leer): las ventas del mes pasado contra «Tu plan» y lo que más conviene hacer.',
+    from: 'platform', to: 'seller', channels: ['email', 'push', 'telegram'], domain: 'cuentas',
+    sender: 'sendBusinessCheckin', origin: 'lib/business-plan/checkin-server.ts', group: 'onboarding',
+  },
+  {
     key: 'shop.claimed_welcome', trigger: 'La tienda se vincula a una cuenta por primera vez.',
     from: 'platform', to: 'seller', channels: ['email'], domain: 'cuentas',
     sender: 'sendShopClaimedWelcome', origin: 'app/api/claim/complete/route.ts',

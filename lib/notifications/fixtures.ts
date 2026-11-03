@@ -68,6 +68,11 @@ export const COMMUNICATION_FIXTURES: Record<string, CommunicationFixture> = {
   'account.welcome': (to) => email.sendAccountWelcome({ to, clerkUserId: 'sample_user' }),
   'shop.p2s_draft_link': (to) => email.sendP2sDraftLink({ to, shopName: SHOP, draftId: '00000000-0000-4000-8000-000000000000', sharePath: '/p2s/v/00000000-0000-4000-8000-000000000001' }),
   'shop.p2s_nudge': (to) => email.sendP2sNudge({ to, shopName: SHOP, step: 'pagos', day: 1, draftId: '00000000-0000-4000-8000-000000000000' }),
+  'shop.business_checkin': (to) => email.sendBusinessCheckin({
+    to, shopName: SHOP, rowId: 'sample',
+    message: { period: '2026-10', month: 'octubre', sold: 48, needed: 120, onTrack: false, next: null },
+    nextText: 'Te faltan 72 ventas al mes: comparte tu catálogo donde están tus compradores.',
+  }),
   'shop.claim_link_requested': (to) => email.sendShopClaimLink({ to, shopName: SHOP, claimUrl: 'https://miyagisanchez.com/claim?token=sample', market: 'mx' }),
   'shop.claimed_welcome': (to) => email.sendShopClaimedWelcome({ to, shopName: SHOP, shopSlug: 'tienda-de-muestra', market: 'mx', sellerId: 'sample_seller' }),
   'shop.created_welcome.mx': (to) => email.sendShopCreatedWelcome({ to, shopName: SHOP, shopSlug: 'tienda-de-muestra', market: 'mx', sellerId: 'sample_created_mx' }),
