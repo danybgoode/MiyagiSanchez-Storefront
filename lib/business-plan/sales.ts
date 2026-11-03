@@ -21,9 +21,13 @@ export const SALES_WINDOW_DAYS = 90
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const cents = (v: unknown): number | null => (typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : null)
 
-/** The products read's `listings` (shape) joined with its `products` (raw rows, for the private variant metadata). */
-export function productsFrom(body: unknown): ShopProduct[] {
-  if (!isObj(body) || !Array.isArray(body.listings)) return []
+/**
+ * The products read's `listings` (shape) joined with its `products` (raw rows, for the private variant metadata).
+ * `null` = the body is not a products read at all — "could not read", never "no products" (an empty list here would
+ * retire every real offer in the model).
+ */
+export function productsFrom(body: unknown): ShopProduct[] | null {
+  if (!isObj(body) || !Array.isArray(body.listings)) return null
   const raw = new Map<string, Record<string, unknown>>()
   for (const p of Array.isArray(body.products) ? body.products : []) if (isObj(p) && typeof p.id === 'string') raw.set(p.id, p)
   const out: ShopProduct[] = []

@@ -111,17 +111,27 @@ export function applyPlanEdit(inputs: BusinessInputs, edit: PlanEdit, at: string
     offers = offers.map((o, j) => (j === i ? updated : o))
   }
   const next: BusinessInputs = { ...inputs, offers }
+  // A section is sent whole, but only what the merchant CHANGED becomes theirs: an untouched estimate keeps its
+  // «estimado» label (PR #467 review — re-sending a list must not launder the AI's numbers into the merchant's own).
   if (edit.capacity !== undefined) {
     if (edit.capacity === null) delete next.capacity
     else {
+      const prev = inputs.capacity
+      const hours = edit.capacity.hours_per_month
       next.capacity = {
-        resource: { value: edit.capacity.resource, source: 'told', at },
-        ...(edit.capacity.hours_per_month !== null ? { hours_per_month: { value: edit.capacity.hours_per_month, source: 'told' as const, at } } : {}),
+        resource: prev && prev.resource.value === edit.capacity.resource ? prev.resource : { value: edit.capacity.resource, source: 'told', at },
+        ...(hours === null
+          ? {}
+          : { hours_per_month: prev?.hours_per_month && prev.hours_per_month.value === hours ? prev.hours_per_month : { value: hours, source: 'told' as const, at } }),
       }
     }
   }
   if (edit.fixed_costs !== undefined) {
-    next.fixed_costs = edit.fixed_costs.map((f) => ({ label: f.label, monthly_cents: { value: toCents(f.monthly), source: 'told' as const, at } }))
+    next.fixed_costs = edit.fixed_costs.map((f) => {
+      const cents = toCents(f.monthly)
+      const same = inputs.fixed_costs.find((p) => p.label === f.label && p.monthly_cents.value === cents)
+      return same ?? { label: f.label, monthly_cents: { value: cents, source: 'told' as const, at } }
+    })
   }
   if (edit.goal !== undefined) {
     if (edit.goal === null) delete next.goal_cents

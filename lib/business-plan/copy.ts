@@ -40,4 +40,6 @@ export const PLAN_COPY = {
     return `cuántos minutos te toma «${g.title}»`
   },
   saveFailed: 'No pudimos guardar ahora. Inténtalo de nuevo en un momento.',
+  invalidInput: 'Revisa los números: deben ser cantidades de 0 o más, y cada costo fijo necesita nombre.',
+  resourceNeeded: 'Escribe cuál es tu límite (por ejemplo «mi tiempo») para guardar sus horas.',
 } as const

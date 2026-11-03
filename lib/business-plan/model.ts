@@ -39,6 +39,12 @@ export interface OfferInput {
   minutes_per_unit?: Valued<number>
   /** Units sold in a typical month. */
   units_per_month?: Valued<number>
+  /**
+   * Kept but no longer counted: an example a real product superseded, or a product the latest read did not return.
+   * The model never DELETES an offer (a merchant's typed number on it would go with it, PR #467 review); it retires it,
+   * and `mergeShop` recomputes who is retired from the full list on every visit, so the answer does not drift.
+   */
+  retired?: true
 }
 
 /** The one resource that limits how much the business can make (the oven, the owner's hours, the van). */
@@ -72,6 +78,8 @@ export const MEASURED_MIN_UNITS = 3
 /** Limits a stored input must respect — the same ones every write path checks, so a bad row cannot poison the plan. */
 export const INPUT_LIMITS = {
   maxOffers: 40,
+  /** Active offers are capped at `maxOffers`; retired ones ride along so nothing typed is lost. */
+  maxStoredOffers: 120,
   maxFixedCosts: 12,
   maxCents: 100_000_000, // $1,000,000 MXN: a micro-business plan, not a ledger
   maxMinutesPerUnit: 60 * 24 * 30,
@@ -103,7 +111,7 @@ function readNumber(v: unknown, max: number): Valued<number> | undefined {
 export function readInputs(raw: unknown): BusinessInputs {
   if (!isObj(raw)) return { ...EMPTY_INPUTS }
   const offers: OfferInput[] = []
-  for (const o of Array.isArray(raw.offers) ? raw.offers.slice(0, INPUT_LIMITS.maxOffers) : []) {
+  for (const o of Array.isArray(raw.offers) ? raw.offers.slice(0, INPUT_LIMITS.maxStoredOffers) : []) {
     if (!isObj(o)) continue
     const key = cleanText(o.key, 80)
     const title = cleanText(o.title, INPUT_LIMITS.maxTitle)
@@ -115,6 +123,7 @@ export function readInputs(raw: unknown): BusinessInputs {
       unit_cost_cents: readNumber(o.unit_cost_cents, INPUT_LIMITS.maxCents),
       minutes_per_unit: readNumber(o.minutes_per_unit, INPUT_LIMITS.maxMinutesPerUnit),
       units_per_month: readNumber(o.units_per_month, INPUT_LIMITS.maxUnitsPerMonth),
+      ...(o.retired === true ? { retired: true as const } : {}),
     })
   }
   const fixed_costs: FixedCostInput[] = []
@@ -157,6 +166,9 @@ export function mergeValue<T>(
   if (incoming.source === 'told') return incoming
   if (current.source === 'told') return incoming.source === 'measured' && opts.confirmed ? incoming : current
   if (incoming.source === 'measured') {
+    // A fresh read supersedes an older read whatever it says (zero sales this window is a fact, not noise); over an
+    // ESTIMATE it needs enough sales behind it.
+    if (current.source === 'measured') return incoming
     return (opts.backedBy ?? Infinity) >= MEASURED_MIN_UNITS ? incoming : current
   }
   // estimated over estimated: the newer estimate wins; estimated never replaces measured.
@@ -171,16 +183,22 @@ export type Gap =
   | { kind: 'capacity' }
   | { kind: 'goal' }
 
+/** The offers the plan counts (retired ones are kept, not counted). */
+export function activeOffers(inputs: BusinessInputs): OfferInput[] {
+  return inputs.offers.filter((o) => !o.retired)
+}
+
 export function gapsOf(inputs: BusinessInputs): Gap[] {
   const gaps: Gap[] = []
+  const active = activeOffers(inputs)
   if (!inputs.goal_cents) gaps.push({ kind: 'goal' })
-  for (const o of inputs.offers) {
+  for (const o of active) {
     if (!o.price_cents) gaps.push({ kind: 'price', offer: o.key, title: o.title })
     if (!o.unit_cost_cents) gaps.push({ kind: 'cost', offer: o.key, title: o.title })
   }
   if (inputs.capacity) {
     if (!inputs.capacity.hours_per_month) gaps.push({ kind: 'capacity' })
-    for (const o of inputs.offers) if (!o.minutes_per_unit) gaps.push({ kind: 'minutes', offer: o.key, title: o.title })
+    for (const o of active) if (!o.minutes_per_unit) gaps.push({ kind: 'minutes', offer: o.key, title: o.title })
   } else {
     gaps.push({ kind: 'capacity' })
   }
@@ -221,8 +239,20 @@ export function seedFromDraft(
       ...(n ? { unit_cost_cents: est(pesosToCents(n.unit_cost)), minutes_per_unit: est(n.minutes_per_unit) } : {}),
     }
   })
+  // Examples a photo already replaced are gone from the catalog, but their estimates are what the photo product
+  // inherits (`mergeShop`). Keep them, retired, so "keep → photo → first visit to «Tu plan»" still carries them.
+  const inCatalog = new Set(offers.map((o) => o.title))
+  ;(numbers?.offers ?? []).filter((n) => !inCatalog.has(n.title)).forEach((n, j) => {
+    offers.push({
+      key: `ex:r${j}`,
+      title: n.title.slice(0, INPUT_LIMITS.maxTitle),
+      unit_cost_cents: est(pesosToCents(n.unit_cost)),
+      minutes_per_unit: est(n.minutes_per_unit),
+      retired: true,
+    })
+  })
   return {
-    offers,
+    offers: offers.slice(0, INPUT_LIMITS.maxOffers),
     fixed_costs: (numbers?.fixed_costs ?? []).slice(0, INPUT_LIMITS.maxFixedCosts).map((f) => ({ label: f.label, monthly_cents: est(pesosToCents(f.monthly)) })),
     ...(numbers?.capacity ? { capacity: { resource: est(numbers.capacity.resource), hours_per_month: est(numbers.capacity.hours_per_month) } } : {}),
   }
@@ -255,23 +285,26 @@ export interface ProductSales {
 export function mergeShop(
   stored: BusinessInputs,
   products: ShopProduct[],
-  sales: ProductSales[],
+  sales: ProductSales[] | null,
   window: { months: number; at: string },
 ): BusinessInputs {
   const at = window.at
   const meas = <T>(value: T): Valued<T> => ({ value, source: 'measured', at })
   const byKey = new Map(stored.offers.map((o) => [o.key, o]))
   const live = products.filter((p) => p.status !== 'deleted').slice(0, INPUT_LIMITS.maxOffers)
-  const offers: OfferInput[] = live.map((p) => {
+  const liveKeys = new Set(live.map((p) => `p:${p.id}`))
+  const months = Math.max(1, window.months)
+
+  const real: OfferInput[] = live.map((p) => {
     const key = `p:${p.id}`
     const prev = byKey.get(key)
-    const s = sales.find((x) => x.product_id === p.id)
-    const units = s?.units ?? 0
-    const months = Math.max(1, window.months)
     // A product made from a photo inherits the ESTIMATES of the example it replaced (still `estimated`): its cost and
     // minutes until the merchant types their own or sets a cost on the product (D4, amended).
     const example = !prev && p.replaces_example ? stored.offers.find((o) => o.key.startsWith('ex:') && o.title === p.replaces_example) : undefined
     const base = prev ?? (example ? { unit_cost_cents: example.unit_cost_cents, minutes_per_unit: example.minutes_per_unit } : undefined)
+    // Sales: `null` = the ledger could not be read, so what is stored stands. A successful read with no line for this
+    // product is a measured ZERO — a fact that replaces an older measurement, but never an estimate or a typed number.
+    const s = sales ? sales.find((x) => x.product_id === p.id) ?? { product_id: p.id, units: 0, revenue_cents: 0 } : null
     return {
       key,
       title: p.title.slice(0, INPUT_LIMITS.maxTitle),
@@ -279,14 +312,31 @@ export function mergeShop(
       price_cents: mergeValue(prev?.price_cents, p.price_cents != null ? meas(p.price_cents) : undefined, { backedBy: Infinity }),
       unit_cost_cents: mergeValue(base?.unit_cost_cents, p.unit_cost_cents != null ? meas(p.unit_cost_cents) : undefined, { backedBy: Infinity }),
       minutes_per_unit: base?.minutes_per_unit,
-      units_per_month: mergeValue(prev?.units_per_month, s ? meas(Math.round((units / months) * 10) / 10) : undefined, { backedBy: units }),
+      units_per_month: s ? mergeValue(prev?.units_per_month, meas(Math.round((s.units / months) * 10) / 10), { backedBy: s.units }) : prev?.units_per_month,
     }
   })
-  // Examples are the plan's stand-ins until the merchant's own products exist. One a real product replaced (by photo)
-  // is gone; the rest stay only while the shop has fewer real offers than examples, so nothing is counted twice.
+
+  // A product the read did not return (deleted, or past the read's page) is RETIRED, never dropped: it may hold
+  // numbers the merchant typed. A later read that returns it brings it back.
+  const gone: OfferInput[] = stored.offers
+    .filter((o) => o.key.startsWith('p:') && !liveKeys.has(o.key))
+    .map((o) => ({ ...o, retired: true as const }))
+
+  // Examples are the plan's stand-ins until the merchant's own products exist. Recomputed from the FULL stored list on
+  // every merge, so the answer is the same visit after visit (the PR #467 review caught an earlier version that
+  // re-pruned an already-pruned list, one batch per visit). An example a photo product replaced is retired; of the
+  // rest, as many stay active as are left over after counting the other real products — preferring examples that
+  // hold a number the merchant typed. Nothing is deleted.
   const replaced = new Set(live.map((p) => p.replaces_example).filter((t): t is string => !!t))
-  const remaining = stored.offers.filter((o) => o.key.startsWith('ex:') && !replaced.has(o.title))
-  const otherReal = live.filter((p) => !p.replaces_example).length
-  const examples = remaining.slice(0, Math.max(0, remaining.length - otherReal))
-  return { ...stored, offers: [...offers, ...examples].slice(0, INPUT_LIMITS.maxOffers) }
+  const examples = stored.offers.filter((o) => o.key.startsWith('ex:'))
+  const candidates = examples.filter((o) => !replaced.has(o.title) && !o.key.startsWith('ex:r'))
+  const typed = (o: OfferInput) => [o.price_cents, o.unit_cost_cents, o.minutes_per_unit, o.units_per_month].some((v) => v?.source === 'told')
+  const keepCount = Math.max(0, candidates.length - live.filter((p) => !p.replaces_example).length)
+  const keep = new Set([...candidates.filter(typed), ...candidates.filter((o) => !typed(o))].slice(0, keepCount).map((o) => o.key))
+  const exampleRows: OfferInput[] = examples.map((o) => {
+    const rest: OfferInput = { key: o.key, title: o.title, price_cents: o.price_cents, unit_cost_cents: o.unit_cost_cents, minutes_per_unit: o.minutes_per_unit, units_per_month: o.units_per_month }
+    return keep.has(o.key) ? rest : { ...rest, retired: true }
+  })
+
+  return { ...stored, offers: [...real, ...exampleRows, ...gone].slice(0, INPUT_LIMITS.maxStoredOffers) }
 }

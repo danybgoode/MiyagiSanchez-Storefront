@@ -97,7 +97,7 @@ export async function loadModel(
   if (!row) {
     const kept = await findKeptDraft(owner.clerkUserId, null)
     const draft = kept && kept !== 'unavailable' && kept.sellerId === owner.sellerId ? kept : null
-    const seed = draft ? seedFromDraft(draft.blocks.catalog, draft.blocks.numbers ?? null, now.toISOString()) : { offers: [], fixed_costs: [] }
+    const seed = draft ? seedFromDraft(draft.blocks.catalog ?? [], draft.blocks.numbers ?? null, now.toISOString()) : { offers: [], fixed_costs: [] }
     const created = await createModel(owner, seed, draft?.id ?? null)
     if (created === 'unavailable') return 'unavailable'
     row = created
@@ -108,15 +108,18 @@ export async function loadModel(
     sellerGet('/store/sellers/me/products?limit=200&offset=0', clerkJwt),
     sellerGet('/store/sellers/me/profit', clerkJwt),
   ])
-  if (productsBody === null) unavailable.push('products')
-  if (ledgerBody === null) unavailable.push('sales')
-  if (productsBody === null) return { row, unavailable }
+  const products = productsBody === null ? null : productsFrom(productsBody)
+  const ledger = ledgerBody as { events?: unknown; orders?: unknown } | null
+  const ledgerOk = !!ledger && Array.isArray(ledger.events) && Array.isArray(ledger.orders)
+  if (products === null) unavailable.push('products')
+  if (!ledgerOk) unavailable.push('sales')
+  // Without the catalog there is nothing to merge into: the stored model stands, and the page names the gap.
+  if (products === null) return { row, unavailable }
 
-  const ledger = (ledgerBody ?? {}) as { events?: ProfitEvent[]; orders?: ProfitOrderInfo[] }
   const merged = mergeShop(
     row.inputs,
-    productsFrom(productsBody),
-    ledgerBody === null ? [] : salesFrom(ledger.events ?? [], ledger.orders ?? [], now),
+    products,
+    ledgerOk ? salesFrom(ledger!.events as ProfitEvent[], ledger!.orders as ProfitOrderInfo[], now) : null,
     { months: windowMonths(), at: now.toISOString() },
   )
   if (JSON.stringify(merged) === JSON.stringify(row.inputs)) return { row, unavailable }

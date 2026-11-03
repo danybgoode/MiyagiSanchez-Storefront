@@ -108,8 +108,13 @@ test('a live shop merges in: catalog price/cost measured; a photo product inheri
   expect(byKey['p:prod_2'].unit_cost_cents).toMatchObject({ value: 1300, source: 'measured' })
   expect(byKey['p:prod_2'].units_per_month).toMatchObject({ value: 10, source: 'measured' })
   expect(byKey['p:prod_3']).toBeUndefined()
-  // «Tamal verde» was replaced; one more real product (prod_2) displaces one more example; one example remains
-  expect(merged.offers.filter((o) => o.key.startsWith('ex:')).map((o) => o.title)).toEqual(['Atole'])
+  // «Tamal verde» was replaced; one more real product (prod_2) displaces one more example; one example stays ACTIVE —
+  // the others are retired, never deleted
+  const active = merged.offers.filter((o) => o.key.startsWith('ex:') && !o.retired).map((o) => o.title)
+  expect(active).toEqual(['Atole'])
+  expect(merged.offers.filter((o) => o.key.startsWith('ex:')).map((o) => o.title)).toEqual(['Tamal verde', 'Atole', 'Champurrado'])
+  // the deleted product is not active
+  expect(merged.offers.find((o) => o.key === 'p:prod_3')).toBeUndefined()
 })
 
 test('measured monthly units need the threshold; a merchant\'s own number is never overwritten by sales', () => {
@@ -138,7 +143,10 @@ test('the products read: price from the listing, cost from the FIRST variant\'s 
     { id: 'p1', title: 'Tamal', status: 'published', price_cents: 3500, unit_cost_cents: 1200, replaces_example: 'Tamal verde' },
     { id: 'p3', title: 'Sin costo', status: 'draft', price_cents: 1000, unit_cost_cents: null, replaces_example: null },
   ])
-  expect(productsFrom(null)).toEqual([])
+  // not a products read at all = could not read (null), never "no products"
+  expect(productsFrom(null)).toBeNull()
+  expect(productsFrom({ listings: 'x' })).toBeNull()
+  expect(productsFrom({ listings: [] })).toEqual([])
 })
 
 test('the ledger read: revenue events in the window, MXN only, a line\'s units counted once', () => {
@@ -197,4 +205,69 @@ test('merging the same shop twice changes nothing — no write, no re-stamped da
   // a CHANGED price is a change
   const third = mergeShop(second, [{ ...products[0], price_cents: 1200 }], sales, { months: 3, at: '2026-11-03T00:00:00.000Z' })
   expect(third.offers[0].price_cents).toMatchObject({ value: 1200, at: '2026-11-03T00:00:00.000Z' })
+})
+
+test('merging is IDEMPOTENT: three visits leave the same model, and a typed example is the last to retire', () => {
+  const stored = draftModel()
+  // the merchant typed a cost on the LAST example
+  stored.offers[2] = { ...stored.offers[2], unit_cost_cents: v(900, 'told') }
+  const products = [{ id: 'hand', title: 'Tamal de rajas', price_cents: 3600, unit_cost_cents: 1300 }]
+  const w = { months: 3, at: AT }
+  const once = mergeShop(stored, products, [], w)
+  const twice = mergeShop(readInputs(JSON.parse(JSON.stringify(once))), products, [], w)
+  const thrice = mergeShop(readInputs(JSON.parse(JSON.stringify(twice))), products, [], w)
+  expect(JSON.stringify(thrice)).toBe(JSON.stringify(readInputs(JSON.parse(JSON.stringify(once)))))
+  // 3 examples, 1 other real product → 2 stay active, the typed one among them; nothing deleted
+  const exs = thrice.offers.filter((o) => o.key.startsWith('ex:'))
+  expect(exs).toHaveLength(3)
+  expect(exs.filter((o) => !o.retired).map((o) => o.title)).toContain('Champurrado')
+  expect(exs.find((o) => o.title === 'Champurrado')?.unit_cost_cents).toEqual(v(900, 'told'))
+})
+
+test('a product the read does not return is retired with its typed numbers, and comes back when it returns', () => {
+  const stored: BusinessInputs = { offers: [{ key: 'p:x', title: 'X', unit_cost_cents: v(500, 'told') }], fixed_costs: [] }
+  const away = mergeShop(stored, [], [], { months: 3, at: AT })
+  expect(away.offers).toEqual([{ ...stored.offers[0], retired: true }])
+  const back = mergeShop(away, [{ id: 'x', title: 'X', price_cents: 1000, unit_cost_cents: null }], [], { months: 3, at: AT })
+  expect(back.offers[0].retired).toBeUndefined()
+  expect(back.offers[0].unit_cost_cents).toEqual(v(500, 'told'))
+})
+
+test('keep → photo → FIRST visit: the replaced example is gone from the catalog, its estimate still reaches the product', () => {
+  // the draft catalog no longer has «Tamal verde» (the photo confirm removed it), but the numbers block does
+  const seeded = seedFromDraft(
+    [{ title: 'Atole', price: 25 }],
+    { offers: [{ title: 'Tamal verde', unit_cost: 12, minutes_per_unit: 10 }, { title: 'Atole', unit_cost: 6, minutes_per_unit: 4 }], capacity: null, fixed_costs: [] },
+    AT,
+  )
+  expect(seeded.offers.find((o) => o.title === 'Tamal verde')).toMatchObject({ retired: true })
+  const merged = mergeShop(seeded, [{ id: 'p1', title: 'Tamal verde de pollo', price_cents: 3800, unit_cost_cents: null, replaces_example: 'Tamal verde' }], [], { months: 3, at: AT })
+  expect(merged.offers.find((o) => o.key === 'p:p1')?.unit_cost_cents).toEqual({ value: 1200, source: 'estimated', at: AT })
+})
+
+test('sales: an unreadable ledger keeps what is stored; a read with no sales is a measured zero over an older read', () => {
+  const stored: BusinessInputs = { offers: [{ key: 'p:a', title: 'A', units_per_month: v(12, 'measured') }], fixed_costs: [] }
+  const product = [{ id: 'a', title: 'A', price_cents: 1000, unit_cost_cents: null }]
+  expect(mergeShop(stored, product, null, { months: 3, at: AT }).offers[0].units_per_month?.value).toBe(12)
+  expect(mergeShop(stored, product, [], { months: 3, at: AT }).offers[0].units_per_month?.value).toBe(0)
+  // over an estimate, zero sales is not enough to replace it
+  const est: BusinessInputs = { offers: [{ key: 'p:a', title: 'A', units_per_month: v(30, 'estimated') }], fixed_costs: [] }
+  expect(mergeShop(est, product, [], { months: 3, at: AT }).offers[0].units_per_month?.source).toBe('estimated')
+})
+
+test('re-sending a section does not launder estimates: only what changed becomes the merchant\'s', () => {
+  const inputs: BusinessInputs = {
+    offers: [],
+    fixed_costs: [{ label: 'Gas', monthly_cents: v(90000, 'estimated') }, { label: 'Luz', monthly_cents: v(40000, 'estimated') }],
+    capacity: { resource: { value: 'la vaporera', source: 'estimated', at: AT }, hours_per_month: v(80, 'estimated') },
+  }
+  const next = applyPlanEdit(inputs, {
+    updated_at: 'u',
+    fixed_costs: [{ label: 'Gas', monthly: 900 }, { label: 'Luz', monthly: 450 }],
+    capacity: { resource: 'la vaporera', hours_per_month: 100 },
+  }, '2026-11-05T00:00:00.000Z')!
+  expect(next.fixed_costs[0].monthly_cents.source).toBe('estimated')
+  expect(next.fixed_costs[1].monthly_cents).toMatchObject({ value: 45000, source: 'told' })
+  expect(next.capacity?.resource.source).toBe('estimated')
+  expect(next.capacity?.hours_per_month).toMatchObject({ value: 100, source: 'told' })
 })
