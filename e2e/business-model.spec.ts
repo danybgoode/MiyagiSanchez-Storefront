@@ -186,3 +186,15 @@ test('a merchant\'s edit: pesos in, told cents stored; cleared = gap again; malf
   // an explicit 0 cost is real (a service with no materials), not a gap
   expect(applyPlanEdit(inputs, { updated_at: 'u', offers: [{ key: 'ex:0', field: 'cost', value: 0 }] }, AT)!.offers[0].unit_cost_cents?.value).toBe(0)
 })
+
+test('merging the same shop twice changes nothing — no write, no re-stamped dates', () => {
+  const products = [{ id: 'a', title: 'A', price_cents: 1000, unit_cost_cents: 400 }]
+  const sales = [{ product_id: 'a', units: 30, revenue_cents: 30000 }]
+  const first = mergeShop({ offers: [], fixed_costs: [] }, products, sales, { months: 3, at: '2026-11-01T00:00:00.000Z' })
+  const second = mergeShop(readInputs(JSON.parse(JSON.stringify(first))), products, sales, { months: 3, at: '2026-11-02T00:00:00.000Z' })
+  expect(JSON.stringify(second)).toBe(JSON.stringify(readInputs(JSON.parse(JSON.stringify(first)))))
+  expect(second.offers[0].price_cents?.at).toBe('2026-11-01T00:00:00.000Z')
+  // a CHANGED price is a change
+  const third = mergeShop(second, [{ ...products[0], price_cents: 1200 }], sales, { months: 3, at: '2026-11-03T00:00:00.000Z' })
+  expect(third.offers[0].price_cents).toMatchObject({ value: 1200, at: '2026-11-03T00:00:00.000Z' })
+})

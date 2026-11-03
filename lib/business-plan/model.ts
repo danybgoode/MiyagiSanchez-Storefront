@@ -150,6 +150,9 @@ export function mergeValue<T>(
   opts: { backedBy?: number; confirmed?: boolean } = {},
 ): Valued<T> | undefined {
   if (!incoming) return current
+  // Same value from the same source: keep what is stored, date included. Re-stamping it would make every visit look
+  // like a change — a write per page view, and a fresh model explanation each time (PR #467).
+  if (current && current.source === incoming.source && current.value === incoming.value) return current
   if (!current) return incoming.source === 'measured' && (opts.backedBy ?? Infinity) < MEASURED_MIN_UNITS ? undefined : incoming
   if (incoming.source === 'told') return incoming
   if (current.source === 'told') return incoming.source === 'measured' && opts.confirmed ? incoming : current
