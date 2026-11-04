@@ -21,6 +21,9 @@ import { SHOP_DOMAINS_TAG } from '@/lib/custom-domain'
 import { tg } from '@/lib/telegram'
 import { readDomainGrant, isOneTimeGrantLive } from '@/lib/domain-entitlement'
 import { revalidateTag } from 'next/cache'
+import { resolveDomainEntitlement } from '@/lib/domain-entitlement-server'
+import { resolvePlan } from '@/lib/plan-server'
+import { decideDomainRelease } from '@/lib/plan'
 
 /**
  * Release the seller's custom domain from the provider, null it in Supabase, and
@@ -30,13 +33,13 @@ import { revalidateTag } from 'next/cache'
  */
 export async function releaseCustomDomainForShop(
   shopId: string | undefined,
-  reason: 'subscription_canceled' | 'one_time_expired' = 'subscription_canceled',
+  reason: 'subscription_canceled' | 'one_time_expired' | 'negocio_ended' = 'subscription_canceled',
 ): Promise<void> {
   if (!shopId) return
   try {
     const { data: shop } = await db
       .from('marketplace_shops')
-      .select('custom_domain, metadata')
+      .select('custom_domain, metadata, clerk_user_id')
       .eq('id', shopId)
       .maybeSingle()
     // A bad/stale shopId would otherwise write 0 rows silently and still alert a
@@ -47,6 +50,17 @@ export async function releaseCustomDomainForShop(
     }
 
     const domain = (shop as { custom_domain?: string | null } | null)?.custom_domain
+    // Release only a domain the shop is no longer entitled to by ANY path: its own grant or standalone subscription,
+    // or Negocio (plans-gratis-negocio D5). The rule is the pure `decideDomainRelease`.
+    const ownerId = (shop as { clerk_user_id?: string | null }).clerk_user_id ?? undefined
+    const meta0 = (shop as { metadata?: unknown }).metadata
+    const entitled = (await resolveDomainEntitlement(meta0, { sellerClerkId: ownerId, shopId })).entitled
+    const planUnavailable = entitled ? false : (await resolvePlan(meta0, { sellerClerkId: ownerId ?? null, shopId })).reason === 'unavailable'
+    const decision = decideDomainRelease({ reason, hasDomain: !!domain, entitled, planUnavailable })
+    if (decision === 'keep_and_alert') {
+      tg.alert(`⚠️ Dominio propio NO liberado: no se pudo leer el plan de la tienda (${reason}). Revisar.\nShop: ${shopId}`)
+    }
+    if (decision !== 'release') return
     if (domain) {
       try {
         await removeDomainFromProject(domain)

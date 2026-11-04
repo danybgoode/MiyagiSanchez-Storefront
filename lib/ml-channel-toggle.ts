@@ -48,12 +48,12 @@ export async function isMlSyncEntitled(userId: string): Promise<boolean> {
   try {
     const { data: shop } = await db
       .from('marketplace_shops')
-      .select('metadata')
+      .select('id, metadata')
       .eq('clerk_user_id', userId)
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle()
-    const entitlement = await resolveMlSyncEntitlement(shop?.metadata, { sellerClerkId: userId })
+    const entitlement = await resolveMlSyncEntitlement(shop?.metadata, { sellerClerkId: userId, shopId: shop?.id })
     return entitlement.entitled
   } catch {
     return false

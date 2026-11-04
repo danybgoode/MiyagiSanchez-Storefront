@@ -4305,7 +4305,7 @@ async function handleGetDomainEntitlement(args: Record<string, unknown>, authHea
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
   const shop = agentAuth.shop
 
-  const ent = await resolveDomainEntitlement(shop.metadata, { sellerClerkId: shop.clerk_user_id })
+  const ent = await resolveDomainEntitlement(shop.metadata, { sellerClerkId: shop.clerk_user_id, shopId: shop.id })
   const summary = ent.entitled
     ? `✅ ${shop.name ?? 'Tu tienda'} puede conectar un dominio propio (motivo: ${ent.reason}).`
     : `🔒 El dominio propio es una función premium (${CUSTOM_DOMAIN_PRICE_LABEL.es}). Tu tienda aún no está habilitada. ` +

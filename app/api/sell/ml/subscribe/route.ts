@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   // `startMlSyncCheckout` short-circuits an active SUBSCRIPTION, but not a live GRANT
   // (a comp or a prepaid year) — this closes that double-charge gap uniformly via the
   // same entitlement seam the UI gates on. (cross-review #154.)
-  const entitlement = await resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: user.id })
+  const entitlement = await resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: user.id, shopId: shop.id })
   if (entitlement.entitled) {
     return NextResponse.json(
       { error: 'Ya tienes la sincronización de Mercado Libre activa.', alreadyActive: true },

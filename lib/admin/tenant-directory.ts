@@ -359,6 +359,10 @@ export function entitlementReasonLabel(reason: DomainEntitlementReason): string 
       return 'Suscripción activa'
     case 'one_time':
       return 'Pago único (1 año)'
+    case 'negocio':
+      return 'Incluido en Negocio'
+    case 'trial':
+      return 'Incluido en la prueba de Negocio'
     case 'none':
       return 'Sin plan'
   }

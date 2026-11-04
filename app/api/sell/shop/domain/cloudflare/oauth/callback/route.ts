@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
   // shop (flag on) before writing any Cloudflare record.
   const ent = await resolveDomainEntitlement(
     (shop as unknown as { metadata?: unknown } | null)?.metadata,
-    { sellerClerkId: clerkUserId },
+    { sellerClerkId: clerkUserId, shopId: (shop as unknown as { id?: string } | null)?.id },
   )
   if (!ent.entitled) return popupClose('error', 'El dominio propio es una función premium.')
 

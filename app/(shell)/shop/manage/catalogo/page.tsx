@@ -101,7 +101,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   // fetched above for the deleted-ids check — no second Supabase query).
   const channelsFlagEnabled = await isEnabled('catalog.inventory_channels_enabled')
   const mlEntitled = channelsFlagEnabled
-    ? (await resolveMlSyncEntitlement(shop?.metadata, { sellerClerkId: user.id })).entitled
+    ? (await resolveMlSyncEntitlement(shop?.metadata, { sellerClerkId: user.id, shopId: shop?.id })).entitled
     : false
   // Staged bulk actions (catalog-management epic, Sprint 3) — fail-safe OFF:
   // no selection checkboxes/bulk bar render while OFF.

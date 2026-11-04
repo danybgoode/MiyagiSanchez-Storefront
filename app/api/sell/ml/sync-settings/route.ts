@@ -37,7 +37,7 @@ export async function GET() {
   if (!shop?.slug) return NextResponse.json({ error: 'Tienda no encontrada.' }, { status: 404 })
 
   const [entitlement, syncEnabled] = await Promise.all([
-    resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: userId }),
+    resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: userId, shopId: shop.id }),
     getSellerSyncEnabled(shop.slug),
   ])
   return NextResponse.json({
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   // Gate ENABLING only — disabling is always allowed (a seller can always stop sync).
   if (enabled) {
-    const entitlement = await resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: userId })
+    const entitlement = await resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: userId, shopId: shop.id })
     if (!entitlement.entitled) {
       return NextResponse.json(
         {

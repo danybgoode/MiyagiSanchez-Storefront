@@ -9,6 +9,8 @@ import { SELLER_LOCALE_COOKIE, resolveSellerLocale, sellerCopyBoundaryNeeded } f
 import { sellerFormatContextForMarket } from '@/lib/seller-format'
 import { PendingListingDeleteProvider } from '@/components/seller/PendingListingDeleteProvider'
 import { retryShopCreatedWelcome } from '@/lib/shop-created-welcome'
+import { auth } from '@clerk/nextjs/server'
+import { ensureNegocioTrial } from '@/lib/plan-server'
 
 /**
  * Seller-mode shell for `/shop/manage/*`.
@@ -38,6 +40,15 @@ export default async function SellerManageLayout({ children }: { children: React
   if (seller) await retryShopCreatedWelcome(seller).catch((error) => {
     console.error('[shop/manage] shop welcome retry failed:', seller.id, error)
   })
+  // The 30-day Negocio trial starts the first time the OWNER opens their panel (plans-gratis-negocio D4) — so a
+  // promoter's unclaimed shop never spends it before the merchant claims it. Stamped once, guarded in the UPDATE;
+  // a failure only delays the trial to the next visit, so it never blocks the panel.
+  if (seller) {
+    const { userId } = await auth()
+    if (userId) await ensureNegocioTrial(userId).catch((error) => {
+      console.error('[shop/manage] negocio trial stamp failed:', seller.id, error)
+    })
+  }
   const market = seller?.market ?? 'mx'
   const locale = resolveSellerLocale({
     preference: (await cookies()).get(SELLER_LOCALE_COOKIE)?.value,
