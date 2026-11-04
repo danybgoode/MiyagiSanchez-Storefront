@@ -75,6 +75,9 @@ export async function startNegocioCheckout(input: {
     metadata: { ...metadata, months: String(NEGOCIO_YEARLY_MONTHS) },
     buyerEmail: input.buyerEmail,
     installments: true,
+    // Card only: the grant is written on `checkout.session.completed`, so the payment must be settled then (and
+    // installments are a card feature anyway). The webhook also refuses an unpaid session.
+    paymentMethodTypes: ['card'],
   })
   return { ok: true, url }
 }

@@ -21,6 +21,8 @@ import { SHOP_DOMAINS_TAG } from '@/lib/custom-domain'
 import { tg } from '@/lib/telegram'
 import { readDomainGrant, isOneTimeGrantLive } from '@/lib/domain-entitlement'
 import { revalidateTag } from 'next/cache'
+import { planOpensCustomDomain } from '@/lib/plan'
+import { resolvePlan } from '@/lib/plan-server'
 
 /**
  * Release the seller's custom domain from the provider, null it in Supabase, and
@@ -36,7 +38,7 @@ export async function releaseCustomDomainForShop(
   try {
     const { data: shop } = await db
       .from('marketplace_shops')
-      .select('custom_domain, metadata')
+      .select('custom_domain, metadata, clerk_user_id')
       .eq('id', shopId)
       .maybeSingle()
     // A bad/stale shopId would otherwise write 0 rows silently and still alert a
@@ -46,6 +48,19 @@ export async function releaseCustomDomainForShop(
       return
     }
 
+    // Negocio includes the custom domain (plans-gratis-negocio D5): a lapsed standalone grant or subscription must not
+    // tear down the domain of a shop that is on Negocio. A plan that cannot be read keeps the domain too — a
+    // teardown is the hard-to-undo direction — and asks for a look.
+    const plan = await resolvePlan((shop as { metadata?: unknown }).metadata, {
+      sellerClerkId: (shop as { clerk_user_id?: string | null }).clerk_user_id ?? null,
+      shopId,
+    })
+    if (planOpensCustomDomain(plan) || plan.reason === 'unavailable') {
+      if (plan.reason === 'unavailable') {
+        tg.alert(`⚠️ Dominio propio NO liberado: no se pudo leer el plan de la tienda (${reason}). Revisar.\nShop: ${shopId}`)
+      }
+      return
+    }
     const domain = (shop as { custom_domain?: string | null } | null)?.custom_domain
     if (domain) {
       try {

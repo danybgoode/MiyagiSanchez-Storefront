@@ -18,6 +18,7 @@ import {
   NEGOCIO_TRIAL_KEY,
   buildNegocioTrial,
   canStartTrial,
+  guardFor,
   derivePlanFromMetadata,
   readNegocioGrant,
   type PlanState,
@@ -65,6 +66,7 @@ export async function readOwnedShop(clerkUserId: string): Promise<OwnedShopRow |
     .select('id, slug, clerk_user_id, metadata')
     .eq('clerk_user_id', clerkUserId)
     .order('created_at', { ascending: true })
+    .order('id', { ascending: true }) // a deterministic tie-break: two reads must never pick different shops
     .limit(1)
     .maybeSingle()
   if (error) throw new Error(`marketplace_shops read failed: ${error.message}`)
@@ -82,11 +84,15 @@ export async function ensureNegocioTrial(clerkUserId: string, now: Date = new Da
   const shop = await readOwnedShop(clerkUserId)
   if (!shop) return 'no_shop'
   if (!canStartTrial(shop.metadata)) return 'not_eligible'
+  // `canStartTrial` treats a JSON-null trial as "never trialed", so the guard must match it (`json_null`), or the
+  // write silently never lands and the shop never gets its trial.
+  const guard = guardFor(shop.metadata, NEGOCIO_TRIAL_KEY)
+  if (guard.mode === 'equals') return 'not_eligible'
   const { data, error } = await db.rpc('merge_shop_metadata', {
     p_shop_id: shop.id,
     p_patch: { [NEGOCIO_TRIAL_KEY]: buildNegocioTrial(now) },
     p_guard_key: NEGOCIO_TRIAL_KEY,
-    p_guard_mode: 'absent',
+    p_guard_mode: guard.mode,
     p_expected: null,
   })
   if (error) throw new Error(`negocio trial stamp failed: ${error.message}`)

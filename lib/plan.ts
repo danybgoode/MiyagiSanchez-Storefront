@@ -175,29 +175,43 @@ export function extendNegocioGrant(
   return { ...grant, granted_at: now.toISOString(), ...(payments.length ? { payments } : {}) }
 }
 
+/**
+ * The `merge_shop_metadata` guard that matches what was READ at `key`: `absent` when the key is missing, `json_null`
+ * when it holds JSON null, `equals` the exact value otherwise. Collapsing "missing" and "JSON null" into one SQL NULL
+ * jams the write forever on a key that holds JSON null (`'null'::jsonb` is distinct from SQL NULL) — the stuck-shop
+ * trap `lib/paywall-grandfather.ts` already guards against.
+ */
+export type MetadataGuard = { mode: 'absent' } | { mode: 'json_null' } | { mode: 'equals'; expected: unknown }
+
+export function guardFor(metadata: unknown, key: string): MetadataGuard {
+  const meta = metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : {}
+  if (!(key in meta)) return { mode: 'absent' }
+  if (meta[key] === null) return { mode: 'json_null' }
+  return { mode: 'equals', expected: meta[key] }
+}
+
 export type NegocioPaymentDecision =
   | { action: 'replay' } // this payment id was already counted: write nothing
   | { action: 'comp' } // the shop holds a permanent Negocio: nothing to extend (the payment is still recorded by the caller)
-  | { action: 'write'; grant: NegocioGrant; expected: unknown } // compare-and-swap: write `grant` iff the key still equals `expected`
+  | { action: 'write'; grant: NegocioGrant; guard: MetadataGuard } // compare-and-swap: write `grant` iff the key is still as read
 
 /**
  * What a paid one-time Negocio payment (a yearly payment, a promoter package) writes to the shop. Pure, so the replay
- * rule and the "add after the current end" rule are tested without Stripe. `expected` is the RAW value read from
- * metadata (even a malformed one), for the `merge_shop_metadata` `equals` guard: if anything changed the grant
- * between the read and the write, the write does nothing and the caller re-reads.
+ * rule and the "add after the current end" rule are tested without Stripe. `guard` matches exactly what was read
+ * (`guardFor`): if anything changed the grant between the read and the write, the write does nothing and the caller
+ * re-reads.
  */
 export function decideNegocioPayment(
   metadata: unknown,
   payment: { paymentId: string; months: number; now?: Date; note?: string },
 ): NegocioPaymentDecision {
-  const raw = metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>)[NEGOCIO_GRANT_KEY] ?? null : null
   const current = readNegocioGrant(metadata)
   if (current?.payments?.includes(payment.paymentId)) return { action: 'replay' }
   if (current?.type === 'comp') return { action: 'comp' }
   return {
     action: 'write',
     grant: extendNegocioGrant(current, payment.months, { now: payment.now, note: payment.note, paymentId: payment.paymentId }),
-    expected: raw,
+    guard: guardFor(metadata, NEGOCIO_GRANT_KEY),
   }
 }
 

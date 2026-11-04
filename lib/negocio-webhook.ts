@@ -24,7 +24,7 @@ import { db } from '@/lib/supabase'
 import { tg } from '@/lib/telegram'
 import { getNegocioSubscription, setNegocioSubscriptionStatus } from '@/lib/negocio-subscription'
 import { NEGOCIO_GRANT_KEY, decideNegocioPayment } from '@/lib/plan'
-import { mapNegocioStatus, sessionMonths } from '@/lib/negocio-checkout-rules'
+import { mapNegocioStatus, sessionMonths, subscriptionPeriod } from '@/lib/negocio-checkout-rules'
 import { markAttributionPaid, isPromoterSku } from '@/lib/promoter'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
@@ -41,8 +41,11 @@ export async function handleNegocioSubscriptionComplete(session: Stripe.Checkout
   }
   try {
     const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
-    type SubWithPeriod = { current_period_start: number; current_period_end: number }
-    const period = stripeSub as unknown as SubWithPeriod
+    // The period is on the subscription ITEM in this API version; a missing one must not block activation.
+    const period = subscriptionPeriod(stripeSub)
+    const nowSec = Math.floor(Date.now() / 1000)
+    const periodStart = period?.start ?? nowSec
+    const periodEnd = period?.end ?? nowSec + 31 * 86_400
     const { plan_id } = await getNegocioSubscription(sellerClerkId, shopId)
     if (!plan_id) throw new Error('negocio plan not found')
     const email = session.customer_details?.email?.toLowerCase().trim() ?? ''
@@ -63,8 +66,8 @@ export async function handleNegocioSubscriptionComplete(session: Stripe.Checkout
         payment_method: 'stripe',
         stripe_subscription_id: stripeSubscriptionId,
         stripe_customer_id: session.customer as string | null,
-        current_period_start: new Date(period.current_period_start * 1000).toISOString(),
-        current_period_end: new Date(period.current_period_end * 1000).toISOString(),
+        current_period_start: new Date(periodStart * 1000).toISOString(),
+        current_period_end: new Date(periodEnd * 1000).toISOString(),
         metadata: { kind: 'negocio', shop_id: shopId },
       }),
     })
@@ -98,8 +101,8 @@ export async function applyNegocioPayment(input: {
       p_shop_id: input.shopId,
       p_patch: { [NEGOCIO_GRANT_KEY]: decision.grant },
       p_guard_key: NEGOCIO_GRANT_KEY,
-      p_guard_mode: 'equals',
-      p_expected: decision.expected,
+      p_guard_mode: decision.guard.mode,
+      p_expected: decision.guard.mode === 'equals' ? decision.guard.expected : null,
     })
     if (error) throw new Error(`grant write failed: ${error.message}`)
     if (Array.isArray(merged) && merged.length > 0) return 'written'
@@ -112,6 +115,13 @@ export async function handleNegocioOneTimeComplete(session: Stripe.Checkout.Sess
   const shopId = session.metadata?.shop_id
   const months = sessionMonths(session.metadata?.months)
   const promoterSku = session.metadata?.promoter_sku
+  // Grant only money that arrived. A delayed method completes the session `unpaid`; this checkout is card-only, but
+  // a session that is not `paid` must never become months of Negocio.
+  if (session.payment_status !== 'paid') {
+    console.error('[negocio one-time] session not paid:', session.id, session.payment_status)
+    tg.alert(`⚠️ Negocio (pago único): sesión completada SIN pago (${session.payment_status}) — no se activó.\nSession: ${session.id}`)
+    return
+  }
   if (!shopId || months === null) {
     console.error('[negocio one-time] bad metadata:', session.id)
     tg.alert(`🚨 Negocio (pago único) PAGADO con datos inválidos — revisar.\nSession: ${session.id}`)
@@ -172,9 +182,8 @@ export async function handleNegocioSubscriptionChanged(subscription: Stripe.Subs
  * payee — this path must NEVER reach the seller-subscription transfer below it in the webhook.
  * S4.3 hooks the promoter's year-2 renewal commission here.
  */
-export async function handleNegocioInvoicePaid(invoice: Stripe.Invoice, stripeSubscriptionId: string): Promise<void> {
+export async function handleNegocioInvoicePaid(_invoice: Stripe.Invoice, stripeSubscriptionId: string): Promise<void> {
   await handleNegocioSubscriptionChanged({ id: stripeSubscriptionId, status: 'active' } as Stripe.Subscription, false)
-  void invoice
 }
 
 /** A failed renewal: past_due is a grace state — Negocio stays while Stripe retries; only a cancel lapses it. */

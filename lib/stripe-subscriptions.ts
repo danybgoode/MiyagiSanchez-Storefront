@@ -114,6 +114,7 @@ export async function createOneTimeCheckout({
   buyerEmail,
   promotionCodeId,
   installments,
+  paymentMethodTypes,
 }: {
   amountCents: number
   currency: string
@@ -125,6 +126,9 @@ export async function createOneTimeCheckout({
   promotionCodeId?: string
   /** Offer card installments (meses sin intereses, Mexico). Stripe allows them on one-time payments only. */
   installments?: boolean
+  /** Restrict the payment methods (e.g. `['card']`): a delayed method (OXXO, a bank voucher) completes the session
+   *  UNPAID, so a grant written on `checkout.session.completed` would be given away. Omitted = the dashboard's set. */
+  paymentMethodTypes?: Array<'card'>
 }): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
@@ -138,6 +142,7 @@ export async function createOneTimeCheckout({
     }],
     payment_intent_data: { metadata },
     ...(installments ? { payment_method_options: { card: { installments: { enabled: true } } } } : {}),
+    ...(paymentMethodTypes ? { payment_method_types: paymentMethodTypes } : {}),
     customer_email: buyerEmail,
     success_url: successUrl,
     cancel_url: cancelUrl,
