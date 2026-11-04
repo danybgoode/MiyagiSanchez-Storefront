@@ -228,6 +228,7 @@ function confirmWorld(opts: { owner?: OwnerLookup; used?: number; spendError?: b
   let failCreate = opts.failCreate ?? 0
   const products: Array<{ id: string; handle: string; nonce: string; image: string; status: 'draft'; title: string; catalogAtCreate: number }> = []
 
+  const spentCaps: number[] = []
   const deps: ConfirmDeps = {
     resolveOwner: async () => { trace.push('owner'); return opts.owner ?? { kind: 'ok', draftId: DRAFT, sellerId: SELLER, shopName: 'Velas Luz' } },
     mutate: async <T>(draftId: string, fn: (r: LedgerRow) => Mutation<T>) => {
@@ -248,13 +249,15 @@ function confirmWorld(opts: { owner?: OwnerLookup; used?: number; spendError?: b
         if (m.write.catalog !== undefined) row.catalog = m.write.catalog
         row.updated_at = `t${++version}`
       }
-      return { ok: true as const, result: m.result }
+      ;(deps as ConfirmDeps & { spentCaps?: number[] }).spentCaps = spentCaps
+  return { ok: true as const, result: m.result }
     },
-    spend: async () => {
+    spend: async (cap: number) => {
       trace.push('spend')
+      spentCaps.push(cap)
       if (opts.spendThrows) throw new Error('network')
       if (opts.spendError) return { data: null, error: { message: 'boom' } }
-      if (used >= P2S_LIMITS.photosPerMonth) return { data: null, error: null }
+      if (used >= cap) return { data: null, error: null }
       used += 1
       return { data: used, error: null }
     },
@@ -556,4 +559,13 @@ test('the photo preview is drawn from the File onto a canvas: no object URL, no 
   expect(src).toContain('<FilePreview file={phase.preview} />')
   expect(src).toContain('createImageBitmap(file)')
   expect(src).not.toMatch(/createObjectURL|<img\b/)
+})
+
+test('the photo cap is the owner plan\'s (plans-gratis-negocio D8): spend and "photos left" use the same number', async () => {
+  const w = confirmWorld()
+  const deps = { ...w.deps, photoCap: async () => 60 }
+  const out = await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, deps)
+  expect((w.deps as ConfirmDeps & { spentCaps?: number[] }).spentCaps).toEqual([60])
+  expect(out.status).toBe(200)
+  if (out.status === 200) expect((out.body as { photos_left: number }).photos_left).toBe(59)
 })

@@ -18,7 +18,9 @@ import { readShopFresh, readShopListings } from '@/lib/listings'
 import { isShopClaimed } from '@/lib/claim'
 import { isShopPreviewPrivateBySlug } from '@/lib/preview-access'
 import { checkRateLimit } from '@/lib/ratelimit'
-import { budgetPeriod } from '@/lib/prompt-to-shop/allowance'
+import { budgetPeriod, monthPeriod } from '@/lib/prompt-to-shop/allowance'
+import { planForSlug } from '@/lib/plan-by-slug-server'
+import { allowanceFor } from '@/lib/plan-allowances'
 import { callModelBody } from '@/lib/prompt-to-shop/server'
 import { verifyTurnstile } from '@/lib/prompt-to-shop/turnstile'
 import type { ChatDeps, ChatShopRead } from './handler'
@@ -73,6 +75,24 @@ export async function spendChat(subject: string, cap: number): Promise<boolean> 
   return !error && typeof data === 'number'
 }
 
+/** One answer from the shop's MONTHLY plan allowance (plans-gratis-negocio D8). NULL from the RPC = the cap is reached. */
+export async function spendChatMonth(subject: string, cap: number): Promise<boolean> {
+  const { data, error } = await db.rpc('spend_ai_allowance', {
+    p_subject: subject,
+    p_kind: 'chat_month',
+    p_period: monthPeriod(new Date()),
+    p_cap: cap,
+  })
+  return !error && typeof data === 'number'
+}
+
+/** The shop's monthly chat answers for its plan, or null when the plan could not be read (the handler then uses
+ *  Gratis's, the lower amount). */
+export async function chatMonthlyCap(slug: string): Promise<number | null> {
+  const plan = await planForSlug(slug)
+  return plan ? allowanceFor(plan.plan).chatAnswersPerMonth : null
+}
+
 export function chatDeps(ip: string): ChatDeps {
   return {
     rateAllowed: async (slug) => {
@@ -82,6 +102,8 @@ export function chatDeps(ip: string): ChatDeps {
     readShop: readChatShop,
     verifyTurnstile: async (token) => (await verifyTurnstile({ secret: process.env.TURNSTILE_SECRET_KEY, token, ip })).ok,
     spend: spendChat,
+    monthlyCap: chatMonthlyCap,
+    spendMonth: spendChatMonth,
     callModel: (body) => callModelBody(body),
     secret: chatTokenSecret(),
     now: () => Date.now(),

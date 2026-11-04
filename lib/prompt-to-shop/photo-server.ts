@@ -7,6 +7,8 @@
 
 import { shapeOf } from '@/lib/business-shape'
 import 'server-only'
+import { resolveMyPlan } from '@/lib/plan-server'
+import { allowanceFor } from '@/lib/plan-allowances'
 import { db } from '@/lib/supabase'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { buildCreateBody, createSellerProduct } from '@/lib/seller-product-create'
@@ -221,7 +223,12 @@ export function confirmDeps(userId: string, clerkJwt: string): ConfirmDeps {
   return {
     resolveOwner: () => resolvePhotoOwner(userId, clerkJwt),
     mutate: (draftId, fn) => mutateKept(userId, draftId, fn),
-    spend: async () => {
+    // The owner's plan sets the month's photos (D8); a plan that cannot be read gets Gratis's (fail closed).
+    photoCap: async () => {
+      const mine = await resolveMyPlan(userId).catch(() => null)
+      return allowanceFor(mine?.plan.plan).photosPerMonth
+    },
+    spend: async (cap: number) => {
       // Bounded (SPEND_TIMEOUT_MS) so a `pending` entry can never outlive the takeover window while still live. An
       // abort reads as an error → refused and released; if the RPC committed anyway, one photo is lost (the
       // accepted worst case), never a double product.
@@ -229,7 +236,7 @@ export function confirmDeps(userId: string, clerkJwt: string): ConfirmDeps {
         p_subject: userSubject(userId),
         p_kind: 'photo',
         p_period: monthPeriod(new Date()),
-        p_cap: P2S_LIMITS.photosPerMonth,
+        p_cap: cap,
       }).abortSignal(AbortSignal.timeout(SPEND_TIMEOUT_MS))
       return { data, error }
     },

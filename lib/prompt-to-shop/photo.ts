@@ -454,8 +454,11 @@ export interface ConfirmDeps {
   /** Runs one ledger mutation as a conditional write on the kept draft (id + claimed_by + updated_at, `.select()`
    *  back). `unavailable` when it could not be applied (read failed, or lost every race). */
   mutate: <T>(draftId: string, fn: (row: LedgerRow) => Mutation<T>) => Promise<{ ok: true; result: T } | { ok: false }>
-  /** `spend_ai_allowance` raw answer — `decidePhotoSpend` reads it. */
-  spend: () => Promise<{ data: unknown; error: unknown }>
+  /** `spend_ai_allowance` raw answer against `cap` — `decidePhotoSpend` reads it. */
+  spend: (cap: number) => Promise<{ data: unknown; error: unknown }>
+  /** The owner's monthly photos for their plan (`lib/plan-allowances.ts`, plans-gratis-negocio D8). Omitted (a test,
+   *  an older caller) → `P2S_LIMITS.photosPerMonth`. Spend and "photos left" read the SAME cap. */
+  photoCap?: () => Promise<number>
   /** A product this nonce already created (a `paid` retry after a create that did land). `unavailable` = could not tell. */
   findCreated: (nonce: string) => Promise<string | null | 'unavailable'>
   /** `exampleTitle` = the draft example this product replaces, kept on the product so the plan can carry its estimate. */
@@ -537,14 +540,15 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
   }
 
   // spend — fails CLOSED. Then mark it paid BEFORE the create.
+  const photoCap = deps.photoCap ? await deps.photoCap() : P2S_LIMITS.photosPerMonth
   if (mustSpend) {
     let rpc: { data: unknown; error: unknown }
     try {
-      rpc = await deps.spend()
+      rpc = await deps.spend(photoCap)
     } catch (e) {
       rpc = { data: null, error: e instanceof Error ? e.message : 'spend threw' }
     }
-    const decision = decidePhotoSpend(rpc, P2S_LIMITS.photosPerMonth)
+    const decision = decidePhotoSpend(rpc, photoCap)
     if (!decision.ok) {
       await deps.mutate(draftId, (r) => releaseMutation(r, nonce))
       deps.log?.({ step: 'photo_spend', ok: false, reason: decision.reason })

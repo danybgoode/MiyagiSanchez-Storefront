@@ -21,6 +21,7 @@ import {
   type ChatShop,
 } from './core'
 import { isLikelyShopSlug } from '../route-shape'
+import { PLAN_ALLOWANCES } from '../plan-allowances'
 
 /** A shop's chat answers this many questions a day; past it the chat says so and offers to leave a message. */
 export const CHAT_PER_SHOP_PER_DAY = 200
@@ -32,6 +33,8 @@ export const CHAT_GLOBAL_PER_DAY = 3000
  */
 export const AGENT_PER_SHOP_PER_DAY = 50
 export const AGENT_GLOBAL_PER_DAY = 500
+/** When a shop's plan cannot be read, its monthly chat allowance is Gratis's — the lower one. */
+const GRATIS_CHAT_MONTHLY = PLAN_ALLOWANCES.gratis.chatAnswersPerMonth
 
 export const CHAT_COPY = {
   invalid: 'No entendimos tu mensaje. Escríbelo de nuevo, en pocas palabras.',
@@ -41,6 +44,9 @@ export const CHAT_COPY = {
   // Neutral: a budget refusal adds no answer to the thread, so the leave form never follows it (PR #470 review).
   budget: 'La tienda ya respondió muchas preguntas hoy. Vuelve a intentarlo mañana.',
   unavailable: 'No pudimos responder ahora. Inténtalo de nuevo en un momento.',
+  // The shop's plan allowance for the month is used up (plans-gratis-negocio D8). Sent as an UNANSWERED answer, so
+  // the widget offers «Déjale tu pregunta a la tienda» — the buyer is never left with an error.
+  allowance: 'Esta tienda ya respondió muchas preguntas este mes. Déjale la tuya y te responde por correo.',
   // S5 ships the handoff, so «no sé» can now offer it: the widget shows the form under this answer.
   unsure: 'No tengo esa respuesta en la información de la tienda. Puedes dejarle tu pregunta y te escribe.',
 } as const
@@ -57,6 +63,13 @@ export interface ChatDeps {
   verifyTurnstile: (token: string | null) => Promise<boolean>
   /** `spend_ai_allowance` per subject; true = this question is paid for. Fails closed (an error is false). */
   spend: (subject: string, cap: number) => Promise<boolean>
+  /**
+   * The shop's monthly answers for its plan (`lib/plan-allowances.ts`), or null when the plan could not be read —
+   * then Gratis's allowance applies (fail closed). Omitted (a test, an older caller): no monthly allowance.
+   */
+  monthlyCap?: (slug: string) => Promise<number | null>
+  /** Spend one answer from the shop's MONTHLY allowance (`spend_ai_allowance`, kind `chat_month`). Fails closed. */
+  spendMonth?: (subject: string, cap: number) => Promise<boolean>
   callModel: (body: Record<string, unknown>) => Promise<{ ok: boolean; text?: string }>
   secret: string
   now: () => number
@@ -90,7 +103,18 @@ export async function handleShopChat(input: { slug: string; body: unknown }, dep
     if (!(await deps.verifyTurnstile(body.turnstileToken))) return refuse(403, 'verify')
   }
 
-  // The shop's own day first (a shop's popularity is not a reason to spend the platform's), then the global ceiling.
+  // The plan's monthly allowance first (D8): over it, the buyer is offered the leave-a-question form, not an error.
+  // Widget and agents spend from ONE monthly subject: the allowance is the shop's, whoever asks.
+  if (deps.monthlyCap && deps.spendMonth) {
+    const cap = (await deps.monthlyCap(slug)) ?? GRATIS_CHAT_MONTHLY
+    if (!(await deps.spendMonth(`shop_chat:month:shop:${slug}`, cap))) {
+      const chat_token = hasToken && body.chatToken ? body.chatToken : signChatToken(slug, now, deps.secret)
+      deps.log?.({ event: 'shop_chat_allowance', slug, cap })
+      return { status: 200, body: { answer: CHAT_COPY.allowance, answered: false, chat_token } }
+    }
+  }
+
+  // The shop's own day next (a shop's popularity is not a reason to spend the platform's), then the global ceiling.
   const agent = deps.audience === 'agent'
   const shopSubject = agent ? `shop_chat:agent:shop:${slug}` : `shop_chat:shop:${slug}`
   const globalSubject = agent ? 'shop_chat:agent:global' : 'shop_chat:global'
