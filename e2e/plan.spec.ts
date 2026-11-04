@@ -14,6 +14,7 @@ import {
   addMonthsClamped,
   canStartTrial,
   daysLeft,
+  decideDomainRelease,
   entitleByPlan,
   derivePlan,
   derivePlanFromMetadata,
@@ -229,4 +230,13 @@ test.describe('entitleByPlan — Negocio opens items, never takes one away (D5)'
     expect(entitleByPlan(none, gratis, planOpensMlSync)).toEqual(none)
     expect(entitleByPlan(none, null, planOpensMlSync)).toEqual(none)
   })
+})
+
+test('custom-domain release: only when entitled by no path; an unreadable plan keeps it and alerts (D5)', () => {
+  const base = { reason: 'subscription_canceled' as const, hasDomain: true, entitled: false, planUnavailable: false }
+  expect(decideDomainRelease(base)).toBe('release')
+  expect(decideDomainRelease({ ...base, entitled: true })).toBe('keep')
+  expect(decideDomainRelease({ ...base, planUnavailable: true })).toBe('keep_and_alert')
+  expect(decideDomainRelease({ ...base, reason: 'negocio_ended', hasDomain: false })).toBe('nothing_to_release')
+  expect(decideDomainRelease({ ...base, reason: 'negocio_ended' })).toBe('release')
 })

@@ -48,8 +48,11 @@ export async function getNegocioSubscription(sellerClerkId: string, shopId: stri
     )
     if (!res.ok) return UNAVAILABLE
     const body = (await res.json()) as Partial<NegocioSubscription> & { reason?: string }
-    // `reason: 'error'` and `reason: 'no_plan'` are "could not look"; a clean answer has no reason.
-    if (body.reason === 'error' || body.reason === 'no_plan') return { ...UNAVAILABLE, plan_id: body.plan_id ?? null }
+    // `reason: 'error'` is "could not look". `reason: 'no_plan'` is a KNOWN absence — with no Negocio plan seeded nobody
+    // can hold a monthly subscription — so it is "not subscribed", and the yearly checkout (which needs no plan) stays
+    // open (Codex, #471). The monthly checkout still refuses: it has no price to sell.
+    if (body.reason === 'error') return { ...UNAVAILABLE, plan_id: body.plan_id ?? null }
+    if (body.reason === 'no_plan') return { ...UNAVAILABLE, unavailable: false }
     return {
       active: body.active === true,
       unavailable: false,

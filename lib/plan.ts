@@ -325,3 +325,25 @@ export function planNegocioTrialBackfill(shops: readonly ShopForTrialBackfill[])
     return { shopId: s.id, slug: s.slug, action: 'stamp', why: 'owned_never_trialed' }
   })
 }
+
+// ── Custom-domain release (plans-gratis-negocio D5, Codex #471) ─────────────────
+
+export type DomainReleaseReason = 'subscription_canceled' | 'one_time_expired' | 'negocio_ended'
+export type DomainReleaseDecision = 'release' | 'keep' | 'keep_and_alert' | 'nothing_to_release'
+
+/**
+ * Should a shop's custom domain be torn down? Only when it is entitled by NO path (its own grant or subscription, or
+ * Negocio). An unreadable plan keeps it — a teardown is the hard-to-undo direction — and asks a human. Ending Negocio on
+ * a shop that never had a domain releases nothing.
+ */
+export function decideDomainRelease(input: {
+  reason: DomainReleaseReason
+  hasDomain: boolean
+  entitled: boolean
+  planUnavailable: boolean
+}): DomainReleaseDecision {
+  if (input.reason === 'negocio_ended' && !input.hasDomain) return 'nothing_to_release'
+  if (input.entitled) return 'keep'
+  if (input.planUnavailable) return 'keep_and_alert'
+  return 'release'
+}

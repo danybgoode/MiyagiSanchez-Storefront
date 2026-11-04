@@ -26,6 +26,7 @@ import { getNegocioSubscription, setNegocioSubscriptionStatus } from '@/lib/nego
 import { NEGOCIO_GRANT_KEY, decideNegocioPayment } from '@/lib/plan'
 import { mapNegocioStatus, sessionMonths, subscriptionPeriod } from '@/lib/negocio-checkout-rules'
 import { markAttributionPaid, isPromoterSku } from '@/lib/promoter'
+import { releaseCustomDomainForShop } from '@/lib/domain-lapse-server'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const MEDUSA_PUB_KEY = process.env.MEDUSA_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -168,6 +169,9 @@ export async function handleNegocioSubscriptionChanged(subscription: Stripe.Subs
   try {
     const updated = await setNegocioSubscriptionStatus(subscription.id, status)
     if (updated === 0) throw new Error('no Negocio subscription row matched')
+    // Negocio ended: a custom domain the shop had THROUGH Negocio is released, unless it is still entitled another
+    // way (its own grant or subscription, a yearly Negocio grant) — the one release function decides (Codex, #471).
+    if (deleted) await releaseCustomDomainForShop(subscription.metadata?.shop_id, 'negocio_ended')
   } catch (e) {
     console.error('[negocio sub] status sync failed:', e)
     tg.alert(

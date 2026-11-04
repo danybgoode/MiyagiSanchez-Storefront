@@ -21,8 +21,9 @@ import { SHOP_DOMAINS_TAG } from '@/lib/custom-domain'
 import { tg } from '@/lib/telegram'
 import { readDomainGrant, isOneTimeGrantLive } from '@/lib/domain-entitlement'
 import { revalidateTag } from 'next/cache'
-import { planOpensCustomDomain } from '@/lib/plan'
+import { resolveDomainEntitlement } from '@/lib/domain-entitlement-server'
 import { resolvePlan } from '@/lib/plan-server'
+import { decideDomainRelease } from '@/lib/plan'
 
 /**
  * Release the seller's custom domain from the provider, null it in Supabase, and
@@ -32,7 +33,7 @@ import { resolvePlan } from '@/lib/plan-server'
  */
 export async function releaseCustomDomainForShop(
   shopId: string | undefined,
-  reason: 'subscription_canceled' | 'one_time_expired' = 'subscription_canceled',
+  reason: 'subscription_canceled' | 'one_time_expired' | 'negocio_ended' = 'subscription_canceled',
 ): Promise<void> {
   if (!shopId) return
   try {
@@ -48,20 +49,18 @@ export async function releaseCustomDomainForShop(
       return
     }
 
-    // Negocio includes the custom domain (plans-gratis-negocio D5): a lapsed standalone grant or subscription must not
-    // tear down the domain of a shop that is on Negocio. A plan that cannot be read keeps the domain too — a
-    // teardown is the hard-to-undo direction — and asks for a look.
-    const plan = await resolvePlan((shop as { metadata?: unknown }).metadata, {
-      sellerClerkId: (shop as { clerk_user_id?: string | null }).clerk_user_id ?? null,
-      shopId,
-    })
-    if (planOpensCustomDomain(plan) || plan.reason === 'unavailable') {
-      if (plan.reason === 'unavailable') {
-        tg.alert(`⚠️ Dominio propio NO liberado: no se pudo leer el plan de la tienda (${reason}). Revisar.\nShop: ${shopId}`)
-      }
-      return
-    }
     const domain = (shop as { custom_domain?: string | null } | null)?.custom_domain
+    // Release only a domain the shop is no longer entitled to by ANY path: its own grant or standalone subscription,
+    // or Negocio (plans-gratis-negocio D5). The rule is the pure `decideDomainRelease`.
+    const ownerId = (shop as { clerk_user_id?: string | null }).clerk_user_id ?? undefined
+    const meta0 = (shop as { metadata?: unknown }).metadata
+    const entitled = (await resolveDomainEntitlement(meta0, { sellerClerkId: ownerId, shopId })).entitled
+    const planUnavailable = entitled ? false : (await resolvePlan(meta0, { sellerClerkId: ownerId ?? null, shopId })).reason === 'unavailable'
+    const decision = decideDomainRelease({ reason, hasDomain: !!domain, entitled, planUnavailable })
+    if (decision === 'keep_and_alert') {
+      tg.alert(`⚠️ Dominio propio NO liberado: no se pudo leer el plan de la tienda (${reason}). Revisar.\nShop: ${shopId}`)
+    }
+    if (decision !== 'release') return
     if (domain) {
       try {
         await removeDomainFromProject(domain)
