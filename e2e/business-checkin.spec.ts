@@ -124,3 +124,14 @@ test('the server surfaces the email\'s own result (dispatch swallows channel err
   expect(server).toContain('if (emailFailed) throw new Error(`email ${emailFailed}`)')
   expect(server).toMatch(/readRows: async \(\) => \{[\s\S]*last_checkin_period\.is\.null,last_checkin_period\.neq\./)
 })
+
+test('the check-in is part of Negocio and its trial (plans-gratis-negocio D9): Gratis is skipped, an unreadable plan waits', async () => {
+  const { deps, trace } = fakes({
+    readRows: async () => { trace.push('read'); return [row({ id: 'gratis', seller_id: 'sel_g' }), row({ id: 'negocio', seller_id: 'sel_1' }), row({ id: 'unknown', seller_id: 'sel_u' })] },
+    planIncludesCheckin: async (r) => (r.id === 'gratis' ? false : r.id === 'unknown' ? null : true),
+  })
+  const r = await runCheckinCron({ authorised: true }, deps)
+  expect(r.body).toMatchObject({ ok: true, sent: 1, skipped: 1, unavailable: 1 })
+  // Gratis and the unreadable plan: no ledger read, no claim, no send.
+  expect(trace).toEqual(['read', 'ledger:sel_1', 'claim:negocio', 'send:negocio'])
+})

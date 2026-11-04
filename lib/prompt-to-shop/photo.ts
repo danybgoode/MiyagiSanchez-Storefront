@@ -228,6 +228,9 @@ export interface AnalyzeDeps {
   burstAllowed: () => Promise<boolean>
   /** This month's photos already used — a READ, never a spend. `null` = could not read. */
   photosUsed: () => Promise<number | null>
+  /** The owner plan's monthly photos (plans-gratis-negocio D8) — the SAME cap the confirm spends against, so "left"
+   *  is never counted against a different number (pr-reviewer, #472). Omitted → `P2S_LIMITS.photosPerMonth`. */
+  photoCap?: () => Promise<number>
   /** `spend_ai_allowance('photo_analysis:user:<id>', 'daily_budget', YYYY-MM-DD MX, photoAnalysesPerDay)` raw answer.
    *  The fail-CLOSED bound on vision calls: the burst limiter fails open, and a merchant who never confirms never
    *  spends a monthly photo. */
@@ -265,7 +268,8 @@ export async function analyzePhoto(input: AnalyzeInput, deps: AnalyzeDeps): Prom
 
   // A read, not a spend: at the cap, refuse BEFORE paying for a vision call the merchant could not confirm anyway.
   // A failed read does not refuse — the confirm's spend is the hard cap and it fails closed.
-  const left = photosLeft(await deps.photosUsed())
+  const cap = deps.photoCap ? await deps.photoCap() : P2S_LIMITS.photosPerMonth
+  const left = photosLeft(await deps.photosUsed(), cap)
   if (left === 0) return refuse(429, 'allowance', photosLeftCopy(0))
 
   const empty = (message: string) => ({ status: 200 as const, body: { ok: true as const, suggestion: null, message, photos_left: left } })
@@ -454,8 +458,11 @@ export interface ConfirmDeps {
   /** Runs one ledger mutation as a conditional write on the kept draft (id + claimed_by + updated_at, `.select()`
    *  back). `unavailable` when it could not be applied (read failed, or lost every race). */
   mutate: <T>(draftId: string, fn: (row: LedgerRow) => Mutation<T>) => Promise<{ ok: true; result: T } | { ok: false }>
-  /** `spend_ai_allowance` raw answer — `decidePhotoSpend` reads it. */
-  spend: () => Promise<{ data: unknown; error: unknown }>
+  /** `spend_ai_allowance` raw answer against `cap` — `decidePhotoSpend` reads it. */
+  spend: (cap: number) => Promise<{ data: unknown; error: unknown }>
+  /** The owner's monthly photos for their plan (`lib/plan-allowances.ts`, plans-gratis-negocio D8). Omitted (a test,
+   *  an older caller) → `P2S_LIMITS.photosPerMonth`. Spend and "photos left" read the SAME cap. */
+  photoCap?: () => Promise<number>
   /** A product this nonce already created (a `paid` retry after a create that did land). `unavailable` = could not tell. */
   findCreated: (nonce: string) => Promise<string | null | 'unavailable'>
   /** `exampleTitle` = the draft example this product replaces, kept on the product so the plan can carry its estimate. */
@@ -537,14 +544,15 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
   }
 
   // spend — fails CLOSED. Then mark it paid BEFORE the create.
+  const photoCap = deps.photoCap ? await deps.photoCap() : P2S_LIMITS.photosPerMonth
   if (mustSpend) {
     let rpc: { data: unknown; error: unknown }
     try {
-      rpc = await deps.spend()
+      rpc = await deps.spend(photoCap)
     } catch (e) {
       rpc = { data: null, error: e instanceof Error ? e.message : 'spend threw' }
     }
-    const decision = decidePhotoSpend(rpc, P2S_LIMITS.photosPerMonth)
+    const decision = decidePhotoSpend(rpc, photoCap)
     if (!decision.ok) {
       await deps.mutate(draftId, (r) => releaseMutation(r, nonce))
       deps.log?.({ step: 'photo_spend', ok: false, reason: decision.reason })

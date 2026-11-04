@@ -7,6 +7,8 @@ import { getShop } from '@/lib/listings'
 import { deriveShopTrustInputs } from '@/lib/trust-inputs'
 import { isPublicReadChannel } from '@/lib/public-read'
 import { CORE_ACCENT } from '@/lib/platform-theme'
+import { shopShowsBadge } from '@/lib/plan-badge-server'
+import { badgeHref } from '@/lib/plan'
 
 type Props = {
   children: React.ReactNode
@@ -42,6 +44,10 @@ export default async function PublicReadChrome({ children, params, surface }: Pr
       logoUrl={shop.logo_url ?? null}
       domain={identity}
       trust={<TrustSignals variant="slim" channel="subdomain" {...trust} paymentProtected={false} />}
+      // The Gratis badge (plans-gratis-negocio D7): the public-read subdomain home and listings are where most
+      // visitors land, so this path must read the plan too (pr-reviewer, #472).
+      showBadge={await shopShowsBadge(shop.slug)}
+      badgeHref={badgeHref(shop.slug)}
     >
       {children}
     </ChannelLayout>

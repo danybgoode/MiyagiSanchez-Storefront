@@ -24,10 +24,25 @@ interface Props {
    * renders, so existing white-label renders are unchanged.
    */
   trust?: ReactNode
+  /**
+   * The «Tienda impulsada por Miyagi Sánchez» footer link is the Gratis plan's badge (plans-gratis-negocio D7): a
+   * Negocio or trial shop hides it. Defaults to shown, so a caller that does not know the plan changes nothing.
+   */
+  showBadge?: boolean
+  /** Where the badge links, tagged with the shop's campaign (`badgeHref` in lib/plan.ts). */
+  badgeHref?: string
   children: ReactNode
 }
 
-export default function ChannelLayout({ shopName, accentColor, logoUrl, trust, children }: Props) {
+export default function ChannelLayout({
+  shopName,
+  accentColor,
+  logoUrl,
+  trust,
+  showBadge = true,
+  badgeHref = 'https://miyagisanchez.com',
+  children,
+}: Props) {
   return (
     <div
       className="min-h-screen flex flex-col"
@@ -87,14 +102,17 @@ export default function ChannelLayout({ shopName, accentColor, logoUrl, trust, c
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs"
           style={{ color: 'var(--embed-fg-subtle)' }}>
           <span>© {new Date().getFullYear()} {shopName}</span>
-          <a
-            href="https://miyagisanchez.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="no-underline hover:opacity-70 transition-opacity"
-            style={{ color: 'var(--fg-subtle)' }}
-          >
-            <BuyerCopyText copyKey="s.slug.ChannelLayout.bb1173f1" /></a>
+          {showBadge && (
+            <a
+              href={badgeHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="no-underline hover:opacity-70 transition-opacity"
+              style={{ color: 'var(--fg-subtle)' }}
+              data-testid="shop-plan-badge"
+            >
+              <BuyerCopyText copyKey="s.slug.ChannelLayout.bb1173f1" /></a>
+          )}
         </div>
       </footer>
     </div>

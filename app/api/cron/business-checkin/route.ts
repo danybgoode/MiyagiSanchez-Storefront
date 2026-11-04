@@ -11,6 +11,8 @@ import { runCheckinCron } from '@/lib/business-plan/checkin'
 import { checkinDeps } from '@/lib/business-plan/checkin-server'
 import { cronSecretMatches } from '@/lib/prompt-to-shop/nudges'
 import { purgeAnsweredEmails } from '@/lib/shop-chat/handoff-server'
+import { runTrialNotices } from '@/lib/negocio-trial-notices'
+import { trialNoticeDeps } from '@/lib/negocio-trial-notices-server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,6 +27,9 @@ export async function GET(req: NextRequest) {
   if (result.status !== 401) {
     const purged = await purgeAnsweredEmails()
     console.info('[shop-chat] purge', JSON.stringify({ purged }))
+    // The same daily run sends the Negocio trial's two notices (plans-gratis-negocio D10), each once per shop.
+    const notices = await runTrialNotices(trialNoticeDeps())
+    console.info('[negocio-trial] notices', JSON.stringify(notices))
   }
   return NextResponse.json(result.body, { status: result.status })
 }

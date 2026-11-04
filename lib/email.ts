@@ -15,6 +15,8 @@ import { formatRentalBookingLines, type RentalBookingLike } from '@/lib/rental-b
 import { NUDGE_COPY, NUDGE_STEP_COPY } from '@/lib/prompt-to-shop/copy'
 import type { NudgeDay, NudgeStep } from '@/lib/prompt-to-shop/nudges'
 import { CHECKIN_COPY } from '@/lib/business-plan/copy'
+import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN } from '@/lib/negocio-pricing'
+import { PLAN_ALLOWANCES } from '@/lib/plan-allowances'
 import type { CheckinMessage } from '@/lib/business-plan/checkin'
 import {
   resolveFoundingOperatorInvitationOutcome,
@@ -529,6 +531,40 @@ export async function sendBusinessCheckin(ctx: { to: string; shopName: string; r
     cta(CHECKIN_COPY.cta, `${SITE}/shop/manage/plan`),
     p(esc(CHECKIN_COPY.footer)),
   ].join(''), undefined, undefined, 'es', `business-checkin/${ctx.rowId}/${m.period}`)
+}
+
+/**
+ * The Negocio trial's two notices (plans-gratis-negocio S2.3, D10): five days left, and «ya estás en Gratis». Prices
+ * and allowances come from their one modules, never typed here.
+ */
+export async function sendNegocioTrialNotice(ctx: {
+  to: string
+  shopName: string
+  shopId: string
+  notice: 'five_days' | 'ended'
+  endsAt: string
+}): Promise<EmailSendResult> {
+  const shopName = plainLine(ctx.shopName) || 'Tu tienda'
+  const pesos = (n: number) => `$${n.toLocaleString('en-US')}`
+  const prices = `Negocio cuesta ${pesos(NEGOCIO_PRICE_MONTHLY_MXN)} al mes, o ${pesos(NEGOCIO_PRICE_YEARLY_MXN)} al año, que puedes pagar a meses sin intereses.`
+  const endDate = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' }).format(new Date(ctx.endsAt))
+  const href = `${SITE}/shop/manage/negocio`
+  if (ctx.notice === 'five_days') {
+    return sendWithResult(ctx.to, `${shopName}: te quedan 5 días de Negocio`, [
+      h1('Tu prueba de Negocio termina pronto'),
+      p(esc('Este mes tu tienda ha tenido la prueba de Negocio: Mercado Libre sincronizado, muchas más respuestas del chat y tu revisión del mes. Con Negocio también puedes conectar tu propio dominio.')),
+      p(esc(`El ${endDate} pasa a Gratis por su cuenta. Sigue abierta, con todos tus productos y tu subdominio; no tienes que hacer nada.`)),
+      p(esc(prices)),
+      cta('Quedarme con Negocio', href),
+    ].join(''), undefined, undefined, 'es', `negocio-trial/${ctx.shopId}/five_days`)
+  }
+  return sendWithResult(ctx.to, `${shopName} sigue abierta, ahora en Gratis`, [
+    h1('Terminó tu prueba de Negocio'),
+    p(esc('Tu tienda, tus productos y tu subdominio siguen igual. Puedes seguir vendiendo sin pagar nada.')),
+    p(esc(`Lo que cambia: el chat de tu tienda responde hasta ${PLAN_ALLOWANCES.gratis.chatAnswersPerMonth} preguntas al mes, y la sincronización con Mercado Libre queda en pausa hasta que vuelvas a Negocio.`)),
+    p(esc(prices)),
+    cta('Volver a Negocio', href),
+  ].join(''), undefined, undefined, 'es', `negocio-trial/${ctx.shopId}/ended`)
 }
 
 /**

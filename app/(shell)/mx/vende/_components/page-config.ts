@@ -20,7 +20,6 @@ import {
   type PromoterSkuEarnings,
 } from '@/lib/promoter-earnings'
 import { buildSkuPriceTable, computeBundleRow, type PromoterSkuPrices } from '@/lib/promoter-pricing'
-import { SUBDOMAIN_PRICE_YEARLY_MXN } from '@/lib/subdomain-pricing'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 import { marketBasePath } from '@/lib/markets'
 import type { SellerAcquisitionPageConfig, LandingCallout } from './SellerAcquisitionSections'
@@ -417,7 +416,6 @@ export function buildPromoterPageConfig(
     // is configured.
     heroStats: [
       { value: `$${priceMxn}`, label: page.priceDomainLabel },
-      { value: `$${SUBDOMAIN_PRICE_YEARLY_MXN}`, label: page.priceSubdomainLabel },
       // Sprint 3 (US-3.1) — "todo esto cuesta $X — con tu promotor $Y" once a bundle is configured.
       ...(bundleRow ? [{ value: `$${bundleRow.bundlePriceMxn}`, label: `paquete completo (antes $${bundleRow.regularTotalMxn})` }] : []),
       ...(heroCommissionStat ? [{ value: heroCommissionStat, label: page.commissionLabel }] : []),

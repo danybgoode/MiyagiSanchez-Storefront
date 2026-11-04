@@ -17,6 +17,8 @@ import { CHECKIN_COPY } from './copy'
 import { moveSentence } from './explain'
 import { reportedPeriod, type CheckinDeps, type CheckinMessage, type CheckinRow } from './checkin'
 import { getShop } from '@/lib/listings'
+import { planGetsCheckin } from '@/lib/plan'
+import { resolvePlan } from '@/lib/plan-server'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const INTERNAL_SECRET = process.env.MEDUSA_INTERNAL_SECRET ?? ''
@@ -91,6 +93,15 @@ export function checkinDeps(): CheckinDeps {
         telegram: telegramText(shopName, message, next),
       })
       if (emailFailed) throw new Error(`email ${emailFailed}`)
+    },
+    // D9: the check-in is part of Negocio and its trial. Read uncached — a daily job, and the plan must be today's.
+    planIncludesCheckin: async (row) => {
+      if (!row.shop_slug) return null
+      const { data, error } = await db.from('marketplace_shops').select('id, clerk_user_id, metadata').eq('slug', row.shop_slug).maybeSingle()
+      if (error || !data) return null
+      const shop = data as { id: string; clerk_user_id: string | null; metadata: unknown }
+      const plan = await resolvePlan(shop.metadata, { sellerClerkId: shop.clerk_user_id, shopId: shop.id })
+      return plan.reason === 'unavailable' ? null : planGetsCheckin(plan)
     },
     now: () => new Date(),
     log: (line) => console.info('[business-checkin]', JSON.stringify(line)),
