@@ -7,6 +7,7 @@
  * Also serves as the well-known discovery document (link from robots.txt / .well-known).
  */
 
+import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN, NEGOCIO_TRIAL_DAYS } from '@/lib/negocio-pricing'
 import { NextRequest, NextResponse } from 'next/server'
 import { UCP_CAPABILITIES, MCP_TOOL_NAMES } from '@/lib/ucp/capabilities'
 import { aboutManifestBlock } from '@/lib/about-agent'
@@ -187,6 +188,15 @@ export async function GET(req: NextRequest) {
           auth: 'authorization_bearer_shop_token',
           note: "Per-shop token (Authorization: Bearer ms_agent_…) generated in the shop's “Agentes e integraciones” settings; scoped to one shop.",
           mcp_tools: ['list_orders'],
+        },
+
+        seller_plan: {
+          method: 'POST',
+          url: `${base}/api/ucp/mcp`,
+          description: `Miyagi Sánchez has two plans: Gratis (free forever, with the shop, its URL and subdomain, 0% commission and every payment method) and Negocio ($${NEGOCIO_PRICE_MONTHLY_MXN} MXN a month, or $${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN a year payable in card installments), which adds the custom domain, Mercado Libre sync, far more shop-chat answers and photos, the monthly check-in and no badge. Every new shop gets a ${NEGOCIO_TRIAL_DAYS}-day Negocio trial. A seller's own agent reads the plan with get_plan and starts Negocio with start_negocio (owner token only); entitlement turns on once the payment lands.`,
+          auth: 'authorization_bearer_shop_token',
+          note: "Per-shop token (Authorization: Bearer ms_agent_…) generated in the shop's “Agentes e integraciones” settings; scoped to one shop.",
+          mcp_tools: ['get_plan', 'start_negocio'],
         },
 
         seller_domain_subscription: {
