@@ -47,6 +47,9 @@ export interface TrialNoticeDeps {
   /** Compare-and-swap the trial from `rawTrial` to `next`. True = this run owns the send. */
   claim: (shop: TrialShop, next: NegocioTrial) => Promise<boolean>
   send: (shop: TrialShop, notice: TrialNotice) => Promise<void>
+  /** Undo a claim whose send FAILED (compare-and-swap `claimed` back to the trial read), so tomorrow retries it
+   *  (Codex, #472). Best-effort: if it cannot release, the notice is skipped rather than sent twice. */
+  release?: (shop: TrialShop, claimed: NegocioTrial) => Promise<void>
   now: () => Date
 }
 
@@ -62,13 +65,16 @@ export async function runTrialNotices(deps: TrialNoticeDeps): Promise<TrialNotic
     if (!plan) { unavailable += 1; continue }
     const notice = decideTrialNotice(shop.trial, plan, now)
     if (!notice) { skipped += 1; continue }
-    if (!(await deps.claim(shop, markNotified(shop.trial, notice, now)))) { skipped += 1; continue }
+    const claimed = markNotified(shop.trial, notice, now)
+    if (!(await deps.claim(shop, claimed))) { skipped += 1; continue }
     try {
       await deps.send(shop, notice)
       sent += 1
     } catch {
-      // Claimed but not sent: counted, never retried into a duplicate. The log names it.
+      // Claimed but not sent: release the claim so tomorrow's run retries it. A release that fails leaves the
+      // notice skipped — one missed email, never two.
       failed += 1
+      await deps.release?.(shop, claimed).catch(() => {})
     }
   }
   return { ok: true, sent, skipped, unavailable, failed }

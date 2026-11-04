@@ -11,6 +11,9 @@
  * any failed cancel exits non-zero — a run that "succeeds" at nothing reads as a passing gate. Run with PRODUCTION
  * Stripe and Resend credentials (the VM env), after the deploy that makes the subdomain free everywhere.
  *
+ * ⚠️ Run ONE --apply at a time. Two overlapping runs could both read a subscription before either marks it and email
+ * its owner twice; this is an operator's one-shot, so it is run once by hand, not on a timer (Codex, #472).
+ *
  * Env: STRIPE_SECRET_KEY, RESEND_API_KEY (apply only).
  */
 import process from 'node:process'

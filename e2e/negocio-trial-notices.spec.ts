@@ -55,3 +55,18 @@ test('a run that cannot read the shops reports unavailable, never "nobody"', asy
   const deps = { readShops: async () => null } as unknown as TrialNoticeDeps
   expect(await runTrialNotices(deps)).toEqual({ ok: false, error: 'unavailable' })
 })
+
+test('a send that fails releases its claim, so the next run retries (Codex, #472)', async () => {
+  const released: string[] = []
+  const shop: TrialShop = { id: 'a', slug: 'a', name: 'A', clerk_user_id: 'u', trial: trialEnding(4), rawTrial: {} }
+  const deps: TrialNoticeDeps = {
+    readShops: async () => [shop],
+    readPlan: async (s) => trialPlan(s.trial),
+    claim: async () => true,
+    send: async () => { throw new Error('smtp down') },
+    release: async (s, claimed) => { released.push(`${s.id}:${claimed.notified_5d_at ? '5d' : '?'}`) },
+    now: () => NOW,
+  }
+  expect(await runTrialNotices(deps)).toMatchObject({ ok: true, sent: 0, failed: 1 })
+  expect(released).toEqual(['a:5d'])
+})

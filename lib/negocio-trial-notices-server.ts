@@ -55,6 +55,15 @@ export function trialNoticeDeps(): TrialNoticeDeps {
       })
       return !error && Array.isArray(data) && data.length === 1
     },
+    release: async (shop, claimed) => {
+      await db.rpc('merge_shop_metadata', {
+        p_shop_id: shop.id,
+        p_patch: { [NEGOCIO_TRIAL_KEY]: shop.rawTrial },
+        p_guard_key: NEGOCIO_TRIAL_KEY,
+        p_guard_mode: 'equals',
+        p_expected: claimed,
+      })
+    },
     send: async (shop, notice) => {
       let emailFailed: string | null = null
       await dispatchToSeller(shop.clerk_user_id, {
