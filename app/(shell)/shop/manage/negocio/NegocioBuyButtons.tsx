@@ -23,7 +23,7 @@ export default function NegocioBuyButtons({ buttons }: { buttons: NegocioButton[
       })
       const json = (await res.json().catch(() => null)) as { ok?: boolean; url?: string; error?: string } | null
       if (res.ok && json?.ok && json.url) {
-        window.location.href = json.url
+        window.location.assign(json.url)
         return
       }
       setError(json?.error || 'No se pudo iniciar el pago. Intenta de nuevo.')
