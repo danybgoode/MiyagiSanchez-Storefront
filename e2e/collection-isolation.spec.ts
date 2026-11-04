@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { resolveClaimedShop } from './_helpers/claimed-shop-fixture'
 
 /**
  * Own-shop premium presentation · Sprint 2, Story 2.2 — collection-page
@@ -12,11 +13,11 @@ import { test, expect } from '@playwright/test'
  * — that's local `curl -H "Host: …"` pre-merge + Daniel's real-domain smoke
  * post-merge, per this sprint's own QA plan.
  *
- * Fixture-gated tests use MS_TEST_CLAIMED_SLUG (any real, claimed shop —
- * already used elsewhere in this suite) and skip cleanly when unset.
+ * Fixture-gated tests use a claimed shop DISCOVERED from the live catalog
+ * (MS_TEST_CLAIMED_SLUG is only a checked, optional pin). Both assert a 404,
+ * so a DEAD shop slug passed them vacuously — the pinned `miyagiprints` had
+ * been deleted and these stayed green while proving nothing.
  */
-
-const CLAIMED_SLUG = process.env.MS_TEST_CLAIMED_SLUG
 
 test.describe('collection page — platform-host isolation (always on)', () => {
   test('/c/[collection] with no channel header (platform host) → 404', async ({ request }) => {
@@ -40,14 +41,22 @@ test.describe('collection page — platform-host isolation (always on)', () => {
 })
 
 test.describe('collection page — marketplace-path isolation (fixture-gated)', () => {
+  let CLAIMED_SLUG: string | null = null
+  let reason = ''
+  test.beforeAll(async ({ request }) => {
+    const fixture = await resolveClaimedShop(request, process.env.MS_TEST_CLAIMED_SLUG)
+    CLAIMED_SLUG = fixture.slug
+    reason = fixture.reason ?? ''
+  })
+
   test('a nonexistent collection under a real shop → 404, not a crash', async ({ request }) => {
-    test.skip(!CLAIMED_SLUG, 'Set MS_TEST_CLAIMED_SLUG (any real claimed shop) to run this.')
+    test.skip(!CLAIMED_SLUG, `FIXTURE UNAVAILABLE — ${reason}`)
     const res = await request.get(`/s/${CLAIMED_SLUG}/c/definitely-not-a-real-collection-xyz`)
     expect(res.status()).toBe(404)
   })
 
   test('a malformed collection slug 404s before any Medusa fetch', async ({ request }) => {
-    test.skip(!CLAIMED_SLUG, 'Set MS_TEST_CLAIMED_SLUG (any real claimed shop) to run this.')
+    test.skip(!CLAIMED_SLUG, `FIXTURE UNAVAILABLE — ${reason}`)
     const res = await request.get(`/s/${CLAIMED_SLUG}/c/${encodeURIComponent('../etc/passwd')}`)
     expect(res.status()).toBe(404)
   })
