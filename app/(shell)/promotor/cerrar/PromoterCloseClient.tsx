@@ -359,7 +359,6 @@ function SetupStep({ n, shop, onShop }: { n: number; shop: Shop | null; onShop: 
  */
 const CLOSE_SKUS = [
   { id: 'domain', label: 'Dominio propio', payLabel: 'Pagar dominio propio (1 año)' },
-  { id: 'subdomain', label: 'Subdominio propio', payLabel: 'Activar subdominio (1 año)' },
   { id: 'ml-sync', label: 'Sincronización Mercado Libre', payLabel: 'Pagar sincronización ML (1 año)' },
   { id: 'migration', label: 'Migración de tienda', payLabel: 'Cobrar migración' },
 ] as const

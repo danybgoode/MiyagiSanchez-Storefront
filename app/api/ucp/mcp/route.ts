@@ -4401,68 +4401,19 @@ async function handleGetSubdomainEntitlement(args: Record<string, unknown>, auth
 }
 
 async function handleStartSubdomainSubscription(args: Record<string, unknown>, authHeader?: string | null) {
+  // plans-gratis-negocio S2.4 (D11): the subdomain is free on every plan; this tool no longer sells or switches it.
+  // Auth still runs first, so an unauthorised caller learns nothing new.
   const agentAuth = await resolveToolShop(authHeader, args, 'start_subdomain_subscription')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
-  const shop = agentAuth.shop
-
-  const cadence = asDomainCadence(args.cadence) ?? 'recurring'
-  const interval = coerceSubdomainInterval(args.interval)
-  const result = await startSubdomainCheckout({
-    shopId: shop.id,
-    sellerClerkId: shop.clerk_user_id,
-    channel: 'api',
-    cadence,
-    interval,
-  })
-
-  if (!result.ok) {
-    return { isError: true, content: [{ type: 'text', text: result.error }] }
-  }
-
-  const cadenceNote = cadence === 'one_time'
-    ? ' (pago único por un año, sin renovación automática)'
-    : interval === 'month'
-      ? ' (suscripción mensual, $25 MXN/mes)'
-      : ' (suscripción anual, $199 MXN/año)'
-  return {
-    content: [
-      {
-        type: 'text',
-        text:
-          `Abre este enlace para activar tu subdominio propio${cadenceNote}:\n${result.url}\n\n` +
-          'La habilitación se activa automáticamente al completar el checkout.',
-      },
-      { type: 'text', text: JSON.stringify({ checkout_url: result.url, cadence, interval }, null, 2) },
-    ],
-  }
+  return { isError: true, content: [{ type: 'text', text: 'El subdominio ahora es gratis en todos los planes de Miyagi Sánchez: no hay nada que comprar ni cambiar. Para dominio propio, Mercado Libre y más, consulta el plan Negocio con get_plan.' }] }
 }
 
 async function handleSwitchSubdomainCadence(args: Record<string, unknown>, authHeader?: string | null) {
+  // plans-gratis-negocio S2.4 (D11): the subdomain is free on every plan; this tool no longer sells or switches it.
+  // Auth still runs first, so an unauthorised caller learns nothing new.
   const agentAuth = await resolveToolShop(authHeader, args, 'switch_subdomain_cadence')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
-  const shop = agentAuth.shop
-
-  // Pass the raw arg — the switch builder validates it strictly (a billing mutation
-  // rejects a missing/invalid interval rather than defaulting).
-  const result = await switchSubdomainCadence({
-    sellerClerkId: shop.clerk_user_id,
-    targetInterval: args.interval,
-  })
-
-  if (!result.ok) {
-    return { isError: true, content: [{ type: 'text', text: result.error }] }
-  }
-
-  const label = result.interval === 'month' ? '$25 MXN/mes' : '$199 MXN/año'
-  const text = result.switched
-    ? `✅ Tu suscripción al subdominio cambió a ${label}. Se prorrateó el cambio (sin cargo doble) y tu subdominio siguió activo sin interrupción.`
-    : `Tu suscripción al subdominio ya está en ${label}. No se hizo ningún cambio ni cargo.`
-  return {
-    content: [
-      { type: 'text', text },
-      { type: 'text', text: JSON.stringify({ switched: result.switched, interval: result.interval }, null, 2) },
-    ],
-  }
+  return { isError: true, content: [{ type: 'text', text: 'El subdominio ahora es gratis en todos los planes de Miyagi Sánchez: no hay nada que comprar ni cambiar. Para dominio propio, Mercado Libre y más, consulta el plan Negocio con get_plan.' }] }
 }
 
 /**

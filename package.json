@@ -22,7 +22,8 @@
     "seed:clear": "node --experimental-strip-types --env-file=.env.local scripts/seed.ts --clear",
     "lint:changed": "node scripts/lint-changed.mjs",
     "paywall:backfill": "tsx --env-file=.env.local scripts/backfill-paywall-grants.ts",
-    "negocio:trial-backfill": "tsx --env-file=.env.local scripts/backfill-negocio-trial.ts"
+    "negocio:trial-backfill": "tsx --env-file=.env.local scripts/backfill-negocio-trial.ts",
+    "subdomain:cancel-paid": "tsx scripts/cancel-subdomain-subscriptions.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",
