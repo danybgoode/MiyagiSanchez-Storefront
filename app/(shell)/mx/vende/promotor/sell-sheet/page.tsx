@@ -2,7 +2,6 @@ import { PACKAGES, PACKAGE_SKUS, packageSentence } from '@/lib/promoter-packages
 import { getCommissionRates } from '@/lib/promoter'
 import type { Metadata } from 'next'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
-import { CUSTOM_DOMAIN_PRICE_MXN } from '@/lib/domain-pricing'
 import { getPromoterSkuPrices } from '@/lib/promoter'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 

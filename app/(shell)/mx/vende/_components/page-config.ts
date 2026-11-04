@@ -15,12 +15,9 @@ import type { PromoterSettings } from '@/lib/promoter'
 import type { PromoterSku } from '@/lib/promoter-skus'
 import {
   buildPromoterEarningsTable,
-  buildPromoterEarningsExample,
-  promoterHeroCommissionStat,
-  PROMOTER_SKU_BASE_PRICE_MXN,
   type PromoterSkuEarnings,
 } from '@/lib/promoter-earnings'
-import { buildSkuPriceTable, computeBundleRow, type PromoterSkuPrices } from '@/lib/promoter-pricing'
+import type { PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 import { marketBasePath } from '@/lib/markets'
 import type { SellerAcquisitionPageConfig, LandingCallout } from './SellerAcquisitionSections'
@@ -366,7 +363,6 @@ export function buildPromoterPageConfig(
   },
 ): SellerAcquisitionPageConfig {
   const page = copy.promotor
-  const priceMxn = opts.customDomainPriceMxn
   const isBoundPromoter = opts.isBoundPromoter ?? false
   const promoterSettings: PromoterSettings = opts.promoterSettings ?? { enabled: false, discount_type: 'fixed', discount_amount_cents: 0 , bundle_skus: [], bundle_price_mxn: null }
   const commissionRates: Record<PromoterSku, number> = opts.commissionRates ?? {
@@ -385,13 +381,6 @@ export function buildPromoterPageConfig(
   const anualKeepMxn = Math.round(packageSplit('negocio_anual', commissionRates.negocio_anual ?? 0).keepCents / 100)
   const gratisKeepMxn = Math.round(packageSplit('setup_gratis', commissionRates.setup_gratis ?? 0).keepCents / 100)
   const pesosStat = (n: number) => '$' + n.toLocaleString('en-US')
-  // Sprint 3 (US-3.1) — "todo esto cuesta $X — con tu promotor $Y" bundle stat, same
-  // deriver the admin preview + close workspace read. Absent (null) until an admin
-  // configures a bundle — never a fabricated number.
-  const bundleRow = computeBundleRow(
-    buildSkuPriceTable(PROMOTER_SKU_BASE_PRICE_MXN, skuPrices, promoterSettings),
-    { skus: promoterSettings.bundle_skus, bundlePriceMxn: promoterSettings.bundle_price_mxn },
-  )
   // The close workspace (`/promotor/cerrar`) 404s when the program is off — hide both CTAs
   // that point there rather than link to a dead page (epic 08 · promoter-funnel-fixes S1.2).
   const closeWorkspaceCta = (label: string, testId: string) =>

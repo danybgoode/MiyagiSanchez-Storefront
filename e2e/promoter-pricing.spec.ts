@@ -4,7 +4,6 @@ import {
   buildSkuPriceRow,
   buildSkuPriceTable,
   computeBundleRow,
-  type PromoterSkuPrices,
   type BundleConfig,
 } from '../lib/promoter-pricing'
 import type { PromoterSettings } from '../lib/promoter'
