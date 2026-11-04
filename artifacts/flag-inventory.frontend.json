@@ -10,8 +10,8 @@
       "enforcement": "both",
       "callsites": [
         "app/(shell)/shop/manage/catalogo/page.tsx:108",
-        "app/api/ucp/mcp/route.ts:4208",
-        "app/api/ucp/mcp/route.ts:4248",
+        "app/api/ucp/mcp/route.ts:4205",
+        "app/api/ucp/mcp/route.ts:4245",
         "lib/catalog-bulk.ts:252",
         "lib/catalog-bulk.ts:504"
       ]
@@ -29,9 +29,9 @@
         "app/api/ucp/catalog/[id]/route.ts:84",
         "app/api/ucp/catalog/route.ts:118",
         "app/api/ucp/checkout-session/route.ts:622",
-        "app/api/ucp/mcp/route.ts:1212",
-        "app/api/ucp/mcp/route.ts:1316",
-        "app/api/ucp/mcp/route.ts:2033"
+        "app/api/ucp/mcp/route.ts:1209",
+        "app/api/ucp/mcp/route.ts:1313",
+        "app/api/ucp/mcp/route.ts:2030"
       ]
     },
     {
@@ -98,7 +98,7 @@
       "enforcement": "frontend",
       "callsites": [
         "lib/admin/tenant-directory-server.ts:72",
-        "lib/domain-entitlement-server.ts:42"
+        "lib/domain-entitlement-server.ts:43"
       ]
     },
     {
@@ -175,14 +175,14 @@
         "app/api/sell/launchpad/submissions/[id]/route.ts:22",
         "app/api/sell/launchpad/submissions/route.ts:15",
         "app/api/sell/listing/[id]/route.ts:156",
-        "app/api/ucp/mcp/route.ts:3484",
-        "app/api/ucp/mcp/route.ts:3530",
-        "app/api/ucp/mcp/route.ts:3559",
-        "app/api/ucp/mcp/route.ts:3599",
-        "app/api/ucp/mcp/route.ts:3668",
-        "app/api/ucp/mcp/route.ts:3703",
-        "app/api/ucp/mcp/route.ts:3737",
-        "app/api/ucp/mcp/route.ts:3772"
+        "app/api/ucp/mcp/route.ts:3481",
+        "app/api/ucp/mcp/route.ts:3527",
+        "app/api/ucp/mcp/route.ts:3556",
+        "app/api/ucp/mcp/route.ts:3596",
+        "app/api/ucp/mcp/route.ts:3665",
+        "app/api/ucp/mcp/route.ts:3700",
+        "app/api/ucp/mcp/route.ts:3734",
+        "app/api/ucp/mcp/route.ts:3769"
       ]
     },
     {
@@ -192,7 +192,7 @@
       "criticality": "medium",
       "enforcement": "frontend",
       "callsites": [
-        "app/api/ucp/mcp/route.ts:4082"
+        "app/api/ucp/mcp/route.ts:4079"
       ]
     },
     {
@@ -202,7 +202,7 @@
       "criticality": "medium",
       "enforcement": "frontend",
       "callsites": [
-        "app/api/ucp/mcp/route.ts:2418"
+        "app/api/ucp/mcp/route.ts:2415"
       ]
     },
     {
@@ -212,7 +212,7 @@
       "criticality": "low",
       "enforcement": "frontend",
       "callsites": [
-        "app/api/ucp/mcp/route.ts:3904"
+        "app/api/ucp/mcp/route.ts:3901"
       ]
     },
     {
@@ -222,7 +222,7 @@
       "criticality": "medium",
       "enforcement": "frontend",
       "callsites": [
-        "app/api/ucp/mcp/route.ts:4032"
+        "app/api/ucp/mcp/route.ts:4029"
       ]
     },
     {
@@ -232,7 +232,7 @@
       "criticality": "medium",
       "enforcement": "frontend",
       "callsites": [
-        "app/api/ucp/mcp/route.ts:2415"
+        "app/api/ucp/mcp/route.ts:2412"
       ]
     },
     {
@@ -250,7 +250,7 @@
         "app/api/sell/shopify/import/parity/estimate/route.ts:23",
         "app/api/sell/shopify/import/parity/route.ts:17",
         "app/api/sell/shopify/import/route.ts:25",
-        "app/api/ucp/mcp/route.ts:4276"
+        "app/api/ucp/mcp/route.ts:4273"
       ]
     },
     {
@@ -298,7 +298,7 @@
         "app/(shell)/sell/edit/[id]/page.tsx:174",
         "app/api/sell/ml/predict/route.ts:18",
         "app/api/sell/ml/publish/route.ts:19",
-        "app/api/ucp/mcp/route.ts:4057",
+        "app/api/ucp/mcp/route.ts:4054",
         "lib/listing-status.ts:53"
       ]
     },
@@ -323,7 +323,7 @@
       "criticality": "low",
       "enforcement": "both",
       "callsites": [
-        "lib/ml-sync-entitlement-server.ts:44"
+        "lib/ml-sync-entitlement-server.ts:45"
       ]
     },
     {
@@ -436,7 +436,6 @@
         "app/api/promoter/close/migration/route.ts:27",
         "app/api/promoter/close/ml-sync/route.ts:34",
         "app/api/promoter/close/print/route.ts:36",
-        "app/api/promoter/close/subdomain/route.ts:40",
         "app/api/promoter/close/transfer/[id]/report/route.ts:20",
         "app/api/promoter/close/transfer/route.ts:21",
         "app/api/promoter/me/bind/route.ts:24",
@@ -505,7 +504,6 @@
         "app/api/promoter/close/domain/route.ts:62",
         "app/api/promoter/close/migration/route.ts:56",
         "app/api/promoter/close/ml-sync/route.ts:61",
-        "app/api/promoter/close/subdomain/route.ts:97",
         "app/api/promoter/close/transfer/[id]/report/route.ts:20",
         "app/api/promoter/close/transfer/route.ts:21"
       ]

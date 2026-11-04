@@ -115,6 +115,11 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     sender: 'sendBusinessCheckin', origin: 'lib/business-plan/checkin-server.ts', group: 'onboarding',
   },
   {
+    key: 'shop.negocio_trial_notice', trigger: 'Cinco días antes de que termine la prueba de Negocio de una tienda, y al terminar si no se pagó (una vez cada una).',
+    from: 'platform', to: 'seller', channels: ['email'], domain: 'cuentas',
+    sender: 'sendNegocioTrialNotice', origin: 'lib/negocio-trial-notices-server.ts', group: 'onboarding',
+  },
+  {
     key: 'shop.claimed_welcome', trigger: 'La tienda se vincula a una cuenta por primera vez.',
     from: 'platform', to: 'seller', channels: ['email'], domain: 'cuentas',
     sender: 'sendShopClaimedWelcome', origin: 'app/api/claim/complete/route.ts',
