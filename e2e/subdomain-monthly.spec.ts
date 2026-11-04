@@ -57,13 +57,13 @@ test.describe('subdomain-monthly · pricing single-source', () => {
     expect(SUBDOMAIN_PRICE_LABEL.es).toContain('$199')
   })
 
-  test('/acerca names BOTH the monthly and yearly subdomain price in both locales', () => {
+  test('/acerca names no subdomain price in either locale: the subdomain is free (plans-gratis-negocio D11)', () => {
     const pricing = getAboutSection('pricing')
     expect(pricing.stub).toBe(false)
     for (const locale of LOCALES) {
       const text = aboutCopy(pricing, locale).body.join(' ')
-      expect(text, `${locale} names the monthly price`).toContain('$25')
-      expect(text, `${locale} still names the yearly price`).toContain('$199')
+      expect(text, `${locale} names no monthly subdomain price`).not.toContain('$25 ')
+      expect(text, `${locale} names no yearly subdomain price`).not.toContain('$199')
     }
   })
 })

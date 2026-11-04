@@ -1196,7 +1196,7 @@
       },
       "pricingCallout": {
         "title": "¿Cuánto cuesta?",
-        "body": "Abrir tu tienda y vender es gratis, con 0% de comisión. Lo opcional tiene precio publicado: subdominio {subdomainYearly}, dominio propio {customDomainYearly}.",
+        "body": "Abrir tu tienda y vender es gratis, con 0% de comisión, y tu subdominio también. Negocio ({negocioMonthly}) suma tu propio dominio, Mercado Libre y más.",
         "ctaLabel": "Ver precios"
       }
     },
@@ -1269,7 +1269,7 @@
         {
           "icon": "iconoir-shop",
           "title": "Tu tienda, con tu dirección",
-          "body": "Elige tu subdominio ({subdomainYearly}) o conecta tu propio dominio ({customDomainYearly})."
+          "body": "Tu subdominio viene gratis; con Negocio conectas tu propio dominio."
         },
         {
           "icon": "iconoir-percentage",
@@ -3302,12 +3302,12 @@
       },
       "pricing": {
         "heading": "Precios",
-        "lead": "Vender es gratis (0% de comisión). Los extras son opcionales y todos tienen precio público en miyagisanchez.com/mx/precios.",
+        "lead": "Vender es gratis (0% de comisión). Hay dos planes, Gratis y Negocio, y todos los precios son públicos en miyagisanchez.com/mx/precios.",
         "body": [
-          "Tu tienda siempre es gratis: tu URL en miyagisanchez.com/mx/s/tu-tienda no cuesta nada y nunca caduca, con 0% de comisión.",
-          "Subdominio propio: {subdomainPrice}. Tu tienda como sitio independiente en tu-tienda.miyagisanchez.com (sin la barra de la plataforma). El plan anual sale más barato; el mensual es sin compromiso. Puedes cambiar entre mensual y anual cuando quieras, sin cargo doble. Se renueva solo; cancela cuando quieras y tu tienda sigue activa y gratis en tu URL miyagisanchez.com/mx/s/tu-tienda.",
-          "Dominio propio: {customDomainPrice}. Conecta tu propio dominio (tutienda.com) con SSL e infraestructura nuestra y sin miyagisanchez.com en la URL. Se renueva cada año; puedes cancelar cuando quieras y tu tienda sigue activa en tu URL gratis.",
-          "Sincronizar con Mercado Libre: {mlSyncPrice}. Tu inventario sincronizado en los dos sentidos; conectar, importar y publicar siguen gratis. Anuncio impreso: {printAdPrice}. Migración con consultor: {migrationPrice}.",
+          "Gratis, para siempre: tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, el marketplace, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».",
+          "Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva lo prueba {trialDays} días gratis (sin el dominio propio, que llega al pagar).",
+          "Si tu prueba termina o cancelas, tu tienda sigue activa y gratis en tu URL miyagisanchez.com/mx/s/tu-tienda.",
+          "Extras aparte: anuncio impreso, {printAdPrice}; migración con consultor, {migrationPrice}.",
           "Tu pasarela de pago (Stripe o Mercado Pago) cobra su propia comisión, no nosotros, y el dinero llega directo a tu cuenta. Todos los precios, con sus fuentes: miyagisanchez.com/mx/precios."
         ]
       },
@@ -3359,16 +3359,21 @@
       "ogAlt": "Precios de Miyagi Sánchez: vender es gratis, 0% de comisión"
     },
     "eyebrow": "Precios",
-    "heroTitle": "Vender es gratis. Pagas solo lo que tú eliges.",
+    "heroTitle": "Vender es gratis. Negocio es opcional.",
     "heroLead": "0% de comisión de la plataforma. Tu dinero llega directo a tu cuenta.",
     "primaryCta": "Empieza gratis",
-    "free": {
-      "title": "Gratis, siempre",
-      "lead": "Todo esto viene con tu tienda, sin plan y sin fecha de caducidad."
+    "plans": {
+      "title": "Dos planes: Gratis y Negocio",
+      "lead": "Vender es gratis, sin comisión. Negocio agrega lo que hace crecer a tu tienda, y toda tienda nueva lo prueba gratis.",
+      "monthlySuffix": "o",
+      "recommended": "Prueba gratis",
+      "cta": "Empieza gratis",
+      "ctaNegocio": "Prueba Negocio gratis",
+      "includesLabel": "Incluye"
     },
     "extras": {
       "title": "Extras opcionales",
-      "lead": "Los activas solo si te sirven. Cancela cuando quieras y tu tienda sigue activa y gratis.",
+      "lead": "Servicios aparte, con su precio: tu anuncio en la edición impresa y la migración con consultor. Tu tienda sigue activa y gratis sin ellos.",
       "fixedBadge": "Precio fijo",
       "quotedBadge": "Se cotiza",
       "quotedCta": "Escríbenos"
@@ -3389,11 +3394,11 @@
       "items": [
         {
           "q": "¿Hay planes o mensualidades?",
-          "a": "No. Vender es gratis y no hay un plan que pagar. Solo pagas los extras que tú actives."
+          "a": "Hay dos: Gratis, para siempre, y Negocio, con dominio propio, sincronización con Mercado Libre y más. Toda tienda nueva prueba Negocio gratis y, si no lo contratas, sigue en Gratis."
         },
         {
-          "q": "¿Qué pasa si cancelo un extra?",
-          "a": "Tu tienda sigue activa y gratis en tu URL de miyagisanchez.com. Solo dejas de tener ese extra."
+          "q": "¿Qué pasa si termina mi prueba o cancelo Negocio?",
+          "a": "Tu tienda sigue activa y gratis en tu URL de miyagisanchez.com. Solo dejas de tener lo que incluye Negocio."
         },
         {
           "q": "¿Por qué no cobran comisión?",

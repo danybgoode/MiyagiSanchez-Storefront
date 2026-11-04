@@ -68,6 +68,7 @@ export async function createSubscriptionCheckout({
   buyerEmail,
   promotionCodeId,
   paymentMethodCollection,
+  idempotencyKey,
 }: {
   priceId: string
   successUrl: string
@@ -76,6 +77,8 @@ export async function createSubscriptionCheckout({
   buyerEmail?: string
   promotionCodeId?: string
   paymentMethodCollection?: 'always' | 'if_required'
+  /** Stripe idempotency key: concurrent requests with the same key get the SAME session, never two. */
+  idempotencyKey?: string
 }): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
@@ -87,7 +90,7 @@ export async function createSubscriptionCheckout({
     metadata,
     ...(promotionCodeId ? { discounts: [{ promotion_code: promotionCodeId }] } : {}),
     ...(paymentMethodCollection ? { payment_method_collection: paymentMethodCollection } : {}),
-  })
+  }, idempotencyKey ? { idempotencyKey } : undefined)
   return session.url!
 }
 
@@ -115,6 +118,7 @@ export async function createOneTimeCheckout({
   promotionCodeId,
   installments,
   paymentMethodTypes,
+  idempotencyKey,
 }: {
   amountCents: number
   currency: string
@@ -129,6 +133,8 @@ export async function createOneTimeCheckout({
   /** Restrict the payment methods (e.g. `['card']`): a delayed method (OXXO, a bank voucher) completes the session
    *  UNPAID, so a grant written on `checkout.session.completed` would be given away. Omitted = the dashboard's set. */
   paymentMethodTypes?: Array<'card'>
+  /** Stripe idempotency key: concurrent requests with the same key get the SAME session, never two. */
+  idempotencyKey?: string
 }): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
@@ -148,7 +154,7 @@ export async function createOneTimeCheckout({
     cancel_url: cancelUrl,
     metadata,
     ...(promotionCodeId ? { discounts: [{ promotion_code: promotionCodeId }] } : {}),
-  })
+  }, idempotencyKey ? { idempotencyKey } : undefined)
   return session.url!
 }
 

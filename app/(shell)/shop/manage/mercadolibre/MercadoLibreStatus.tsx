@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation'
 import type { MlHealth, MlHealthState } from '@/lib/ml-health'
 import type { SanitizedMlConnection } from '@/lib/ml-connection'
 import type { MlEventView } from '@/lib/ml-events-view'
-import { ML_SYNC_PRICE_YEARLY_MXN, ML_SYNC_PRICE_MONTHLY_MXN } from '@/lib/ml-sync-pricing'
 
 /**
  * Mercado Libre connection status + actions (US-3; extended in S5 · US-13/14).
@@ -102,28 +101,6 @@ export default function MercadoLibreStatus({
     }
   }
 
-  async function buyMlSync(interval: 'year' | 'month') {
-    if (syncBusy) return
-    setSyncBusy(true)
-    setSyncError(null)
-    try {
-      const res = await fetch('/api/sell/ml/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cadence: 'recurring', interval }),
-      })
-      const d = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
-      if (res.ok && d.url) {
-        window.location.href = d.url
-        return
-      }
-      setSyncError(d.error ?? 'No pudimos iniciar el pago. Vuelve a intentarlo.')
-    } catch {
-      setSyncError('No pudimos iniciar el pago. Vuelve a intentarlo.')
-    } finally {
-      setSyncBusy(false)
-    }
-  }
 
   async function disconnect() {
     if (busy) return
@@ -285,39 +262,11 @@ export default function MercadoLibreStatus({
           ) : (
             <div style={{ padding: '12px 14px', borderRadius: 'var(--r-md)', background: 'var(--bg-sunk)', fontSize: 13 }}>
               <p style={{ margin: '0 0 10px', color: 'var(--fg)' }}>
-                La sincronización automática de inventario es una función de pago. Actívala para no vender de
-                más en ninguno de los dos canales — también hace que tus pedidos de Mercado Libre aparezcan
-                automáticamente en tu bandeja de pedidos de Miyagi.
+                La sincronización automática de inventario viene incluida en Negocio (y en tu prueba de Negocio). Así no
+                vendes de más en ninguno de los dos canales, y tus pedidos de Mercado Libre aparecen solos en tu
+                bandeja de pedidos.
               </p>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => buyMlSync('year')}
-                  disabled={syncBusy}
-                  style={{
-                    padding: '9px 15px', borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 600, border: 'none',
-                    background: 'var(--accent)', color: 'var(--fg-inverse)',
-                    cursor: syncBusy ? 'default' : 'pointer', opacity: syncBusy ? 0.6 : 1,
-                  }}
-                >
-                  Activar — ${ML_SYNC_PRICE_YEARLY_MXN}/año
-                </button>
-                <button
-                  type="button"
-                  onClick={() => buyMlSync('month')}
-                  disabled={syncBusy}
-                  style={{
-                    padding: '9px 15px', borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 600,
-                    border: '1.5px solid var(--border)', background: 'transparent', color: 'var(--fg)',
-                    cursor: syncBusy ? 'default' : 'pointer', opacity: syncBusy ? 0.6 : 1,
-                  }}
-                >
-                  o ${ML_SYNC_PRICE_MONTHLY_MXN}/mes
-                </button>
-              </div>
-              <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-muted)' }}>
-                ¿Trabajas con un promotor? También puede activártela por ti.
-              </p>
+              <a href="/shop/manage/negocio" className="btn btn-primary btn-sm">Ver Negocio →</a>
             </div>
           )}
           {syncError && <div style={{ color: 'var(--danger)', fontSize: 13, marginTop: 10 }}>{syncError}</div>}

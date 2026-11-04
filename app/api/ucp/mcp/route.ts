@@ -78,13 +78,12 @@ import { thresholdReached } from '@/lib/launchpad-campaign-types'
 import { campaignErrorMessage } from '@/app/api/sell/launchpad/campaigns/route'
 import type { MedusaSellerForMirror } from '@/lib/provisioning'
 import { resolveDomainEntitlement } from '@/lib/domain-entitlement-server'
-import { startCustomDomainCheckout } from '@/lib/domain-subscription-checkout'
 import { stageShopifyBatch } from '@/lib/shopify-import-bridge'
 import { isPublicDomainShape } from '@/lib/ssrf-guard'
 import { downloadArtworkBytes } from '@/lib/artwork-url-fetch'
-import { CUSTOM_DOMAIN_PRICE_LABEL } from '@/lib/domain-pricing'
-import { asDomainCadence } from '@/lib/domain-cadence'
-import { CAMPAIGN_COUPON_CODE } from '@/lib/domain-coupon'
+import { resolvePlan } from '@/lib/plan-server'
+import { planAgentView } from '@/lib/plan-agent'
+import { coerceNegocioCadence, startNegocioCheckout } from '@/lib/negocio-checkout'
 import { buildStoreConfigSnapshot } from '@/lib/store-config'
 import { stageBulkActionAsAgent, applyBulkBatchAsAgent, getBulkBatch, type BulkActionPayload, type BulkFilterParams } from '@/lib/catalog-bulk'
 import { applyStoreConfig } from '@/lib/apply-config-manifest'
@@ -1040,6 +1039,22 @@ const TOOLS = [
     },
   },
   {
+    name: 'get_plan',
+    description: "SELLER TOOL. Read YOUR OWN shop's Miyagi Sánchez plan: Gratis (free forever), its 30-day Negocio trial, or Negocio. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop (a partner credential may read it too). Returns the plan, why, when it ends and days left, exactly what it includes (custom domain, Mercado Libre sync, the «Tienda impulsada por Miyagi Sánchez» badge, the monthly check-in, chat answers and photos per month), Negocio's prices, and which checkout can be started now. Use before start_negocio.",
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'start_negocio',
+    description: "SELLER TOOL. Start the Stripe checkout for Negocio on YOUR OWN shop. Requires the shop OWNER's agent token (Authorization: Bearer ms_agent_…); a partner credential cannot start a payment. `cadence`: 'month' (a monthly subscription) or 'year' (one payment for 12 months, card installments / meses sin intereses offered at checkout; a second year is added after the current end). Returns a Stripe checkout URL the merchant opens to pay; Negocio turns on by itself once the payment lands. Refused when the shop already pays monthly or holds a permanent Negocio, monthly is refused while a paid year is running, and an unclaimed shop must be claimed first.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cadence: { type: 'string', enum: ['month', 'year'], description: "'month' (monthly subscription) or 'year' (one payment, 12 months, meses sin intereses)" },
+      },
+      required: ['cadence'],
+    },
+  },
+  {
     name: 'get_domain_entitlement',
     description: "SELLER TOOL. Check whether YOUR OWN shop may connect a custom domain (the platform's paid SKU). Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop. Returns whether the shop is entitled and why (grandfathered / comp grant / one-time grant / active subscription / not entitled), the annual price, and — when not entitled — that the campaign coupon `miyagisan` covers the first year free. The SKU can be bought in two cadences (an annual subscription, or a one-time year up front with no recurring mandate). The subdomain and free shop URL are always free regardless. Use before start_domain_subscription.",
     inputSchema: {
@@ -1049,7 +1064,7 @@ const TOOLS = [
   },
   {
     name: 'start_domain_subscription',
-    description: "SELLER TOOL. Start the Stripe checkout for YOUR OWN shop's custom-domain SKU ($499 MXN/yr). Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop. Two cadences: `recurring` (default — an annual subscription that auto-renews) or `one_time` (pay one year up front with NO recurring mandate; entitlement is a dated 12-month grant that lapses gracefully at year end with no auto-charge — the cash-friendly option). On the `recurring` cadence you may pass a `coupon` (e.g. `miyagisan`) to comp the first year — capped at 100 redemptions; an exhausted/invalid coupon is refused with a clear message and no checkout is created. Returns a Stripe checkout URL the seller opens to pay (or, with a valid 100%-off coupon, to confirm at $0). Entitlement flips on automatically once checkout completes.",
+    description: "SELLER TOOL (retired). The custom domain is part of Negocio now and is not sold on its own: this tool always answers that, and never creates a checkout. Use get_plan, then start_negocio (owner token only).",
     inputSchema: {
       type: 'object',
       properties: {
@@ -1073,7 +1088,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         cadence: { type: 'string', enum: ['recurring', 'one_time'], description: "Payment cadence: 'recurring' (subscription, default) or 'one_time' (pay a year up front, no renewal)" },
-        interval: { type: 'string', enum: ['year', 'month'], description: "Recurring billing interval: 'year' ($199/yr, default) or 'month' ($25/mo). Applies to the 'recurring' cadence only." },
+        interval: { type: 'string', enum: ['year', 'month'], description: "Ignored: the subdomain is free." },
       },
     },
   },
@@ -1083,7 +1098,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        interval: { type: 'string', enum: ['year', 'month'], description: "Target billing interval: 'year' ($199/yr) or 'month' ($25/mo)." },
+        interval: { type: 'string', enum: ['year', 'month'], description: "Ignored: the subdomain is free." },
       },
       required: ['interval'],
     },
@@ -4295,6 +4310,51 @@ async function handleStartShopifyMigration(args: Record<string, unknown>, authHe
 
 // ── Custom-domain paywall (epic 07 · S3) — seller-agent domain SKU tools ──────
 
+// ── Plans (epic 08 · plans-gratis-negocio S3.3, README D17) ─────────────────────
+
+async function handleGetPlan(args: Record<string, unknown>, authHeader?: string | null) {
+  const agentAuth = await resolveToolShop(authHeader, args, 'get_plan')
+  if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
+  const shop = agentAuth.shop
+  // The exact shop the token is scoped to — never "the owner's oldest shop" (Negocio is per shop).
+  const plan = await resolvePlan(shop.metadata, { sellerClerkId: shop.clerk_user_id, shopId: shop.id })
+  const view = planAgentView(plan)
+  return { content: [{ type: 'text', text: view.summary }, { type: 'text', text: JSON.stringify(view.json, null, 2) }] }
+}
+
+async function handleStartNegocio(args: Record<string, unknown>, authHeader?: string | null) {
+  // Not in PARTNER_READ_TOOLS: only the shop owner's own token can start a payment.
+  const agentAuth = await resolveToolShop(authHeader, args, 'start_negocio')
+  if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
+  // Only the shop OWNER's token may start a payment. `resolveToolShop` limits only the VIEWER partner role to
+  // PARTNER_READ_TOOLS, so a manager partner would pass it — refuse every partner credential here (pr-reviewer, #473).
+  if (agentAuth.partner) {
+    return { isError: true, content: [{ type: 'text', text: 'Solo el dueño de la tienda puede iniciar el pago de Negocio, con su propio token.' }] }
+  }
+  const shop = agentAuth.shop
+  const cadence = coerceNegocioCadence(args.cadence)
+  if (!cadence) return { isError: true, content: [{ type: 'text', text: "cadence debe ser 'month' o 'year'." }] }
+  if (!shop.clerk_user_id) {
+    return { isError: true, content: [{ type: 'text', text: 'Esta tienda aún no tiene dueño: primero hay que reclamarla.' }] }
+  }
+  const result = await startNegocioCheckout({
+    shopId: shop.id,
+    shopMetadata: shop.metadata,
+    sellerClerkId: shop.clerk_user_id,
+    cadence,
+  }).catch((e: unknown) => {
+    console.error('[mcp start_negocio] checkout failed:', e)
+    return { ok: false as const, status: 502, error: 'No se pudo iniciar el pago.' }
+  })
+  if (!result.ok) return { isError: true, content: [{ type: 'text', text: result.error }] }
+  return {
+    content: [
+      { type: 'text', text: `Abre este enlace para pagar Negocio (${cadence === 'month' ? 'mensual' : 'anual, con meses sin intereses'}): ${result.url}` },
+      { type: 'text', text: JSON.stringify({ checkout_url: result.url, cadence }, null, 2) },
+    ],
+  }
+}
+
 async function handleGetDomainEntitlement(args: Record<string, unknown>, authHeader?: string | null) {
   const agentAuth = await resolveToolShop(authHeader, args, 'get_domain_entitlement')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
@@ -4303,9 +4363,8 @@ async function handleGetDomainEntitlement(args: Record<string, unknown>, authHea
   const ent = await resolveDomainEntitlement(shop.metadata, { sellerClerkId: shop.clerk_user_id, shopId: shop.id })
   const summary = ent.entitled
     ? `✅ ${shop.name ?? 'Tu tienda'} puede conectar un dominio propio (motivo: ${ent.reason}).`
-    : `🔒 El dominio propio es una función premium (${CUSTOM_DOMAIN_PRICE_LABEL.es}). Tu tienda aún no está habilitada. ` +
-      `El cupón “${CAMPAIGN_COUPON_CODE}” cubre gratis el primer año (sujeto a disponibilidad). El subdominio y tu URL gratis siempre son gratis. ` +
-      `Usa start_domain_subscription para activar.`
+    : `🔒 Tu tienda aún no puede conectar un dominio propio. El dominio propio viene incluido en Negocio ` +
+      `(consulta get_plan y actívalo con start_negocio). El subdominio y tu URL gratis siempre son gratis.`
 
   return {
     content: [
@@ -4316,8 +4375,7 @@ async function handleGetDomainEntitlement(args: Record<string, unknown>, authHea
           {
             entitled: ent.entitled,
             reason: ent.reason,
-            price_label: CUSTOM_DOMAIN_PRICE_LABEL.es,
-            campaign_coupon: CAMPAIGN_COUPON_CODE,
+            included_in: 'negocio',
           },
           null,
           2,
@@ -4328,38 +4386,10 @@ async function handleGetDomainEntitlement(args: Record<string, unknown>, authHea
 }
 
 async function handleStartDomainSubscription(args: Record<string, unknown>, authHeader?: string | null) {
+  // plans-gratis-negocio (D5): the custom domain is part of Negocio and is not sold on its own any more.
   const agentAuth = await resolveToolShop(authHeader, args, 'start_domain_subscription')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
-  const shop = agentAuth.shop
-
-  const couponCode = typeof args.coupon === 'string' ? args.coupon : null
-  const cadence = asDomainCadence(args.cadence) ?? 'recurring'
-  const result = await startCustomDomainCheckout({
-    shopId: shop.id,
-    sellerClerkId: shop.clerk_user_id,
-    channel: 'api',
-    couponCode,
-    cadence,
-  })
-
-  if (!result.ok) {
-    return { isError: true, content: [{ type: 'text', text: result.error }] }
-  }
-
-  const cadenceNote = cadence === 'one_time'
-    ? ' (pago único por un año, sin renovación automática)'
-    : ''
-  return {
-    content: [
-      {
-        type: 'text',
-        text:
-          `Abre este enlace para activar tu dominio propio${cadenceNote}${couponCode ? ` con el cupón “${couponCode}”` : ''}:\n${result.url}\n\n` +
-          'La habilitación se activa automáticamente al completar el checkout.',
-      },
-      { type: 'text', text: JSON.stringify({ checkout_url: result.url, cadence }, null, 2) },
-    ],
-  }
+  return { isError: true, content: [{ type: 'text', text: 'El dominio propio ahora viene incluido en Negocio y ya no se vende por separado. Consulta get_plan y actívalo con start_negocio.' }] }
 }
 
 // ── Subdomain paywall (epic 07 · subdomain-pricing S2) — seller-agent SKU tools ─
@@ -4738,6 +4768,8 @@ async function handleMcpMethod(
       case 'stage_bulk_action':         { const r = await handleStageBulkAction(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'apply_bulk_action':         { const r = await handleApplyBulkAction(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'start_shopify_migration':   { const r = await handleStartShopifyMigration(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
+      case 'get_plan':                  { const r = await handleGetPlan(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
+      case 'start_negocio':             { const r = await handleStartNegocio(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'get_domain_entitlement':    { const r = await handleGetDomainEntitlement(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'start_domain_subscription': { const r = await handleStartDomainSubscription(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'get_subdomain_entitlement':    { const r = await handleGetSubdomainEntitlement(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }

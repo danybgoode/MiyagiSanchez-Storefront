@@ -6,6 +6,7 @@
  * adds a second year while a real second payment always adds after the current end.
  */
 import { test, expect } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { coerceNegocioCadence, decideNegocioCheckout, mapNegocioStatus, sessionMonths, subscriptionPeriod } from '../lib/negocio-checkout-rules'
 import { NEGOCIO_GRANT_KEY, decideNegocioPayment, guardFor, type PlanState } from '../lib/plan'
 
@@ -120,4 +121,10 @@ test.describe('#471 review fixes', () => {
     expect(subscriptionPeriod({ items: { data: [{}] } })).toBeNull()
     expect(subscriptionPeriod(null)).toBeNull()
   })
+})
+
+test('both Negocio checkouts carry a per-shop idempotency key, so concurrent requests share one session (Codex security, #473)', () => {
+  const src = readFileSync('lib/negocio-checkout.ts', 'utf8')
+  expect(src).toContain('const idempotencyKey = `negocio:${shopId}:${cadence}:')
+  expect(src.match(/idempotencyKey,/g)?.length).toBe(2)
 })

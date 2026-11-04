@@ -9,6 +9,7 @@ import {
   type AboutLocale,
   type AboutSectionId,
 } from '../lib/about-content'
+import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN } from '../lib/negocio-pricing'
 
 const LOCALES: AboutLocale[] = ['es', 'en']
 // custom-domain-paywall S2.3: `pricing` is now grounded (real $499/yr price).
@@ -57,13 +58,14 @@ test.describe('about-content · single bilingual source', () => {
     }
   })
 
-  test('pricing section publishes the real custom-domain price in both locales', () => {
+  test('pricing section publishes the Negocio prices (from lib/negocio-pricing.ts) in both locales', () => {
     const pricing = getAboutSection('pricing')
     expect(pricing.stub, 'pricing must be grounded').toBe(false)
     for (const locale of LOCALES) {
       const text = aboutCopy(pricing, locale).body.join(' ')
-      expect(text, `${locale} pricing mentions the annual price`).toContain('$499')
-      expect(text, `${locale} pricing mentions the monthly equivalent`).toContain('$42')
+      expect(text, `${locale} pricing mentions the monthly price`).toContain(`$${NEGOCIO_PRICE_MONTHLY_MXN} MXN`)
+      expect(text, `${locale} pricing mentions the yearly price`).toContain(`$${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN`)
+      expect(text, `${locale} pricing names both plans`).toContain('Negocio')
       expect(text.toLowerCase(), `${locale} pricing no longer says coming soon`).not.toMatch(/próximamente|coming soon/)
     }
   })

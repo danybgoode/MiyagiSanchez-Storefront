@@ -25,6 +25,12 @@ import { CUSTOM_DOMAIN_PRICE_MXN } from './domain-pricing'
 import { ML_SYNC_PRICE_YEARLY_MXN, ML_SYNC_PRICE_MONTHLY_MXN } from './ml-sync-pricing'
 import { MIGRATION_FLAT_LISTING_CAP } from './migration-estimate'
 import { PROMOTER_SKUS, type PromoterSku } from './promoter-skus'
+import {
+  NEGOCIO_PRICE_MONTHLY_MXN,
+  NEGOCIO_PRICE_YEARLY_MXN,
+  NEGOCIO_TRIAL_DAYS,
+} from './negocio-pricing'
+import { PLAN_ALLOWANCES } from './plan-allowances'
 
 export type PricingLocale = 'es' | 'en'
 export type Localized = Record<PricingLocale, string>
@@ -82,7 +88,22 @@ export interface ProcessorRow {
   verifiedAt: string | null
 }
 
+/** One plan on the price list (plans-gratis-negocio D16): what it costs and what it includes. */
+export interface PlanRow {
+  id: 'gratis' | 'negocio'
+  name: Localized
+  /** The headline price: «Gratis, para siempre» or the monthly figure. */
+  priceLabel: Localized
+  /** The yearly alternative, or `null` for Gratis. */
+  yearlyLabel: Localized | null
+  /** Whole MXN; `null` for Gratis. Numbers come from `lib/negocio-pricing.ts`, never typed here. */
+  monthlyMxn: number | null
+  yearlyMxn: number | null
+  includes: Localized[]
+}
+
 export interface PricingCatalog {
+  plans: PlanRow[]
   free: FreeItem[]
   extras: ExtraRow[]
   processors: ProcessorRow[]
@@ -189,6 +210,60 @@ const FREE_ITEMS: FreeItem[] = [
   },
 ]
 
+/** The two plans (plans-gratis-negocio D16). Prices are formatted from `lib/negocio-pricing.ts`; allowances from `PLAN_ALLOWANCES`. */
+function planRows(): PlanRow[] {
+  const gratis = PLAN_ALLOWANCES.gratis
+  const negocio = PLAN_ALLOWANCES.negocio
+  const monthly = formatPesos(NEGOCIO_PRICE_MONTHLY_MXN)
+  const yearly = formatPesos(NEGOCIO_PRICE_YEARLY_MXN)
+  return [
+    {
+      id: 'gratis',
+      name: { es: 'Gratis', en: 'Free' },
+      priceLabel: { es: 'Gratis, para siempre', en: 'Free, forever' },
+      yearlyLabel: null,
+      monthlyMxn: null,
+      yearlyMxn: null,
+      includes: [
+        { es: 'Tu tienda y su URL', en: 'Your shop and its URL' },
+        { es: 'Tu subdominio (tu-tienda.miyagisanchez.com)', en: 'Your subdomain (your-shop.miyagisanchez.com)' },
+        { es: '0% de comisión de la plataforma', en: '0% platform commission' },
+        { es: 'Todos los métodos de pago', en: 'Every payment method' },
+        { es: 'El marketplace, ofertas y mensajes', en: 'The marketplace, offers and messages' },
+        { es: 'Agentes de IA (UCP/MCP)', en: 'AI agents (UCP/MCP)' },
+        { es: 'La IA que arma tu tienda', en: 'The AI that builds your shop' },
+        { es: `${gratis.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${gratis.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
+        { es: 'Un pequeño enlace «Tienda impulsada por Miyagi Sánchez»', en: 'A small «Shop powered by Miyagi Sánchez» link' },
+      ],
+    },
+    {
+      id: 'negocio',
+      name: { es: 'Negocio', en: 'Negocio' },
+      priceLabel: { es: `${monthly} MXN/mes`, en: `${monthly} MXN/month` },
+      yearlyLabel: {
+        es: `${yearly} MXN/año (también a meses sin intereses)`,
+        en: `${yearly} MXN/year (interest-free installments available)`,
+      },
+      monthlyMxn: NEGOCIO_PRICE_MONTHLY_MXN,
+      yearlyMxn: NEGOCIO_PRICE_YEARLY_MXN,
+      includes: [
+        { es: 'Todo lo de Gratis', en: 'Everything in Free' },
+        { es: 'Dominio propio (tutienda.com), una vez que pagas Negocio', en: 'Your own domain (yourshop.com), once you pay for Negocio' },
+        { es: 'Sincronización con Mercado Libre', en: 'Mercado Libre sync' },
+        { es: 'Sin el enlace de la plataforma en tu tienda', en: 'No platform link on your shop' },
+        { es: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
+        { es: `Más fotos: ${negocio.photosPerMonth} al mes para convertir en productos`, en: `More photos: ${negocio.photosPerMonth} a month to turn into products` },
+        { es: 'El chequeo mensual de tu tienda', en: 'The monthly check-in on your shop' },
+        { es: `${NEGOCIO_TRIAL_DAYS} días gratis para toda tienda nueva (el dominio propio no entra en la prueba)`, en: `${NEGOCIO_TRIAL_DAYS} days free for every new shop (the custom domain is not part of the trial)` },
+      ],
+    },
+  ]
+}
+
+/** The extras still sold on their own (plans-gratis-negocio D16): the subdomain is free now and the custom domain and
+ *  ML sync live inside Negocio. The SKUs stay in `PROMOTER_SKUS` (Sprint 4 retires them); only the LIST is filtered. */
+const EXTRA_SKUS_SOLD: readonly PromoterSku[] = ['print_ad', 'migration']
+
 function extraRows(input: PricingCatalogInput): ExtraRow[] {
   const printFrom =
     input.printAdTiersCents && input.printAdTiersCents.length > 0
@@ -281,9 +356,9 @@ function extraRows(input: PricingCatalogInput): ExtraRow[] {
       quoted: migration == null,
     },
   }
-  // PROMOTER_SKUS order, so a new SKU added there without a row here fails to typecheck (Record)
-  // AND the completeness spec (README D3).
-  return PROMOTER_SKUS.map((sku) => rows[sku])
+  // PROMOTER_SKUS order (so a new SKU without a row still fails to typecheck, via the Record), limited to the
+  // extras still sold.
+  return PROMOTER_SKUS.filter((sku) => EXTRA_SKUS_SOLD.includes(sku)).map((sku) => rows[sku])
 }
 
 function processorRows(input: PricingCatalogInput): ProcessorRow[] {
@@ -337,7 +412,7 @@ function processorRows(input: PricingCatalogInput): ProcessorRow[] {
 
 /** Assemble the full catalog. Pure: same input ⇒ same output. */
 export function buildPricingCatalog(input: PricingCatalogInput): PricingCatalog {
-  return { free: FREE_ITEMS, extras: extraRows(input), processors: processorRows(input) }
+  return { plans: planRows(), free: FREE_ITEMS, extras: extraRows(input), processors: processorRows(input) }
 }
 
 export function getExtra(catalog: PricingCatalog, sku: PromoterSku): ExtraRow {
@@ -362,10 +437,13 @@ export function fixedPricingTokens(locale: PricingLocale): Record<string, string
   const perYear = locale === 'es' ? 'al año' : 'a year'
   return {
     subdomainPrice: yearlyLabel(SUBDOMAIN_PRICE_YEARLY_MXN, SUBDOMAIN_PRICE_MONTHLY_MXN)[locale],
+    trialDays: String(NEGOCIO_TRIAL_DAYS),
     subdomainYearly: `${formatPesos(SUBDOMAIN_PRICE_YEARLY_MXN)} MXN ${perYear}`,
     customDomainPrice: yearlyLabel(CUSTOM_DOMAIN_PRICE_MXN, null)[locale],
     customDomainYearly: `${formatPesos(CUSTOM_DOMAIN_PRICE_MXN)} MXN ${perYear}`,
     mlSyncPrice: yearlyLabel(ML_SYNC_PRICE_YEARLY_MXN, ML_SYNC_PRICE_MONTHLY_MXN)[locale],
+    negocioMonthly: `${formatPesos(NEGOCIO_PRICE_MONTHLY_MXN)} MXN ${locale === 'es' ? 'al mes' : 'a month'}`,
+    negocioYearly: `${formatPesos(NEGOCIO_PRICE_YEARLY_MXN)} MXN ${perYear}`,
   }
 }
 
