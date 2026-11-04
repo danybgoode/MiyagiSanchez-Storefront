@@ -113,6 +113,7 @@ export async function createOneTimeCheckout({
   metadata,
   buyerEmail,
   promotionCodeId,
+  installments,
 }: {
   amountCents: number
   currency: string
@@ -122,6 +123,8 @@ export async function createOneTimeCheckout({
   metadata: Record<string, string>
   buyerEmail?: string
   promotionCodeId?: string
+  /** Offer card installments (meses sin intereses, Mexico). Stripe allows them on one-time payments only. */
+  installments?: boolean
 }): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
@@ -134,6 +137,7 @@ export async function createOneTimeCheckout({
       },
     }],
     payment_intent_data: { metadata },
+    ...(installments ? { payment_method_options: { card: { installments: { enabled: true } } } } : {}),
     customer_email: buyerEmail,
     success_url: successUrl,
     cancel_url: cancelUrl,

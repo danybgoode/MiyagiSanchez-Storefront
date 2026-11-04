@@ -35,7 +35,13 @@ export type NegocioGrant = {
   expires_at?: string
   /** Optional human note: "yearly", "promoter negocio_anual", "WC26 partner"… */
   note?: string
+  /** The payment ids (Stripe checkout session, or an approved transfer) already counted into this grant, newest
+   *  last — a replayed webhook finds its id here and adds nothing. Capped at NEGOCIO_GRANT_PAYMENTS_KEPT. */
+  payments?: string[]
 }
+
+/** How many payment ids a grant remembers. Far more than any replay window needs; keeps the JSON small. */
+export const NEGOCIO_GRANT_PAYMENTS_KEPT = 24
 
 export type NegocioTrial = {
   started_at: string
@@ -83,6 +89,7 @@ export function readNegocioGrant(metadata: unknown): NegocioGrant | null {
     granted_at: g.granted_at,
     ...(isIso(g.expires_at) ? { expires_at: g.expires_at } : {}),
     ...(typeof g.note === 'string' && g.note.trim() ? { note: g.note.trim() } : {}),
+    ...(Array.isArray(g.payments) ? { payments: g.payments.filter((x): x is string => typeof x === 'string' && x !== '') } : {}),
   }
 }
 
@@ -140,15 +147,45 @@ export function buildNegocioTrial(now: Date = new Date()): NegocioTrial {
  * months AFTER the current end, never from today — otherwise paying early would throw away the days already paid
  * for. A lapsed or absent grant starts from `now`.
  */
-export function extendNegocioGrant(current: NegocioGrant | null, months: number, opts?: { now?: Date; note?: string }): NegocioGrant {
+export function extendNegocioGrant(
+  current: NegocioGrant | null,
+  months: number,
+  opts?: { now?: Date; note?: string; paymentId?: string },
+): NegocioGrant {
   const now = opts?.now ?? new Date()
   if (current?.type === 'comp') return current // permanent already; a payment cannot shorten or replace it
-  const from = current?.type === 'one_time' && current.expires_at && Date.parse(current.expires_at) > now.getTime()
-    ? new Date(current.expires_at)
-    : now
+  const live = current?.type === 'one_time' && !!current.expires_at && Date.parse(current.expires_at) > now.getTime()
+  const from = live ? new Date(current!.expires_at!) : now
   const grant = buildNegocioOneTimeGrant({ months, now: from, note: opts?.note })
+  const payments = [...(current?.payments ?? []), ...(opts?.paymentId ? [opts.paymentId] : [])].slice(-NEGOCIO_GRANT_PAYMENTS_KEPT)
   // `granted_at` records when THIS payment happened, not where the term starts.
-  return { ...grant, granted_at: now.toISOString() }
+  return { ...grant, granted_at: now.toISOString(), ...(payments.length ? { payments } : {}) }
+}
+
+export type NegocioPaymentDecision =
+  | { action: 'replay' } // this payment id was already counted: write nothing
+  | { action: 'comp' } // the shop holds a permanent Negocio: nothing to extend (the payment is still recorded by the caller)
+  | { action: 'write'; grant: NegocioGrant; expected: unknown } // compare-and-swap: write `grant` iff the key still equals `expected`
+
+/**
+ * What a paid one-time Negocio payment (a yearly payment, a promoter package) writes to the shop. Pure, so the replay
+ * rule and the "add after the current end" rule are tested without Stripe. `expected` is the RAW value read from
+ * metadata (even a malformed one), for the `merge_shop_metadata` `equals` guard: if anything changed the grant
+ * between the read and the write, the write does nothing and the caller re-reads.
+ */
+export function decideNegocioPayment(
+  metadata: unknown,
+  payment: { paymentId: string; months: number; now?: Date; note?: string },
+): NegocioPaymentDecision {
+  const raw = metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>)[NEGOCIO_GRANT_KEY] ?? null : null
+  const current = readNegocioGrant(metadata)
+  if (current?.payments?.includes(payment.paymentId)) return { action: 'replay' }
+  if (current?.type === 'comp') return { action: 'comp' }
+  return {
+    action: 'write',
+    grant: extendNegocioGrant(current, payment.months, { now: payment.now, note: payment.note, paymentId: payment.paymentId }),
+    expected: raw,
+  }
 }
 
 // ── The decision ──────────────────────────────────────────────────────────────
