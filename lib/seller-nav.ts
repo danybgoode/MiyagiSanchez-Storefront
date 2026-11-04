@@ -44,7 +44,7 @@ const NAV_LABELS = {
     canales: 'Canales', mercadoLibre: 'Mercado Libre', importar: 'Importar catálogo',
     crecer: 'Crecer', cupones: 'Cupones', suscripciones: 'Suscripciones',
     contenido: 'Contenido', eventos: 'Eventos', sorteos: 'Sorteos',
-    analiticas: 'Analíticas', ganancias: 'Ganancias', tuPlan: 'Tu plan', configuracion: 'Configuración',
+    analiticas: 'Analíticas', ganancias: 'Ganancias', tuPlan: 'Tu plan', tuSuscripcion: 'Tu suscripción', configuracion: 'Configuración',
     miTienda: 'Mi tienda',
   },
   en: {
@@ -53,7 +53,7 @@ const NAV_LABELS = {
     canales: 'Channels', mercadoLibre: 'Mercado Libre', importar: 'Import catalog',
     crecer: 'Grow', cupones: 'Coupons', suscripciones: 'Subscriptions',
     contenido: 'Content', eventos: 'Events', sorteos: 'Giveaways',
-    analiticas: 'Analytics', ganancias: 'Earnings', tuPlan: 'Your plan', configuracion: 'Settings',
+    analiticas: 'Analytics', ganancias: 'Earnings', tuPlan: 'Your plan', tuSuscripcion: 'Your subscription', configuracion: 'Settings',
     miTienda: 'My shop',
   },
 } as const
@@ -182,6 +182,9 @@ export const SELLER_NAV: SellerNavGroup[] = [
       // business-infrastructure S2/S3: the shop's numbers and the plan built on them. Not flagged (WAYS-OF-WORKING:
       // no new flags); it reads the profit ledger but works without it, naming what it could not read.
       { key: 'plan', label: 'Tu plan', href: '/shop/manage/plan', icon: 'iconoir-stats-report' },
+      // plans-gratis-negocio S3.2 (D15): the billing page. «Tu plan» above is the business plan; this one is the
+      // shop's Gratis / Negocio subscription. Not flagged.
+      { key: 'suscripcion', label: 'Tu suscripción', href: '/shop/manage/negocio', icon: 'iconoir-credit-card' },
     ],
   },
   {
