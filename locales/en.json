@@ -1405,7 +1405,7 @@
         {
           "icon": "iconoir-shop",
           "title": "Your shop, at your address",
-          "body": "Pick your subdomain ({subdomainYearly}) or connect your own domain ({customDomainYearly})."
+          "body": "Your subdomain is free; with Negocio you connect your own domain."
         },
         {
           "icon": "iconoir-percentage",
@@ -3305,7 +3305,7 @@
         "lead": "Selling is free (0% commission). There are two plans, Free and Negocio, and every price is public at miyagisanchez.com/mx/precios.",
         "body": [
           "Free, forever: your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.",
-          "Negocio: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop tries it free for 30 days.",
+          "Negocio: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop tries it free for {trialDays} days (without the custom domain, which comes once you pay).",
           "If your trial ends or you cancel, your shop stays live and free at your URL miyagisanchez.com/mx/s/your-shop.",
           "Separate extras: print ad, {printAdPrice}; assisted migration, {migrationPrice}.",
           "Your payment processor (Stripe or Mercado Pago) charges its own fee, not us, and the money goes straight to your account. Every price, with its sources: miyagisanchez.com/mx/precios."

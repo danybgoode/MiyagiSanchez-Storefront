@@ -248,13 +248,13 @@ function planRows(): PlanRow[] {
       yearlyMxn: NEGOCIO_PRICE_YEARLY_MXN,
       includes: [
         { es: 'Todo lo de Gratis', en: 'Everything in Free' },
-        { es: 'Dominio propio (tutienda.com)', en: 'Your own domain (yourshop.com)' },
+        { es: 'Dominio propio (tutienda.com), una vez que pagas Negocio', en: 'Your own domain (yourshop.com), once you pay for Negocio' },
         { es: 'Sincronización con Mercado Libre', en: 'Mercado Libre sync' },
         { es: 'Sin el enlace de la plataforma en tu tienda', en: 'No platform link on your shop' },
         { es: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
         { es: `Más fotos: ${negocio.photosPerMonth} al mes para convertir en productos`, en: `More photos: ${negocio.photosPerMonth} a month to turn into products` },
         { es: 'El chequeo mensual de tu tienda', en: 'The monthly check-in on your shop' },
-        { es: `${NEGOCIO_TRIAL_DAYS} días gratis para toda tienda nueva`, en: `${NEGOCIO_TRIAL_DAYS} days free for every new shop` },
+        { es: `${NEGOCIO_TRIAL_DAYS} días gratis para toda tienda nueva (el dominio propio no entra en la prueba)`, en: `${NEGOCIO_TRIAL_DAYS} days free for every new shop (the custom domain is not part of the trial)` },
       ],
     },
   ]
@@ -437,6 +437,7 @@ export function fixedPricingTokens(locale: PricingLocale): Record<string, string
   const perYear = locale === 'es' ? 'al año' : 'a year'
   return {
     subdomainPrice: yearlyLabel(SUBDOMAIN_PRICE_YEARLY_MXN, SUBDOMAIN_PRICE_MONTHLY_MXN)[locale],
+    trialDays: String(NEGOCIO_TRIAL_DAYS),
     subdomainYearly: `${formatPesos(SUBDOMAIN_PRICE_YEARLY_MXN)} MXN ${perYear}`,
     customDomainPrice: yearlyLabel(CUSTOM_DOMAIN_PRICE_MXN, null)[locale],
     customDomainYearly: `${formatPesos(CUSTOM_DOMAIN_PRICE_MXN)} MXN ${perYear}`,

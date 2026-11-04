@@ -270,7 +270,7 @@ const ABOUT_SECTION_TEMPLATES: AboutSection[] = [
       lead: 'Vender es gratis (0% de comisión). Hay dos planes, Gratis y Negocio, y todos los precios son públicos en miyagisanchez.com/mx/precios.',
       body: [
         'Gratis, para siempre: tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, el marketplace, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».',
-        'Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva lo prueba 30 días gratis.',
+        'Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva lo prueba {trialDays} días gratis (sin el dominio propio, que llega al pagar).',
         'Si tu prueba termina o cancelas, tu tienda sigue activa y gratis en tu URL miyagisanchez.com/mx/s/tu-tienda.',
         'Extras aparte: anuncio impreso, {printAdPrice}; migración con consultor, {migrationPrice}.',
         'Tu pasarela de pago (Stripe o Mercado Pago) cobra su propia comisión, no nosotros, y el dinero llega directo a tu cuenta. Todos los precios, con sus fuentes: miyagisanchez.com/mx/precios.',
@@ -281,7 +281,7 @@ const ABOUT_SECTION_TEMPLATES: AboutSection[] = [
       lead: 'Selling is free (0% commission). There are two plans, Free and Negocio, and every price is public at miyagisanchez.com/mx/precios.',
       body: [
         'Free, forever: your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.',
-        'Negocio: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop tries it free for 30 days.',
+        'Negocio: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop tries it free for {trialDays} days (without the custom domain, which comes once you pay).',
         'If your trial ends or you cancel, your shop stays live and free at your URL miyagisanchez.com/mx/s/your-shop.',
         'Separate extras: print ad, {printAdPrice}; assisted migration, {migrationPrice}.',
         'Your payment processor (Stripe or Mercado Pago) charges its own fee, not us, and the money goes straight to your account. Every price, with its sources: miyagisanchez.com/mx/precios.',

@@ -18,13 +18,14 @@ export default async function TuSuscripcionPage({ searchParams }: { searchParams
   const { userId } = await auth()
   if (!userId) redirect('/sign-in?redirect_url=%2Fshop%2Fmanage%2Fnegocio')
   const [mine, catalog, sp] = await Promise.all([
-    resolveMyPlan(userId).catch(() => null),
+    // A failed read is NOT "no shop": it renders the unavailable state instead of sending the merchant to /sell.
+    resolveMyPlan(userId).then((m) => m ?? ('none' as const)).catch(() => ('unavailable' as const)),
     getPricingCatalog(),
     searchParams,
   ])
-  if (!mine) redirect('/sell')
+  if (mine === 'none') redirect('/sell')
 
-  const view = negocioPageView(mine.plan)
+  const view = negocioPageView(mine === 'unavailable' ? { plan: 'gratis', reason: 'unavailable', endsAt: null } : mine.plan)
   const negocio = catalog.plans.find((p) => p.id === 'negocio')
 
   return (

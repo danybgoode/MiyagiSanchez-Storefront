@@ -78,13 +78,9 @@ import { thresholdReached } from '@/lib/launchpad-campaign-types'
 import { campaignErrorMessage } from '@/app/api/sell/launchpad/campaigns/route'
 import type { MedusaSellerForMirror } from '@/lib/provisioning'
 import { resolveDomainEntitlement } from '@/lib/domain-entitlement-server'
-import { startCustomDomainCheckout } from '@/lib/domain-subscription-checkout'
 import { stageShopifyBatch } from '@/lib/shopify-import-bridge'
 import { isPublicDomainShape } from '@/lib/ssrf-guard'
 import { downloadArtworkBytes } from '@/lib/artwork-url-fetch'
-import { CUSTOM_DOMAIN_PRICE_LABEL } from '@/lib/domain-pricing'
-import { asDomainCadence } from '@/lib/domain-cadence'
-import { CAMPAIGN_COUPON_CODE } from '@/lib/domain-coupon'
 import { resolvePlan } from '@/lib/plan-server'
 import { planAgentView } from '@/lib/plan-agent'
 import { coerceNegocioCadence, startNegocioCheckout } from '@/lib/negocio-checkout'
@@ -1068,7 +1064,7 @@ const TOOLS = [
   },
   {
     name: 'start_domain_subscription',
-    description: "SELLER TOOL. Start the Stripe checkout for YOUR OWN shop's custom-domain SKU ($499 MXN/yr). Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop. Two cadences: `recurring` (default — an annual subscription that auto-renews) or `one_time` (pay one year up front with NO recurring mandate; entitlement is a dated 12-month grant that lapses gracefully at year end with no auto-charge — the cash-friendly option). On the `recurring` cadence you may pass a `coupon` (e.g. `miyagisan`) to comp the first year — capped at 100 redemptions; an exhausted/invalid coupon is refused with a clear message and no checkout is created. Returns a Stripe checkout URL the seller opens to pay (or, with a valid 100%-off coupon, to confirm at $0). Entitlement flips on automatically once checkout completes.",
+    description: "SELLER TOOL (retired). The custom domain is part of Negocio now and is not sold on its own: this tool always answers that, and never creates a checkout. Use get_plan, then start_negocio (owner token only).",
     inputSchema: {
       type: 'object',
       properties: {
@@ -1092,7 +1088,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         cadence: { type: 'string', enum: ['recurring', 'one_time'], description: "Payment cadence: 'recurring' (subscription, default) or 'one_time' (pay a year up front, no renewal)" },
-        interval: { type: 'string', enum: ['year', 'month'], description: "Recurring billing interval: 'year' ($199/yr, default) or 'month' ($25/mo). Applies to the 'recurring' cadence only." },
+        interval: { type: 'string', enum: ['year', 'month'], description: "Ignored: the subdomain is free." },
       },
     },
   },
@@ -1102,7 +1098,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        interval: { type: 'string', enum: ['year', 'month'], description: "Target billing interval: 'year' ($199/yr) or 'month' ($25/mo)." },
+        interval: { type: 'string', enum: ['year', 'month'], description: "Ignored: the subdomain is free." },
       },
       required: ['interval'],
     },
@@ -4330,6 +4326,11 @@ async function handleStartNegocio(args: Record<string, unknown>, authHeader?: st
   // Not in PARTNER_READ_TOOLS: only the shop owner's own token can start a payment.
   const agentAuth = await resolveToolShop(authHeader, args, 'start_negocio')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
+  // Only the shop OWNER's token may start a payment. `resolveToolShop` limits only the VIEWER partner role to
+  // PARTNER_READ_TOOLS, so a manager partner would pass it — refuse every partner credential here (pr-reviewer, #473).
+  if (agentAuth.partner) {
+    return { isError: true, content: [{ type: 'text', text: 'Solo el dueño de la tienda puede iniciar el pago de Negocio, con su propio token.' }] }
+  }
   const shop = agentAuth.shop
   const cadence = coerceNegocioCadence(args.cadence)
   if (!cadence) return { isError: true, content: [{ type: 'text', text: "cadence debe ser 'month' o 'year'." }] }
@@ -4341,7 +4342,10 @@ async function handleStartNegocio(args: Record<string, unknown>, authHeader?: st
     shopMetadata: shop.metadata,
     sellerClerkId: shop.clerk_user_id,
     cadence,
-  }).catch((e: unknown) => ({ ok: false as const, status: 502, error: e instanceof Error ? 'No se pudo iniciar el pago.' : 'No se pudo iniciar el pago.' }))
+  }).catch((e: unknown) => {
+    console.error('[mcp start_negocio] checkout failed:', e)
+    return { ok: false as const, status: 502, error: 'No se pudo iniciar el pago.' }
+  })
   if (!result.ok) return { isError: true, content: [{ type: 'text', text: result.error }] }
   return {
     content: [
@@ -4371,8 +4375,7 @@ async function handleGetDomainEntitlement(args: Record<string, unknown>, authHea
           {
             entitled: ent.entitled,
             reason: ent.reason,
-            price_label: CUSTOM_DOMAIN_PRICE_LABEL.es,
-            campaign_coupon: CAMPAIGN_COUPON_CODE,
+            included_in: 'negocio',
           },
           null,
           2,
@@ -4383,38 +4386,10 @@ async function handleGetDomainEntitlement(args: Record<string, unknown>, authHea
 }
 
 async function handleStartDomainSubscription(args: Record<string, unknown>, authHeader?: string | null) {
+  // plans-gratis-negocio (D5): the custom domain is part of Negocio and is not sold on its own any more.
   const agentAuth = await resolveToolShop(authHeader, args, 'start_domain_subscription')
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
-  const shop = agentAuth.shop
-
-  const couponCode = typeof args.coupon === 'string' ? args.coupon : null
-  const cadence = asDomainCadence(args.cadence) ?? 'recurring'
-  const result = await startCustomDomainCheckout({
-    shopId: shop.id,
-    sellerClerkId: shop.clerk_user_id,
-    channel: 'api',
-    couponCode,
-    cadence,
-  })
-
-  if (!result.ok) {
-    return { isError: true, content: [{ type: 'text', text: result.error }] }
-  }
-
-  const cadenceNote = cadence === 'one_time'
-    ? ' (pago único por un año, sin renovación automática)'
-    : ''
-  return {
-    content: [
-      {
-        type: 'text',
-        text:
-          `Abre este enlace para activar tu dominio propio${cadenceNote}${couponCode ? ` con el cupón “${couponCode}”` : ''}:\n${result.url}\n\n` +
-          'La habilitación se activa automáticamente al completar el checkout.',
-      },
-      { type: 'text', text: JSON.stringify({ checkout_url: result.url, cadence }, null, 2) },
-    ],
-  }
+  return { isError: true, content: [{ type: 'text', text: 'El dominio propio ahora viene incluido en Negocio y ya no se vende por separado. Consulta get_plan y actívalo con start_negocio.' }] }
 }
 
 // ── Subdomain paywall (epic 07 · subdomain-pricing S2) — seller-agent SKU tools ─

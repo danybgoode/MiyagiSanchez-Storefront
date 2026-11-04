@@ -13,7 +13,7 @@ import type { PlanState } from '../lib/plan'
 const NOW = new Date('2026-11-10T12:00:00Z')
 const st = (plan: PlanState['plan'], reason: PlanState['reason'], endsAt: string | null = null): PlanState => ({ plan, reason, endsAt })
 
-test('both tools are seller tools; a partner may READ the plan but never start a payment', () => {
+test('both tools are seller tools; a partner may READ the plan (viewer list), and start_negocio refuses partners in its handler', () => {
   expect(MCP_SELLER_TOOLS).toContain('get_plan')
   expect(MCP_SELLER_TOOLS).toContain('start_negocio')
   expect(PARTNER_READ_TOOLS.has('get_plan')).toBe(true)
@@ -43,4 +43,8 @@ test('the tools are scoped to the token\'s exact shop, and an unclaimed shop can
   const start = src.slice(src.indexOf('async function handleStartNegocio('), src.indexOf('async function handleGetDomainEntitlement('))
   expect(start).toContain('shopId: shop.id')
   expect(start).toContain('if (!shop.clerk_user_id)')
+  // Every partner credential is refused BEFORE any checkout — the viewer-only PARTNER_READ_TOOLS gate would let a
+  // manager partner through (pr-reviewer, #473).
+  expect(start.indexOf('if (agentAuth.partner)')).toBeGreaterThan(-1)
+  expect(start.indexOf('if (agentAuth.partner)')).toBeLessThan(start.indexOf('startNegocioCheckout('))
 })
