@@ -44,6 +44,10 @@ export async function startNegocioCheckout(input: {
   const origin = canonicalOrigin()
   const successUrl = `${origin}/shop/manage/negocio?negocio=activated`
   const cancelUrl = `${origin}/shop/manage/negocio?negocio=cancelled`
+  // Two concurrent requests for the same shop and cadence (two tabs, an agent retrying) get the SAME Stripe session
+  // within a 10-minute window, so they can never become two subscriptions or two yearly payments (Codex security,
+  // #473). Stripe keeps idempotency keys for 24 hours; the window bucket lets a deliberate retry after it start fresh.
+  const idempotencyKey = `negocio:${shopId}:${cadence}:${Math.floor(Date.now() / 600_000)}`
   const metadata: Record<string, string> = {
     kind: NEGOCIO_CHECKOUT_KIND,
     shop_id: shopId,
@@ -62,6 +66,7 @@ export async function startNegocioCheckout(input: {
       cancelUrl,
       metadata,
       buyerEmail: input.buyerEmail,
+      idempotencyKey,
     })
     return { ok: true, url }
   }
@@ -78,6 +83,7 @@ export async function startNegocioCheckout(input: {
     // Card only: the grant is written on `checkout.session.completed`, so the payment must be settled then (and
     // installments are a card feature anyway). The webhook also refuses an unpaid session.
     paymentMethodTypes: ['card'],
+    idempotencyKey,
   })
   return { ok: true, url }
 }

@@ -121,3 +121,9 @@ test.describe('#471 review fixes', () => {
     expect(subscriptionPeriod(null)).toBeNull()
   })
 })
+
+test('both Negocio checkouts carry a per-shop idempotency key, so concurrent requests share one session (Codex security, #473)', () => {
+  const src = readFileSync('lib/negocio-checkout.ts', 'utf8')
+  expect(src).toContain('const idempotencyKey = `negocio:${shopId}:${cadence}:')
+  expect(src.match(/idempotencyKey,/g)?.length).toBe(2)
+})
