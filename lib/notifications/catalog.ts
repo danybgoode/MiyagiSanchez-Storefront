@@ -268,6 +268,16 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     sender: 'sendPlatformBroadcast', origin: 'app/api/admin/comunicaciones/broadcast/route.ts',
   },
   {
+    key: 'mensajes.shop_question', trigger: 'Un comprador deja en el chat de la tienda una pregunta que el chat no pudo responder.',
+    from: 'buyer', to: 'seller', channels: ['email', 'push', 'telegram'], domain: 'mensajes',
+    sender: 'sendShopQuestionToOwner', origin: 'lib/shop-chat/handoff-server.ts', group: 'mensajes',
+  },
+  {
+    key: 'mensajes.shop_answer', trigger: 'La tienda responde, desde «Preguntas», una pregunta que un comprador dejó en su chat.',
+    from: 'seller', to: 'buyer', channels: ['email'], domain: 'mensajes',
+    sender: 'sendShopAnswerToBuyer', origin: 'lib/shop-chat/handoff-server.ts',
+  },
+  {
     key: 'mensajes.conversation_message',
     trigger: 'Alguien escribe en una conversación sobre un anuncio (incluye "Preguntar" en un anuncio).',
     from: 'buyer', to: 'seller', channels: ['email', 'push', 'telegram'], domain: 'mensajes',
