@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
 
 // ── GET — check DNS + Vercel verification status ──────────────────────────────
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const user = await currentUser()
   if (!user) return NextResponse.json({ error: 'No autenticado.' }, { status: 401 })
 
@@ -265,7 +265,7 @@ export async function GET(req: NextRequest) {
 
 // ── DELETE — remove domain ───────────────────────────────────────────────────
 
-export async function DELETE(_req: NextRequest) {
+export async function DELETE() {
   const user = await currentUser()
   if (!user) return NextResponse.json({ error: 'No autenticado.' }, { status: 401 })
 
