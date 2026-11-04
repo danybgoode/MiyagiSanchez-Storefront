@@ -26,7 +26,7 @@ export type NegocioPageView = {
 }
 
 export const MONTHLY_BUTTON_LABEL = `${formatPesos(NEGOCIO_PRICE_MONTHLY_MXN)} al mes`
-export const YEARLY_BUTTON_LABEL = `${formatPesos(NEGOCIO_PRICE_YEARLY_MXN)} al año (hasta 6 meses sin intereses)`
+export const YEARLY_BUTTON_LABEL = `${formatPesos(NEGOCIO_PRICE_YEARLY_MXN)} al año (a meses sin intereses)`
 export const RENEW_BUTTON_LABEL = `Renovar por otro año: ${formatPesos(NEGOCIO_PRICE_YEARLY_MXN)}`
 
 /** `4 de noviembre de 2027` in es-MX, computed in UTC so a server's timezone never moves the date. */

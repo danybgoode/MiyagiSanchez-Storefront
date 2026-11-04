@@ -46,7 +46,7 @@ test.describe('pricing catalog', () => {
     expect(gratis.priceLabel.es).toMatch(/^Gratis/)
     expect([negocio.monthlyMxn, negocio.yearlyMxn]).toEqual([NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN])
     expect(negocio.priceLabel.es).toBe(`$${NEGOCIO_PRICE_MONTHLY_MXN} MXN/mes`)
-    expect(negocio.yearlyLabel?.es).toBe(`$${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN/año (hasta en meses sin intereses)`)
+    expect(negocio.yearlyLabel?.es).toBe(`$${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN/año (también a meses sin intereses)`)
     const incl = (p: typeof gratis, loc: 'es' | 'en') => p.includes.map((i) => i[loc]).join(' | ')
     for (const loc of ['es', 'en'] as const) {
       expect(incl(gratis, loc)).toContain(String(PLAN_ALLOWANCES.gratis.chatAnswersPerMonth))

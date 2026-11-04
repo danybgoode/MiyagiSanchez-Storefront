@@ -15,7 +15,7 @@ const cadences = (p: PlanState) => negocioPageView(p, NOW).buttons.map((b) => b.
 test.describe('«Tu suscripción» view', () => {
   test('the button labels are built from lib/negocio-pricing.ts', () => {
     expect(MONTHLY_BUTTON_LABEL).toBe(`$${NEGOCIO_PRICE_MONTHLY_MXN} al mes`)
-    expect(YEARLY_BUTTON_LABEL).toBe(`$${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} al año (hasta 6 meses sin intereses)`)
+    expect(YEARLY_BUTTON_LABEL).toBe(`$${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} al año (a meses sin intereses)`)
     expect(RENEW_BUTTON_LABEL).toContain(NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US'))
   })
 
