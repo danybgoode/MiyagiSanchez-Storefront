@@ -38,7 +38,8 @@ export const CHAT_COPY = {
   notFound: 'Esta tienda no tiene chat.',
   rateLimited: 'Vas muy rápido. Espera un momento y vuelve a preguntar.',
   verify: 'No pudimos verificar que eres una persona. Recarga la página e inténtalo de nuevo.',
-  budget: 'La tienda ya respondió muchas preguntas hoy. Puedes dejarle tu pregunta y te escribe.',
+  // Neutral: a budget refusal adds no answer to the thread, so the leave form never follows it (PR #470 review).
+  budget: 'La tienda ya respondió muchas preguntas hoy. Vuelve a intentarlo mañana.',
   unavailable: 'No pudimos responder ahora. Inténtalo de nuevo en un momento.',
   // S5 ships the handoff, so «no sé» can now offer it: the widget shows the form under this answer.
   unsure: 'No tengo esa respuesta en la información de la tienda. Puedes dejarle tu pregunta y te escribe.',

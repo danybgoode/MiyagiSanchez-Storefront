@@ -85,6 +85,8 @@ export default function ShopChat({ slug, shopName, siteKey, bottomOffset = 84 }:
         body: JSON.stringify({ email: email.trim(), question: lastQuestion, transcript: turns.slice(-12), chat_token: chatToken.current }),
       })
       const body = (await res.json().catch(() => null)) as { message?: string } | null
+      // An expired conversation: the next question runs the human check again (and the form waits for a new «no sé»).
+      if (res.status === 403) { chatToken.current = null; setVerified(false); setTurnstile(null); setResetKey((k) => k + 1) }
       setLeave({ kind: res.ok ? 'done' : 'error', message: body?.message ?? COPY.failed })
     } catch {
       setLeave({ kind: 'error', message: COPY.failed })
@@ -98,6 +100,8 @@ export default function ShopChat({ slug, shopName, siteKey, bottomOffset = 84 }:
     if (!chatToken.current && !turnstile) { setError(COPY.verify); return }
     const next: Turn[] = [...turns, { role: 'user', text }]
     setTurns(next)
+    // A new question: the next «no sé» may offer the handoff again.
+    setLeave({ kind: 'idle' })
     setDraft('')
     setBusy(true)
     setError(null)

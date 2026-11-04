@@ -535,12 +535,15 @@ export async function sendBusinessCheckin(ctx: { to: string; shopName: string; r
  * A buyer left a question the shop's chat could not answer (business-infrastructure S5). To the shop OWNER only, with
  * a link to answer in «Preguntas». The buyer's email is not in this message: the reply goes through the platform.
  */
-export async function sendShopQuestionToOwner(ctx: { to: string; shopName: string; threadId: string; question: string }): Promise<EmailSendResult> {
+export async function sendShopQuestionToOwner(ctx: { to: string; shopName: string; threadId: string; question: string; transcript?: Array<{ role: string; text: string }> }): Promise<EmailSendResult> {
   const shopName = plainLine(ctx.shopName) || 'Tu tienda'
   return sendWithResult(ctx.to, `${shopName}: alguien te dejó una pregunta`, [
     h1('Te dejaron una pregunta'),
     p('El chat de tu tienda no tenía la respuesta, así que te la pasamos:'),
     p(`<strong>${esc(ctx.question)}</strong>`),
+    ...(ctx.transcript && ctx.transcript.length > 1
+      ? [p(`<em>La conversación:</em><br>${ctx.transcript.slice(-6).map((t) => `${t.role === 'user' ? 'Comprador' : 'Chat'}: ${esc(t.text)}`).join('<br>')}`)]
+      : []),
     cta('Responder', `${SITE}/shop/manage/preguntas`),
     p('Le llega tu respuesta a su correo. Si la guardas como pregunta frecuente, el chat la responde solo la próxima vez.'),
   ].join(''), undefined, undefined, 'es', `shop-question/${ctx.threadId}`)
@@ -554,6 +557,7 @@ export async function sendShopAnswerToBuyer(ctx: { to: string; shopName: string;
     p(`Tu pregunta: <em>${esc(ctx.question)}</em>`),
     p(esc(ctx.reply)),
     cta('Ver la tienda', `${SITE}/s/${encodeURIComponent(ctx.shopSlug)}`),
+    p('Si tú no hiciste esta pregunta, ignora este correo.'),
   ].join(''), undefined, undefined, 'es', `shop-answer/${ctx.threadId}`)
 }
 

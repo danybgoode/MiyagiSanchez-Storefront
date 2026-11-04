@@ -11,6 +11,7 @@
  */
 
 import { CHAT_LIMITS, verifyChatToken, type ChatTurn } from './core'
+import { isLikelyShopSlug } from '../route-shape'
 
 /** The FAQ the platform keeps (`settings-import` caps `content.faq.items` at 12, question ≤ 140, answer ≤ 600). */
 export const FAQ_CAP = 12
@@ -27,7 +28,9 @@ export const HANDOFF_COPY = {
   replyInvalid: 'Escribe una respuesta de hasta 600 caracteres.',
   replyGone: 'Esta pregunta ya fue respondida o no es de tu tienda.',
   replyDone: 'Respuesta enviada.',
-  faqAdded: 'También quedó en tus preguntas frecuentes: el chat ya la responde.',
+  replyNoEmail: 'Tu respuesta quedó guardada. Esta pregunta ya no tiene el correo de quien la hizo, así que no se envió.',
+  replyEmailFailed: 'No pudimos enviar tu respuesta por correo. Inténtalo de nuevo en un momento.',
+  faqAdded: 'También quedó en tus preguntas frecuentes.',
   faqFull: 'Tus preguntas frecuentes ya tienen 12. Quita una en Configuración › Páginas para agregar esta.',
   faqFailed: 'La respuesta se envió, pero no pudimos agregarla a tus preguntas frecuentes. Agrégala en Configuración › Páginas.',
 } as const
@@ -70,7 +73,7 @@ export interface LeaveDeps {
   /** Insert one thread; the id, or null when the write did not land. */
   store: (row: { shop: HandoffShop; question: string; transcript: ChatTurn[]; email: string }) => Promise<string | null>
   /** Alert the owner on their channels. Best effort: the question is stored either way. */
-  notifyOwner: (shop: HandoffShop, threadId: string, question: string) => Promise<void>
+  notifyOwner: (shop: HandoffShop, threadId: string, question: string, transcript: ChatTurn[]) => Promise<void>
   secret: string
   now: () => number
 }
@@ -82,7 +85,8 @@ const fail = (status: HandoffResult['status'], message: string): HandoffResult =
 export async function handleLeave(input: { slug: string; body: unknown }, deps: LeaveDeps): Promise<HandoffResult> {
   const slug = input.slug.toLowerCase()
   const req = parseLeave(input.body)
-  if (!req || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(slug)) return fail(400, HANDOFF_COPY.invalid)
+  // The platform's own slug rule (up to 80), the same one the chat uses — never a second, shorter one.
+  if (!req || !isLikelyShopSlug(slug)) return fail(400, HANDOFF_COPY.invalid)
   if (!(await deps.rateAllowed(slug))) return fail(429, HANDOFF_COPY.rateLimited)
   const shop = await deps.readShop(slug)
   if (shop === 'unavailable') return fail(503, HANDOFF_COPY.unavailable)
@@ -91,7 +95,7 @@ export async function handleLeave(input: { slug: string; body: unknown }, deps: 
   if (!verifyChatToken(req.chatToken, slug, deps.now(), deps.secret)) return fail(403, HANDOFF_COPY.verify)
   const id = await deps.store({ shop, question: req.question, transcript: req.transcript, email: req.email })
   if (!id) return fail(503, HANDOFF_COPY.unavailable)
-  await deps.notifyOwner(shop, id, req.question).catch(() => {})
+  await deps.notifyOwner(shop, id, req.question, req.transcript).catch(() => {})
   return { status: 200, body: { ok: true, message: HANDOFF_COPY.sent } }
 }
 
@@ -132,6 +136,8 @@ export interface ReplyDeps {
   /** Conditional `open → answered` by id AND owner, `.select()` back. null = not open, or not this owner's. */
   claim: (threadId: string, ownerClerkUserId: string, reply: string) => Promise<ClaimedThread | null | 'unavailable'>
   emailBuyer: (thread: ClaimedThread, reply: string) => Promise<boolean>
+  /** Undo a claim whose email did not go out (answered → open, only if still this reply), so the owner can retry. */
+  release: (threadId: string, ownerClerkUserId: string, reply: string) => Promise<void>
   readFaq: () => Promise<unknown | 'unavailable'>
   writeFaq: (items: FaqItem[]) => Promise<boolean>
 }
@@ -143,6 +149,11 @@ export async function handleReply(input: { threadId: string; ownerClerkUserId: s
   if (thread === 'unavailable') return fail(503, HANDOFF_COPY.unavailable)
   if (!thread) return fail(409, HANDOFF_COPY.replyGone)
   const emailed = thread.buyerEmail ? await deps.emailBuyer(thread, req.reply).catch(() => false) : false
+  // Never tell the owner "sent" when it was not (PR #470 review): a failed email releases the claim so they can retry.
+  if (thread.buyerEmail && !emailed) {
+    await deps.release(thread.id, input.ownerClerkUserId, req.reply).catch(() => {})
+    return fail(503, HANDOFF_COPY.replyEmailFailed)
+  }
   let faq: 'added' | 'full' | 'failed' | 'skipped' = 'skipped'
   if (req.saveFaq) {
     const current = await deps.readFaq().catch(() => 'unavailable' as const)
@@ -152,13 +163,16 @@ export async function handleReply(input: { threadId: string; ownerClerkUserId: s
       faq = 'full' in next ? 'full' : (await deps.writeFaq(next.items).catch(() => false)) ? 'added' : 'failed'
     }
   }
-  const message = [HANDOFF_COPY.replyDone, faq === 'added' ? HANDOFF_COPY.faqAdded : faq === 'full' ? HANDOFF_COPY.faqFull : faq === 'failed' ? HANDOFF_COPY.faqFailed : null]
+  const message = [thread.buyerEmail ? HANDOFF_COPY.replyDone : HANDOFF_COPY.replyNoEmail, faq === 'added' ? HANDOFF_COPY.faqAdded : faq === 'full' ? HANDOFF_COPY.faqFull : faq === 'failed' ? HANDOFF_COPY.faqFailed : null]
     .filter(Boolean)
     .join(' ')
   return { status: 200, body: { ok: true, message, emailed, faq } }
 }
 
-/** Threads answered before this instant have their buyer email nulled. */
+/**
+ * Threads answered before this instant — or left unanswered since before it — have their buyer email nulled: "long
+ * enough for a follow-up, then gone" holds for an ignored question too (PR #470 review).
+ */
 export function purgeCutoff(now: Date): string {
   return new Date(now.getTime() - EMAIL_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString()
 }

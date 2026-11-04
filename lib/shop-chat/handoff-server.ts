@@ -32,7 +32,8 @@ export async function readHandoffShop(slug: string): Promise<HandoffShop | null 
 export function leaveDeps(ip: string): LeaveDeps {
   return {
     rateAllowed: async (slug) => {
-      const [byIp, byShop] = await Promise.all([checkRateLimit('shop_chat_ip', `leave:${ip}`), checkRateLimit('shop_chat_shop', `leave:${slug}`)])
+      // Its OWN buckets, sized for owner alerts, not chat turns (PR #470 review): each leave emails the owner.
+      const [byIp, byShop] = await Promise.all([checkRateLimit('shop_chat_leave_ip', ip), checkRateLimit('shop_chat_leave_shop', slug)])
       return byIp.allowed && byShop.allowed
     },
     readShop: readHandoffShop,
@@ -44,10 +45,10 @@ export function leaveDeps(ip: string): LeaveDeps {
         .single()
       return error || !data ? null : (data as { id: string }).id
     },
-    notifyOwner: async (shop, threadId, question) => {
+    notifyOwner: async (shop, threadId, question, transcript) => {
       await dispatchToSeller(shop.ownerClerkUserId, {
         group: 'mensajes',
-        email: async (to) => { await sendShopQuestionToOwner({ to, shopName: shop.name, threadId, question }) },
+        email: async (to) => { await sendShopQuestionToOwner({ to, shopName: shop.name, threadId, question, transcript }) },
         push: { kind: 'new_message', title: `${shop.name}: te dejaron una pregunta`, body: question.slice(0, 120), url: '/shop/manage/preguntas', tag: `shop-question-${threadId}` },
         telegram: `<b>${escapeHtml(shop.name)}: te dejaron una pregunta</b>\n${escapeHtml(question)}\nhttps://miyagisanchez.com/shop/manage/preguntas`,
       })
@@ -102,6 +103,15 @@ export function replyDeps(owner: { clerkUserId: string; clerkJwt: string | null 
       }
       return thread
     },
+    release: async (threadId, ownerClerkUserId, reply) => {
+      await db
+        .from('shop_chat_threads')
+        .update({ status: 'open', reply: null, answered_at: null })
+        .eq('id', threadId)
+        .eq('owner_clerk_user_id', ownerClerkUserId)
+        .eq('status', 'answered')
+        .eq('reply', reply)
+    },
     emailBuyer: async (thread, reply) => {
       if (!thread.buyerEmail) return false
       const r = await sendShopAnswerToBuyer({ to: thread.buyerEmail, shopName: thread.shopName, shopSlug: thread.shopSlug, threadId: thread.id, question: thread.question, reply })
@@ -113,6 +123,10 @@ export function replyDeps(owner: { clerkUserId: string; clerkJwt: string | null 
       if (read.state !== 'resolved') return 'unavailable'
       // The shop must still be the caller's: a FAQ is written to the caller's own shop only.
       if (read.shop.clerk_user_id !== owner.clerkUserId) return 'unavailable'
+      // …and it must be the shop the write lands on: `applyStoreConfig` writes the caller's OLDEST shop. Today no owner
+      // has two (checked 2026-11-04), but nothing enforces it — never write one shop's FAQ into another (PR #470 review).
+      const { data: target } = await db.from('marketplace_shops').select('slug').eq('clerk_user_id', owner.clerkUserId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+      if ((target as { slug?: string } | null)?.slug !== shopSlug) return 'unavailable'
       return ((read.shop.metadata as { settings?: { faq?: unknown } } | null)?.settings?.faq) ?? null
     },
     writeFaq: async (items) => {
@@ -124,11 +138,14 @@ export function replyDeps(owner: { clerkUserId: string; clerkJwt: string | null 
 
 /** Null the buyer emails of threads answered more than 90 days ago (run by the daily check-in timer). */
 export async function purgeAnsweredEmails(now = new Date()): Promise<number | null> {
+  const cutoff = purgeCutoff(now)
   const { data, error } = await db
     .from('shop_chat_threads')
     .update({ buyer_email: null })
-    .lt('answered_at', purgeCutoff(now))
     .not('buyer_email', 'is', null)
+    // Answered more than 90 days ago, OR left unanswered for more than 90 days.
+    // Values quoted: an ISO timestamp carries '.' and ':', which PostgREST's or() grammar would otherwise split on.
+    .or(`answered_at.lt."${cutoff}",and(status.eq.open,created_at.lt."${cutoff}")`)
     .select('id')
   return error ? null : Array.isArray(data) ? data.length : 0
 }

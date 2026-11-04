@@ -70,6 +70,7 @@ function replyFakes(over: Partial<ReplyDeps> = {}) {
       return { id, question: '¿Hacen factura?', buyerEmail: 'ana@ejemplo.mx', shopSlug: 'tamales-rosa', shopName: 'Tamales Doña Rosa' }
     },
     emailBuyer: async () => { trace.push('email'); return true },
+    release: async () => { trace.push('release') },
     readFaq: async () => { trace.push('readFaq'); return { items: [{ question: '¿Dónde están?', answer: 'Coyoacán.' }] } },
     writeFaq: async (items) => { trace.push(`writeFaq:${items.length}`); return true },
     ...over,
@@ -122,4 +123,29 @@ test('privacy: emails purged 90 days after the answer; the table is service-role
   expect(COMMUNICATION_CATALOG.map((e) => e.key)).toEqual(expect.arrayContaining(['mensajes.shop_question', 'mensajes.shop_answer']))
   // the widget offers the handoff only after a «no sé», inside a verified conversation
   expect(src('components/shop-chat/ShopChat.tsx')).toContain("const offerLeave = verified && last?.role === 'assistant' && last.answered === false")
+})
+
+test('reply: a failed email RELEASES the claim and says so — never "sent" when it was not', async () => {
+  const { deps, trace } = replyFakes({ emailBuyer: async () => { trace.push('email'); return false } })
+  const r = await handleReply({ threadId: THREAD, ownerClerkUserId: 'user_owner', body: { reply: 'Sí.', save_faq: true } }, deps)
+  expect(r).toMatchObject({ status: 503, body: { ok: false, message: HANDOFF_COPY.replyEmailFailed } })
+  expect(trace).toEqual(['claim:user_owner', 'email', 'release'])
+  // a thread whose email was already purged: answered, and the owner is told no email went out
+  const purged = replyFakes({ claim: async (id) => ({ id, question: 'q', buyerEmail: null, shopSlug: 'tamales-rosa', shopName: 'T' }) })
+  const r2 = await handleReply({ threadId: THREAD, ownerClerkUserId: 'user_owner', body: { reply: 'Sí.' } }, purged.deps)
+  expect(r2).toMatchObject({ status: 200, body: { message: HANDOFF_COPY.replyNoEmail } })
+})
+
+test('leave has its OWN, tighter limits; the purge covers ignored questions too; the FAQ write is guarded to the thread\'s shop', () => {
+  const server = src('lib/shop-chat/handoff-server.ts')
+  expect(server).toContain("checkRateLimit('shop_chat_leave_ip', ip), checkRateLimit('shop_chat_leave_shop', slug)")
+  expect(server).toContain('and(status.eq.open,created_at.lt.')
+  expect(server).toContain("if ((target as { slug?: string } | null)?.slug !== shopSlug) return 'unavailable'")
+  expect(src('lib/email.ts')).toContain('Si tú no hiciste esta pregunta, ignora este correo.')
+})
+
+test('a slug up to the platform\'s 80 characters can leave a question (same rule as the chat)', async () => {
+  const long = 'tienda-' + 'b'.repeat(70)
+  const { deps } = leaveFakes()
+  expect((await handleLeave({ slug: long, body: body({ chat_token: signChatToken(long, NOW, SECRET) }) }, deps)).status).toBe(404)
 })
