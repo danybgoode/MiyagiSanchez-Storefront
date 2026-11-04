@@ -65,7 +65,8 @@ test('the domain proof point no longer promises a free link', () => {
   const domain = anchor.proofPoints.find((p) => /dirección/.test(p.title))
   expect(domain, 'the address proof point is gone').toBeTruthy()
   expect(domain!.body).not.toMatch(/link gratis/i)
-  expect(domain!.body).toMatch(/subdominio \(\$[\d,]+ MXN al año\)/)
+  // plans-gratis-negocio (D11): the subdomain is free now, so the point says so instead of quoting a price.
+  expect(domain!.body).toMatch(/subdominio viene gratis/)
   // Same claim on the creators page (product owner, 10-29): gone in both languages.
   expect(read('locales/es.json')).not.toMatch(/link gratis/i)
   expect(read('locales/en.json')).not.toMatch(/free link/i)

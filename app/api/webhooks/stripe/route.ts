@@ -53,6 +53,7 @@ import { oneTimeGrantNote } from '@/lib/promoter-close'
 import { listingUrlFor } from '@/lib/market-url'
 import { notifyMerchantCloseReceipt } from '@/lib/promoter-close-notify'
 import { MIGRATION_CHECKOUT_KIND } from '@/lib/migration-checkout'
+import { PROMOTER_PACKAGE_CHECKOUT_KIND, handlePromoterPackageComplete } from '@/lib/promoter-package-server'
 import { NEGOCIO_CHECKOUT_KIND } from '@/lib/negocio-subscription'
 import {
   handleNegocioInvoiceFailed,
@@ -168,6 +169,12 @@ export async function POST(req: NextRequest) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
+      // Negocio and promoter packages are paid to the PLATFORM. An event from a connected account carrying those kinds
+      // could only be a merchant forging metadata on their own account: ignore it (pr-reviewer, #474).
+      if ((event as { account?: string | null }).account && (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND || session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND)) {
+        console.error('[stripe webhook] platform-payee kind from a connected account, ignored:', session.id)
+        break
+      }
       if (session.mode === 'subscription') {
         if (session.metadata?.kind === CUSTOM_DOMAIN_CHECKOUT_KIND) {
           await handleCustomDomainSubscriptionComplete(session)
@@ -195,7 +202,10 @@ export async function POST(req: NextRequest) {
         await handleMlSyncOneTimeComplete(session)
       } else if (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
         // Negocio yearly or a promoter package (plans-gratis-negocio D6): paid months added to the shop's grant.
-        await handleNegocioOneTimeComplete(session)
+        await handleNegocioOneTimeComplete(session, event.created)
+      } else if (session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND) {
+        // A promoter pays the platform its share of a package by card (plans-gratis-negocio S4.2, D12).
+        await handlePromoterPackageComplete(session)
       } else if (session.metadata?.kind === MIGRATION_CHECKOUT_KIND) {
         // migration SKU (epic 03 · platform-migrations S2): a one-time consulting
         // service, no subscription — writes an inert migration_grant marker.
@@ -1481,7 +1491,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   // Negocio monthly (plans-gratis-negocio D6): the platform is the payee — never the seller transfer below.
   if (stripeSub.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
-    await handleNegocioInvoicePaid(invoice, stripeSubscriptionId)
+    await handleNegocioInvoicePaid(invoice, stripeSubscriptionId, stripeSub.metadata?.shop_id ?? null)
     return
   }
 

@@ -22,6 +22,8 @@ import { db } from '@/lib/supabase'
 import { tg } from '@/lib/telegram'
 import { buildOneTimeGrant } from '@/lib/domain-entitlement'
 import { SKU_GRANT_KEYS, type TransferSku } from '@/lib/promoter-transfer'
+import { PACKAGES, isPackageSku } from '@/lib/promoter-packages'
+import { applyNegocioPayment } from '@/lib/negocio-webhook'
 
 export type ActivateGrantResult =
   | { ok: true }
@@ -41,8 +43,36 @@ export async function activatePromoterOneTimeGrant(input: {
   promoterId: string
   sellerClerkId: string
   note?: string
+  /** A stable id for this payment (e.g. `transfer:<id>`), so a retried approval can never add Negocio twice. */
+  paymentId?: string
 }): Promise<ActivateGrantResult> {
   const { sku, shopId, promoterId, sellerClerkId, note = 'S4 transfer' } = input
+
+  // plans-gratis-negocio S4 (D12): a package adds its months of Negocio through the same replay-safe compare-and-swap
+  // the yearly payment uses; the free-plan setup grants nothing (the shop's own trial still runs).
+  if (isPackageSku(sku)) {
+    const months = PACKAGES[sku].negocioMonths
+    if (months === 0) return { ok: true }
+    try {
+      const outcome = await applyNegocioPayment({
+        shopId,
+        paymentId: input.paymentId ?? `transfer:${promoterId}:${shopId}:${sku}`,
+        months,
+        note: `promoter ${sku}`,
+      })
+      if (outcome === 'comp') {
+        tg.alert(`⚠️ Paquete aprobado en una tienda que ya tenía Negocio sin costo — revisar reembolso.\nShop: ${shopId}\nPromotor: ${promoterId}`)
+        return { ok: true }
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      console.error('[promoter grant] package activation failed:', message)
+      tg.alert(`🚨 Paquete aprobado pero NO se activó Negocio (${sku}) — reparar a mano.\nShop: ${shopId}\nPromotor: ${promoterId}\nError: ${message}`)
+      return { ok: false, error: 'No se pudo activar Negocio.' }
+    }
+    tg.alert(`✅ Paquete aprobado — Negocio ${months} meses\nShop: ${shopId}\nPromotor: ${promoterId}`)
+    return { ok: true }
+  }
   const grantKey = SKU_GRANT_KEYS[sku]
 
   try {

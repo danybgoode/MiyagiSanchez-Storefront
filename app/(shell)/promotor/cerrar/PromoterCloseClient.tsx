@@ -358,8 +358,11 @@ function SetupStep({ n, shop, onShop }: { n: number; shop: Shop | null; onShop: 
  * (Print is a different flow — it needs ad content — so it's not in this picker.)
  */
 const CLOSE_SKUS = [
-  { id: 'domain', label: 'Dominio propio', payLabel: 'Pagar dominio propio (1 año)' },
-  { id: 'ml-sync', label: 'Sincronización Mercado Libre', payLabel: 'Pagar sincronización ML (1 año)' },
+  // plans-gratis-negocio S4 (D12): the three packages first — the deal a promoter says in one sentence. The custom
+  // domain and ML sync are no longer sold on their own (they are part of Negocio).
+  { id: 'package/negocio_anual', label: 'Paquete Anual — instalación + 12 meses de Negocio', payLabel: 'Pagar la parte de Miyagi Sánchez' },
+  { id: 'package/negocio_arranque', label: 'Paquete Arranque — instalación + 3 meses de Negocio', payLabel: 'Pagar la parte de Miyagi Sánchez' },
+  { id: 'package/setup_gratis', label: 'Instalación en el plan Gratis', payLabel: 'Pagar la parte de Miyagi Sánchez' },
   { id: 'migration', label: 'Migración de tienda', payLabel: 'Cobrar migración' },
 ] as const
 type CloseSkuId = (typeof CLOSE_SKUS)[number]['id']
@@ -374,7 +377,7 @@ const mxn = (cents: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 }).format(cents / 100)
 
 function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: boolean; n: number }) {
-  const [sku, setSku] = useState<CloseSkuId>('domain')
+  const [sku, setSku] = useState<CloseSkuId>('package/negocio_anual')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<string | null>(null)
@@ -399,7 +402,7 @@ function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: 
       setTransfer(null)
       return
     }
-    const transferSku = sku === 'ml-sync' ? 'ml_sync' : sku
+    const transferSku = sku.startsWith('package/') ? sku.slice('package/'.length) : sku
     let cancelled = false
     fetch(`/api/promoter/close/transfer?shopId=${encodeURIComponent(shop.shopId)}&sku=${transferSku}`)
       .then((res) => res.json())

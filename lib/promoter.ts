@@ -615,6 +615,22 @@ export async function getCommissionRates(): Promise<Record<PromoterSku, number>>
 }
 
 /**
+ * One SKU's configured rate, or null when it could not be read or no row exists (plans-gratis-negocio S4, pr-reviewer
+ * #474). A package's split must never fall back to 0%: that would charge the promoter the full price. "Could not look"
+ * is not "0%". An explicitly configured 0 is returned as 0.
+ */
+export async function getConfiguredCommissionRate(sku: PromoterSku): Promise<number | null> {
+  const { data, error } = await db
+    .from('marketplace_promoter_commission_rates')
+    .select('rate_pct')
+    .eq('sku', sku)
+    .maybeSingle()
+  if (error || !data) return null
+  const rate = (data as { rate_pct: number | null }).rate_pct
+  return typeof rate === 'number' ? rate : null
+}
+
+/**
  * Upsert one SKU's commission rate. Returns `ok:false` when the write didn't land
  * (DB error / missing table), mirroring updatePromoterSettings' "check the write"
  * discipline. The caller validates `ratePct` with isValidRatePct first. US-7.
