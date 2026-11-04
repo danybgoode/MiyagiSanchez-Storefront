@@ -49,8 +49,8 @@ test.describe('pricing catalog', () => {
     expect(negocio.yearlyLabel?.es).toBe(`$${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN/año (también a meses sin intereses)`)
     const incl = (p: typeof gratis, loc: 'es' | 'en') => p.includes.map((i) => i[loc]).join(' | ')
     for (const loc of ['es', 'en'] as const) {
-      expect(incl(gratis, loc)).toContain(String(PLAN_ALLOWANCES.gratis.chatAnswersPerMonth))
-      expect(incl(negocio, loc)).toContain(String(PLAN_ALLOWANCES.negocio.chatAnswersPerMonth))
+      expect(incl(gratis, loc)).toContain(PLAN_ALLOWANCES.gratis.chatAnswersPerMonth.toLocaleString("en-US"))
+      expect(incl(negocio, loc)).toContain(PLAN_ALLOWANCES.negocio.chatAnswersPerMonth.toLocaleString("en-US"))
       expect(incl(negocio, loc)).toContain(String(PLAN_ALLOWANCES.negocio.photosPerMonth))
       expect(incl(negocio, loc)).toContain(String(NEGOCIO_TRIAL_DAYS))
     }
