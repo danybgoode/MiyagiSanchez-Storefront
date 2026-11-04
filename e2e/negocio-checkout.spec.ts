@@ -6,6 +6,7 @@
  * adds a second year while a real second payment always adds after the current end.
  */
 import { test, expect } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { coerceNegocioCadence, decideNegocioCheckout, mapNegocioStatus, sessionMonths, subscriptionPeriod } from '../lib/negocio-checkout-rules'
 import { NEGOCIO_GRANT_KEY, decideNegocioPayment, guardFor, type PlanState } from '../lib/plan'
 
