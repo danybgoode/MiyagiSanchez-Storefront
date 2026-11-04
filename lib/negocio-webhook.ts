@@ -113,7 +113,7 @@ export async function applyNegocioPayment(input: {
   throw new Error('grant write lost three compare-and-swap races')
 }
 
-export async function handleNegocioOneTimeComplete(session: Stripe.Checkout.Session): Promise<void> {
+export async function handleNegocioOneTimeComplete(session: Stripe.Checkout.Session, completedAt?: number): Promise<void> {
   const shopId = session.metadata?.shop_id
   const months = sessionMonths(session.metadata?.months)
   const promoterSku = session.metadata?.promoter_sku
@@ -150,8 +150,9 @@ export async function handleNegocioOneTimeComplete(session: Stripe.Checkout.Sess
   // A merchant's own yearly payment may be the year-2 renewal of a promoter's package (D13): 10% to that promoter.
   // (A promoter package itself is a different checkout kind, so it never counts as its own renewal.)
   if (outcome === 'written' && !promoterSku) {
-    // The payment's own time (the session's creation, seconds), never the webhook's processing time (Codex, #474).
-    const paidAt = session.created ? new Date(session.created * 1000) : new Date()
+    // When the payment COMPLETED (the event's own timestamp, seconds) — never the webhook's processing time nor the
+    // session's creation, which can sit on the other side of a renewal boundary (Codex security, #474).
+    const paidAt = completedAt ? new Date(completedAt * 1000) : new Date()
     await recordRenewalShare({ shopId, paymentRef: session.id, grossCents: session.amount_total ?? 0, paidAt })
   }
 

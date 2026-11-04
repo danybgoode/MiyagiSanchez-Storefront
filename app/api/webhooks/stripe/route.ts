@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
         await handleMlSyncOneTimeComplete(session)
       } else if (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
         // Negocio yearly or a promoter package (plans-gratis-negocio D6): paid months added to the shop's grant.
-        await handleNegocioOneTimeComplete(session)
+        await handleNegocioOneTimeComplete(session, event.created)
       } else if (session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND) {
         // A promoter pays the platform its share of a package by card (plans-gratis-negocio S4.2, D12).
         await handlePromoterPackageComplete(session)
