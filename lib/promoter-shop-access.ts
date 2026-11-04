@@ -11,12 +11,15 @@
  */
 import 'server-only'
 import { db } from '@/lib/supabase'
-import { promoterOpenedShop } from '@/lib/promoter-close'
+import { isSelfOwned, promoterOpenedShop } from '@/lib/promoter-close'
 
 export async function promoterMayCloseShop(input: {
-  promoter: { id: string; code: string }
-  shop: { id: string; sourceUrl: string | null }
+  promoter: { id: string; code: string; clerk_user_id?: string | null }
+  shop: { id: string; sourceUrl: string | null; clerkUserId?: string | null }
 }): Promise<boolean> {
+  // Never on a shop the promoter OWNS (Codex security, #474): opening a shop, claiming it with their own account and
+  // closing a package would buy Negocio at the promoter's share. A product call for Daniel may relax this.
+  if (isSelfOwned(input.shop.clerkUserId, input.promoter.clerk_user_id)) return false
   if (promoterOpenedShop(input.shop.sourceUrl, input.promoter.code)) return true
   const { data, error } = await db
     .from('merchant_relationships')

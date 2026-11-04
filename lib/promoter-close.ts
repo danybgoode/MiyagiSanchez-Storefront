@@ -115,3 +115,8 @@ export function promoterOpenedShop(sourceUrl: string | null | undefined, promote
   const code = normalizePromoterCode(promoterCode)
   return !!code && typeof sourceUrl === 'string' && sourceUrl.startsWith(`promoter://${code}/`)
 }
+
+/** Does the promoter own this shop? Then they may not close a package on it (self-close). Unknown owners are not self. */
+export function isSelfOwned(shopOwnerClerkId: string | null | undefined, promoterClerkId: string | null | undefined): boolean {
+  return !!shopOwnerClerkId && !!promoterClerkId && shopOwnerClerkId === promoterClerkId
+}

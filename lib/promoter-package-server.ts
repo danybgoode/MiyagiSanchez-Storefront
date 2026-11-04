@@ -13,6 +13,7 @@ import 'server-only'
 import type Stripe from 'stripe'
 import { createOneTimeCheckout } from '@/lib/stripe-subscriptions'
 import { tg } from '@/lib/telegram'
+import { db } from '@/lib/supabase'
 import { markAttributionPaid } from '@/lib/promoter'
 import { notifyMerchantCloseReceipt } from '@/lib/promoter-close-notify'
 import { applyNegocioPayment } from '@/lib/negocio-webhook'
@@ -50,6 +51,18 @@ export async function startPackageCardCheckout(input: {
     buyerEmail: input.buyerEmail,
     paymentMethodTypes: ['card'],
   })
+}
+
+async function packageAlreadyPaid(input: { promoterId: string; shopId: string; sku: PackageSku }): Promise<boolean> {
+  const { data } = await db
+    .from('marketplace_promoter_attributions')
+    .select('status')
+    .eq('promoter_id', input.promoterId)
+    .eq('seller_id', input.shopId)
+    .eq('sku', input.sku)
+    .is('payment_ref', null)
+    .maybeSingle()
+  return (data as { status?: string } | null)?.status === 'paid'
 }
 
 /**
@@ -100,6 +113,12 @@ export async function handlePromoterPackageComplete(session: Stripe.Checkout.Ses
       )
       return
     }
+  }
+  // The free-plan setup has no Negocio grant to remember the payment, so a replayed delivery is detected on the
+  // attribution: already paid ⇒ re-record (idempotent) and send no second receipt or alert (Codex, #474).
+  if (months === 0 && (await packageAlreadyPaid({ promoterId, shopId, sku }))) {
+    await recordPackageAttribution({ promoterId, shopId, sku, gross, sessionId: session.id })
+    return
   }
   // Settled at source: the promoter kept their part, so nothing accrues; the attribution records the full price.
   await recordPackageAttribution({ promoterId, shopId, sku, gross, sessionId: session.id })

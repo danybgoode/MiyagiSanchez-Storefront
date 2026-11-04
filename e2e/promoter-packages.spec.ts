@@ -17,7 +17,7 @@ import {
 } from '../lib/promoter-packages'
 import { PROMOTER_SKUS } from '../lib/promoter-skus'
 import { TRANSFER_SKUS } from '../lib/promoter-transfer'
-import { promoterOpenedShop, promoterSourceUrl } from '../lib/promoter-close'
+import { isSelfOwned, promoterOpenedShop, promoterSourceUrl } from '../lib/promoter-close'
 
 test('the packages are promoter SKUs and transfer SKUs (the DB CHECK was widened by M1)', () => {
   for (const sku of PACKAGE_SKUS) {
@@ -104,4 +104,14 @@ test('money guards (pr-reviewer, #474): an unread rate refuses, a comp shop refu
   expect(webhook).toContain('platform-payee kind from a connected account, ignored')
   const renewal = readFileSync('lib/promoter-renewal-server.ts', 'utf8')
   expect(renewal).toContain("throw new Error('renewal commission did not accrue')")
+})
+
+test('no self-close: a promoter never closes a package on a shop they own (Codex security, #474)', () => {
+  expect(isSelfOwned('user_p', 'user_p')).toBe(true)
+  expect(isSelfOwned('user_m', 'user_p')).toBe(false)
+  expect(isSelfOwned(null, 'user_p')).toBe(false) // unclaimed: the normal case
+  const access = readFileSync('lib/promoter-shop-access.ts', 'utf8')
+  expect(access.indexOf('isSelfOwned(')).toBeGreaterThan(-1)
+  expect(access.indexOf('isSelfOwned(')).toBeLessThan(access.indexOf('promoterOpenedShop(input.shop.sourceUrl'))
+  expect(readFileSync('app/api/promoter/close/package/[sku]/route.ts', 'utf8')).toContain('clerk_user_id: user.id')
 })

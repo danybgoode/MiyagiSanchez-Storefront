@@ -52,8 +52,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sku
   if (!shop) return NextResponse.json({ ok: false, error: 'Tienda no encontrada.' }, { status: 404 })
   // Only a shop this promoter opened or holds a relationship with (Codex security, #474): a package grants Negocio and
   // makes the promoter the renewal beneficiary, so it can never be attached to someone else's shop.
-  if (!(await promoterMayCloseShop({ promoter, shop }))) {
-    return NextResponse.json({ ok: false, error: 'Solo puedes cerrar paquetes en tiendas que abriste tú.' }, { status: 403 })
+  // The signed-in user IS the promoter: their Clerk id decides self-ownership (never a body field).
+  if (!(await promoterMayCloseShop({ promoter: { ...promoter, clerk_user_id: user.id }, shop }))) {
+    return NextResponse.json({ ok: false, error: 'Solo puedes cerrar paquetes en tiendas que abriste tú para otro comerciante.' }, { status: 403 })
   }
   // A shop with a permanent Negocio gains nothing from a package: refuse before any money moves (pr-reviewer, #474).
   if (readNegocioGrant(shop.metadata)?.type === 'comp') {
