@@ -67,14 +67,14 @@ test.describe('subdomain-checkout · pricing single-source', () => {
     expect(SUBDOMAIN_PRICE_LABEL.en).toContain('$199')
   })
 
-  test('/acerca pricing names the subdomain price in both locales (no drift)', () => {
+  test('/acerca pricing: the subdomain is free and no retired standalone price is named (plans-gratis-negocio D11, D16)', () => {
     const pricing = getAboutSection('pricing')
     expect(pricing.stub).toBe(false)
     for (const locale of LOCALES) {
       const text = aboutCopy(pricing, locale).body.join(' ')
-      expect(text, `${locale} names the subdomain price`).toContain('$199')
-      // The custom-domain SKU is still listed too.
-      expect(text, `${locale} still names the custom-domain price`).toContain('$499')
+      // The subdomain and the custom domain are no longer sold on their own: Gratis includes one, Negocio the other.
+      expect(text, `${locale} no longer names the subdomain price`).not.toContain('$199')
+      expect(text, `${locale} no longer names the standalone custom-domain price`).not.toContain('$499')
     }
   })
 
