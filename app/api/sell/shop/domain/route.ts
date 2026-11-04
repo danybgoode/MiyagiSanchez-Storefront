@@ -44,8 +44,8 @@ async function getShopForUser(clerkUserId: string) {
  * paths only; DELETE (removal) is intentionally always allowed — it moves away
  * from the gated state and is the escape hatch a lapsed seller needs.
  */
-async function paywallBlock(metadata: unknown, sellerClerkId: string): Promise<NextResponse | null> {
-  const ent = await resolveDomainEntitlement(metadata, { sellerClerkId })
+async function paywallBlock(metadata: unknown, sellerClerkId: string, shopId: string): Promise<NextResponse | null> {
+  const ent = await resolveDomainEntitlement(metadata, { sellerClerkId, shopId })
   if (ent.entitled) return null
   return NextResponse.json(
     { error: 'El dominio propio es una función premium. Conéctalo desde Catálogo → Canales.', paywall: true },
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
   if (!shop) return NextResponse.json({ error: 'Tienda no encontrada.' }, { status: 404 })
 
   // Paywall: refuse to connect a domain for a non-entitled shop (flag on).
-  const blocked = await paywallBlock(shop.metadata, user.id)
+  const blocked = await paywallBlock(shop.metadata, user.id, shop.id)
   if (blocked) return blocked
 
   // Check if another shop already claimed this domain

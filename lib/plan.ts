@@ -111,13 +111,25 @@ export function readNegocioTrial(metadata: unknown): NegocioTrial | null {
 
 // ── Builders (the ONE place each shape is composed) ───────────────────────────
 
+/**
+ * `months` calendar months after `from`, CLAMPED to the target month's last day: Jan 31 + 1 month is Feb 28 (or 29),
+ * never Mar 3, and Feb 29 + 12 months is Feb 28 — `setMonth` alone overflows into the next month and gives days away
+ * (Codex, #471). Computed in UTC so a server's timezone never moves the date.
+ */
+export function addMonthsClamped(from: Date, months: number): Date {
+  const y = from.getUTCFullYear()
+  const m = from.getUTCMonth() + months
+  const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
+  const day = Math.min(from.getUTCDate(), lastDay)
+  return new Date(Date.UTC(y, m, day, from.getUTCHours(), from.getUTCMinutes(), from.getUTCSeconds(), from.getUTCMilliseconds()))
+}
+
 /** A dated Negocio grant: `months` calendar months from `now` (12 for a yearly payment, 3 for Arranque). */
 export function buildNegocioOneTimeGrant(opts?: { months?: number; now?: Date; note?: string }): NegocioGrant {
   const now = opts?.now ?? new Date()
   const months = opts?.months ?? NEGOCIO_YEARLY_MONTHS
   if (!Number.isInteger(months) || months < 1) throw new Error(`buildNegocioOneTimeGrant: months must be a positive integer (got ${months})`)
-  const expires = new Date(now)
-  expires.setMonth(expires.getMonth() + months)
+  const expires = addMonthsClamped(now, months)
   return {
     type: 'one_time',
     granted_at: now.toISOString(),

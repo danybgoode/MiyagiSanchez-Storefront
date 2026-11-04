@@ -28,7 +28,7 @@ export default async function CanalPropioPage() {
 
   const { data: shop } = await db
     .from('marketplace_shops')
-    .select('slug, custom_domain, custom_domain_verified, metadata')
+    .select('id, slug, custom_domain, custom_domain_verified, metadata')
     .eq('clerk_user_id', user.id)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -40,7 +40,7 @@ export default async function CanalPropioPage() {
   const st = settings as SettingsTree
 
   // Custom-domain paywall: resolve entitlement (epic: custom-domain-paywall).
-  const domainEntitled = (await resolveDomainEntitlement(shop.metadata, { sellerClerkId: user.id })).entitled
+  const domainEntitled = (await resolveDomainEntitlement(shop.metadata, { sellerClerkId: user.id, shopId: shop.id })).entitled
 
   // Subdomain paywall (epic 07 · subdomain-pricing): one getSubdomainSubscription
   // call feeds both the entitlement deriver (via hasActiveSubscription, no double

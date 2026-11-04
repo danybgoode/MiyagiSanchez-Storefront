@@ -35,8 +35,9 @@ export async function resolveDomainEntitlement(
   opts?: {
     sellerClerkId?: string
     hasActiveSubscription?: boolean
-    /** The marketplace shop id, when the caller has it (else the owner's shop is looked up, only if needed). */
-    shopId?: string
+    /** The marketplace shop whose metadata this is. REQUIRED for Negocio to open the item (Negocio is per shop):
+     *  without it the plan is not read and only the item's own grants and subscription count. */
+    shopId?: string | null
   },
 ): Promise<DomainEntitlement> {
   const paywallEnabled = await isEnabled('domain.paywall_enabled')
@@ -59,7 +60,7 @@ export async function resolveDomainEntitlement(
   const own = deriveDomainEntitlement({ paywallEnabled, grant, hasActiveSubscription })
   // Negocio includes the custom domain (plans-gratis-negocio D5). The item's own answer wins when it entitles — an old grant
   // or a standalone subscription keeps working — so the plan is only read when it could change the answer.
-  if (own.entitled || !opts?.sellerClerkId) return own
+  if (own.entitled || !opts?.sellerClerkId || !opts.shopId) return own
   const plan = await resolvePlanForOwner(metadata, { sellerClerkId: opts.sellerClerkId, shopId: opts.shopId })
   return entitleByPlan(own, plan, planOpensCustomDomain)
 }

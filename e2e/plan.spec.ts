@@ -11,6 +11,7 @@ import {
   NEGOCIO_TRIAL_KEY,
   buildNegocioOneTimeGrant,
   buildNegocioTrial,
+  addMonthsClamped,
   canStartTrial,
   daysLeft,
   entitleByPlan,
@@ -138,19 +139,23 @@ test.describe('grants — paying early never throws days away', () => {
     expect(g.expires_at?.slice(0, 10)).toBe('2027-02-15')
   })
 
+  test('month ends clamp instead of overflowing into the next month (no free days)', () => {
+    expect(addMonthsClamped(new Date('2027-01-31T10:00:00Z'), 1).toISOString()).toBe('2027-02-28T10:00:00.000Z')
+    expect(addMonthsClamped(new Date('2028-01-31T10:00:00Z'), 1).toISOString()).toBe('2028-02-29T10:00:00.000Z')
+    expect(addMonthsClamped(new Date('2028-02-29T10:00:00Z'), 12).toISOString()).toBe('2029-02-28T10:00:00.000Z')
+    expect(addMonthsClamped(new Date('2026-11-30T10:00:00Z'), 3).toISOString()).toBe('2027-02-28T10:00:00.000Z')
+    expect(addMonthsClamped(new Date('2026-11-10T10:00:00Z'), 12).toISOString()).toBe('2027-11-10T10:00:00.000Z')
+  })
+
   test('a second payment adds after the current end', () => {
     const extended = extendNegocioGrant(liveOneTime, 12, { now: NOW })
-    const expected = new Date(liveOneTime.expires_at)
-    expected.setMonth(expected.getMonth() + 12)
-    expect(extended.expires_at).toBe(expected.toISOString())
+    expect(extended.expires_at).toBe(addMonthsClamped(new Date(liveOneTime.expires_at), 12).toISOString())
     expect(extended.granted_at).toBe(NOW.toISOString())
   })
 
   test('a lapsed grant restarts from now; a comp is never replaced', () => {
     const restarted = extendNegocioGrant(lapsedOneTime, 3, { now: NOW })
-    const expected = new Date(NOW)
-    expected.setMonth(expected.getMonth() + 3)
-    expect(restarted.expires_at).toBe(expected.toISOString())
+    expect(restarted.expires_at).toBe(addMonthsClamped(NOW, 3).toISOString())
     const comp = { type: 'comp' as const, granted_at: iso(0) }
     expect(extendNegocioGrant(comp, 12, { now: NOW })).toBe(comp)
   })
