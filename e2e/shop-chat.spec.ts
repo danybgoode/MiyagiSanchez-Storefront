@@ -219,3 +219,11 @@ test('wiring: claimed shops only, public read, agents get ask_shop', () => {
   expect(MCP_BUYER_TOOLS).toContain('ask_shop')
   expect(src('app/api/ucp/mcp/route.ts')).toContain("case 'ask_shop':")
 })
+
+test('the history the model sees always STARTS with the buyer (an even window of a long chat would start on an answer)', () => {
+  const turns = Array.from({ length: 13 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', text: `t${i}` }))
+  const parsed = parseChatBody({ messages: turns })!
+  expect(parsed.messages[0].role).toBe('user')
+  expect(parsed.messages[parsed.messages.length - 1]).toEqual({ role: 'user', text: 't12' })
+  expect(parsed.messages.length).toBeLessThanOrEqual(CHAT_LIMITS.maxMessages)
+})

@@ -52,6 +52,10 @@ export function parseChatBody(body: unknown): ChatBody | null {
     messages.push({ role: m.role, text })
   }
   if (messages[messages.length - 1].role !== 'user') return null
+  // The model requires the conversation to START with the buyer: a 12-turn window of an alternating dialog that ends
+  // on the buyer always starts on an answer (even length), which Gemini refuses — every question from the 7th on would
+  // have become «no sé» (PR #469 re-review). Drop leading answers, whatever the window.
+  while (messages.length && messages[0].role !== 'user') messages.shift()
   return {
     messages,
     turnstileToken: typeof body.turnstile_token === 'string' && body.turnstile_token ? body.turnstile_token : null,
