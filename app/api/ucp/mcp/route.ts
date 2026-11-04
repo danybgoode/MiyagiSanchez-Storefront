@@ -27,6 +27,8 @@ import { readShopFresh } from '@/lib/listings'
 import { readInputs as readBusinessInputs } from '@/lib/business-plan/model'
 import { computePlan as computeBusinessPlan } from '@/lib/business-plan/engine'
 import { explainTemplate as explainPlanTemplate } from '@/lib/business-plan/explain'
+import { handleShopChat } from '@/lib/shop-chat/handler'
+import { chatDeps } from '@/lib/shop-chat/server'
 import { filterLinksByState, formatLinkForAgent, mapCancelLinkArgs, mapCreateLinkArgs, type AgentLinkView } from '@/lib/in-person/payment-link-mcp'
 import { internalLinkCall } from '@/lib/in-person/payment-link-backend'
 import { NextRequest, NextResponse } from 'next/server'
@@ -374,6 +376,18 @@ const TOOLS = [
         market:    { type: 'string', enum: ['mx', 'us'], default: 'mx', description: 'Active country market code. Legacy default: mx.' },
         shop_slug: { type: 'string', description: 'Shop slug from listing.shop.slug in search results' },
         limit:     { type: 'number', minimum: 1, maximum: 20, default: 10, description: 'Number of listings to return' },
+      },
+    },
+  },
+  {
+    name: 'ask_shop',
+    description: "Ask ONE shop a question in plain words (\"¿hacen envíos a Puebla?\", \"do you deliver on Sundays?\") and get the shop's own answer, drawn only from what the shop publishes: its FAQ, about, returns policy, how it charges and delivers, and its catalog with exact prices and stock. `answered: false` means the shop has not said — relay that honestly and suggest the buyer contact the shop; never fill the gap yourself. Prices in an answer are copied from the catalog; anything else is refused rather than invented.",
+    inputSchema: {
+      type: 'object',
+      required: ['shop_slug', 'question'],
+      properties: {
+        shop_slug: { type: 'string', description: 'Shop slug from listing.shop.slug in search results' },
+        question:  { type: 'string', maxLength: 600, description: "The buyer's question, in their own words" },
       },
     },
   },
@@ -1947,6 +1961,32 @@ async function handleMakeOffer(args: Record<string, unknown>, baseUrl: string, a
   return { content: [{ type: 'text', text: english
     ? `✅ Offer submitted!\n\n**Offer ID:** \`${offerId}\`\n**Amount:** ${formattedAmount}\n**Listing:** ${listing.title}\n\nThe seller has 48 hours to respond. If accepted, read commerce_readiness before attempting checkout.`
     : `✅ Oferta enviada.\n\n**ID de oferta:** \`${offerId}\`\n**Monto:** ${formattedAmount}\n**Anuncio:** ${listing.title}\n\nEl vendedor tiene 48 horas para responder. Si acepta, revisa commerce_readiness antes de intentar el checkout.` }] }
+}
+
+/**
+ * ask_shop (business-infrastructure S4, D16) — the shop's chat for agents. The same core as the widget
+ * (`handleShopChat`): the shop from the slug, claimed and public only, the per-shop and global daily budgets, the same
+ * answer guard. The human check is the widget's; here the MCP endpoint's own per-IP limit has already run, and the
+ * per-shop limiter still applies.
+ */
+async function handleAskShop(args: Record<string, unknown>) {
+  const slug = typeof args.shop_slug === 'string' ? args.shop_slug : ''
+  const question = typeof args.question === 'string' ? args.question : ''
+  const base = chatDeps('mcp')
+  const result = await handleShopChat(
+    { slug, body: { messages: [{ role: 'user', text: question }] } },
+    {
+      ...base,
+      // Agents get their own per-shop bucket key and their own budget subjects (`audience: 'agent'`), so a script can
+      // never lock a shop's chat for its real buyers (PR #469 review).
+      rateAllowed: async (s) => (await checkRateLimit('shop_chat_shop', `agent:${s}`)).allowed,
+      verifyTurnstile: async () => true,
+      audience: 'agent',
+    },
+  )
+  if (result.status !== 200) return { isError: true, content: [{ type: 'text', text: result.body.error }] }
+  const { answer, answered } = result.body
+  return { content: [{ type: 'text', text: answer }, { type: 'text', text: JSON.stringify({ shop_slug: slug.toLowerCase(), answer, answered }) }] }
 }
 
 async function handleGetShop(args: Record<string, unknown>, baseUrl: string) {
@@ -4717,6 +4757,7 @@ async function handleMcpMethod(
       case 'create_support_checkout': { const r = await handleCreateSupportCheckout(args, baseUrl); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'make_offer':           { const r = await handleMakeOffer(args, baseUrl, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'get_shop':             { const r = await handleGetShop(args, baseUrl); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
+      case 'ask_shop':             { const r = await handleAskShop(args); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'check_availability':   { const r = await handleCheckAvailability(args); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'book_appointment':     { const r = await handleBookAppointment(args); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'get_buyer_trust':      { const r = await handleGetBuyerTrust(args); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }

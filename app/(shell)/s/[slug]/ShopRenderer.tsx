@@ -36,6 +36,8 @@ import { resolveSectionAvailability } from '@/lib/shop-presentation/availability
 import { trustChips, railOccupiesTrack, railPanels } from '@/lib/shop-presentation/chrome'
 import { sectionPath } from '@/lib/shop-presentation/sections'
 import { resolveTheme } from '@/lib/shop-presentation/theme'
+import ShopChat from '@/components/shop-chat/ShopChat'
+import { isShopClaimed } from '@/lib/claim'
 
 interface Social { instagram?: string; facebook?: string; whatsapp?: string; tiktok?: string; twitter?: string }
 
@@ -485,6 +487,9 @@ export async function ShopPage({
         basePath={navBasePath}
         copy={buyerCopy}
       />
+
+      {/* The shop's chat (business-infrastructure S4): claimed shops only — an unclaimed one has nobody to answer. */}
+      {isShopClaimed(shop) ? <ShopChat slug={shop.slug} shopName={shop.name} siteKey={process.env.TURNSTILE_SITE_KEY || null} /> : null}
 
       {/* The footer content links that used to sit here are GONE (Living Shop,
           epic 07 · Story 3.5). Acerca / Preguntas / Políticas are now first-class

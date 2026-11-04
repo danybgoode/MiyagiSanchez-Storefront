@@ -55,6 +55,8 @@ export type Listing = {
   images: Array<{ url: string; alt?: string }>
   tags: string[]
   status: string
+  /** Sellable variants when read from Medusa; >1 means `price_cents` is a «desde» price. */
+  variant_count?: number
   source_platform: string | null
   source_url: string | null
   views: number

@@ -122,9 +122,12 @@ export function shopInputFrom(identity: IdentityBlock): ShopCreateInput {
  */
 export function manifestFrom(identity: IdentityBlock, words: WordsBlock | null): StoreConfigManifest {
   const handDelivery = SHAPE_DEFAULTS[shapeOf(identity)].handDelivery
+  const faq = words?.faq ?? []
   return {
     profile: profileOf(identity, words ?? undefined),
     ...(handDelivery ? { shipping: { local_pickup: true } } : {}),
+    // The FAQ the description answered (S4.3): the shop's chat answers from it on day one.
+    ...(faq.length ? { content: { faq: { items: faq } } } : {}),
   }
 }
 
