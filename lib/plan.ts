@@ -19,6 +19,7 @@
  */
 
 import { NEGOCIO_TRIAL_DAYS, NEGOCIO_YEARLY_MONTHS } from './negocio-pricing'
+import type { DomainEntitlement } from './domain-entitlement'
 
 export const NEGOCIO_GRANT_KEY = 'negocio_grant'
 export const NEGOCIO_TRIAL_KEY = 'negocio_trial'
@@ -263,6 +264,20 @@ export function planShowsBadge(state: PlanState): boolean {
 /** The monthly check-in is part of Negocio, and the trial includes it. */
 export function planGetsCheckin(state: PlanState): boolean {
   return state.plan === 'negocio' || state.plan === 'trial'
+}
+
+/**
+ * Layer the plan over an item's own entitlement (custom domain, ML sync). The item's own answer wins when it entitles
+ * (a grandfather, a comp, a standalone subscription — Daniel: existing paid merchants keep what they paid for);
+ * otherwise the plan opens it if `opens(plan)` says so. Never takes an entitlement away.
+ */
+export function entitleByPlan(
+  own: DomainEntitlement,
+  plan: PlanState | null,
+  opens: (state: PlanState) => boolean,
+): DomainEntitlement {
+  if (own.entitled || !plan || !opens(plan)) return own
+  return { entitled: true, reason: plan.plan === 'trial' ? 'trial' : 'negocio' }
 }
 
 // ── The trial backfill planner (decision a: existing owned shops get the trial on launch day) ──

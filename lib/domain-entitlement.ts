@@ -50,6 +50,8 @@ export type DomainEntitlementReason =
   | 'comp'            // durable comp grant
   | 'one_time'        // dated one-time grant, still within its 12-month term (S2)
   | 'subscription'    // active paid subscription to the custom-domain plan
+  | 'negocio'         // the shop is on Negocio, which includes it (plans-gratis-negocio D5)
+  | 'trial'           // the shop's Negocio trial includes it (ML sync only — never the custom domain)
   | 'none'            // paywall on, no grant, no subscription ⇒ NOT entitled
 
 export type DomainEntitlement = {

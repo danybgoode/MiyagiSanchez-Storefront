@@ -101,3 +101,21 @@ export async function resolveMyPlan(clerkUserId: string, now: Date = new Date())
   const plan = await resolvePlan(shop.metadata, { sellerClerkId: clerkUserId, shopId: shop.id, now })
   return { shop, plan }
 }
+
+/**
+ * The plan for a shop given its metadata and its owner, for the item composers (custom domain, ML sync). The shop id
+ * is the caller's when it has one; otherwise the owner's shop is read — only here, after the item's own grants failed
+ * to decide, so the common path costs nothing. Any failure returns null: the plan then opens nothing (fail closed).
+ */
+export async function resolvePlanForOwner(
+  metadata: unknown,
+  opts: { sellerClerkId: string; shopId?: string | null; now?: Date },
+): Promise<PlanState | null> {
+  try {
+    const shopId = opts.shopId ?? (await readOwnedShop(opts.sellerClerkId))?.id ?? null
+    return await resolvePlan(metadata, { sellerClerkId: opts.sellerClerkId, shopId, now: opts.now })
+  } catch (e) {
+    console.error('[plan] owner plan read failed:', e)
+    return null
+  }
+}

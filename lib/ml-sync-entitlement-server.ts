@@ -15,6 +15,8 @@
  * entitled — an already-enabled tester can never be trapped behind the paywall.
  */
 import 'server-only'
+import { entitleByPlan, planOpensMlSync } from '@/lib/plan'
+import { resolvePlanForOwner } from '@/lib/plan-server'
 import { isEnabled } from '@/lib/flags'
 import { readMlSyncGrant, deriveMlSyncEntitlement } from '@/lib/ml-sync-entitlement'
 import { isOneTimeGrantLive, type DomainEntitlement } from '@/lib/domain-entitlement'
@@ -32,7 +34,12 @@ import { hasActiveMlSyncSubscription } from '@/lib/ml-sync-subscription'
  */
 export async function resolveMlSyncEntitlement(
   metadata: unknown,
-  opts?: { sellerClerkId?: string; hasActiveSubscription?: boolean },
+  opts?: {
+    sellerClerkId?: string
+    hasActiveSubscription?: boolean
+    /** The marketplace shop id, when the caller has it (else the owner's shop is looked up, only if needed). */
+    shopId?: string
+  },
 ): Promise<DomainEntitlement> {
   const paywallEnabled = await isEnabled('ml.sync_paywall_enabled')
 
@@ -44,5 +51,10 @@ export async function resolveMlSyncEntitlement(
     hasActiveSubscription = await hasActiveMlSyncSubscription(opts.sellerClerkId)
   }
 
-  return deriveMlSyncEntitlement({ paywallEnabled, grant, hasActiveSubscription })
+  const own = deriveMlSyncEntitlement({ paywallEnabled, grant, hasActiveSubscription })
+  // Negocio includes the ML sync (plans-gratis-negocio D5). The item's own answer wins when it entitles — an old grant
+  // or a standalone subscription keeps working — so the plan is only read when it could change the answer.
+  if (own.entitled || !opts?.sellerClerkId) return own
+  const plan = await resolvePlanForOwner(metadata, { sellerClerkId: opts.sellerClerkId, shopId: opts.shopId })
+  return entitleByPlan(own, plan, planOpensMlSync)
 }

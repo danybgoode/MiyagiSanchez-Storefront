@@ -11,6 +11,8 @@
  * seam without pulling in `server-only` (and the Supabase client).
  */
 import 'server-only'
+import { entitleByPlan, planOpensCustomDomain } from '@/lib/plan'
+import { resolvePlanForOwner } from '@/lib/plan-server'
 import { isEnabled } from '@/lib/flags'
 import {
   deriveDomainEntitlement,
@@ -30,7 +32,12 @@ import { hasActiveCustomDomainSubscription } from '@/lib/domain-subscription'
  */
 export async function resolveDomainEntitlement(
   metadata: unknown,
-  opts?: { sellerClerkId?: string; hasActiveSubscription?: boolean },
+  opts?: {
+    sellerClerkId?: string
+    hasActiveSubscription?: boolean
+    /** The marketplace shop id, when the caller has it (else the owner's shop is looked up, only if needed). */
+    shopId?: string
+  },
 ): Promise<DomainEntitlement> {
   const paywallEnabled = await isEnabled('domain.paywall_enabled')
 
@@ -49,5 +56,10 @@ export async function resolveDomainEntitlement(
     hasActiveSubscription = await hasActiveCustomDomainSubscription(opts.sellerClerkId)
   }
 
-  return deriveDomainEntitlement({ paywallEnabled, grant, hasActiveSubscription })
+  const own = deriveDomainEntitlement({ paywallEnabled, grant, hasActiveSubscription })
+  // Negocio includes the custom domain (plans-gratis-negocio D5). The item's own answer wins when it entitles — an old grant
+  // or a standalone subscription keeps working — so the plan is only read when it could change the answer.
+  if (own.entitled || !opts?.sellerClerkId) return own
+  const plan = await resolvePlanForOwner(metadata, { sellerClerkId: opts.sellerClerkId, shopId: opts.shopId })
+  return entitleByPlan(own, plan, planOpensCustomDomain)
 }

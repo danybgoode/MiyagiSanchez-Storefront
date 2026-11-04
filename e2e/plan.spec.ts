@@ -13,6 +13,7 @@ import {
   buildNegocioTrial,
   canStartTrial,
   daysLeft,
+  entitleByPlan,
   derivePlan,
   derivePlanFromMetadata,
   extendNegocioGrant,
@@ -197,5 +198,30 @@ test.describe('the launch-day trial backfill (decision a)', () => {
     expect(parseArgs([])).toEqual({ ok: true, apply: false })
     expect(parseArgs(['--apply'])).toEqual({ ok: true, apply: true })
     expect(parseArgs(['--aply']).ok).toBe(false)
+  })
+})
+
+test.describe('entitleByPlan — Negocio opens items, never takes one away (D5)', () => {
+  const none = { entitled: false, reason: 'none' } as const
+  const trial = { plan: 'trial', reason: 'trial', endsAt: liveTrial.expires_at } as const
+  const negocio = { plan: 'negocio', reason: 'one_time', endsAt: liveOneTime.expires_at } as const
+  const gratis = { plan: 'gratis', reason: 'none', endsAt: null } as const
+
+  test('an item the shop already holds stays, whatever the plan', () => {
+    const grandfathered = { entitled: true, reason: 'grandfathered' } as const
+    expect(entitleByPlan(grandfathered, gratis, planOpensCustomDomain)).toBe(grandfathered)
+    // Even on Negocio, the item keeps its own reason: an admin must still see it was grandfathered, not bundled.
+    expect(entitleByPlan(grandfathered, negocio, planOpensCustomDomain)).toBe(grandfathered)
+  })
+  test('Negocio opens the custom domain; the trial does not', () => {
+    expect(entitleByPlan(none, negocio, planOpensCustomDomain)).toEqual({ entitled: true, reason: 'negocio' })
+    expect(entitleByPlan(none, trial, planOpensCustomDomain)).toEqual(none)
+  })
+  test('the trial opens ML sync, and says so', () => {
+    expect(entitleByPlan(none, trial, planOpensMlSync)).toEqual({ entitled: true, reason: 'trial' })
+  })
+  test('Gratis, or a plan that could not be read, opens nothing', () => {
+    expect(entitleByPlan(none, gratis, planOpensMlSync)).toEqual(none)
+    expect(entitleByPlan(none, null, planOpensMlSync)).toEqual(none)
   })
 })
