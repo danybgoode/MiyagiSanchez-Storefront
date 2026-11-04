@@ -569,3 +569,10 @@ test('the photo cap is the owner plan\'s (plans-gratis-negocio D8): spend and "p
   expect(out.status).toBe(200)
   if (out.status === 200) expect((out.body as { photos_left: number }).photos_left).toBe(59)
 })
+
+test('analysis: a Negocio owner past Gratis\'s 20 photos is NOT refused — the plan cap is read here too (pr-reviewer, #472)', async () => {
+  const w = analyzeWorld({ used: P2S_LIMITS.photosPerMonth })
+  const out = await analyzePhoto({ userId: USER, body: { image_url: PHOTO }, hosts: HOSTS }, { ...w.deps, photoCap: async () => 60 })
+  expect(out.status).toBe(200)
+  if (out.status === 200) expect((out.body as { photos_left: number }).photos_left).toBe(60 - P2S_LIMITS.photosPerMonth)
+})

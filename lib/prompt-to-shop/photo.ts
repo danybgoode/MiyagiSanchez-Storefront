@@ -228,6 +228,9 @@ export interface AnalyzeDeps {
   burstAllowed: () => Promise<boolean>
   /** This month's photos already used — a READ, never a spend. `null` = could not read. */
   photosUsed: () => Promise<number | null>
+  /** The owner plan's monthly photos (plans-gratis-negocio D8) — the SAME cap the confirm spends against, so "left"
+   *  is never counted against a different number (pr-reviewer, #472). Omitted → `P2S_LIMITS.photosPerMonth`. */
+  photoCap?: () => Promise<number>
   /** `spend_ai_allowance('photo_analysis:user:<id>', 'daily_budget', YYYY-MM-DD MX, photoAnalysesPerDay)` raw answer.
    *  The fail-CLOSED bound on vision calls: the burst limiter fails open, and a merchant who never confirms never
    *  spends a monthly photo. */
@@ -265,7 +268,8 @@ export async function analyzePhoto(input: AnalyzeInput, deps: AnalyzeDeps): Prom
 
   // A read, not a spend: at the cap, refuse BEFORE paying for a vision call the merchant could not confirm anyway.
   // A failed read does not refuse — the confirm's spend is the hard cap and it fails closed.
-  const left = photosLeft(await deps.photosUsed())
+  const cap = deps.photoCap ? await deps.photoCap() : P2S_LIMITS.photosPerMonth
+  const left = photosLeft(await deps.photosUsed(), cap)
   if (left === 0) return refuse(429, 'allowance', photosLeftCopy(0))
 
   const empty = (message: string) => ({ status: 200 as const, body: { ok: true as const, suggestion: null, message, photos_left: left } })

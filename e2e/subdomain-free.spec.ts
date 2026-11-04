@@ -10,14 +10,24 @@ const sub = (over: Partial<Parameters<typeof planSubdomainCancellations>[0][numb
   id: 'sub_1', status: 'active', cancel_at_period_end: false, metadata: { kind: 'subdomain' }, customerEmail: 'a@b.mx', ...over,
 })
 
-test('only live subdomain subscriptions not already ending are cancelled', () => {
+test('only live subdomain subscriptions are cancelled, and only when the owner can be emailed', () => {
   expect(planSubdomainCancellations([
     sub({ id: 'live' }),
     sub({ id: 'grace', status: 'past_due' }),
-    sub({ id: 'ending', cancel_at_period_end: true }),
+    sub({ id: 'theirs', cancel_at_period_end: true }),
     sub({ id: 'gone', status: 'canceled' }),
     sub({ id: 'other', metadata: { kind: 'ml_sync' } }),
-  ]).map((d) => [d.id, d.action])).toEqual([['live', 'cancel'], ['grace', 'cancel'], ['ending', 'skip'], ['gone', 'skip'], ['other', 'skip']])
+    sub({ id: 'mute', customerEmail: null }),
+  ]).map((d) => [d.id, d.action, d.why])).toEqual([
+    ['live', 'cancel', 'live_subdomain'], ['grace', 'cancel', 'live_subdomain'], ['theirs', 'skip', 'already_ending'],
+    ['gone', 'skip', 'not_live'], ['other', 'skip', 'not_subdomain'], ['mute', 'skip', 'no_email'],
+  ])
+})
+
+test('the notice is retryable: ours-but-not-yet-emailed is notify; emailed is done; never twice', () => {
+  const ours = { kind: 'subdomain', subdomain_free_cancel: '1' }
+  expect(planSubdomainCancellations([sub({ id: 'owed', cancel_at_period_end: true, metadata: ours })])[0]).toMatchObject({ action: 'notify' })
+  expect(planSubdomainCancellations([sub({ id: 'sent', cancel_at_period_end: true, metadata: { ...ours, subdomain_free_notice: '1' } })])[0]).toMatchObject({ action: 'skip', why: 'done' })
 })
 
 test('the email says it is free, when the paid period ends, and that nothing else is charged', () => {

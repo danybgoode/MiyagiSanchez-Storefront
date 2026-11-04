@@ -103,7 +103,16 @@ export async function handleShopChat(input: { slug: string; body: unknown }, dep
     if (!(await deps.verifyTurnstile(body.turnstileToken))) return refuse(403, 'verify')
   }
 
-  // The plan's monthly allowance first (D8): over it, the buyer is offered the leave-a-question form, not an error.
+  // The shop's own day first (a shop's popularity is not a reason to spend the platform's), then the global ceiling.
+  const agent = deps.audience === 'agent'
+  const shopSubject = agent ? `shop_chat:agent:shop:${slug}` : `shop_chat:shop:${slug}`
+  const globalSubject = agent ? 'shop_chat:agent:global' : 'shop_chat:global'
+  if (!(await deps.spend(shopSubject, agent ? AGENT_PER_SHOP_PER_DAY : CHAT_PER_SHOP_PER_DAY))) return refuse(429, 'budget')
+  if (!(await deps.spend(globalSubject, agent ? AGENT_GLOBAL_PER_DAY : CHAT_GLOBAL_PER_DAY))) return refuse(429, 'budget')
+
+  // Then the plan's monthly allowance (D8) — after the daily checks, so a daily refusal never uses up a monthly answer
+  // (Codex, #472). Over it, the buyer is offered the leave-a-question form, not an error. A model failure after this
+  // still counts: that call cost money too.
   // Widget and agents spend from ONE monthly subject: the allowance is the shop's, whoever asks.
   if (deps.monthlyCap && deps.spendMonth) {
     const cap = (await deps.monthlyCap(slug)) ?? GRATIS_CHAT_MONTHLY
@@ -113,13 +122,6 @@ export async function handleShopChat(input: { slug: string; body: unknown }, dep
       return { status: 200, body: { answer: CHAT_COPY.allowance, answered: false, chat_token } }
     }
   }
-
-  // The shop's own day next (a shop's popularity is not a reason to spend the platform's), then the global ceiling.
-  const agent = deps.audience === 'agent'
-  const shopSubject = agent ? `shop_chat:agent:shop:${slug}` : `shop_chat:shop:${slug}`
-  const globalSubject = agent ? 'shop_chat:agent:global' : 'shop_chat:global'
-  if (!(await deps.spend(shopSubject, agent ? AGENT_PER_SHOP_PER_DAY : CHAT_PER_SHOP_PER_DAY))) return refuse(429, 'budget')
-  if (!(await deps.spend(globalSubject, agent ? AGENT_GLOBAL_PER_DAY : CHAT_GLOBAL_PER_DAY))) return refuse(429, 'budget')
 
   const knowledge = buildKnowledge(read.shop, read.products)
   const result = await deps.callModel(chatRequestBody(systemPrompt(read.shop.name, knowledge), body.messages))

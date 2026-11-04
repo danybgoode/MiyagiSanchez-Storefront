@@ -36,7 +36,7 @@ test('allowances: Gratis gets some, the trial and Negocio get more; an unknown p
   expect(allowanceFor(undefined)).toEqual(PLAN_ALLOWANCES.gratis)
 })
 
-test('over the monthly allowance: an unanswered answer that offers the leave form — no model call, no daily spend', async () => {
+test('over the monthly allowance: an unanswered answer that offers the leave form — no model call', async () => {
   const { d, trace } = deps({
     monthlyCap: async () => 50,
     spendMonth: async (s, c) => { trace.push(`month:${s}:${c}`); return false },
@@ -46,18 +46,21 @@ test('over the monthly allowance: an unanswered answer that offers the leave for
   if (r.status !== 200) return
   expect(r.body).toMatchObject({ answer: CHAT_COPY.allowance, answered: false })
   expect(r.body.chat_token).toBeTruthy()
-  expect(trace).toEqual(['month:shop_chat:month:shop:tamales-rosa:50'])
+  // The daily checks run first (a daily refusal must never use up a monthly answer), then the month refuses.
+  expect(trace.filter((t) => t.startsWith('month:'))).toEqual(['month:shop_chat:month:shop:tamales-rosa:50'])
+  expect(trace).not.toContain('model')
 })
 
-test('within the allowance: the month is spent first, then the day, then the model', async () => {
+test('within the allowance: the day first, then the month, then the model', async () => {
   const { d, trace } = deps({
     monthlyCap: async () => 1000,
     spendMonth: async (s, c) => { trace.push(`month:${s}:${c}`); return true },
   })
   const r = await handleShopChat({ slug: 'tamales-rosa', body: ask }, d)
   expect(r.status).toBe(200)
-  expect(trace[0]).toBe('month:shop_chat:month:shop:tamales-rosa:1000')
-  expect(trace).toContain('model')
+  const month = trace.indexOf('month:shop_chat:month:shop:tamales-rosa:1000')
+  expect(trace.findIndex((t) => t.startsWith('day:'))).toBeLessThan(month)
+  expect(trace.indexOf('model')).toBeGreaterThan(month)
 })
 
 test('a plan that cannot be read spends against Gratis\'s allowance (fail closed)', async () => {
@@ -72,4 +75,12 @@ test('agents spend from the SAME monthly subject as the widget: the allowance is
   const { d } = deps({ audience: 'agent', monthlyCap: async () => 50, spendMonth: async (s) => { subjects.push(s); return true } })
   await handleShopChat({ slug: 'tamales-rosa', body: ask }, d)
   expect(subjects).toEqual(['shop_chat:month:shop:tamales-rosa'])
+})
+
+test('a daily refusal never uses up a monthly answer (Codex, #472)', async () => {
+  const months: string[] = []
+  const { d } = deps({ spend: async () => false, monthlyCap: async () => 50, spendMonth: async (s) => { months.push(s); return true } })
+  const r = await handleShopChat({ slug: 'tamales-rosa', body: ask }, d)
+  expect(r.status).toBe(429)
+  expect(months).toEqual([])
 })

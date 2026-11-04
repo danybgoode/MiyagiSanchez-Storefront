@@ -417,7 +417,6 @@ export function buildPromoterPageConfig(
     // is configured.
     heroStats: [
       { value: `$${priceMxn}`, label: page.priceDomainLabel },
-      { value: `$${SUBDOMAIN_PRICE_YEARLY_MXN}`, label: page.priceSubdomainLabel },
       // Sprint 3 (US-3.1) — "todo esto cuesta $X — con tu promotor $Y" once a bundle is configured.
       ...(bundleRow ? [{ value: `$${bundleRow.bundlePriceMxn}`, label: `paquete completo (antes $${bundleRow.regularTotalMxn})` }] : []),
       ...(heroCommissionStat ? [{ value: heroCommissionStat, label: page.commissionLabel }] : []),

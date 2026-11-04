@@ -100,11 +100,19 @@ function log(line: Record<string, unknown>) {
   console.info('[p2s]', JSON.stringify({ via: MODEL_VIA, ...line }))
 }
 
+/** The owner's monthly photos for their plan (D8); a plan that cannot be read gets Gratis's (fail closed). One read
+ *  shared by analyze, confirm and the page that says "te quedan", so all three count against the same number. */
+export async function ownerPhotoCap(userId: string): Promise<number> {
+  const mine = await resolveMyPlan(userId).catch(() => null)
+  return allowanceFor(mine?.plan.plan).photosPerMonth
+}
+
 export function analyzeDeps(userId: string, clerkJwt: string): AnalyzeDeps {
   return {
     resolveOwner: () => resolvePhotoOwner(userId, clerkJwt),
     burstAllowed: async () => (await checkRateLimit('p2s_photo', userId)).allowed,
     photosUsed: () => photosUsedThisMonth(userId),
+    photoCap: () => ownerPhotoCap(userId),
     // The existing D4 RPC on its own subject: no migration, and the same fail-closed single conditional write.
     spendAnalysis: async () => {
       const { data, error } = await db.rpc('spend_ai_allowance', {
@@ -224,10 +232,7 @@ export function confirmDeps(userId: string, clerkJwt: string): ConfirmDeps {
     resolveOwner: () => resolvePhotoOwner(userId, clerkJwt),
     mutate: (draftId, fn) => mutateKept(userId, draftId, fn),
     // The owner's plan sets the month's photos (D8); a plan that cannot be read gets Gratis's (fail closed).
-    photoCap: async () => {
-      const mine = await resolveMyPlan(userId).catch(() => null)
-      return allowanceFor(mine?.plan.plan).photosPerMonth
-    },
+    photoCap: () => ownerPhotoCap(userId),
     spend: async (cap: number) => {
       // Bounded (SPEND_TIMEOUT_MS) so a `pending` entry can never outlive the takeover window while still live. An
       // abort reads as an error → refused and released; if the RPC committed anyway, one photo is lost (the

@@ -114,7 +114,7 @@ export default async function PromoterSellSheetPage() {
       <h2 style={{ fontSize: 16 }}>{p.pitchTitle}</h2>
       <p style={{ fontSize: 14 }}>{p.pitchBody}</p>
       <p className="ss-price">
-        {p.priceDomainLabel}: ${CUSTOM_DOMAIN_PRICE_MXN} MXN · {p.priceSubdomainLabel}: ${SUBDOMAIN_PRICE_YEARLY_MXN} MXN/año
+        {p.priceDomainLabel}: ${CUSTOM_DOMAIN_PRICE_MXN} MXN
         {migrationPriceMxn != null ? ` · Migración de tienda: $${migrationPriceMxn} MXN` : ''}
       </p>
       <p className="no-print" style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 24 }}>

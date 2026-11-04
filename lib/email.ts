@@ -552,7 +552,7 @@ export async function sendNegocioTrialNotice(ctx: {
   if (ctx.notice === 'five_days') {
     return sendWithResult(ctx.to, `${shopName}: te quedan 5 días de Negocio`, [
       h1('Tu prueba de Negocio termina pronto'),
-      p(esc('Este mes tu tienda ha tenido todo Negocio: tu propio dominio, Mercado Libre sincronizado, muchas más respuestas del chat y tu revisión del mes.')),
+      p(esc('Este mes tu tienda ha tenido la prueba de Negocio: Mercado Libre sincronizado, muchas más respuestas del chat y tu revisión del mes. Con Negocio también puedes conectar tu propio dominio.')),
       p(esc(`El ${endDate} pasa a Gratis por su cuenta. Sigue abierta, con todos tus productos y tu subdominio; no tienes que hacer nada.`)),
       p(esc(prices)),
       cta('Quedarme con Negocio', href),
@@ -561,7 +561,7 @@ export async function sendNegocioTrialNotice(ctx: {
   return sendWithResult(ctx.to, `${shopName} sigue abierta, ahora en Gratis`, [
     h1('Terminó tu prueba de Negocio'),
     p(esc('Tu tienda, tus productos y tu subdominio siguen igual. Puedes seguir vendiendo sin pagar nada.')),
-    p(esc(`Lo que cambia: el chat de tu tienda responde hasta ${PLAN_ALLOWANCES.gratis.chatAnswersPerMonth} preguntas al mes, y tu dominio propio y la sincronización con Mercado Libre quedan en pausa hasta que vuelvas a Negocio.`)),
+    p(esc(`Lo que cambia: el chat de tu tienda responde hasta ${PLAN_ALLOWANCES.gratis.chatAnswersPerMonth} preguntas al mes, y la sincronización con Mercado Libre queda en pausa hasta que vuelvas a Negocio.`)),
     p(esc(prices)),
     cta('Volver a Negocio', href),
   ].join(''), undefined, undefined, 'es', `negocio-trial/${ctx.shopId}/ended`)

@@ -13,7 +13,7 @@ import { findKeptDraft } from '@/lib/prompt-to-shop/claim-server'
 import { readChooserState, type CobrosSettings } from '@/lib/prompt-to-shop/cobros'
 import { ARMAR_COPY } from '@/lib/prompt-to-shop/copy'
 import { publishState } from '@/lib/prompt-to-shop/photo'
-import { listOwnProducts, photosUsedThisMonth } from '@/lib/prompt-to-shop/photo-server'
+import { listOwnProducts, ownerPhotoCap, photosUsedThisMonth } from '@/lib/prompt-to-shop/photo-server'
 import { draftView, ownProductCards } from '@/lib/prompt-to-shop/view'
 import { guideProductCount, guideProgress, guideStepsFor } from '@/lib/setup-guide-source'
 import { fetchDeletedListingIds, fetchGuideShop } from '@/lib/setup-guide-server'
@@ -63,12 +63,14 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
   if (kept?.sellerId) {
     const { getToken } = await auth()
     const clerkJwt = await getToken()
-    const [seller, guideShop, listings, used, correosAvailable] = await Promise.all([
+    const [seller, guideShop, listings, used, correosAvailable, photoCap] = await Promise.all([
       getMySeller(),
       fetchGuideShop(userId),
       clerkJwt ? listOwnProducts(clerkJwt) : Promise.resolve(null),
       photosUsedThisMonth(userId),
       isEnabled('shipping.correos_enabled'),
+      // The owner plan's photos (plans-gratis-negocio D8), the same cap analyze and confirm spend against.
+      ownerPhotoCap(userId),
     ])
     const deletedIds = guideShop?.id ? await fetchDeletedListingIds(guideShop.id) : new Set<string>()
     // Resumen counts an unreadable product list as none for the checklist; so does this, for the same %. «Publicar»
@@ -83,7 +85,7 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
         progress={guideProgress(steps)}
         ownCards={own ? ownProductCards(own) : null}
         publish={publishState(own ? own.length : null)}
-        photosLeft={photosLeft(used)}
+        photosLeft={photosLeft(used, photoCap)}
         profile={{ name: guideShop?.name ?? kept.blocks.identity?.name ?? '', description: guideShop?.description ?? '' }}
         market={seller?.market ?? 'mx'}
         chooser={readChooserState((guideShop?.metadata as { settings?: CobrosSettings } | null)?.settings)}
