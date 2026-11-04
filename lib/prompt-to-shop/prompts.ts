@@ -11,7 +11,7 @@
 import { NUMBERS_SCHEMA } from './numbers'
 import { CATALOG_CATEGORY_KEYS } from '../catalog-import'
 import { EXAMPLE_SETUP, SETUP_LANGUAGE_DIRECTIVE } from '../setup-spec'
-import { EXAMPLE_ROWS_MAX, EXAMPLE_ROWS_MIN, GENERATABLE_PRESETS, type BlockKey, type IdentityBlock } from './blocks'
+import { EXAMPLE_ROWS_MAX, EXAMPLE_ROWS_MIN, FAQ_MAX_ITEMS, GENERATABLE_PRESETS, type BlockKey, type IdentityBlock } from './blocks'
 import { BUSINESS_SHAPES, DEFAULT_SHAPE, SHAPE_DEFAULTS, shapeChoicesForPrompt, type BusinessShape } from '../business-shape'
 
 const SAFETY =
@@ -84,6 +84,7 @@ Devuelve un objeto JSON con:
 - "announcement": la barra de aviso arriba de la tienda (máx. 140 caracteres), por ejemplo cómo pedir o cuándo entrega.
 - "headline": la frase grande de bienvenida (máx. 120).
 - "about": un párrafo "quiénes somos" (máx. 800).
+- "faq": hasta ${FAQ_MAX_ITEMS} preguntas frecuentes de compradores con su respuesta ({"question", "answer"}). SOLO preguntas que la descripción RESPONDE con lo que dice (zona, qué vende, cómo pide, días). Si la descripción no responde algo, NO incluyas esa pregunta. Puede ser una lista vacía.
 No prometas envíos, descuentos ni horarios que la descripción no diga.
 
 IDIOMA
@@ -146,6 +147,10 @@ export const RESPONSE_SCHEMAS: Record<BlockKey, Record<string, unknown>> = {
       announcement: { type: 'STRING' },
       headline: { type: 'STRING' },
       about: { type: 'STRING' },
+      faq: {
+        type: 'ARRAY',
+        items: { type: 'OBJECT', properties: { question: { type: 'STRING' }, answer: { type: 'STRING' } }, required: ['question', 'answer'] },
+      },
     },
     required: ['announcement', 'headline', 'about'],
   },

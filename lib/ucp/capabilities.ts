@@ -112,6 +112,7 @@ export const MCP_BUYER_TOOLS = [
   'create_checkout',
   'make_offer',
   'get_shop',
+  'ask_shop',        // business-infrastructure S4 — the shop's own answer from its published info (no auth)
   'check_availability',
   'book_appointment',
   'get_buyer_trust',

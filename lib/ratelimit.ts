@@ -245,6 +245,21 @@ const p2sPhotoLimiter = () => {
   return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(12, '10 m'), prefix: 'rl:p2s_photo' })
 }
 
+// The shop's chat (business-infrastructure S4, D14). Each message is one paid model call. Per IP: a buyer asking a
+// handful of questions fits 20 in 10 minutes; a script does not. Per shop: one shop's chat cannot be used to drain the
+// day's budget in a burst. Both fail open like every limiter here; the hard caps are the daily allowance rows
+// (`spend_ai_allowance`, per shop and global) that fail CLOSED.
+const shopChatIpLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(20, '10 m'), prefix: 'rl:shop_chat_ip' })
+}
+const shopChatShopLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, '10 m'), prefix: 'rl:shop_chat_shop' })
+}
+
 // Share kit catalog PDF (share-kit D16). Charged on a cache MISS only — a cached PDF costs one R2 read, a miss costs a
 // headless-Chromium render on the VM. Per shop: a merchant editing and re-downloading all afternoon still fits 6 an
 // hour. Per IP: one visitor cannot walk the shop list rendering every catalog. Both fail open like every limiter here;
@@ -263,7 +278,7 @@ const catalogPdfIpLimiter = () => {
 
 // ── Public helper ──────────────────────────────────────────────────────────────
 
-export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_mail_link' | 'p2s_mail_link_device' | 'p2s_photo' | 'catalog_pdf_shop' | 'catalog_pdf_ip'
+export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_mail_link' | 'p2s_mail_link_device' | 'p2s_photo' | 'catalog_pdf_shop' | 'catalog_pdf_ip' | 'shop_chat_ip' | 'shop_chat_shop'
 
 function limiterFor(key: LimitKey): Ratelimit | null {
   const getLimiter = key === 'offers'          ? offerLimiter
@@ -292,6 +307,8 @@ function limiterFor(key: LimitKey): Ratelimit | null {
     : key === 'p2s_photo' ? p2sPhotoLimiter
     : key === 'catalog_pdf_shop' ? catalogPdfShopLimiter
     : key === 'catalog_pdf_ip' ? catalogPdfIpLimiter
+    : key === 'shop_chat_ip' ? shopChatIpLimiter
+    : key === 'shop_chat_shop' ? shopChatShopLimiter
     : supplyImportLimiter
   return getLimiter()
 }

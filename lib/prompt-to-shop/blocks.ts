@@ -65,6 +65,28 @@ export interface WordsBlock {
   /** The canvas's hero line. Draft-only: the platform hero's promo mode needs an image URL we never invent. */
   headline: string
   about: string
+  /**
+   * The shop's first FAQ (business-infrastructure S4.3): ONLY questions the merchant's own description answers — a
+   * generated answer the merchant never stated would become a fact the shop's chat repeats. 0–6 items; applied at
+   * keep as `content.faq` through the existing validator; editable after in Configuración › Páginas.
+   */
+  faq?: Array<{ question: string; answer: string }>
+}
+
+export const FAQ_MAX_ITEMS = 6
+
+/** Read a FAQ list leniently: a malformed item is dropped (never a failed block — the FAQ is optional). */
+export function readFaq(value: unknown): Array<{ question: string; answer: string }> {
+  if (!Array.isArray(value)) return []
+  const out: Array<{ question: string; answer: string }> = []
+  for (const it of value) {
+    if (!isObj(it)) continue
+    const question = text(it.question, 140)
+    const answer = text(it.answer, 600)
+    if (question && answer && !out.some((o) => o.question === question)) out.push({ question, answer })
+    if (out.length === FAQ_MAX_ITEMS) break
+  }
+  return out
 }
 
 /** A draft-only row: `CatalogImportRow` has no example field, and `MiyagiSetupFile` is not widened for it. */
@@ -153,7 +175,8 @@ export function validateWords(value: unknown): BlockParse<'words'> {
   const report = validateConfig({ profile: { announcement: { text: announcement!, link: null } } })
   const profileIssues = report.blocks.flatMap((b) => b.issues)
   if (profileIssues.length) return { ok: false, issues: profileIssues }
-  return { ok: true, data: { announcement: announcement!, headline: headline!, about: about! } }
+  const faq = readFaq(value.faq)
+  return { ok: true, data: { announcement: announcement!, headline: headline!, about: about!, ...(faq.length ? { faq } : {}) } }
 }
 
 /**

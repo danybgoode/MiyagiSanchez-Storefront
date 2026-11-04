@@ -1,4 +1,5 @@
 import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
+import ShopChat from '@/components/shop-chat/ShopChat'
 import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -887,6 +888,8 @@ export async function ListingPage({
     // column below, or its surface color only paints the center column on wide
     // viewports (mirrors the shop page's outer/inner split, page.tsx).
     <div style={{ '--shop-accent': shopAccent } as React.CSSProperties} data-shop-preset={themePreset || undefined}>
+    {/* The shop's chat on the product page too (business-infrastructure S4); claimed shops only. */}
+    {isClaimed && listing.shop ? <ShopChat slug={listing.shop.slug} shopName={listing.shop.name} siteKey={process.env.TURNSTILE_SITE_KEY || null} /> : null}
     {/* Mobile: single-col centered. Desktop: unconstrained width up to 960px, 2-col grid.
        Redesign (S1.1): drop the fixed mobile `pb-[120px]` — StickyBuyBar renders a
        measured spacer matching the bar's real height instead, so content is never clipped. */}
