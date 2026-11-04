@@ -105,6 +105,12 @@ export interface CheckinDeps {
   /** Conditional `last_checkin_period = period` where it is not already, `.select()` back. True = this run owns the send. */
   claim: (rowId: string, period: string) => Promise<boolean>
   send: (row: CheckinRow, message: CheckinMessage) => Promise<void>
+  /**
+   * Does this shop's plan include the check-in? (plans-gratis-negocio D9: Negocio and its trial.) null = could not
+   * read the plan — the merchant waits for tomorrow, counted as unavailable. Omitted (a test, an older caller): every
+   * shop gets it, as before.
+   */
+  planIncludesCheckin?: (row: CheckinRow) => Promise<boolean | null>
   now: () => Date
   log?: (line: Record<string, unknown>) => void
 }
@@ -129,6 +135,11 @@ export async function runCheckinCron(
     if (row.last_checkin_period === period) { skipped += 1; continue }
     // A shop with nothing in its plan is skipped before any read: no network call, no false "unavailable".
     if (!activeOffers(readInputs(row.inputs)).length) { skipped += 1; continue }
+    if (deps.planIncludesCheckin) {
+      const included = await deps.planIncludesCheckin(row)
+      if (included === null) { unavailable += 1; continue }
+      if (!included) { skipped += 1; continue }
+    }
     const ledger = await deps.readLedger(row.seller_id)
     const units = ledger ? unitsInPeriod(ledger.events, ledger.orders, period) : null
     if (units === null) { unavailable += 1; continue }
