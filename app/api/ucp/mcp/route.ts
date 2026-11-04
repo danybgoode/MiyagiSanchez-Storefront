@@ -1977,8 +1977,11 @@ async function handleAskShop(args: Record<string, unknown>) {
     { slug, body: { messages: [{ role: 'user', text: question }] } },
     {
       ...base,
-      rateAllowed: async (s) => (await checkRateLimit('shop_chat_shop', s)).allowed,
+      // Agents get their own per-shop bucket key and their own budget subjects (`audience: 'agent'`), so a script can
+      // never lock a shop's chat for its real buyers (PR #469 review).
+      rateAllowed: async (s) => (await checkRateLimit('shop_chat_shop', `agent:${s}`)).allowed,
       verifyTurnstile: async () => true,
+      audience: 'agent',
     },
   )
   if (result.status !== 200) return { isError: true, content: [{ type: 'text', text: result.body.error }] }

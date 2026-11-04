@@ -653,6 +653,8 @@ const getShopListingsCached = unstable_cache(
           title: p.title,
           description: p.description ?? null,
           price_cents: priceObj?.amount ?? fallbackPrice,
+          // How many sellable variants: >1 means `price_cents` is the LOWEST ("desde $X"), never "the" price.
+          variant_count: variants.length,
           currency: sellerMarket.currency_code.toUpperCase(),
           condition: (meta.condition as string) ?? null,
           listing_type: p.type?.value ?? (meta.listing_type as string | undefined) ?? 'product',

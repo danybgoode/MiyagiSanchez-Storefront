@@ -43,7 +43,8 @@ export async function readChatShop(slug: string): Promise<ChatShopRead | null | 
       name: shop.name,
       description: shop.description,
       location: shop.location,
-      settings: ((shop.metadata as { settings?: Record<string, unknown> } | null)?.settings ?? null),
+      // The PUBLIC projection the backend already sanitized (no CLABE, no account ids).
+      metadata: (shop.metadata as Record<string, unknown> | null) ?? null,
     },
     products: listings
       .filter((l) => l.status === 'published' || l.status === 'active')
@@ -56,6 +57,7 @@ export async function readChatShop(slug: string): Promise<ChatShopRead | null | 
         listing_type: l.listing_type,
         in_stock: l.in_stock,
         available_quantity: l.available_quantity ?? null,
+        variant_count: l.variant_count,
       })),
   }
 }

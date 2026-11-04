@@ -26,6 +26,8 @@ import { deriveShopTrustInputs } from '@/lib/trust-inputs'
 import { listingUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 import type { Metadata } from 'next'
+import ShopChat from '@/components/shop-chat/ShopChat'
+import { isShopClaimed } from '@/lib/claim'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
@@ -138,6 +140,8 @@ export default async function EmbedShopPage({
           )}
         </div>
       </div>
+      {/* The shop's chat inside the embed too (business-infrastructure D15); claimed shops only. */}
+      {isShopClaimed(shop) ? <ShopChat slug={shop.slug} shopName={shop.name} siteKey={process.env.TURNSTILE_SITE_KEY || null} bottomOffset={16} /> : null}
     </ChannelLayout>
   )
 }

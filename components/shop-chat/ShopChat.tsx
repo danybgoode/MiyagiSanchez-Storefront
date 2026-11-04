@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import BodyPortal from '@/components/ui/BodyPortal'
 import TurnstileWidget from '@/app/(shell)/p2s/_components/TurnstileWidget'
 
@@ -27,7 +27,13 @@ const COPY = {
   failed: 'No pudimos responder ahora. Inténtalo de nuevo.',
 }
 
-export default function ShopChat({ slug, shopName, siteKey }: { slug: string; shopName: string; siteKey: string | null }) {
+export default function ShopChat({ slug, shopName, siteKey, bottomOffset = 84 }: {
+  slug: string
+  shopName: string
+  siteKey: string | null
+  /** Pixels above the bottom edge: clear of the tab bar on shop pages, of the sticky buy bar on product pages. */
+  bottomOffset?: number
+}) {
   const [open, setOpen] = useState(false)
   const [turns, setTurns] = useState<Turn[]>([])
   const [draft, setDraft] = useState('')
@@ -39,6 +45,21 @@ export default function ShopChat({ slug, shopName, siteKey }: { slug: string; sh
   // Rendering decides on STATE (a ref read during render is not reactive); the token itself stays in the ref.
   const [verified, setVerified] = useState(false)
   const list = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLInputElement>(null)
+  const launcherRef = useRef<HTMLButtonElement>(null)
+
+  // Escape closes; focus goes to the question on open and back to the launcher on close (like every sheet here).
+  useEffect(() => {
+    if (!open) return
+    input.current?.focus()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('keydown', onKey)
+    const launcher = launcherRef.current
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      launcher?.focus()
+    }
+  }, [open])
 
   if (!siteKey) return null
 
@@ -63,7 +84,13 @@ export default function ShopChat({ slug, shopName, siteKey }: { slug: string; sh
       })
       const body = (await res.json().catch(() => null)) as { answer?: string; answered?: boolean; chat_token?: string; error?: string; code?: string } | null
       if (!res.ok || !body?.answer) {
-        if (body?.code === 'verify') { chatToken.current = null; setVerified(false); setTurnstile(null); setResetKey((k) => k + 1) }
+        // Take the unanswered question back out of the thread and into the box: two user turns in a row would make
+        // the model refuse the whole conversation (PR #469 review).
+        setTurns(turns)
+        setDraft(text)
+        // A Turnstile token is single-use: any failure before a conversation token exists needs a fresh challenge.
+        if (body?.code === 'verify') { chatToken.current = null; setVerified(false) }
+        if (!chatToken.current) { setTurnstile(null); setResetKey((k) => k + 1) }
         setError(body?.error ?? COPY.failed)
         return
       }
@@ -71,6 +98,9 @@ export default function ShopChat({ slug, shopName, siteKey }: { slug: string; sh
       setTurns([...next, { role: 'assistant', text: body.answer, answered: body.answered }])
       requestAnimationFrame(() => list.current?.scrollTo({ top: list.current.scrollHeight }))
     } catch {
+      setTurns(turns)
+      setDraft(text)
+      if (!chatToken.current) { setTurnstile(null); setResetKey((k) => k + 1) }
       setError(COPY.failed)
     } finally {
       setBusy(false)
@@ -80,11 +110,12 @@ export default function ShopChat({ slug, shopName, siteKey }: { slug: string; sh
   return (
     <>
       <button
+        ref={launcherRef}
         type="button"
         className="btn btn-primary"
         onClick={() => setOpen(true)}
         data-testid="shop-chat-launcher"
-        style={{ position: 'fixed', right: 16, bottom: 'calc(84px + env(safe-area-inset-bottom))', zIndex: 'var(--z-overlay)', borderRadius: 999, boxShadow: '0 6px 20px rgba(0,0,0,.18)' }}
+        style={{ position: 'fixed', right: 16, bottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom))`, zIndex: 'var(--z-overlay)', borderRadius: 999, boxShadow: '0 6px 20px rgba(0,0,0,.18)' }}
       >
         <i className="iconoir-chat-bubble" aria-hidden="true" /> {COPY.launcher}
       </button>
@@ -129,7 +160,7 @@ export default function ShopChat({ slug, shopName, siteKey }: { slug: string; sh
               <form className="grid gap-2" onSubmit={ask}>
                 {!verified ? <TurnstileWidget siteKey={siteKey} onToken={setTurnstile} resetKey={resetKey} /> : null}
                 <div className="flex gap-2">
-                  <input className="input" style={{ flex: 1, minWidth: 0 }} value={draft} maxLength={600} placeholder={COPY.placeholder} onChange={(e) => setDraft(e.target.value)} aria-label={COPY.placeholder} data-testid="shop-chat-input" />
+                  <input ref={input} className="input" style={{ flex: 1, minWidth: 0 }} value={draft} maxLength={600} placeholder={COPY.placeholder} onChange={(e) => setDraft(e.target.value)} aria-label={COPY.placeholder} data-testid="shop-chat-input" />
                   <button type="submit" className="btn btn-primary" disabled={busy || !draft.trim()} data-testid="shop-chat-send">{COPY.send}</button>
                 </div>
                 {error ? <p className="t-small" role="alert" style={{ margin: 0, color: 'var(--danger)' }}>{error}</p> : null}
