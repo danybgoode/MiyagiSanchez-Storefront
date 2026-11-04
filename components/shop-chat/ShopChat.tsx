@@ -25,6 +25,10 @@ const COPY = {
   close: 'Cerrar',
   verify: 'Un momento: verificamos que eres una persona.',
   failed: 'No pudimos responder ahora. Inténtalo de nuevo.',
+  leaveTitle: 'Déjale tu pregunta a la tienda',
+  leaveEmail: 'Tu correo, para que te responda',
+  leaveSend: 'Enviar pregunta',
+  leaveSending: 'Enviando…',
 }
 
 export default function ShopChat({ slug, shopName, siteKey, bottomOffset = 84 }: {
@@ -44,6 +48,9 @@ export default function ShopChat({ slug, shopName, siteKey, bottomOffset = 84 }:
   const chatToken = useRef<string | null>(null)
   // Rendering decides on STATE (a ref read during render is not reactive); the token itself stays in the ref.
   const [verified, setVerified] = useState(false)
+  // The handoff (S5): after a «no sé», the buyer may leave their last question and an email.
+  const [leave, setLeave] = useState<{ kind: 'idle' | 'sending' } | { kind: 'done' | 'error'; message: string }>({ kind: 'idle' })
+  const [email, setEmail] = useState('')
   const list = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const launcherRef = useRef<HTMLButtonElement>(null)
@@ -62,6 +69,27 @@ export default function ShopChat({ slug, shopName, siteKey, bottomOffset = 84 }:
   }, [open])
 
   if (!siteKey) return null
+
+  const last = turns[turns.length - 1]
+  const lastQuestion = [...turns].reverse().find((t) => t.role === 'user')?.text ?? ''
+  const offerLeave = verified && last?.role === 'assistant' && last.answered === false && leave.kind !== 'done'
+
+  async function leaveQuestion(e: FormEvent) {
+    e.preventDefault()
+    if (!email.trim() || !lastQuestion || leave.kind === 'sending') return
+    setLeave({ kind: 'sending' })
+    try {
+      const res = await fetch(`/api/shop-chat/${encodeURIComponent(slug)}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), question: lastQuestion, transcript: turns.slice(-12), chat_token: chatToken.current }),
+      })
+      const body = (await res.json().catch(() => null)) as { message?: string } | null
+      setLeave({ kind: res.ok ? 'done' : 'error', message: body?.message ?? COPY.failed })
+    } catch {
+      setLeave({ kind: 'error', message: COPY.failed })
+    }
+  }
 
   async function ask(e: FormEvent) {
     e.preventDefault()
@@ -156,6 +184,14 @@ export default function ShopChat({ slug, shopName, siteKey, bottomOffset = 84 }:
                   </p>
                 ))}
                 {busy ? <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COPY.sending}</p> : null}
+                {offerLeave ? (
+                  <form className="grid gap-2" onSubmit={leaveQuestion} data-testid="shop-chat-leave" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--s-2, 8px)' }}>
+                    <p className="t-small" style={{ margin: 0, fontWeight: 600 }}>{COPY.leaveTitle}</p>
+                    <input className="input" type="email" inputMode="email" autoComplete="email" required maxLength={254} placeholder={COPY.leaveEmail} aria-label={COPY.leaveEmail} value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <div><button type="submit" className="btn btn-secondary btn-sm" disabled={leave.kind === 'sending'}>{leave.kind === 'sending' ? COPY.leaveSending : COPY.leaveSend}</button></div>
+                  </form>
+                ) : null}
+                {leave.kind === 'done' || leave.kind === 'error' ? <p className="t-small" role="status" style={{ margin: 0 }}>{leave.message}</p> : null}
               </div>
               <form className="grid gap-2" onSubmit={ask}>
                 {!verified ? <TurnstileWidget siteKey={siteKey} onToken={setTurnstile} resetKey={resetKey} /> : null}

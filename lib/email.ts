@@ -531,6 +531,32 @@ export async function sendBusinessCheckin(ctx: { to: string; shopName: string; r
   ].join(''), undefined, undefined, 'es', `business-checkin/${ctx.rowId}/${m.period}`)
 }
 
+/**
+ * A buyer left a question the shop's chat could not answer (business-infrastructure S5). To the shop OWNER only, with
+ * a link to answer in «Preguntas». The buyer's email is not in this message: the reply goes through the platform.
+ */
+export async function sendShopQuestionToOwner(ctx: { to: string; shopName: string; threadId: string; question: string }): Promise<EmailSendResult> {
+  const shopName = plainLine(ctx.shopName) || 'Tu tienda'
+  return sendWithResult(ctx.to, `${shopName}: alguien te dejó una pregunta`, [
+    h1('Te dejaron una pregunta'),
+    p('El chat de tu tienda no tenía la respuesta, así que te la pasamos:'),
+    p(`<strong>${esc(ctx.question)}</strong>`),
+    cta('Responder', `${SITE}/shop/manage/preguntas`),
+    p('Le llega tu respuesta a su correo. Si la guardas como pregunta frecuente, el chat la responde solo la próxima vez.'),
+  ].join(''), undefined, undefined, 'es', `shop-question/${ctx.threadId}`)
+}
+
+/** The shop's answer, to the buyer who left the question (S5). Idempotency key = thread: one answer, one email. */
+export async function sendShopAnswerToBuyer(ctx: { to: string; shopName: string; shopSlug: string; threadId: string; question: string; reply: string }): Promise<EmailSendResult> {
+  const shopName = plainLine(ctx.shopName) || 'La tienda'
+  return sendWithResult(ctx.to, `${shopName} respondió tu pregunta`, [
+    h1(`${esc(shopName)} te respondió`),
+    p(`Tu pregunta: <em>${esc(ctx.question)}</em>`),
+    p(esc(ctx.reply)),
+    cta('Ver la tienda', `${SITE}/s/${encodeURIComponent(ctx.shopSlug)}`),
+  ].join(''), undefined, undefined, 'es', `shop-answer/${ctx.threadId}`)
+}
+
 /** General account welcome. Shop-specific language belongs to the claim receipt. */
 export async function sendAccountWelcome(ctx: { to: string; clerkUserId: string }): Promise<EmailSendResult> {
   return sendWithResult(ctx.to, 'Bienvenido a Miyagi Sánchez / Welcome', [
