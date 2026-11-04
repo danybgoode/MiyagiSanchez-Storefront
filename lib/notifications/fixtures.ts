@@ -73,6 +73,7 @@ export const COMMUNICATION_FIXTURES: Record<string, CommunicationFixture> = {
     message: { period: '2026-10', month: 'octubre', sold: 48, needed: 120, onTrack: false, next: null },
     nextText: 'Te faltan 72 ventas al mes: comparte tu catálogo donde están tus compradores.',
   }),
+  'shop.negocio_trial_notice': (to) => email.sendNegocioTrialNotice({ to, shopName: SHOP, shopId: 'sample', notice: 'five_days', endsAt: '2026-12-10T18:00:00Z' }),
   'mensajes.shop_question': (to) => email.sendShopQuestionToOwner({ to, shopName: SHOP, threadId: 'sample', question: '¿Hacen pedidos para 30 personas?' }),
   'mensajes.shop_answer': (to) => email.sendShopAnswerToBuyer({ to, shopName: SHOP, shopSlug: 'tienda-de-muestra', threadId: 'sample', question: '¿Hacen pedidos para 30 personas?', reply: 'Sí, con tres días de anticipación.' }),
   'shop.claim_link_requested': (to) => email.sendShopClaimLink({ to, shopName: SHOP, claimUrl: 'https://miyagisanchez.com/claim?token=sample', market: 'mx' }),
