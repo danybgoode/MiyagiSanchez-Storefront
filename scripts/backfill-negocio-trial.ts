@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js'
 import {
   NEGOCIO_TRIAL_KEY,
   buildNegocioTrial,
+  guardFor,
   planNegocioTrialBackfill,
   readNegocioTrial,
   type ShopForTrialBackfill,
@@ -73,11 +74,16 @@ async function main(): Promise<void> {
   let raced = 0
   const failures: string[] = []
   for (const d of owed) {
+    // The guard matches what was read: a JSON-null trial is "never trialed" for the planner, so it must be written with
+    // `json_null`, not `absent`, or the write never lands (Codex, #471).
+    const shop = shops.find((x) => x.id === d.shopId)
+    const guard = guardFor(shop?.metadata, NEGOCIO_TRIAL_KEY)
+    if (guard.mode === 'equals') { raced += 1; continue }
     const { data: merged, error: writeError } = await db.rpc('merge_shop_metadata', {
       p_shop_id: d.shopId,
       p_patch: { [NEGOCIO_TRIAL_KEY]: trial },
       p_guard_key: NEGOCIO_TRIAL_KEY,
-      p_guard_mode: 'absent',
+      p_guard_mode: guard.mode,
       p_expected: null,
     })
     if (writeError) { failures.push(`${d.slug ?? d.shopId}: ${writeError.message}`); continue }
