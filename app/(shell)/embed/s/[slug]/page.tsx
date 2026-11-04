@@ -21,6 +21,8 @@ import { notFound } from 'next/navigation'
 import { getShop, getShopListings, formatPrice } from '@/lib/listings'
 import { assertShopNotPreviewPrivate, isShopPreviewPrivateBySlug } from '@/lib/preview-access'
 import ChannelLayout from '@/app/(shell)/s/[slug]/ChannelLayout'
+import { shopShowsBadge } from '@/lib/plan-badge-server'
+import { badgeHref } from '@/lib/plan'
 import TrustSignals from '@/app/components/TrustSignals'
 import { deriveShopTrustInputs } from '@/lib/trust-inputs'
 import { listingUrlFor } from '@/lib/market-url'
@@ -77,6 +79,9 @@ export default async function EmbedShopPage({
       accentColor={accent}
       logoUrl={shop.logo_url ?? null}
       domain=""
+      // The Gratis badge (plans-gratis-negocio D7) — the embed is a white-label surface too.
+      showBadge={await shopShowsBadge(shop.slug)}
+      badgeHref={badgeHref(shop.slug)}
       trust={
         // Epic D / D.2 — the embed shell carries the same platform-assurance strip.
         // paymentProtected suppressed (the shell's lead line carries that assurance).

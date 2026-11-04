@@ -12,6 +12,7 @@ import {
   buildNegocioOneTimeGrant,
   buildNegocioTrial,
   addMonthsClamped,
+  badgeHref,
   canStartTrial,
   daysLeft,
   decideDomainRelease,
@@ -239,4 +240,9 @@ test('custom-domain release: only when entitled by no path; an unreadable plan k
   expect(decideDomainRelease({ ...base, planUnavailable: true })).toBe('keep_and_alert')
   expect(decideDomainRelease({ ...base, reason: 'negocio_ended', hasDomain: false })).toBe('nothing_to_release')
   expect(decideDomainRelease({ ...base, reason: 'negocio_ended' })).toBe('release')
+})
+
+test('the badge links home, tagged with the shop (and encodes it)', () => {
+  expect(badgeHref('tacos-don-beto')).toBe('https://miyagisanchez.com/?utm_source=badge&utm_medium=shop&utm_campaign=tacos-don-beto')
+  expect(badgeHref('a b&c')).toContain('utm_campaign=a%20b%26c')
 })

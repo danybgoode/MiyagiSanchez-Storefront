@@ -287,6 +287,12 @@ export function planShowsBadge(state: PlanState): boolean {
   return state.plan === 'gratis'
 }
 
+/** Where the Gratis badge links: the home page, tagged with the shop so its referrals can be counted. */
+export function badgeHref(slug: string): string {
+  const campaign = encodeURIComponent(slug || 'shop')
+  return `https://miyagisanchez.com/?utm_source=badge&utm_medium=shop&utm_campaign=${campaign}`
+}
+
 /** The monthly check-in is part of Negocio, and the trial includes it. */
 export function planGetsCheckin(state: PlanState): boolean {
   return state.plan === 'negocio' || state.plan === 'trial'
