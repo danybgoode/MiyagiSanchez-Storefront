@@ -105,3 +105,13 @@ export function canAnchorPreview(
   if (shop.clerkUserId !== null) return false // claimed → never a preview subject
   return isPromoterShopOwner(shop, promoterCode)
 }
+
+/**
+ * Was this shop opened by the promoter with this code? `promoterSourceUrl` stamps every shop the workspace opens with
+ * `promoter://<code>/…`; the package close route accepts only such shops (or a relationship the promoter owns) —
+ * plans-gratis-negocio S4.2, Codex security #474.
+ */
+export function promoterOpenedShop(sourceUrl: string | null | undefined, promoterCode: string): boolean {
+  const code = normalizePromoterCode(promoterCode)
+  return !!code && typeof sourceUrl === 'string' && sourceUrl.startsWith(`promoter://${code}/`)
+}

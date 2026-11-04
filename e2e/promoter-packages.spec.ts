@@ -17,6 +17,7 @@ import {
 } from '../lib/promoter-packages'
 import { PROMOTER_SKUS } from '../lib/promoter-skus'
 import { TRANSFER_SKUS } from '../lib/promoter-transfer'
+import { promoterOpenedShop, promoterSourceUrl } from '../lib/promoter-close'
 
 test('the packages are promoter SKUs and transfer SKUs (the DB CHECK was widened by M1)', () => {
   for (const sku of PACKAGE_SKUS) {
@@ -72,4 +73,17 @@ test('the close workspace offers the three packages first, and the card path pay
   expect(card).toContain('amountCents: split.payPlatformCents')
   expect(card).toContain("paymentMethodTypes: ['card']")
   expect(card).toContain("session.payment_status !== 'paid'")
+})
+
+test('a promoter may close a package only on a shop they opened (or their own relationship) — Codex security, #474', () => {
+  const mine = promoterSourceUrl('PRM-EKTK5L', 'Tacos Don Beto')
+  expect(promoterOpenedShop(mine, 'PRM-EKTK5L')).toBe(true)
+  expect(promoterOpenedShop(mine, 'prm-ektk5l')).toBe(true) // codes are normalized
+  expect(promoterOpenedShop(mine, 'PRM-OTHER1')).toBe(false)
+  expect(promoterOpenedShop('https://supply.example/shop', 'PRM-EKTK5L')).toBe(false)
+  expect(promoterOpenedShop(null, 'PRM-EKTK5L')).toBe(false)
+  const route = readFileSync('app/api/promoter/close/package/[sku]/route.ts', 'utf8')
+  // The check runs before EITHER payment path.
+  expect(route.indexOf('promoterMayCloseShop(')).toBeGreaterThan(-1)
+  expect(route.indexOf('promoterMayCloseShop(')).toBeLessThan(route.indexOf("if (body.paymentMethod === 'transfer')"))
 })

@@ -70,7 +70,12 @@ export async function handlePromoterPackageComplete(session: Stripe.Checkout.Ses
   if (months > 0) {
     try {
       const outcome = await applyNegocioPayment({ shopId, paymentId: session.id, months, note: `promoter ${sku}` })
-      if (outcome === 'replay') return // already counted: no second attribution, receipt or alert
+      if (outcome === 'replay') {
+        // The grant was already counted, but the attribution may not have landed on the first delivery (Codex, #474):
+        // re-record it — markAttributionPaid is idempotent — and send no second receipt or alert.
+        await markAttributionPaid({ promoterId, sellerId: shopId, sku, grossAmountCents: gross, cadence: 'one_time', skipAccrual: true })
+        return
+      }
     } catch (e) {
       console.error('[promoter package] grant write failed:', e)
       tg.alert(

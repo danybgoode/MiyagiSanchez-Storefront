@@ -21,6 +21,7 @@ import { resolveTargetShop } from '@/lib/promoter-server'
 import { startPromoterTransferClose } from '@/lib/promoter-transfers'
 import { PACKAGES, isPackageSku } from '@/lib/promoter-packages'
 import { startPackageCardCheckout } from '@/lib/promoter-package-server'
+import { promoterMayCloseShop } from '@/lib/promoter-shop-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sku
   try { body = await req.json() } catch { /* validated below */ }
   const shop = await resolveTargetShop({ shopId: body.shopId, slug: body.slug })
   if (!shop) return NextResponse.json({ ok: false, error: 'Tienda no encontrada.' }, { status: 404 })
+  // Only a shop this promoter opened or holds a relationship with (Codex security, #474): a package grants Negocio and
+  // makes the promoter the renewal beneficiary, so it can never be attached to someone else's shop.
+  if (!(await promoterMayCloseShop({ promoter, shop }))) {
+    return NextResponse.json({ ok: false, error: 'Solo puedes cerrar paquetes en tiendas que abriste tú.' }, { status: 403 })
+  }
 
   if (body.paymentMethod === 'transfer') {
     if (!(await isEnabled('promoter.transfer_enabled'))) return NextResponse.json({ ok: false }, { status: 404 })
