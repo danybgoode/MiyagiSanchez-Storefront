@@ -53,6 +53,7 @@ import { oneTimeGrantNote } from '@/lib/promoter-close'
 import { listingUrlFor } from '@/lib/market-url'
 import { notifyMerchantCloseReceipt } from '@/lib/promoter-close-notify'
 import { MIGRATION_CHECKOUT_KIND } from '@/lib/migration-checkout'
+import { PROMOTER_PACKAGE_CHECKOUT_KIND, handlePromoterPackageComplete } from '@/lib/promoter-package-server'
 import { NEGOCIO_CHECKOUT_KIND } from '@/lib/negocio-subscription'
 import {
   handleNegocioInvoiceFailed,
@@ -196,6 +197,9 @@ export async function POST(req: NextRequest) {
       } else if (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
         // Negocio yearly or a promoter package (plans-gratis-negocio D6): paid months added to the shop's grant.
         await handleNegocioOneTimeComplete(session)
+      } else if (session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND) {
+        // A promoter pays the platform its share of a package by card (plans-gratis-negocio S4.2, D12).
+        await handlePromoterPackageComplete(session)
       } else if (session.metadata?.kind === MIGRATION_CHECKOUT_KIND) {
         // migration SKU (epic 03 · platform-migrations S2): a one-time consulting
         // service, no subscription — writes an inert migration_grant marker.
@@ -1481,7 +1485,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   // Negocio monthly (plans-gratis-negocio D6): the platform is the payee — never the seller transfer below.
   if (stripeSub.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
-    await handleNegocioInvoicePaid(invoice, stripeSubscriptionId)
+    await handleNegocioInvoicePaid(invoice, stripeSubscriptionId, stripeSub.metadata?.shop_id ?? null)
     return
   }
 

@@ -1,3 +1,4 @@
+import { PACKAGES, PACKAGE_SKUS, packageSentence, packageSplit } from '@/lib/promoter-packages'
 import type { Dictionary } from '@/lib/dictionary'
 import {
   resolveSellerPersonaRoute,
@@ -374,11 +375,16 @@ export function buildPromoterPageConfig(
     subdomain: 0,
     ml_sync: 0,
     migration: 0,
+    negocio_anual: 0,
+    negocio_arranque: 0,
+    setup_gratis: 0,
+    negocio_renewal: 0,
   }
   const skuPrices: PromoterSkuPrices = opts.skuPrices ?? {}
   const earningsTable = buildPromoterEarningsTable(commissionRates, promoterSettings, skuPrices)
-  const heroCommissionStat = promoterHeroCommissionStat(commissionRates)
-  const monthlyExample = buildPromoterEarningsExample(commissionRates, promoterSettings, [5])
+  const anualKeepMxn = Math.round(packageSplit('negocio_anual', commissionRates.negocio_anual ?? 0).keepCents / 100)
+  const gratisKeepMxn = Math.round(packageSplit('setup_gratis', commissionRates.setup_gratis ?? 0).keepCents / 100)
+  const pesosStat = (n: number) => '$' + n.toLocaleString('en-US')
   // Sprint 3 (US-3.1) — "todo esto cuesta $X — con tu promotor $Y" bundle stat, same
   // deriver the admin preview + close workspace read. Absent (null) until an admin
   // configures a bundle — never a fabricated number.
@@ -414,25 +420,34 @@ export function buildPromoterPageConfig(
     // Pricing figures — the custom-domain + subdomain prices are fixed numbers; the commission
     // stat is computed from the live admin config (US-1.4) and hidden (not "%"/"0%") until a rate
     // is configured.
-    heroStats: [
-      { value: `$${priceMxn}`, label: page.priceDomainLabel },
-      // Sprint 3 (US-3.1) — "todo esto cuesta $X — con tu promotor $Y" once a bundle is configured.
-      ...(bundleRow ? [{ value: `$${bundleRow.bundlePriceMxn}`, label: `paquete completo (antes $${bundleRow.regularTotalMxn})` }] : []),
-      ...(heroCommissionStat ? [{ value: heroCommissionStat, label: page.commissionLabel }] : []),
-    ],
+    // plans-gratis-negocio S4.1 (D12): what a promoter keeps per package, from the live rates. The old "max
+    // commission %" stat is gone: the free-plan setup's 80% would read as the headline and mislead.
+    heroStats: anualKeepMxn > 0
+      ? [
+          { value: pesosStat(anualKeepMxn), label: 'te quedas por cada Paquete Anual' },
+          { value: pesosStat(gratisKeepMxn), label: 'te quedas por cada instalación en Gratis' },
+        ]
+      : [],
     proofTitle: page.proofTitle,
     proofLead: page.proofLead,
     // The glossary maps onto proof points (icon/title/body), with the computed regular/promoter
     // price + commission appended per SKU (US-1.4) — degrades to the plain glossary body until a
     // rate is configured.
-    proofPoints: page.glossary.map((raw, i) => {
+    proofPoints: [
+      ...PACKAGE_SKUS.map((sku) => ({
+        icon: sku === 'setup_gratis' ? 'iconoir-shop' : 'iconoir-sparks',
+        title: PACKAGES[sku].label,
+        body: `${PACKAGES[sku].summary}. ${packageSentence(sku, commissionRates[sku] ?? 0)}.`,
+      })),
+      ...page.glossary.map((raw, i) => {
       // The glossary's prices are `{token}`s (pricing-page D8) — filled from the price modules here.
       const point = { ...raw, body: fillFixedPricingTokens(raw.body, 'es') }
       const sku = GLOSSARY_SKU_ORDER[i]
       if (sku === 'subdomain') return point
       const earnings = earningsTable.find((r) => r.sku === sku)
       return earnings ? { ...point, body: withEarningsLine(point.body, earnings) } : point
-    }),
+    }).filter((_, i) => GLOSSARY_SKU_ORDER[i] === 'print_ad'),
+    ],
     stepsTitle: page.stepsTitle,
     steps: page.steps,
     agentTitle: copy.shared.selfCheck.title,
@@ -441,11 +456,11 @@ export function buildPromoterPageConfig(
     socialBody: page.pitchBody,
     // The 3rd pitch stat becomes a "close N shops/month" earnings example once the representative
     // SKU has a configured rate; degrades to the original placeholder stats until then.
-    socialStats: monthlyExample
+    socialStats: anualKeepMxn > 0
       ? [
           page.pitchStats[0],
           page.pitchStats[1],
-          { value: `$${monthlyExample[0].estimatedMonthlyMxn}`, label: `cerrando ${monthlyExample[0].closesPerMonth} tiendas/mes` },
+          { value: pesosStat(anualKeepMxn * 5), label: 'cerrando 5 Paquetes Anuales al mes' },
         ]
       : page.pitchStats,
     faqTitle: copy.shared.faqTitle,

@@ -27,6 +27,7 @@ import { NEGOCIO_GRANT_KEY, decideNegocioPayment } from '@/lib/plan'
 import { mapNegocioStatus, sessionMonths, subscriptionPeriod } from '@/lib/negocio-checkout-rules'
 import { markAttributionPaid, isPromoterSku } from '@/lib/promoter'
 import { releaseCustomDomainForShop } from '@/lib/domain-lapse-server'
+import { recordRenewalShare } from '@/lib/promoter-renewal-server'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const MEDUSA_PUB_KEY = process.env.MEDUSA_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -146,6 +147,12 @@ export async function handleNegocioOneTimeComplete(session: Stripe.Checkout.Sess
   }
   if (outcome === 'replay') return // already counted: no second attribution, no second alert
 
+  // A merchant's own yearly payment may be the year-2 renewal of a promoter's package (D13): 10% to that promoter.
+  // (A promoter package itself is a different checkout kind, so it never counts as its own renewal.)
+  if (outcome === 'written' && !promoterSku) {
+    await recordRenewalShare({ shopId, paymentRef: session.id, grossCents: session.amount_total ?? 0, paidAt: new Date() })
+  }
+
   const promoterId = session.metadata?.promoter_id
   if (promoterId && isPromoterSku(promoterSku)) {
     await markAttributionPaid({
@@ -186,8 +193,17 @@ export async function handleNegocioSubscriptionChanged(subscription: Stripe.Subs
  * payee — this path must NEVER reach the seller-subscription transfer below it in the webhook.
  * S4.3 hooks the promoter's year-2 renewal commission here.
  */
-export async function handleNegocioInvoicePaid(_invoice: Stripe.Invoice, stripeSubscriptionId: string): Promise<void> {
+export async function handleNegocioInvoicePaid(
+  invoice: Stripe.Invoice,
+  stripeSubscriptionId: string,
+  shopId?: string | null,
+): Promise<void> {
   await handleNegocioSubscriptionChanged({ id: stripeSubscriptionId, status: 'active' } as Stripe.Subscription, false)
+  // A monthly payment in year 2 of a promoter's package earns that promoter 10% (D13), once per invoice.
+  if (shopId && invoice.id) {
+    const paidAt = invoice.status_transitions?.paid_at ? new Date(invoice.status_transitions.paid_at * 1000) : new Date()
+    await recordRenewalShare({ shopId, paymentRef: invoice.id, grossCents: invoice.amount_paid ?? 0, paidAt })
+  }
 }
 
 /** A failed renewal: past_due is a grace state — Negocio stays while Stripe retries; only a cancel lapses it. */

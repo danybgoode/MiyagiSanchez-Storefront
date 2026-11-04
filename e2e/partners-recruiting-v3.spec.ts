@@ -22,6 +22,7 @@ const PROMOTER_IDENTITY_BY_CLERK_ID_CONSUMERS = [
   'app/api/promoter/close/listing/route.ts',
   'app/api/promoter/close/migration/route.ts',
   'app/api/promoter/close/ml-sync/route.ts',
+  'app/api/promoter/close/package/[sku]/route.ts',
   'app/api/promoter/close/print/route.ts',
   'app/api/promoter/close/transfer/[id]/report/route.ts',
   'app/api/promoter/close/transfer/route.ts',

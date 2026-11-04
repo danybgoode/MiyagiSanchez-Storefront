@@ -264,6 +264,11 @@ function planRows(): PlanRow[] {
  *  ML sync live inside Negocio. The SKUs stay in `PROMOTER_SKUS` (Sprint 4 retires them); only the LIST is filtered. */
 const EXTRA_SKUS_SOLD: readonly PromoterSku[] = ['print_ad', 'migration']
 
+/** The SKUs that were ever sold as an extra (each has a row). The promoter packages and the renewal share are not
+ *  extras: they are promoter deals (lib/promoter-packages.ts), never on the price list. */
+type ExtraSku = Exclude<PromoterSku, 'negocio_anual' | 'negocio_arranque' | 'setup_gratis' | 'negocio_renewal'>
+const isExtraSku = (sku: PromoterSku): sku is ExtraSku => (EXTRA_SKUS_SOLD as readonly string[]).includes(sku)
+
 function extraRows(input: PricingCatalogInput): ExtraRow[] {
   const printFrom =
     input.printAdTiersCents && input.printAdTiersCents.length > 0
@@ -277,7 +282,7 @@ function extraRows(input: PricingCatalogInput): ExtraRow[] {
       ? input.migrationPriceMxn
       : null
 
-  const rows: Record<PromoterSku, ExtraRow> = {
+  const rows: Record<ExtraSku, ExtraRow> = {
     subdomain: {
       sku: 'subdomain',
       kind: 'fixed',
@@ -358,7 +363,7 @@ function extraRows(input: PricingCatalogInput): ExtraRow[] {
   }
   // PROMOTER_SKUS order (so a new SKU without a row still fails to typecheck, via the Record), limited to the
   // extras still sold.
-  return PROMOTER_SKUS.filter((sku) => EXTRA_SKUS_SOLD.includes(sku)).map((sku) => rows[sku])
+  return PROMOTER_SKUS.filter(isExtraSku).map((sku) => rows[sku])
 }
 
 function processorRows(input: PricingCatalogInput): ProcessorRow[] {

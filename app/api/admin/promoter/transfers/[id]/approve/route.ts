@@ -39,6 +39,8 @@ export const POST = withAdmin(async (_req: Request, { params }: { params: Promis
     shopId: transfer.seller_id,
     promoterId: transfer.promoter_id,
     sellerClerkId: shop?.clerkUserId ?? '',
+    // The transfer's own id: a retried approval adds a package's Negocio months once (plans-gratis-negocio D12).
+    paymentId: `transfer:${transfer.id}`,
   })
   if (!activated.ok) {
     await releasePromoterTransferClaim(id)

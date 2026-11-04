@@ -28,6 +28,11 @@ export const DEFAULT_COMMISSION_RATES: Record<PromoterSku, number> = {
   subdomain: 0,
   ml_sync: 0,
   migration: 0,
+  // plans-gratis-negocio (D12, D13): the real rates (55 / 50 / 80 / 10) are rows seeded by M1; 0 is only the floor.
+  negocio_anual: 0,
+  negocio_arranque: 0,
+  setup_gratis: 0,
+  negocio_renewal: 0,
 }
 
 /**

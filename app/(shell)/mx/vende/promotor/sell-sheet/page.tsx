@@ -1,3 +1,5 @@
+import { PACKAGES, PACKAGE_SKUS, packageSentence } from '@/lib/promoter-packages'
+import { getCommissionRates } from '@/lib/promoter'
 import type { Metadata } from 'next'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { CUSTOM_DOMAIN_PRICE_MXN } from '@/lib/domain-pricing'
@@ -50,6 +52,8 @@ export default async function PromoterSellSheetPage() {
   // subdomain above) — it's admin-set (platform-migrations S2), so it's read live
   // rather than hardcoded, and the line is omitted entirely until an admin sets one.
   const migrationPriceMxn = (await getPromoterSkuPrices()).migration ?? null
+  // plans-gratis-negocio S4.1 (D12): the three packages, each said in one sentence from the live commission rates.
+  const rates = await getCommissionRates()
 
   return (
     <main className="ss-root">
@@ -112,10 +116,17 @@ export default async function PromoterSellSheetPage() {
 
       <h2 style={{ fontSize: 16 }}>{p.pitchTitle}</h2>
       <p style={{ fontSize: 14 }}>{p.pitchBody}</p>
-      <p className="ss-price">
-        {p.priceDomainLabel}: ${CUSTOM_DOMAIN_PRICE_MXN} MXN
-        {migrationPriceMxn != null ? ` · Migración de tienda: $${migrationPriceMxn} MXN` : ''}
-      </p>
+      <h2 style={{ fontSize: 16 }}>Tus tres paquetes</h2>
+      <ul style={{ fontSize: 14, paddingLeft: 18 }} data-testid="sell-sheet-packages">
+        {PACKAGE_SKUS.map((sku) => (
+          <li key={sku} style={{ marginBottom: 6 }}>
+            <strong>{PACKAGES[sku].label}</strong> ({PACKAGES[sku].summary}): {packageSentence(sku, rates[sku] ?? 0)}.
+          </li>
+        ))}
+      </ul>
+      {migrationPriceMxn != null && (
+        <p className="ss-price">Migración de tienda: ${migrationPriceMxn} MXN</p>
+      )}
       <p className="no-print" style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 24 }}>
         <a href="/mx/vende/promotor/migracion" style={{ textDecoration: 'underline', fontSize: 14, fontWeight: 600 }}>
           → Manual de migración (fotografiar, entrevistar, cerrar)

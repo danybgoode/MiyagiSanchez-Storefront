@@ -13,6 +13,7 @@
  * `promoter.transfer_enabled` (lib/flags.ts, default off).
  */
 
+import { isPackageSku } from '@/lib/promoter-packages'
 import { db } from '@/lib/supabase'
 import { computeOwedCents, isTransferMethod, hasRequiredTransferDetail, type TransferSku, type TransferMethod, type TransferStatus } from '@/lib/promoter-transfer'
 import { computeCommissionCents } from '@/lib/promoter-commission'
@@ -144,12 +145,19 @@ export async function startPromoterTransferClose(input: {
     return { ok: false, status: 422, error: 'Aún no hay datos de transferencia configurados para este método. Contacta al administrador.' }
   }
 
-  const resolved = resolvePromoterDiscount({ promoter, settings, itemsCents: basePriceCents, sku, skuPrices })
-  if (!resolved.ok) {
-    return { ok: false, status: 422, error: promoterRefusalMessage(resolved.reason) }
+  // A package has its OWN list price and no promoter discount (plans-gratis-negocio D12): the promoter charges the
+  // list price and keeps their rate of it, so the gross is exactly `basePriceCents`. Every other SKU keeps the
+  // existing discount deriver.
+  let grossAmountCents: number
+  if (isPackageSku(sku)) {
+    grossAmountCents = basePriceCents
+  } else {
+    const resolved = resolvePromoterDiscount({ promoter, settings, itemsCents: basePriceCents, sku, skuPrices })
+    if (!resolved.ok) {
+      return { ok: false, status: 422, error: promoterRefusalMessage(resolved.reason) }
+    }
+    grossAmountCents = Math.max(0, basePriceCents - resolved.discount_cents)
   }
-
-  const grossAmountCents = Math.max(0, basePriceCents - resolved.discount_cents)
   const ratePct = rates[sku] ?? 0
   const commissionCents = computeCommissionCents(ratePct, grossAmountCents)
   const owedCents = computeOwedCents(grossAmountCents, ratePct)
