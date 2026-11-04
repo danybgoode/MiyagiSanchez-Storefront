@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { CUSTOM_DOMAIN_PRICE_MXN } from '@/lib/domain-pricing'
-import { SUBDOMAIN_PRICE_YEARLY_MXN } from '@/lib/subdomain-pricing'
 import { getPromoterSkuPrices } from '@/lib/promoter'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 

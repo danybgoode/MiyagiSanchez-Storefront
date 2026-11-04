@@ -20,7 +20,6 @@ import {
   type PromoterSkuEarnings,
 } from '@/lib/promoter-earnings'
 import { buildSkuPriceTable, computeBundleRow, type PromoterSkuPrices } from '@/lib/promoter-pricing'
-import { SUBDOMAIN_PRICE_YEARLY_MXN } from '@/lib/subdomain-pricing'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 import { marketBasePath } from '@/lib/markets'
 import type { SellerAcquisitionPageConfig, LandingCallout } from './SellerAcquisitionSections'
