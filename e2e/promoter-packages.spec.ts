@@ -87,3 +87,18 @@ test('a promoter may close a package only on a shop they opened (or their own re
   expect(route.indexOf('promoterMayCloseShop(')).toBeGreaterThan(-1)
   expect(route.indexOf('promoterMayCloseShop(')).toBeLessThan(route.indexOf("if (body.paymentMethod === 'transfer')"))
 })
+
+test('money guards (pr-reviewer, #474): an unread rate refuses, a comp shop refuses, sellers cannot pre-create package attributions, connected-account events are ignored', () => {
+  const route = readFileSync('app/api/promoter/close/package/[sku]/route.ts', 'utf8')
+  const pay = route.indexOf("if (body.paymentMethod === 'transfer')")
+  expect(route.indexOf('const ratePct = await getConfiguredCommissionRate(sku)')).toBeLessThan(pay)
+  expect(route.indexOf('if (ratePct === null)')).toBeLessThan(pay)
+  expect(route.indexOf("readNegocioGrant(shop.metadata)?.type === 'comp'")).toBeLessThan(pay)
+  expect(route).not.toContain('rates[sku] ?? 0')
+  const attribute = readFileSync('app/api/promoter/attribute/route.ts', 'utf8')
+  expect(attribute).toContain('isPackageSku(sku) || sku === RENEWAL_SKU')
+  const webhook = readFileSync('app/api/webhooks/stripe/route.ts', 'utf8')
+  expect(webhook).toContain('platform-payee kind from a connected account, ignored')
+  const renewal = readFileSync('lib/promoter-renewal-server.ts', 'utf8')
+  expect(renewal).toContain("throw new Error('renewal commission did not accrue')")
+})

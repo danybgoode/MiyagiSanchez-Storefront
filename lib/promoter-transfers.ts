@@ -120,6 +120,8 @@ export async function startPromoterTransferClose(input: {
   basePriceCents: number
   sellerId: string
   transferMethod: unknown
+  /** A rate the caller already READ for this SKU (packages: never the 0% fallback). Omitted → the rates table. */
+  ratePct?: number
 }): Promise<StartTransferCloseResult> {
   const { promoter, sku, basePriceCents, sellerId, transferMethod } = input
   if (!isTransferMethod(transferMethod)) {
@@ -158,7 +160,7 @@ export async function startPromoterTransferClose(input: {
     }
     grossAmountCents = Math.max(0, basePriceCents - resolved.discount_cents)
   }
-  const ratePct = rates[sku] ?? 0
+  const ratePct = input.ratePct ?? rates[sku] ?? 0
   const commissionCents = computeCommissionCents(ratePct, grossAmountCents)
   const owedCents = computeOwedCents(grossAmountCents, ratePct)
 

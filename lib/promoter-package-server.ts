@@ -52,6 +52,17 @@ export async function startPackageCardCheckout(input: {
   })
 }
 
+/**
+ * Record the package attribution; a row that does not land is ALERTED (pr-reviewer, #474): it anchors the promoter's
+ * year-2 renewal share, and markAttributionPaid never throws.
+ */
+export async function recordPackageAttribution(input: { promoterId: string; shopId: string; sku: PackageSku; gross: number; sessionId: string }): Promise<void> {
+  const r = await markAttributionPaid({ promoterId: input.promoterId, sellerId: input.shopId, sku: input.sku, grossAmountCents: input.gross, cadence: 'one_time', skipAccrual: true })
+  if (r !== 'recorded') {
+    tg.alert(`🚨 Paquete ${input.sku} cobrado pero la atribución del promotor NO se registró — reparar a mano (de ella depende el 10% del año 2).\nShop: ${input.shopId}\nPromotor: ${input.promoterId}\nPago: ${input.sessionId}`)
+  }
+}
+
 export async function handlePromoterPackageComplete(session: Stripe.Checkout.Session): Promise<void> {
   const sku = session.metadata?.promoter_sku
   const shopId = session.metadata?.shop_id
@@ -72,8 +83,13 @@ export async function handlePromoterPackageComplete(session: Stripe.Checkout.Ses
       const outcome = await applyNegocioPayment({ shopId, paymentId: session.id, months, note: `promoter ${sku}` })
       if (outcome === 'replay') {
         // The grant was already counted, but the attribution may not have landed on the first delivery (Codex, #474):
-        // re-record it — markAttributionPaid is idempotent — and send no second receipt or alert.
-        await markAttributionPaid({ promoterId, sellerId: shopId, sku, grossAmountCents: gross, cadence: 'one_time', skipAccrual: true })
+        // re-record it — markAttributionPaid is idempotent — and send no second receipt.
+        await recordPackageAttribution({ promoterId, shopId, sku, gross, sessionId: session.id })
+        return
+      }
+      if (outcome === 'comp') {
+        // Refused at close start, so only a race gets here: the promoter paid for a shop that already has Negocio.
+        tg.alert(`⚠️ Paquete ${PACKAGES[sku].label} pagado en una tienda que ya tenía Negocio sin costo — revisar reembolso.\nShop: ${shopId}\nSession: ${session.id}`)
         return
       }
     } catch (e) {
@@ -86,7 +102,7 @@ export async function handlePromoterPackageComplete(session: Stripe.Checkout.Ses
     }
   }
   // Settled at source: the promoter kept their part, so nothing accrues; the attribution records the full price.
-  await markAttributionPaid({ promoterId, sellerId: shopId, sku, grossAmountCents: gross, cadence: 'one_time', skipAccrual: true })
+  await recordPackageAttribution({ promoterId, shopId, sku, gross, sessionId: session.id })
   notifyMerchantCloseReceipt({
     shopId,
     promoterId,

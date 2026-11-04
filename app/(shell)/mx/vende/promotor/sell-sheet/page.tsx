@@ -119,7 +119,7 @@ export default async function PromoterSellSheetPage() {
       <ul style={{ fontSize: 14, paddingLeft: 18 }} data-testid="sell-sheet-packages">
         {PACKAGE_SKUS.map((sku) => (
           <li key={sku} style={{ marginBottom: 6 }}>
-            <strong>{PACKAGES[sku].label}</strong> ({PACKAGES[sku].summary}): {packageSentence(sku, rates[sku] ?? 0)}.
+            <strong>{PACKAGES[sku].label}</strong> ({PACKAGES[sku].summary}): {rates[sku] ? `${packageSentence(sku, rates[sku])}.` : `cobras $${PACKAGES[sku].priceMxn.toLocaleString('en-US')}; tu parte se confirma con Miyagi Sánchez.`}
           </li>
         ))}
       </ul>

@@ -426,7 +426,9 @@ export function buildPromoterPageConfig(
       ...PACKAGE_SKUS.map((sku) => ({
         icon: sku === 'setup_gratis' ? 'iconoir-shop' : 'iconoir-sparks',
         title: PACKAGES[sku].label,
-        body: `${PACKAGES[sku].summary}. ${packageSentence(sku, commissionRates[sku] ?? 0)}.`,
+        body: commissionRates[sku]
+          ? `${PACKAGES[sku].summary}. ${packageSentence(sku, commissionRates[sku])}.`
+          : `${PACKAGES[sku].summary}. Cobras $${PACKAGES[sku].priceMxn.toLocaleString('en-US')}; tu parte se confirma con Miyagi Sánchez.`,
       })),
       ...page.glossary.map((raw, i) => {
       // The glossary's prices are `{token}`s (pricing-page D8) — filled from the price modules here.

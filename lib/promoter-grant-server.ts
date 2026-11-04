@@ -54,12 +54,16 @@ export async function activatePromoterOneTimeGrant(input: {
     const months = PACKAGES[sku].negocioMonths
     if (months === 0) return { ok: true }
     try {
-      await applyNegocioPayment({
+      const outcome = await applyNegocioPayment({
         shopId,
         paymentId: input.paymentId ?? `transfer:${promoterId}:${shopId}:${sku}`,
         months,
         note: `promoter ${sku}`,
       })
+      if (outcome === 'comp') {
+        tg.alert(`⚠️ Paquete aprobado en una tienda que ya tenía Negocio sin costo — revisar reembolso.\nShop: ${shopId}\nPromotor: ${promoterId}`)
+        return { ok: true }
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       console.error('[promoter grant] package activation failed:', message)

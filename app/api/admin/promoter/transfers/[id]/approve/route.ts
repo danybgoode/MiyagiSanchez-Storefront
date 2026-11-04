@@ -10,6 +10,7 @@
  *
  * Auth: Clerk admin session (via withAdmin). Promoter Funnel v2 · Sprint 4 (US-4.2).
  */
+import { tg } from '@/lib/telegram'
 import { NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { withAdmin } from '@/lib/admin/guard'
@@ -47,7 +48,7 @@ export const POST = withAdmin(async (_req: Request, { params }: { params: Promis
     return NextResponse.json({ error: activated.error }, { status: 502 })
   }
 
-  await markAttributionPaid({
+  const attributed = await markAttributionPaid({
     promoterId: transfer.promoter_id,
     sellerId: transfer.seller_id,
     sku: transfer.sku,
@@ -55,6 +56,10 @@ export const POST = withAdmin(async (_req: Request, { params }: { params: Promis
     cadence: 'one_time',
     skipAccrual: true, // settled at source — never an accrued commission row
   })
+  if (attributed !== 'recorded') {
+    // It anchors a package's year-2 renewal share, and markAttributionPaid never throws (pr-reviewer, #474).
+    tg.alert(`🚨 Transferencia aprobada pero la atribución del promotor NO se registró — reparar a mano.\nTransfer: ${transfer.id}\nShop: ${transfer.seller_id}`)
+  }
 
   // Sprint 5 (US-5.5) — the merchant receipt, one per completed close.
   notifyMerchantCloseReceipt({

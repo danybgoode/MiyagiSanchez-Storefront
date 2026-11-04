@@ -16,7 +16,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { checkRateLimit, getClientIp } from '@/lib/ratelimit'
 import { isEnabled } from '@/lib/flags'
-import { getCommissionRates, getPromoterByClerkId } from '@/lib/promoter'
+import { getConfiguredCommissionRate, getPromoterByClerkId } from '@/lib/promoter'
+import { readNegocioGrant } from '@/lib/plan'
 import { resolveTargetShop } from '@/lib/promoter-server'
 import { startPromoterTransferClose } from '@/lib/promoter-transfers'
 import { PACKAGES, isPackageSku } from '@/lib/promoter-packages'
@@ -54,6 +55,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sku
   if (!(await promoterMayCloseShop({ promoter, shop }))) {
     return NextResponse.json({ ok: false, error: 'Solo puedes cerrar paquetes en tiendas que abriste tú.' }, { status: 403 })
   }
+  // A shop with a permanent Negocio gains nothing from a package: refuse before any money moves (pr-reviewer, #474).
+  if (readNegocioGrant(shop.metadata)?.type === 'comp') {
+    return NextResponse.json({ ok: false, error: 'Esta tienda ya tiene Negocio sin costo; no hace falta un paquete.' }, { status: 409 })
+  }
+  // The split comes from the configured rate. If it cannot be read, refuse: a 0% fallback would charge the promoter
+  // the full price (pr-reviewer, #474).
+  const ratePct = await getConfiguredCommissionRate(sku)
+  if (ratePct === null) {
+    return NextResponse.json({ ok: false, error: 'No pudimos confirmar tu parte de este paquete. Intenta en un momento.' }, { status: 503 })
+  }
 
   if (body.paymentMethod === 'transfer') {
     if (!(await isEnabled('promoter.transfer_enabled'))) return NextResponse.json({ ok: false }, { status: 404 })
@@ -63,16 +74,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sku
       basePriceCents: PACKAGES[sku].priceMxn * 100,
       sellerId: shop.id,
       transferMethod: body.transferMethod,
+      ratePct,
     })
     if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status })
     return NextResponse.json({ ok: true, transfer: result.transfer })
   }
 
-  const rates = await getCommissionRates()
   try {
     const url = await startPackageCardCheckout({
       sku,
-      ratePct: rates[sku] ?? 0,
+      ratePct,
       promoterId: promoter.id,
       shopId: shop.id,
       buyerEmail: user.emailAddresses?.[0]?.emailAddress,

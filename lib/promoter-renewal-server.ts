@@ -56,13 +56,28 @@ export async function recordRenewalShare(input: {
       })
       .select('id')
       .maybeSingle()
+    let attributionId: string
+    let outcome: RenewalOutcome = 'recorded'
     if (insertError) {
-      if (insertError.code === '23505') return 'replay' // this payment was already recorded
-      throw new Error(`renewal attribution insert failed: ${insertError.message}`)
+      if (insertError.code !== '23505') throw new Error(`renewal attribution insert failed: ${insertError.message}`)
+      // This payment was already recorded: re-run the (idempotent) accrual, in case it was the step that failed.
+      const { data: existing } = await db.from('marketplace_promoter_attributions').select('id').eq('payment_ref', paymentRef).maybeSingle()
+      if (!existing) throw new Error('renewal attribution exists by payment_ref but could not be read')
+      attributionId = (existing as { id: string }).id
+      outcome = 'replay'
+    } else {
+      if (!inserted) throw new Error('renewal attribution insert returned no row')
+      attributionId = (inserted as { id: string }).id
     }
-    if (!inserted) throw new Error('renewal attribution insert returned no row')
-    await accrueCommissionForAttribution((inserted as { id: string }).id)
-    return 'recorded'
+    await accrueCommissionForAttribution(attributionId)
+    // accrueCommissionForAttribution never throws: verify the commission row exists, or say so (pr-reviewer, #474).
+    const { data: commission, error: commissionError } = await db
+      .from('marketplace_promoter_commissions')
+      .select('id')
+      .eq('attribution_id', attributionId)
+      .maybeSingle()
+    if (commissionError || !commission) throw new Error('renewal commission did not accrue')
+    return outcome
   } catch (e) {
     console.error('[promoter renewal] failed:', e)
     tg.alert(`⚠️ Comisión de renovación (10%) NO registrada — revisar.\nShop: ${shopId}\nPago: ${paymentRef}\nError: ${e instanceof Error ? e.message : String(e)}`)
