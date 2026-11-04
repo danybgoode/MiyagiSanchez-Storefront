@@ -3302,12 +3302,12 @@
       },
       "pricing": {
         "heading": "Pricing",
-        "lead": "Selling is free (0% commission). The extras are optional and every one has a public price at miyagisanchez.com/mx/precios.",
+        "lead": "Selling is free (0% commission). There are two plans, Free and Negocio, and every price is public at miyagisanchez.com/mx/precios.",
         "body": [
-          "Your shop is always free: your URL at miyagisanchez.com/mx/s/your-shop costs nothing and never expires, with 0% commission.",
-          "Custom subdomain: {subdomainPrice}. Your shop as a standalone site at your-shop.miyagisanchez.com (no platform bar). The yearly plan is cheaper; the monthly one has no commitment. You can switch between monthly and yearly anytime with no double charge. It renews automatically; cancel anytime and your shop stays live and free at your URL miyagisanchez.com/mx/s/your-shop.",
-          "Custom domain: {customDomainPrice}. Connect your own domain (yourshop.com) with SSL and our infrastructure, with no miyagisanchez.com in the URL. It renews yearly; you can cancel anytime and your shop stays live on your free URL.",
-          "Mercado Libre sync: {mlSyncPrice}. Two-way inventory sync; connecting, importing and publishing stay free. Print ad: {printAdPrice}. Assisted migration: {migrationPrice}.",
+          "Free, forever: your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.",
+          "Negocio: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop tries it free for 30 days.",
+          "If your trial ends or you cancel, your shop stays live and free at your URL miyagisanchez.com/mx/s/your-shop.",
+          "Separate extras: print ad, {printAdPrice}; assisted migration, {migrationPrice}.",
           "Your payment processor (Stripe or Mercado Pago) charges its own fee, not us, and the money goes straight to your account. Every price, with its sources: miyagisanchez.com/mx/precios."
         ]
       },
@@ -3359,16 +3359,21 @@
       "ogAlt": "Miyagi Sánchez pricing: selling is free, 0% commission"
     },
     "eyebrow": "Pricing",
-    "heroTitle": "Selling is free. You pay only for what you choose.",
+    "heroTitle": "Selling is free. Negocio is optional.",
     "heroLead": "0% platform commission. Your money goes straight to your account.",
     "primaryCta": "Start free",
-    "free": {
-      "title": "Free, always",
-      "lead": "All of this comes with your shop, with no plan and no expiry date."
+    "plans": {
+      "title": "Two plans: Free and Negocio",
+      "lead": "Selling is free, with no commission. Negocio adds what helps your shop grow, and every new shop tries it free.",
+      "monthlySuffix": "or",
+      "recommended": "Free trial",
+      "cta": "Start free",
+      "ctaNegocio": "Try Negocio free",
+      "includesLabel": "Includes"
     },
     "extras": {
       "title": "Optional extras",
-      "lead": "Turn them on only if they help. Cancel anytime and your shop stays live and free.",
+      "lead": "Separate services, each with its price: your ad in the print edition and assisted migration. Your shop stays live and free without them.",
       "fixedBadge": "Fixed price",
       "quotedBadge": "On request",
       "quotedCta": "Write to us"
@@ -3389,11 +3394,11 @@
       "items": [
         {
           "q": "Are there plans or monthly fees?",
-          "a": "No. Selling is free and there is no plan to pay for. You pay only for the extras you turn on."
+          "a": "There are two: Free, forever, and Negocio, with your own domain, Mercado Libre sync and more. Every new shop tries Negocio free and, if you do not subscribe, stays on Free."
         },
         {
-          "q": "What happens if I cancel an extra?",
-          "a": "Your shop stays live and free at your miyagisanchez.com URL. You just stop having that extra."
+          "q": "What happens when my trial ends or I cancel Negocio?",
+          "a": "Your shop stays live and free at your miyagisanchez.com URL. You just stop having what Negocio includes."
         },
         {
           "q": "Why no commission?",

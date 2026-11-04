@@ -38,30 +38,24 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image', title: meta.title, description: meta.description },
 }
 
-/** JSON-LD `Offer`s for fixed-price extras only (D9) — an admin-set price never gets one. */
+/** JSON-LD `Offer`s for Negocio's fixed prices only (D9) — an admin-set price never gets one. */
 function offersJsonLd(catalog: PricingCatalog) {
-  const offers = catalog.extras
-    .filter((r) => r.kind === 'fixed')
-    .flatMap((r) => [
-      ...(r.yearlyMxn != null
-        ? [{ name: `${r.name.es} (anual)`, price: r.yearlyMxn, unit: 'ANN' }]
-        : []),
-      ...(r.monthlyMxn != null
-        ? [{ name: `${r.name.es} (mensual)`, price: r.monthlyMxn, unit: 'MON' }]
-        : []),
-    ])
-    .map((o) => ({
-      '@type': 'Offer',
-      name: o.name,
+  const negocio = catalog.plans.find((p) => p.id === 'negocio')
+  const offers = [
+    ...(negocio?.yearlyMxn != null ? [{ name: 'Negocio (anual)', price: negocio.yearlyMxn, unit: 'ANN' }] : []),
+    ...(negocio?.monthlyMxn != null ? [{ name: 'Negocio (mensual)', price: negocio.monthlyMxn, unit: 'MON' }] : []),
+  ].map((o) => ({
+    '@type': 'Offer',
+    name: o.name,
+    price: String(o.price),
+    priceCurrency: 'MXN',
+    priceSpecification: {
+      '@type': 'UnitPriceSpecification',
       price: String(o.price),
       priceCurrency: 'MXN',
-      priceSpecification: {
-        '@type': 'UnitPriceSpecification',
-        price: String(o.price),
-        priceCurrency: 'MXN',
-        unitCode: o.unit,
-      },
-    }))
+      unitCode: o.unit,
+    },
+  }))
   return {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
@@ -70,7 +64,7 @@ function offersJsonLd(catalog: PricingCatalog) {
     url: `${BASE_URL}${PAGE_PATH}`,
     inLanguage: 'es-MX',
     isPartOf: { '@type': 'WebSite', name: 'Miyagi Sánchez', url: BASE_URL },
-    mainEntity: { '@type': 'OfferCatalog', name: 'Extras opcionales de Miyagi Sánchez', itemListElement: offers },
+    mainEntity: { '@type': 'OfferCatalog', name: 'Planes de Miyagi Sánchez', itemListElement: offers },
   }
 }
 
@@ -126,15 +120,28 @@ export default async function PreciosPage() {
         </PreciosTrackedLink>
       </header>
 
-      <section aria-labelledby="precios-free-title" data-testid="precios-free" style={SECTION}>
-        <h2 id="precios-free-title" className="t-h2" style={{ letterSpacing: 0, marginBottom: 'var(--s-2)' }}>{ui.free.title}</h2>
-        <p className="t-lead" style={{ color: 'var(--fg-muted)', marginBottom: 'var(--s-5)' }}>{ui.free.lead}</p>
+      <section aria-labelledby="precios-plans-title" data-testid="precios-plans" style={SECTION}>
+        <h2 id="precios-plans-title" className="t-h2" style={{ letterSpacing: 0, marginBottom: 'var(--s-2)' }}>{ui.plans.title}</h2>
+        <p className="t-lead" style={{ color: 'var(--fg-muted)', marginBottom: 'var(--s-5)' }}>{ui.plans.lead}</p>
         <div style={GRID}>
-          {catalog.free.map((item) => (
-            <article key={item.id} className="card-panel" style={{ padding: 'var(--s-5)' }}>
-              <i className={item.icon} aria-hidden="true" style={{ color: 'var(--accent)', fontSize: 24, display: 'block', marginBottom: 'var(--s-3)' }} />
-              <h3 className="t-h4" style={{ letterSpacing: 0, marginBottom: 'var(--s-1)' }}>{item.title.es}</h3>
-              <p className="t-small" style={{ color: 'var(--fg-muted)', margin: 0 }}>{item.body.es}</p>
+          {catalog.plans.map((plan) => (
+            <article key={plan.id} className="card-panel" data-testid={`precios-plan-${plan.id}`} style={{ padding: 'var(--s-5)', display: 'flex', flexDirection: 'column', gap: 'var(--s-2)' }}>
+              {plan.id === 'negocio' ? <span className="badge badge-success" style={{ alignSelf: 'flex-start' }}>{ui.plans.recommended}</span> : null}
+              <h3 className="t-h3" style={{ letterSpacing: 0, margin: 0 }}>{plan.name.es}</h3>
+              <p className="t-h4" data-testid={`precios-plan-${plan.id}-price`} style={{ letterSpacing: 0, margin: 0, color: 'var(--accent)' }}>{plan.priceLabel.es}</p>
+              {plan.yearlyLabel ? (
+                <p className="t-small" data-testid={`precios-plan-${plan.id}-yearly`} style={{ margin: 0, fontWeight: 600 }}>{ui.plans.monthlySuffix} {plan.yearlyLabel.es}</p>
+              ) : null}
+              <p className="t-small" style={{ color: 'var(--fg-muted)', margin: 0 }}>{ui.plans.includesLabel}:</p>
+              <ul style={{ margin: 0, paddingLeft: 'var(--s-4)', display: 'grid', gap: 'var(--s-1)' }}>
+                {plan.includes.map((line) => (
+                  <li key={line.es} className="t-small">{line.es}</li>
+                ))}
+              </ul>
+              <PreciosTrackedLink href={sellerLandingPath('mx')} event="precios_signup_clicked" className={plan.id === 'negocio' ? 'btn btn-primary' : 'btn btn-secondary'} testId={`precios-plan-${plan.id}-cta`}>
+                {plan.id === 'negocio' ? ui.plans.ctaNegocio : ui.plans.cta}
+                <i className="iconoir-arrow-right" aria-hidden="true" />
+              </PreciosTrackedLink>
             </article>
           ))}
         </div>
