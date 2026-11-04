@@ -4,7 +4,7 @@
  * Server-side bridge to the Medusa Commerce Negocio subscription (epic 08 · plans-gratis-negocio S1.2, README D1/D3).
  * A clone of `lib/ml-sync-subscription.ts`: Medusa Commerce is the SOURCE OF TRUTH for "does this seller have a live
  * monthly Negocio subscription?" (AGENTS rule #1). Reads and writes go through the Backend's internal routes
- * (`/internal/negocio-subscription`, Backend PR #224).
+ * (`/internal/negocio-subscription`).
  *
  * Three states, never two: a read that FAILED is reported as `unavailable: true`, so the plan seam can say "could
  * not look" instead of a confident "Gratis". Gating still fails closed (an unavailable read never grants).
