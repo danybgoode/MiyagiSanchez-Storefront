@@ -3,8 +3,9 @@
  *
  * A bound promoter turns a photo they just uploaded into a suggested product card for the shop they are opening
  * (epic 08 · plans-gratis-negocio S5.1, README D14). The answer only FILLS the workspace form; publishing still goes
- * through `/api/promoter/close/listing` and its ownership checks. The shop must be one the promoter may close (the
- * same `resolveTargetShop` every close route uses); only its NAME reaches the model.
+ * through `/api/promoter/close/listing`, unchanged. NOTE (pr-reviewer, #475): that route checks only that the shop
+ * exists, not that this promoter opened it or that it is unclaimed — a pre-existing gap left as a product call. THIS
+ * route is limited to shops the promoter may close (`promoterMayCloseShop`); only the shop's NAME reaches the model.
  *
  * Auth: Clerk session + a bound promoter. Allowance: the promoter's own daily vision budget (fails closed).
  */
@@ -32,9 +33,15 @@ export async function POST(req: NextRequest) {
   const promoter = await getPromoterByClerkId(user.id)
   if (!promoter) return NextResponse.json({ ok: false, error: 'Vincula tu código de promotor primero.' }, { status: 403 })
 
-  let body: { shopId?: string; slug?: string; imageUrl?: unknown } = {}
-  try { body = await req.json() } catch { /* validated below */ }
-  const shop = await resolveTargetShop({ shopId: body.shopId, slug: body.slug })
+  let raw: unknown = null
+  try { raw = await req.json() } catch { /* validated below */ }
+  const body = (raw && typeof raw === 'object' ? raw : {}) as { shopId?: unknown; slug?: unknown; imageUrl?: unknown }
+  const text = (v: unknown) => (typeof v === 'string' ? v : undefined)
+  // A non-string id is a bad request, never a 500 from `.trim()` downstream (pr-reviewer nit, #475).
+  if ((body.shopId !== undefined && !text(body.shopId)) || (body.slug !== undefined && !text(body.slug))) {
+    return NextResponse.json({ ok: false, error: 'Tienda no válida.' }, { status: 400 })
+  }
+  const shop = await resolveTargetShop({ shopId: text(body.shopId), slug: text(body.slug) })
   if (!shop) return NextResponse.json({ ok: false, error: 'Tienda no encontrada.' }, { status: 404 })
   // Same rule as the package close (Codex security, #474): only a shop this promoter opened or holds a relationship with.
   if (!(await promoterMayCloseShop({ promoter, shop }))) {

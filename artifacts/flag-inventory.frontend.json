@@ -432,7 +432,7 @@
         "app/api/promoter/close/listing/route.ts:74",
         "app/api/promoter/close/migration/route.ts:27",
         "app/api/promoter/close/package/[sku]/route.ts:30",
-        "app/api/promoter/close/photo/route.ts:29",
+        "app/api/promoter/close/photo/route.ts:30",
         "app/api/promoter/close/print/route.ts:36",
         "app/api/promoter/close/transfer/[id]/report/route.ts:20",
         "app/api/promoter/close/transfer/route.ts:21",
