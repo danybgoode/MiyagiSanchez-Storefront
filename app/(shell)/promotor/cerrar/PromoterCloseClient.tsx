@@ -1,6 +1,6 @@
 'use client'
 
-import { PACKAGES } from '@/lib/promoter-packages'
+import { PACKAGES, packageSplit, type PackageSku } from '@/lib/promoter-packages'
 import { useEffect, useState } from 'react'
 import { ESTADO_NAMES } from '@/lib/mx-locations'
 import { shopUrlFor } from '@/lib/market-url'
@@ -37,11 +37,14 @@ export default function PromoterCloseClient({
   transferEnabled,
   previewEnabled,
   activationCrmEnabled,
+  packageRates,
 }: {
   bound: Bound
   transferEnabled: boolean
   previewEnabled: boolean
   activationCrmEnabled: boolean
+  /** Each option's commission rate, so the promoter sees what they charge, pass on and keep before paying. */
+  packageRates: Partial<Record<PackageSku, number>>
 }) {
   const [bound, setBound] = useState<Bound>(initialBound)
   const [shop, setShop] = useState<Shop | null>(null)
@@ -138,7 +141,7 @@ export default function PromoterCloseClient({
       <SetupStep n={(n += 1)} shop={shop} onShop={handleShopCreated} />
       {shop && <ListingStep shop={shop} n={(n += 1)} />}
       {shop && previewEnabled && <PreviewStep shop={shop} n={(n += 1)} />}
-      {shop && <CloseStep shop={shop} transferEnabled={transferEnabled} n={(n += 1)} />}
+      {shop && <CloseStep shop={shop} transferEnabled={transferEnabled} packageRates={packageRates} n={(n += 1)} />}
       {shop && <HandoffStep shop={shop} n={(n += 1)} />}
     </div>
   )
@@ -377,12 +380,12 @@ const TRANSFER_METHOD_LABEL: Record<Transfer['method'], string> = {
 const mxn = (cents: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 }).format(cents / 100)
 
-function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: boolean; n: number }) {
+function CloseStep({ shop, transferEnabled, packageRates, n }: { shop: Shop; transferEnabled: boolean; packageRates: Partial<Record<PackageSku, number>>; n: number }) {
   const [sku, setSku] = useState<CloseSkuId>('package/negocio_anual')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<string | null>(null)
-  const [payMethod, setPayMethod] = useState<'stripe' | 'transfer'>('stripe')
+  const [payMethod, setPayMethod] = useState<'stripe' | 'transfer'>(transferEnabled ? 'transfer' : 'stripe')
   const [transferMethod, setTransferMethod] = useState<Transfer['method']>('spei')
   const [transfer, setTransfer] = useState<Transfer | null>(null)
   const [reporting, setReporting] = useState(false)
@@ -479,7 +482,7 @@ function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: 
         )}
         {transfer.status === 'rejected' && (
           <p className="text-sm text-[color:var(--danger)]">
-            Esta transferencia fue rechazada. Vuelve a elegir un producto para intentar de nuevo.
+            Esta transferencia fue rechazada. Vuelve a elegir qué vendes para intentar de nuevo.
           </p>
         )}
       </Card>
@@ -487,10 +490,10 @@ function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: 
   }
 
   return (
-    <Card n={2} title="Cobra y pásanos nuestra parte">
+    <Card n={n} title="Cobra y pásanos nuestra parte">
       <p className="text-sm text-[var(--color-muted)]">
-        Cobra al dueño del negocio (en efectivo o por transferencia) y pásanos solo nuestra parte. Con tu tarjeta, el
-        plan se activa al instante; por transferencia, en cuanto confirmamos que llegó. Lo demás es tuyo.
+        Cobra al dueño del negocio (en efectivo o por transferencia) y pásanos solo nuestra parte. Lo demás es tuyo.
+        {sku.startsWith('package/') ? ' Por transferencia, el plan se activa en cuanto confirmamos que llegó; con tu tarjeta, al instante.' : ''}
       </p>
       <label className="block text-sm">
         <span className="text-[var(--color-muted)]">Qué vendes</span>
@@ -504,6 +507,7 @@ function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: 
           {CLOSE_SKUS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
       </label>
+      {sku.startsWith('package/') ? <SplitLine sku={sku.slice('package/'.length) as PackageSku} rate={packageRates[sku.slice('package/'.length) as PackageSku]} /> : null}
       {sku === 'migration' && (
         <label className="block text-sm">
           <span className="text-[var(--color-muted)]">
@@ -522,13 +526,13 @@ function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: 
       {transferEnabled && (
         <div className="space-y-2">
           <div className="flex gap-2" role="radiogroup" aria-label="Forma de pago">
-            <button type="button" onClick={() => setPayMethod('stripe')} disabled={busy}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${payMethod === 'stripe' ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--fg-inverse)]' : 'border-[var(--color-border)]'}`}>
-              Con mi tarjeta
-            </button>
             <button type="button" onClick={() => setPayMethod('transfer')} disabled={busy}
               className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${payMethod === 'transfer' ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--fg-inverse)]' : 'border-[var(--color-border)]'}`}>
               Por transferencia
+            </button>
+            <button type="button" onClick={() => setPayMethod('stripe')} disabled={busy}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${payMethod === 'stripe' ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--fg-inverse)]' : 'border-[var(--color-border)]'}`}>
+              Con mi tarjeta
             </button>
           </div>
           {payMethod === 'transfer' && (
@@ -555,6 +559,20 @@ function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: 
         {busy ? 'Procesando…' : payMethod === 'transfer' ? 'Ver datos de transferencia' : selected.payLabel}
       </button>
     </Card>
+  )
+}
+
+/** The money for the chosen option, large: what the promoter charges, passes on and keeps (from the live rate). */
+function SplitLine({ sku, rate }: { sku: PackageSku; rate: number | undefined }) {
+  if (!rate) return <p className="text-sm">Cobras ${PACKAGES[sku].priceMxn.toLocaleString('en-US')}. Tu parte se confirma con Miyagi Sánchez.</p>
+  const s = packageSplit(sku, rate)
+  const p = (c: number) => `$${Math.round(c / 100).toLocaleString('en-US')}`
+  return (
+    <div className="grid grid-cols-3 gap-2 rounded-lg bg-[var(--color-surface)] p-3 text-center" data-testid="close-split">
+      <div><div className="text-xs text-[var(--color-muted)]">Cobras</div><div className="text-lg font-bold">{p(s.chargeCents)}</div></div>
+      <div><div className="text-xs text-[var(--color-muted)]">Nos pasas</div><div className="text-lg font-bold">{p(s.payPlatformCents)}</div></div>
+      <div><div className="text-xs text-[var(--color-muted)]">Te quedas</div><div className="text-2xl font-extrabold text-[color:var(--success)]">{p(s.keepCents)}</div></div>
+    </div>
   )
 }
 

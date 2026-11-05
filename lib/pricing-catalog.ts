@@ -248,7 +248,7 @@ function planRows(): PlanRow[] {
       yearlyMxn: NEGOCIO_PRICE_YEARLY_MXN,
       includes: [
         { es: 'Todo lo del Plan Gratis', en: 'Everything in the Free plan' },
-        { es: 'Tu propio dominio (tunegocio.com), en cuanto contratas', en: 'Your own domain (yourbusiness.com), as soon as you sign up' },
+        { es: 'Conecta tu propio dominio (tunegocio.com), en cuanto contratas', en: 'Connect your own domain (yourbusiness.com), as soon as you sign up' },
         { es: 'Sincronización con Mercado Libre', en: 'Mercado Libre sync' },
         { es: 'Tu tienda sin el enlace de Miyagi Sánchez', en: 'Your shop without the Miyagi Sánchez link' },
         { es: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
@@ -424,7 +424,7 @@ export function buildPricingCatalog(input: PricingCatalogInput): PricingCatalog 
 
 export function getExtra(catalog: PricingCatalog, sku: PromoterSku): ExtraRow {
   const row = catalog.extras.find((r) => r.sku === sku)
-  // Unreachable while extraRows maps PROMOTER_SKUS — kept so a broken invariant fails loudly.
+  // Only the extras on the price list have a row (the migration since 2026-11-05): asking for any other fails loudly.
   if (!row) throw new Error(`pricing-catalog: no row for ${sku}`)
   return row
 }

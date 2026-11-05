@@ -211,9 +211,8 @@ test.describe('promoter-cadence · the UCP manifest says the domain is part of N
   test('GET /api/ucp/manifest sends the domain to start_negocio and sells no domain cadence', async ({ request }) => {
     const res = await request.get('/api/ucp/manifest')
     expect(res.ok()).toBeTruthy()
-    const body = await res.text()
-    expect(body).toContain('seller_domain_subscription')
-    expect(body).toContain('start_domain_subscription is retired and points to start_negocio')
-    expect(body).not.toContain('one_time')
+    const domain = JSON.stringify((await res.json()).endpoints?.seller_domain_subscription ?? null)
+    expect(domain).toContain('start_domain_subscription is retired and points to start_negocio')
+    expect(domain).not.toContain('one_time')
   })
 })

@@ -144,19 +144,19 @@ test.describe('promoter-transfer · transfer-details completeness (hasRequiredTr
 
 test.describe('promoter-transfer · route guards (flag-agnostic — asserted in both states)', () => {
   // The single-product closes are retired (the packages replaced them): hidden (404) or retired (410), never a transfer.
-  test('POST /api/promoter/close/domain with paymentMethod:transfer → 404 (hidden) or 410 (retired)', async ({ request }) => {
+  test('POST /api/promoter/close/domain with paymentMethod:transfer → 410 (retired)', async ({ request }) => {
     const res = await request.post('/api/promoter/close/domain', { data: { paymentMethod: 'transfer', transferMethod: 'spei' } })
-    expect([404, 410]).toContain(res.status())
+    expect(res.status()).toBe(410)
   })
 
-  test('POST /api/promoter/close/subdomain with paymentMethod:transfer → 404 (hidden) or 410 (retired)', async ({ request }) => {
+  test('POST /api/promoter/close/subdomain with paymentMethod:transfer → 410 (retired)', async ({ request }) => {
     const res = await request.post('/api/promoter/close/subdomain', { data: { paymentMethod: 'transfer', transferMethod: 'dimo' } })
-    expect([404, 410]).toContain(res.status())
+    expect(res.status()).toBe(410)
   })
 
-  test('POST /api/promoter/close/ml-sync with paymentMethod:transfer → 404 (hidden) or 410 (retired)', async ({ request }) => {
+  test('POST /api/promoter/close/ml-sync with paymentMethod:transfer → 410 (retired)', async ({ request }) => {
     const res = await request.post('/api/promoter/close/ml-sync', { data: { paymentMethod: 'transfer', transferMethod: 'codi' } })
-    expect([404, 410]).toContain(res.status())
+    expect(res.status()).toBe(410)
   })
 
   test('GET /api/promoter/close/transfer → 404 (hidden) or 401 (auth required)', async ({ request }) => {

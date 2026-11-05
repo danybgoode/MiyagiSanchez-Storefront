@@ -108,8 +108,8 @@ export default async function PromoterSellSheetPage() {
 
       <h2 className="ss-h2">{g.sayTitle}</h2>
       <ul className="ss-say">
-        {PACKAGE_SKUS.map((sku, i) => (
-          <li key={sku}><strong>{PACKAGES[sku].label}:</strong> {g.say[i]}</li>
+        {PACKAGE_SKUS.map((sku) => (
+          <li key={sku}><strong>{PACKAGES[sku].label}:</strong> {g.say[sku]}</li>
         ))}
       </ul>
 

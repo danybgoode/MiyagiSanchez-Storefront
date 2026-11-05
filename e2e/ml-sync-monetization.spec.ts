@@ -111,9 +111,9 @@ test.describe('ml-sync money routes · anonymous is rejected (S6)', () => {
     expect(res.status()).toBe(410)
   })
 
-  test('POST /api/promoter/close/ml-sync → 404 (hidden) or 410 (retired)', async ({ request }) => {
+  test('POST /api/promoter/close/ml-sync → 410 (retired)', async ({ request }) => {
     const res = await request.post('/api/promoter/close/ml-sync', { data: { slug: 'x' } })
-    expect([404, 410]).toContain(res.status())
+    expect(res.status()).toBe(410)
   })
 
   test('GET /api/admin/tenants/:id?sku=ml_sync → 401 (admin-gated, anon)', async ({ request }) => {

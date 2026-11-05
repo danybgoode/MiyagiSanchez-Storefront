@@ -22,12 +22,11 @@ const PROMOTER_IDENTITY_BY_CLERK_ID_CONSUMERS = [
   'app/api/promoter/close/migration/route.ts',
   'app/api/promoter/close/package/[sku]/route.ts',
   'app/api/promoter/close/photo/route.ts',
-  'app/api/promoter/close/print/route.ts',
+  // close/print and rate-card are retired (410, no printed ads since 2026-11-05): they read no identity at all.
   'app/api/promoter/close/transfer/[id]/report/route.ts',
   'app/api/promoter/close/transfer/route.ts',
   'app/api/promoter/preview/activate/route.ts',
   'app/api/promoter/preview/route.ts',
-  'app/api/promoter/rate-card/route.ts',
   'app/api/promoter/shop/setup/route.ts',
 ] as const
 const PARTNER_IDENTITY_BY_ID_CONSUMERS = [

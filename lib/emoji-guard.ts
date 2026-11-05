@@ -135,7 +135,6 @@ export const enforcedSweptPaths = new Set<string>([
   'app/(shell)/l/[id]/SubscriptionSection.tsx',
   'app/(shell)/payment/success/page.tsx',
   'app/(shell)/promotor/cerrar/ListingStep.tsx',
-  'app/(shell)/promotor/cerrar/PrintAdStep.tsx',
   'app/(shell)/promotor/cerrar/PromoterCloseClient.tsx',
   'app/(shell)/s/[slug]/claim/page.tsx',
   'app/(shell)/s/[slug]/ClosetListingCard.tsx',

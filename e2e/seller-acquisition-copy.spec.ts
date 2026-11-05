@@ -148,8 +148,15 @@ test.describe('promoter landing · CTA + wording sweep (promoter-funnel-v2 S1 ·
     expect(config.socialStats.map((s) => s.value)).toContain('10%')
   })
 
-  test('no "cerrar / cierre" vocabulary on the promoter page or the guide (Daniel, 2026-11-05)', () => {
-    expect(JSON.stringify(promoterCopy)).not.toMatch(/cerrar|cierre|cierra/i)
+  test('no "cerrar / cierre" vocabulary on the promoter page, the guide or the migration guide (Daniel, 2026-11-05)', () => {
+    // The workspace URL /promotor/cerrar is the only allowed occurrence: it is an address, not a word a promoter reads.
+    const words = JSON.stringify([promoterCopy, fullCopy.promotorMigracion]).replaceAll('/promotor/cerrar', '/promotor/[panel]')
+    expect(words).not.toMatch(/cerrar|cierre|cierra/i)
+  })
+
+  test('the 1-year option never promises to BUY a domain: a domain the merchant has is connected', () => {
+    expect(promoterCopy.guide.say.negocio_anual).toContain('Si tienes un dominio')
+    expect(promoterCopy.guide.say.negocio_anual).not.toMatch(/[Ii]ncluye tu propio dominio/)
   })
 
   test('a not-yet-bound visitor gets the apply CTA, never the dead-ended workspace CTA', () => {

@@ -172,8 +172,8 @@ test.describe('subdomain-monthly · the UCP manifest no longer prices the subdom
   test('GET /api/ucp/manifest calls the switch tool retired and states no subdomain price', async ({ request }) => {
     const res = await request.get('/api/ucp/manifest')
     expect(res.ok()).toBeTruthy()
-    const body = await res.text()
-    expect(body).toContain('switch_subdomain_cadence are retired')
-    expect(body).not.toContain('$25')
+    const sub = JSON.stringify((await res.json()).endpoints?.seller_subdomain_subscription ?? null)
+    expect(sub).toContain('switch_subdomain_cadence are retired')
+    expect(sub).not.toContain('$25')
   })
 })

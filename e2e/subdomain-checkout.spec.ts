@@ -157,9 +157,8 @@ test.describe('subdomain-checkout · the UCP manifest says the subdomain is free
   test('GET /api/ucp/manifest says the subdomain is free and sells no cadence', async ({ request }) => {
     const res = await request.get('/api/ucp/manifest')
     expect(res.ok()).toBeTruthy()
-    const body = await res.text()
-    expect(body).toContain('seller_subdomain_subscription')
-    expect(body).toContain('is FREE on every plan')
-    expect(body).not.toContain('one_time')
+    const sub = JSON.stringify((await res.json()).endpoints?.seller_subdomain_subscription ?? null)
+    expect(sub).toContain('is FREE on every plan')
+    expect(sub).not.toContain('one_time')
   })
 })

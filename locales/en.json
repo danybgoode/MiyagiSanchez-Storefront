@@ -2567,11 +2567,11 @@
         "renewalLine": "If the business renews its Negocio plan in year two, you get {renewalPct}% of that payment.",
         "ratesPending": "Your share is confirmed with Miyagi Sánchez.",
         "sayTitle": "What you say",
-        "say": [
-          "«Today I'll leave your shop online with your products, and you won't pay us anything else all year. It includes your own domain, like yourbusiness.com.»",
-          "«Today I'll leave your shop ready and you get the Negocio plan for three months. After that, you decide whether to keep it.»",
-          "«Today I'll leave your shop online, free forever: no monthly fee and no commission on your sales.»"
-        ],
+        "say": {
+          "negocio_anual": "«Today I'll leave your shop online with your products, and you won't pay us anything else all year. If you have a domain, like yourbusiness.com, we connect it too.»",
+          "negocio_arranque": "«Today I'll leave your shop ready and you get the Negocio plan for three months. After that, you decide whether to keep it.»",
+          "setup_gratis": "«Today I'll leave your shop online, free forever: no monthly fee and no commission on your sales.»"
+        },
         "stepsTitle": "Step by step",
         "steps": [
           "Open your panel and create the business's shop.",
@@ -3327,12 +3327,12 @@
   "precios": {
     "metadata": {
       "title": "Pricing: Free plan and Negocio plan | Miyagi Sánchez",
-      "description": "With the Free plan your online shop is free forever, with no commission. The Negocio plan adds your own domain, Mercado Libre and more AI help. Every new shop tries it without paying.",
+      "description": "With the Free plan your online shop is free forever, with no commission. The Negocio plan lets you connect your own domain, sync Mercado Libre and get more AI help. Every new shop tries it without paying.",
       "ogAlt": "Miyagi Sánchez pricing: the Free plan forever and the Negocio plan"
     },
     "eyebrow": "Pricing",
     "heroTitle": "Your online shop, free forever.",
-    "heroLead": "With the Free plan you sell with no monthly fee and no commission. When you want more, the Negocio plan adds your own domain, Mercado Libre and more AI help. Every new shop uses it for {trialDays} days without paying.",
+    "heroLead": "With the Free plan you sell with no monthly fee and no commission. When you want more, the Negocio plan lets you connect your own domain, sync Mercado Libre and get more AI help. Every new shop uses it for {trialDays} days without paying.",
     "primaryCta": "Open your shop for free",
     "plans": {
       "title": "Choose your plan",
