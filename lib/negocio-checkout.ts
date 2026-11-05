@@ -16,7 +16,7 @@ import { createOneTimeCheckout, createSubscriptionCheckout } from '@/lib/stripe-
 import { getNegocioSubscription, NEGOCIO_CHECKOUT_KIND } from '@/lib/negocio-subscription'
 import { resolvePlan } from '@/lib/plan-server'
 import { NEGOCIO_CURRENCY, NEGOCIO_PRICE_YEARLY_CENTS, NEGOCIO_YEARLY_MONTHS } from '@/lib/negocio-pricing'
-import { decideNegocioCheckout, type NegocioCadence } from '@/lib/negocio-checkout-rules'
+import { decideNegocioCheckout, monthlyFirstChargeAt, type NegocioCadence } from '@/lib/negocio-checkout-rules'
 
 export { decideNegocioCheckout, coerceNegocioCadence, type NegocioCadence } from '@/lib/negocio-checkout-rules'
 
@@ -67,6 +67,8 @@ export async function startNegocioCheckout(input: {
       metadata,
       buyerEmail: input.buyerEmail,
       idempotencyKey,
+      // During the free trial the first charge waits for its end (the card is saved today, nothing is charged).
+      trialEnd: monthlyFirstChargeAt(plan),
     })
     return { ok: true, url }
   }

@@ -4,8 +4,10 @@ import { useState } from 'react'
 import type { NegocioButton } from '@/lib/negocio-page'
 
 /**
- * The buy buttons on «Tu suscripción». Each POSTs the cadence (the only input — the server owns the shop and the price)
- * to the checkout route and sends the browser to the Stripe URL it returns. A failure shows the server's own sentence.
+ * The ways to pay on «Tu suscripción», each as a card that says what it is before the button (Daniel, 2026-11-05:
+ * "what does each do? if I pay right now what happens?"). Each POSTs the cadence (the only input — the server owns the
+ * shop and the price) to the checkout route and sends the browser to the Stripe URL it returns. A failure shows the
+ * server's own sentence.
  */
 export default function NegocioBuyButtons({ buttons }: { buttons: NegocioButton[] }) {
   const [busy, setBusy] = useState<string | null>(null)
@@ -34,19 +36,25 @@ export default function NegocioBuyButtons({ buttons }: { buttons: NegocioButton[
   }
 
   return (
-    <div style={{ display: 'grid', gap: 'var(--s-2)' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-3)' }}>
-        {buttons.map((b, i) => (
-          <button
-            key={b.cadence}
-            type="button"
-            className={i === 0 && buttons.length > 1 ? 'btn btn-secondary' : 'btn btn-primary'}
-            data-testid={`negocio-buy-${b.cadence}`}
-            disabled={busy !== null}
-            onClick={() => start(b.cadence)}
-          >
-            {busy === b.cadence ? 'Un momento…' : b.label}
-          </button>
+    <div style={{ display: 'grid', gap: 'var(--s-3)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 'var(--s-3)' }}>
+        {buttons.map((b) => (
+          <article key={b.cadence} className="card-panel" data-testid={`negocio-option-${b.cadence}`} style={{ padding: 'var(--s-5)', display: 'flex', flexDirection: 'column', gap: 'var(--s-2)' }}>
+            <h3 className="t-h4" style={{ margin: 0, letterSpacing: 0 }}>{b.title}</h3>
+            <ul style={{ margin: 0, paddingLeft: 'var(--s-4)', display: 'grid', gap: 'var(--s-1)', flex: 1 }}>
+              {b.lines.map((line) => <li key={line} className="t-small">{line}</li>)}
+            </ul>
+            <button
+              type="button"
+              className={b.cadence === 'year' ? 'btn btn-primary' : 'btn btn-secondary'}
+              data-testid={`negocio-buy-${b.cadence}`}
+              disabled={busy !== null}
+              onClick={() => start(b.cadence)}
+              style={{ marginTop: 'var(--s-2)' }}
+            >
+              {busy === b.cadence ? 'Un momento…' : b.label}
+            </button>
+          </article>
         ))}
       </div>
       {error ? (

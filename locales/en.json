@@ -3369,6 +3369,14 @@
           "a": "Your shop stays open on the Free plan, with your products, your address and your sales. It never closes and you don't have to do anything. Only the Negocio plan's extras pause: the Mercado Libre connection, the monthly check-in and the extra AI help, and a small «Shop powered by Miyagi Sánchez» link appears. Everything comes back as soon as you sign up for the Negocio plan."
         },
         {
+          "q": "Does the monthly Negocio plan charge itself?",
+          "a": "Yes. It is a subscription: it charges your card every month, and you can cancel it whenever you like from «Tu suscripción». The yearly plan is a single payment for 12 months (interest-free installments available) and does not renew on its own."
+        },
+        {
+          "q": "If I sign up during my {trialDays} free days, do I lose the days I have left?",
+          "a": "No. The monthly plan first charges you when your free days end. The yearly plan is paid that day, but its 12 months start when your free days end."
+        },
+        {
           "q": "Do I need a card to start?",
           "a": "No. You open your shop and use the Negocio plan for {trialDays} days without giving any card."
         },

@@ -39,6 +39,25 @@ export function decideNegocioCheckout(input: { cadence: NegocioCadence; plan: Pl
   return { ok: true }
 }
 
+/**
+ * Stripe Checkout refuses a `subscription_data.trial_end` less than 48 hours away. A minute of slack keeps a request
+ * built at the edge from being refused by the time Stripe reads it.
+ */
+export const STRIPE_MIN_TRIAL_SECONDS = 48 * 3600 + 60
+
+/**
+ * When a MONTHLY Negocio bought now should first charge (unix seconds), or null to charge today. During a live free
+ * trial the first charge waits for its end (Daniel, 2026-11-05: paying early never loses free days). Stripe needs at
+ * least 48 hours, so a trial ending sooner is rounded up to that: the merchant gets up to two extra free days, never
+ * fewer than promised.
+ */
+export function monthlyFirstChargeAt(plan: PlanState, now: Date = new Date()): number | null {
+  if (plan.reason !== 'trial' || !plan.endsAt) return null
+  const end = Math.floor(Date.parse(plan.endsAt) / 1000)
+  if (!Number.isFinite(end)) return null
+  return Math.max(end, Math.floor(now.getTime() / 1000) + STRIPE_MIN_TRIAL_SECONDS)
+}
+
 /** Months a one-time session grants: a whole number 1–24 from its metadata, or 12. Anything else is refused. */
 export function sessionMonths(raw: unknown): number | null {
   if (raw === undefined || raw === null || raw === '') return NEGOCIO_YEARLY_MONTHS

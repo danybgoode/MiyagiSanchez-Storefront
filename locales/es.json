@@ -3369,6 +3369,14 @@
           "a": "Tu tienda sigue abierta en el Plan Gratis, con tus productos, tu dirección y tus ventas. Nunca se cierra y no tienes que hacer nada. Solo se pausa lo del Plan Negocio: la conexión con Mercado Libre, el chequeo mensual de tu tienda y la ayuda extra de la IA, y aparece un pequeño enlace «Tienda impulsada por Miyagi Sánchez». Todo vuelve en cuanto contratas el Plan Negocio."
         },
         {
+          "q": "¿El Plan Negocio mensual se cobra solo?",
+          "a": "Sí. Es una suscripción: se cobra sola cada mes a tu tarjeta, y la cancelas cuando quieras desde «Tu suscripción». El anual es un solo pago por 12 meses (también a meses sin intereses) y no se renueva solo."
+        },
+        {
+          "q": "Si contrato durante mis {trialDays} días gratis, ¿pierdo los días que me quedan?",
+          "a": "No. El mensual te cobra por primera vez cuando terminan tus días gratis. El anual se paga ese día, pero sus 12 meses empiezan cuando terminan tus días gratis."
+        },
+        {
           "q": "¿Necesito tarjeta para empezar?",
           "a": "No. Abres tu tienda y usas el Plan Negocio {trialDays} días sin dar ninguna tarjeta."
         },
