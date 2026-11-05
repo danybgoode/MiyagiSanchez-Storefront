@@ -9,7 +9,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { NEGOCIO_GRANT_KEY, NEGOCIO_TRIAL_KEY, addMonthsClamped, decideNegocioPayment, type PlanState } from '../lib/plan'
-import { STRIPE_MIN_TRIAL_SECONDS, monthlyFirstChargeAt } from '../lib/negocio-checkout-rules'
+import { NEGOCIO_CHECKOUT_WINDOW_MS, STRIPE_MIN_TRIAL_SECONDS, invoiceSubscriptionId, monthlyFirstChargeAt } from '../lib/negocio-checkout-rules'
 import { isSafeSearchValue, pickNegocioSubscription, startNegocioManage, type NegocioSubscriptionLike } from '../lib/negocio-manage'
 
 const NOW = new Date('2026-11-10T12:00:00Z')
@@ -52,8 +52,19 @@ test.describe('a monthly subscription during the trial first charges when the tr
   })
 
   test('a trial ending within 48 h is rounded up to what Stripe accepts (a little longer free, never shorter)', () => {
-    expect(monthlyFirstChargeAt(trial(1), NOW)).toBe(sec(NOW) + STRIPE_MIN_TRIAL_SECONDS)
+    const first = monthlyFirstChargeAt(trial(1), NOW)!
+    expect(first).toBeGreaterThanOrEqual(sec(NOW) + STRIPE_MIN_TRIAL_SECONDS)
+    expect(first).toBeLessThanOrEqual(sec(NOW) + STRIPE_MIN_TRIAL_SECONDS + NEGOCIO_CHECKOUT_WINDOW_MS / 1000)
     expect(STRIPE_MIN_TRIAL_SECONDS).toBeGreaterThan(48 * 3600)
+  })
+
+  test('two clicks inside one idempotency window send the SAME first charge, or Stripe refuses the retry (#477)', () => {
+    const windowStart = Math.floor(NOW.getTime() / NEGOCIO_CHECKOUT_WINDOW_MS) * NEGOCIO_CHECKOUT_WINDOW_MS
+    const early = monthlyFirstChargeAt(trial(1), new Date(windowStart + 1_000))
+    const late = monthlyFirstChargeAt(trial(1), new Date(windowStart + NEGOCIO_CHECKOUT_WINDOW_MS - 1_000))
+    expect(early).toBe(late)
+    // And the key shares the window constant.
+    expect(readFileSync('lib/negocio-checkout.ts', 'utf8')).toContain('Math.floor(Date.now() / NEGOCIO_CHECKOUT_WINDOW_MS)')
   })
 
   test('no trial, no wait: Gratis and an ended trial charge today', () => {
@@ -68,6 +79,22 @@ test.describe('a monthly subscription during the trial first charges when the tr
     const stripe = readFileSync('lib/stripe-subscriptions.ts', 'utf8')
     expect(stripe).toContain('trial_end: trialEnd')
   })
+})
+
+test("an invoice's subscription is read on every API version: old top-level field, or the new parent block (#477)", () => {
+  expect(invoiceSubscriptionId({ subscription: 'sub_old' })).toBe('sub_old')
+  expect(invoiceSubscriptionId({ subscription: { id: 'sub_expanded' } })).toBe('sub_expanded')
+  expect(invoiceSubscriptionId({ parent: { subscription_details: { subscription: 'sub_new' } } })).toBe('sub_new')
+  expect(invoiceSubscriptionId({ parent: null })).toBeNull()
+  // Both invoice handlers read it through the helper, never the bare field.
+  const route = readFileSync('app/api/webhooks/stripe/route.ts', 'utf8')
+  expect(route.match(/const stripeSubscriptionId = invoiceSubscriptionId\(invoice\)/g)?.length).toBe(2)
+  expect(route).not.toContain('.subscription as string | undefined')
+})
+
+test('a monthly bought during the trial is recorded as trialing, not active', () => {
+  const src = readFileSync('lib/negocio-webhook.ts', 'utf8')
+  expect(src).toContain("status: mapNegocioStatus(stripeSub.status) === 'trialing' ? 'trialing' : 'active'")
 })
 
 test('the $0 invoice that opens a free period is not a payment: it returns before any status flip or renewal share', () => {

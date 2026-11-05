@@ -3374,7 +3374,7 @@
         },
         {
           "q": "Si contrato durante mis {trialDays} días gratis, ¿pierdo los días que me quedan?",
-          "a": "No. El mensual te cobra por primera vez cuando terminan tus días gratis. El anual se paga ese día, pero sus 12 meses empiezan cuando terminan tus días gratis."
+          "a": "No. El mensual te cobra por primera vez cuando terminan tus días gratis. El anual se paga el día que lo contratas, pero sus 12 meses empiezan cuando terminan tus días gratis."
         },
         {
           "q": "¿Necesito tarjeta para empezar?",

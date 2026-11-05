@@ -46,6 +46,12 @@ export function decideNegocioCheckout(input: { cadence: NegocioCadence; plan: Pl
 export const STRIPE_MIN_TRIAL_SECONDS = 48 * 3600 + 60
 
 /**
+ * The window a Negocio checkout's idempotency key is stable for. Every parameter sent with one key must be identical
+ * for the whole window, or Stripe refuses the retry (`idempotency_error`), so anything time-based is rounded to it.
+ */
+export const NEGOCIO_CHECKOUT_WINDOW_MS = 600_000
+
+/**
  * When a MONTHLY Negocio bought now should first charge (unix seconds), or null to charge today. During a live free
  * trial the first charge waits for its end (Daniel, 2026-11-05: paying early never loses free days). Stripe needs at
  * least 48 hours, so a trial ending sooner is rounded up to that: the merchant gets up to two extra free days, never
@@ -55,7 +61,23 @@ export function monthlyFirstChargeAt(plan: PlanState, now: Date = new Date()): n
   if (plan.reason !== 'trial' || !plan.endsAt) return null
   const end = Math.floor(Date.parse(plan.endsAt) / 1000)
   if (!Number.isFinite(end)) return null
-  return Math.max(end, Math.floor(now.getTime() / 1000) + STRIPE_MIN_TRIAL_SECONDS)
+  // Measured from the END of the current idempotency window, not from this second: a double click or a retry within
+  // the window must send the same trial_end, or Stripe refuses it (pr-reviewer, #477). At most ten minutes more free.
+  const windowEndSec = (Math.floor(now.getTime() / NEGOCIO_CHECKOUT_WINDOW_MS) + 1) * (NEGOCIO_CHECKOUT_WINDOW_MS / 1000)
+  return Math.max(end, windowEndSec + STRIPE_MIN_TRIAL_SECONDS)
+}
+
+/**
+ * The subscription an invoice belongs to, on any Stripe API version: `invoice.subscription` before 2025-03-31.basil,
+ * `invoice.parent.subscription_details.subscription` after. A webhook endpoint follows the account's API version, so
+ * reading only one of them would silently drop every renewal and failed payment on the other (pr-reviewer, #477).
+ */
+export function invoiceSubscriptionId(invoice: unknown): string | null {
+  const inv = (invoice ?? {}) as Record<string, unknown>
+  const idOf = (v: unknown): string | null =>
+    typeof v === 'string' ? v : v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string' ? (v as { id: string }).id : null
+  const parent = inv.parent as { subscription_details?: { subscription?: unknown } } | null | undefined
+  return idOf(inv.subscription) ?? idOf(parent?.subscription_details?.subscription)
 }
 
 /** Months a one-time session grants: a whole number 1–24 from its metadata, or 12. Anything else is refused. */

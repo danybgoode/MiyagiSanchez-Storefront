@@ -3374,7 +3374,7 @@
         },
         {
           "q": "If I sign up during my {trialDays} free days, do I lose the days I have left?",
-          "a": "No. The monthly plan first charges you when your free days end. The yearly plan is paid that day, but its 12 months start when your free days end."
+          "a": "No. The monthly plan first charges you when your free days end. The yearly plan is paid the day you buy it, but its 12 months start when your free days end."
         },
         {
           "q": "Do I need a card to start?",

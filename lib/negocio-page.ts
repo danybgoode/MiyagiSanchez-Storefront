@@ -83,9 +83,9 @@ function monthlyButton(plan: PlanState, now: Date): NegocioButton {
     lines: [
       'Es una suscripción: se cobra sola cada mes a tu tarjeta, sin que hagas nada.',
       firstCharge
-        ? `Hoy solo guardas tu tarjeta. El primer cobro llega cuando terminan tus días gratis, el ${formatPlanDate(new Date(firstCharge * 1000).toISOString())}.`
+        ? `Hoy solo guardas tu tarjeta. El primer cobro llega el ${formatPlanDate(new Date(firstCharge * 1000).toISOString())}, cuando ya terminaron tus días gratis.`
         : 'El primer cobro es hoy.',
-      'La cancelas cuando quieras desde esta misma página.',
+      'La cancelas cuando quieras desde esta misma página, y sigues con el Plan Negocio hasta el final del mes que pagaste.',
     ],
   }
 }

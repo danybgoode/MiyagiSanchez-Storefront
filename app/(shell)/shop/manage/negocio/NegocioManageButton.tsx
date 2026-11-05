@@ -30,7 +30,8 @@ export default function NegocioManageButton() {
   return (
     <div style={{ display: 'grid', gap: 'var(--s-2)' }}>
       <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>
-        Ahí cambias tu tarjeta, ves tus pagos o cancelas. Si cancelas, tu tienda sigue abierta en el Plan Gratis.
+        Ahí cambias tu tarjeta, ves tus pagos o cancelas. Si cancelas, sigues con el Plan Negocio hasta el final del mes
+        que pagaste, y tu tienda sigue abierta después.
       </p>
       <button type="button" className="btn btn-secondary" data-testid="negocio-manage" disabled={busy} onClick={open} style={{ justifySelf: 'start' }}>
         {busy ? 'Un momento…' : 'Ver mis pagos o cancelar'}

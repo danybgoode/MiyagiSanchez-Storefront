@@ -40,8 +40,8 @@ test.describe('«Tu suscripción» view', () => {
   test('each button says what it is and when it starts: during the trial nothing is lost', () => {
     const [month, year] = negocioPageView(st('trial', 'trial', in5), NOW).buttons
     expect(month.lines.join(' ')).toContain('se cobra sola cada mes')
-    expect(month.lines.join(' ')).toContain('El primer cobro llega cuando terminan tus días gratis, el 9 de noviembre de 2026.')
-    expect(month.lines.join(' ')).toContain('La cancelas cuando quieras')
+    expect(month.lines.join(' ')).toContain('El primer cobro llega el 9 de noviembre de 2026, cuando ya terminaron tus días gratis.')
+    expect(month.lines.join(' ')).toContain('sigues con el Plan Negocio hasta el final del mes que pagaste')
     expect(year.lines.join(' ')).toContain('Un solo pago')
     expect(year.lines.join(' ')).toContain('meses empiezan cuando terminan tus días gratis, el 9 de noviembre de 2026.')
     expect(year.lines.join(' ')).toContain('No se renueva solo')
