@@ -44,6 +44,17 @@ const COPY = {
   fillYourself: 'No pudimos leer el producto en la foto. Llénalo a mano.',
 } as const
 
+async function spendOne(deps: PromoterPhotoDeps): Promise<'spent' | 'capped' | 'error'> {
+  let rpc: { data: unknown; error: unknown }
+  try {
+    rpc = await deps.spend()
+  } catch (e) {
+    rpc = { data: null, error: e instanceof Error ? e.message : 'spend threw' }
+  }
+  if (rpc.error) return 'error'
+  return typeof rpc.data === 'number' ? 'spent' : 'capped'
+}
+
 export async function suggestFromPhoto(
   input: { promoterClerkId: string; imageUrl: unknown; shopName: string | null },
   deps: PromoterPhotoDeps,
@@ -54,20 +65,18 @@ export async function suggestFromPhoto(
   if (!deps.modelConfigured) return { status: 200, body: { ok: true, suggestion: null, message: COPY.fillYourself } }
 
   // The daily budget is spent BEFORE the vision call, and fails closed: an error or the cap both mean no model call.
-  let rpc: { data: unknown; error: unknown }
-  try {
-    rpc = await deps.spend()
-  } catch (e) {
-    rpc = { data: null, error: e instanceof Error ? e.message : 'spend threw' }
-  }
-  if (rpc.error) return { status: 503, body: { ok: false, error: COPY.unavailable } }
-  if (typeof rpc.data !== 'number') return { status: 429, body: { ok: false, error: COPY.daily } }
+  const first = await spendOne(deps)
+  if (first === 'error') return { status: 503, body: { ok: false, error: COPY.unavailable } }
+  if (first === 'capped') return { status: 429, body: { ok: false, error: COPY.daily } }
 
   const image = await deps.fetchImage(input.imageUrl)
   if (!image) return { status: 200, body: { ok: true, suggestion: null, message: COPY.fillYourself } }
 
   const request = buildPhotoRequest(image, input.shopName)
   for (let attempt = 1; attempt <= PHOTO_MAX_ATTEMPTS; attempt++) {
+    // Every model call costs one unit, the retry included (Codex security, #475): otherwise 60 a day buys 120 calls.
+    // Out of budget for the retry ⇒ "fill it by hand", never an unpaid call.
+    if (attempt > 1 && (await spendOne(deps)) !== 'spent') break
     let result: { ok: boolean; text?: string }
     try {
       result = await deps.callModel(request)

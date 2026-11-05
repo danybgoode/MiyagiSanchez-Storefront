@@ -64,6 +64,23 @@ test('a bad answer is retried once, then "fill it by hand" — never an invented
   expect(calls).toBe(2)
 })
 
+test('every model call spends one unit — the retry included, and an exhausted budget stops the retry', async () => {
+  let spends = 0
+  let calls = 0
+  const bad = async () => { calls += 1; return { ok: true, text: '{"title":""}' } }
+  const paid = world({ spend: async () => { spends += 1; return { data: spends, error: null } }, callModel: bad })
+  await suggestFromPhoto({ promoterClerkId: PROMOTER_USER, imageUrl: OWN, shopName: null }, paid.deps)
+  expect({ spends, calls }).toEqual({ spends: 2, calls: 2 })
+
+  spends = 0
+  calls = 0
+  const lastUnit = world({ spend: async () => { spends += 1; return { data: spends === 1 ? 60 : null, error: null } }, callModel: bad })
+  const out = await suggestFromPhoto({ promoterClerkId: PROMOTER_USER, imageUrl: OWN, shopName: null }, lastUnit.deps)
+  expect({ spends, calls }).toEqual({ spends: 2, calls: 1 })
+  expect(out.status).toBe(200)
+  if (out.status === 200) expect(out.body.suggestion).toBeNull()
+})
+
 test('no model credential: "fill it by hand", and nothing is spent', async () => {
   const w = world({ modelConfigured: false })
   const out = await suggestFromPhoto({ promoterClerkId: PROMOTER_USER, imageUrl: OWN, shopName: null }, w.deps)
