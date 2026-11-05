@@ -65,7 +65,7 @@ export function negocioGains(): string[] {
   const g = PLAN_ALLOWANCES.gratis
   const n = PLAN_ALLOWANCES.negocio
   return [
-    'Tu propio dominio (tunegocio.com)',
+    'Conectar tu propio dominio (tunegocio.com), si tienes uno',
     'La sincronización con Mercado Libre',
     'El chequeo mensual de tu tienda',
     `${n.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda (hoy tienes ${g.chatAnswersPerMonth.toLocaleString('en-US')})`,
