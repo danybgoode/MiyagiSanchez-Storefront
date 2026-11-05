@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import RelationshipHistoryPanel, { STAGE_LABEL } from '@/app/components/RelationshipHistoryPanel'
 
@@ -40,26 +41,38 @@ export default function PromoterRelacionesClient() {
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  async function load() {
+  // One read of the promoter's shops. Every setState happens in a promise callback, never in an effect body
+  // (`react-hooks/set-state-in-effect`); the mount starts already loading with no error, so it needs no reset.
+  function fetchRows(isCancelled: () => boolean = () => false) {
+    return fetch('/api/promoter/relationships')
+      .then(async (res) => {
+        const json = await res.json()
+        if (isCancelled()) return
+        if (!res.ok || !json.ok) {
+          setError('No se pudo cargar tu cartera de comercios.')
+          return
+        }
+        setRows(json.relationships ?? [])
+      })
+      .catch(() => {
+        if (!isCancelled()) setError('No se pudo cargar tu cartera de comercios.')
+      })
+      .finally(() => {
+        if (!isCancelled()) setLoading(false)
+      })
+  }
+
+  // A refresh after a change (the history panel's `onChanged`): reset, then read again.
+  function load() {
     setLoading(true)
     setError(null)
-    try {
-      const res = await fetch('/api/promoter/relationships')
-      const json = await res.json()
-      if (!res.ok || !json.ok) {
-        setError('No se pudo cargar tu cartera de comercios.')
-        return
-      }
-      setRows(json.relationships ?? [])
-    } catch {
-      setError('No se pudo cargar tu cartera de comercios.')
-    } finally {
-      setLoading(false)
-    }
+    void fetchRows()
   }
 
   useEffect(() => {
-    load()
+    let cancelled = false
+    void fetchRows(() => cancelled)
+    return () => { cancelled = true }
   }, [])
 
   return (
@@ -77,7 +90,7 @@ export default function PromoterRelacionesClient() {
       {!loading && !error && rows.length === 0 && (
         <p className="text-sm text-[var(--color-muted)] py-8 text-center">
           Todavía no tienes comercios registrados. Captúralos desde{' '}
-          <a href="/promotor/cerrar" className="underline">Abrir una tienda</a>.
+          <Link href="/promotor/cerrar" className="underline">Abrir una tienda</Link>.
         </p>
       )}
 
