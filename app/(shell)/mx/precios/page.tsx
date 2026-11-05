@@ -5,7 +5,7 @@ import es from '@/locales/es.json'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { getPricingCatalog } from '@/lib/pricing-catalog-server'
 import { contactMailto } from '@/lib/contact'
-import type { ExtraRow, PricingCatalog } from '@/lib/pricing-catalog'
+import { fillFixedPricingTokens, type ExtraRow, type PricingCatalog } from '@/lib/pricing-catalog'
 import { PreciosTrackedLink, PreciosViewed } from './_components/PreciosTracking'
 
 /**
@@ -42,8 +42,8 @@ export const metadata: Metadata = {
 function offersJsonLd(catalog: PricingCatalog) {
   const negocio = catalog.plans.find((p) => p.id === 'negocio')
   const offers = [
-    ...(negocio?.yearlyMxn != null ? [{ name: 'Negocio (anual)', price: negocio.yearlyMxn, unit: 'ANN' }] : []),
-    ...(negocio?.monthlyMxn != null ? [{ name: 'Negocio (mensual)', price: negocio.monthlyMxn, unit: 'MON' }] : []),
+    ...(negocio?.yearlyMxn != null ? [{ name: 'Plan Negocio (anual)', price: negocio.yearlyMxn, unit: 'ANN' }] : []),
+    ...(negocio?.monthlyMxn != null ? [{ name: 'Plan Negocio (mensual)', price: negocio.monthlyMxn, unit: 'MON' }] : []),
   ].map((o) => ({
     '@type': 'Offer',
     name: o.name,
@@ -104,6 +104,8 @@ const SECTION = { marginBottom: 'var(--s-10)' } as const
 export default async function PreciosPage() {
   const [dict, catalog] = await Promise.all([getOverriddenDictionary('es'), getPricingCatalog()])
   const ui = dict.precios
+  // The copy says the trial length as `{trialDays}`, never a typed number, so it follows `NEGOCIO_TRIAL_DAYS`.
+  const fill = (text: string) => fillFixedPricingTokens(text, 'es')
 
   return (
     <main className="app-shell" data-testid="precios-page" style={{ paddingTop: 'var(--s-8)', paddingBottom: 'var(--s-10)' }}>
@@ -113,7 +115,7 @@ export default async function PreciosPage() {
       <header style={{ ...SECTION, maxWidth: 'var(--measure-prose)' }}>
         <p className="t-small" style={{ color: 'var(--accent)', fontWeight: 600, marginBottom: 'var(--s-2)' }}>{ui.eyebrow}</p>
         <h1 className="t-h1" style={{ letterSpacing: 0, marginBottom: 'var(--s-3)' }}>{ui.heroTitle}</h1>
-        <p className="t-lead" style={{ marginBottom: 'var(--s-5)' }}>{ui.heroLead}</p>
+        <p className="t-lead" style={{ marginBottom: 'var(--s-5)' }}>{fill(ui.heroLead)}</p>
         <PreciosTrackedLink href={sellerLandingPath('mx')} event="precios_signup_clicked" className="btn btn-primary btn-lg" testId="precios-primary-cta">
           {ui.primaryCta}
           <i className="iconoir-arrow-right" aria-hidden="true" />
@@ -122,11 +124,11 @@ export default async function PreciosPage() {
 
       <section aria-labelledby="precios-plans-title" data-testid="precios-plans" style={SECTION}>
         <h2 id="precios-plans-title" className="t-h2" style={{ letterSpacing: 0, marginBottom: 'var(--s-2)' }}>{ui.plans.title}</h2>
-        <p className="t-lead" style={{ color: 'var(--fg-muted)', marginBottom: 'var(--s-5)' }}>{ui.plans.lead}</p>
+        <p className="t-lead" style={{ color: 'var(--fg-muted)', marginBottom: 'var(--s-5)' }}>{fill(ui.plans.lead)}</p>
         <div style={GRID}>
           {catalog.plans.map((plan) => (
             <article key={plan.id} className="card-panel" data-testid={`precios-plan-${plan.id}`} style={{ padding: 'var(--s-5)', display: 'flex', flexDirection: 'column', gap: 'var(--s-2)' }}>
-              {plan.id === 'negocio' ? <span className="badge badge-success" style={{ alignSelf: 'flex-start' }}>{ui.plans.recommended}</span> : null}
+              {plan.id === 'negocio' ? <span className="badge badge-success" style={{ alignSelf: 'flex-start' }}>{fill(ui.plans.recommended)}</span> : null}
               <h3 className="t-h3" style={{ letterSpacing: 0, margin: 0 }}>{plan.name.es}</h3>
               <p className="t-h4" data-testid={`precios-plan-${plan.id}-price`} style={{ letterSpacing: 0, margin: 0, color: 'var(--accent)' }}>{plan.priceLabel.es}</p>
               {plan.yearlyLabel ? (
@@ -139,7 +141,7 @@ export default async function PreciosPage() {
                 ))}
               </ul>
               <PreciosTrackedLink href={sellerLandingPath('mx')} event="precios_signup_clicked" className={plan.id === 'negocio' ? 'btn btn-primary' : 'btn btn-secondary'} testId={`precios-plan-${plan.id}-cta`}>
-                {plan.id === 'negocio' ? ui.plans.ctaNegocio : ui.plans.cta}
+                {plan.id === 'negocio' ? fill(ui.plans.ctaNegocio) : ui.plans.cta}
                 <i className="iconoir-arrow-right" aria-hidden="true" />
               </PreciosTrackedLink>
             </article>
@@ -194,9 +196,9 @@ export default async function PreciosPage() {
       <section aria-labelledby="precios-faq-title" data-testid="precios-faq" style={{ ...SECTION, maxWidth: 'var(--measure-prose)' }}>
         <h2 id="precios-faq-title" className="t-h2" style={{ letterSpacing: 0, marginBottom: 'var(--s-4)' }}>{ui.faq.title}</h2>
         {ui.faq.items.map((item) => (
-          <details key={item.q} className="card-panel" style={{ padding: 'var(--s-4)', marginBottom: 'var(--s-3)' }}>
-            <summary style={{ fontWeight: 600, cursor: 'pointer' }}>{item.q}</summary>
-            <p className="t-small" style={{ color: 'var(--fg-muted)', margin: 'var(--s-2) 0 0' }}>{item.a}</p>
+          <details key={fill(item.q)} className="card-panel" style={{ padding: 'var(--s-4)', marginBottom: 'var(--s-3)' }}>
+            <summary style={{ fontWeight: 600, cursor: 'pointer' }}>{fill(item.q)}</summary>
+            <p className="t-small" style={{ color: 'var(--fg-muted)', margin: 'var(--s-2) 0 0' }}>{fill(item.a)}</p>
           </details>
         ))}
       </section>

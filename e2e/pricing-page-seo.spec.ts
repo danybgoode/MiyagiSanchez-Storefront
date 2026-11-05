@@ -34,8 +34,10 @@ test.describe('/mx/precios · server HTML', () => {
     expect(html).toContain(`$${YEARLY} MXN/año`)
     // The retired extras are not sold on the page any more.
     for (const sku of ['subdomain', 'custom_domain', 'ml_sync']) expect(html).not.toContain(`precios-extra-${sku}`)
+    // No printed ad is sold (Daniel, 2026-11-05).
+    expect(html).not.toContain('precios-extra-print_ad')
     // Admin-set extras: a price or «Precio a cotizar» — never a bare $0.
-    for (const sku of ['print_ad', 'migration']) {
+    for (const sku of ['migration']) {
       const card = html.match(new RegExp(`data-testid="precios-extra-${sku}-price"[^>]*>([^<]+)<`))
       expect(card, sku).not.toBeNull()
       expect(card![1]).toMatch(/Precio a cotizar|\$[1-9]/)
@@ -50,7 +52,11 @@ test.describe('/mx/precios · server HTML', () => {
     expect(html).toMatch(/href="\/"[^>]*data-testid="precios-primary-cta"|data-testid="precios-primary-cta"[^>]*href="\/"/)
     expect(html).not.toContain('href="/mx/vende"')
     // No unfilled token reached the page.
-    expect(html).not.toMatch(/\{(subdomain|customDomain|mlSync|printAd|migration|negocio)\w*\}/)
+    expect(html).not.toMatch(/\{(subdomain|customDomain|mlSync|printAd|migration|negocio|trialDays)\w*\}/)
+    // The full plan names, never a bare «Negocio es opcional» (Daniel, 2026-11-05).
+    expect(html).toContain('Plan Gratis')
+    expect(html).toContain('Plan Negocio')
+    expect(html).not.toContain('Negocio es opcional')
   })
 
   test('exposes metadata, OG, canonical and JSON-LD offers for the Negocio prices only', async ({ request }) => {

@@ -77,7 +77,7 @@ export default function PromoterRelacionesClient() {
       {!loading && !error && rows.length === 0 && (
         <p className="text-sm text-[var(--color-muted)] py-8 text-center">
           Todavía no tienes comercios registrados. Captúralos desde{' '}
-          <a href="/promotor/cerrar" className="underline">Cerrar venta</a>.
+          <a href="/promotor/cerrar" className="underline">Abrir una tienda</a>.
         </p>
       )}
 

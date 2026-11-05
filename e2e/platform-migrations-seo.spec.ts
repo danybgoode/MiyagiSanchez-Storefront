@@ -144,7 +144,13 @@ test.describe('platform migrations · consultant runbook (US-3.2)', () => {
   // uses). Nothing in this repo lints for a hardcoded price in JSX automatically —
   // guard it at the source level: both pages must call the live reader, and must not
   // hardcode the epic-doc's $999 reference price as a bare literal.
-  for (const relPath of ['app/(shell)/mx/vende/promotor/migracion/page.tsx', 'app/(shell)/mx/vende/promotor/sell-sheet/page.tsx']) {
+  // The quick guide (sell-sheet) no longer prints a migration price: it links the migration guide, which does.
+  test('the promoter quick guide types no migration price and links the migration guide', () => {
+    const source = readFileSync(new URL('../app/(shell)/mx/vende/promotor/sell-sheet/page.tsx', import.meta.url), 'utf8')
+    expect(source).not.toContain('$999')
+    expect(source).toContain('/mx/vende/promotor/migracion')
+  })
+  for (const relPath of ['app/(shell)/mx/vende/promotor/migracion/page.tsx']) {
     test(`${relPath} sources the migration price from getPromoterSkuPrices(), not a literal`, () => {
       const source = readFileSync(new URL(`../${relPath}`, import.meta.url), 'utf8')
       expect(source).toContain('getPromoterSkuPrices')

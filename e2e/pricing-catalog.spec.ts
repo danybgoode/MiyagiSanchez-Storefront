@@ -32,15 +32,18 @@ const UNSET: PricingCatalogInput = {
 }
 
 test.describe('pricing catalog', () => {
-  test('the extras are exactly the print ad and the migration, in PROMOTER_SKUS order (plans D16)', () => {
+  test('the only extra on the price list is the migration: no printed ad is sold (Daniel, 2026-11-05)', () => {
     const catalog = buildPricingCatalog(UNSET)
-    expect(catalog.extras.map((r) => r.sku)).toEqual(PROMOTER_SKUS.filter((s) => s === 'print_ad' || s === 'migration'))
-    expect(catalog.extras.map((r) => r.sku).sort()).toEqual(['migration', 'print_ad'])
+    expect(catalog.extras.map((r) => r.sku)).toEqual(PROMOTER_SKUS.filter((s) => s === 'migration'))
+    expect(catalog.extras.map((r) => r.sku)).not.toContain('print_ad')
   })
 
   test('two plans: Gratis and Negocio, with Negocio priced from lib/negocio-pricing.ts (plans D16)', () => {
     const c = buildPricingCatalog(UNSET)
     expect(c.plans.map((p) => p.id)).toEqual(['gratis', 'negocio'])
+    // Always the full plan names, so «Negocio» never reads as "doing business" (Daniel, 2026-11-05).
+    expect(c.plans.map((p) => p.name.es)).toEqual(['Plan Gratis', 'Plan Negocio'])
+    expect(c.plans.map((p) => p.name.en)).toEqual(['Free plan', 'Negocio plan'])
     const [gratis, negocio] = c.plans
     expect([gratis.monthlyMxn, gratis.yearlyMxn, gratis.yearlyLabel]).toEqual([null, null, null])
     expect(gratis.priceLabel.es).toMatch(/^Gratis/)
@@ -54,7 +57,7 @@ test.describe('pricing catalog', () => {
       expect(incl(negocio, loc)).toContain(String(PLAN_ALLOWANCES.negocio.photosPerMonth))
       expect(incl(negocio, loc)).toContain(String(NEGOCIO_TRIAL_DAYS))
     }
-    expect(incl(negocio, 'es')).toMatch(/Dominio propio/)
+    expect(incl(negocio, 'es')).toMatch(/propio dominio/)
     expect(incl(negocio, 'es')).toMatch(/Mercado Libre/)
     expect(incl(gratis, 'es')).toMatch(/subdominio/)
     expect(incl(gratis, 'es')).toMatch(/Tienda impulsada por Miyagi Sánchez/)
@@ -73,7 +76,7 @@ test.describe('pricing catalog', () => {
 
   test('an unset admin price reads «Precio a cotizar», never $0', () => {
     const c = buildPricingCatalog(UNSET)
-    for (const sku of ['print_ad', 'migration'] as const) {
+    for (const sku of ['migration'] as const) {
       const row = getExtra(c, sku)
       expect(row.quoted).toBe(true)
       expect(row.oneOffMxn).toBeNull()
@@ -85,14 +88,12 @@ test.describe('pricing catalog', () => {
   test('a zero or broken admin price is treated as unset, not as free', () => {
     const c = buildPricingCatalog({ ...UNSET, migrationPriceMxn: 0, printAdTiersCents: [0, Number.NaN] })
     expect(getExtra(c, 'migration').quoted).toBe(true)
-    expect(getExtra(c, 'print_ad').quoted).toBe(true)
   })
 
-  test('set admin prices show: migration flat, print ad «desde» the cheapest open tier', () => {
+  test('a set migration price shows flat, and a print-ad price never reaches the list', () => {
     const c = buildPricingCatalog({ ...UNSET, migrationPriceMxn: 999, printAdTiersCents: [10000, 2500, 7500] })
     expect(getExtra(c, 'migration').priceLabel.es).toBe('$999 MXN, pago único')
-    expect(getExtra(c, 'print_ad').priceLabel.es).toBe('Desde $25 MXN por edición')
-    expect(getExtra(c, 'print_ad').quoted).toBe(false)
+    expect(() => getExtra(c, 'print_ad')).toThrow(/no row for print_ad/)
   })
 
   test('processors carry the dataset rates with source + date, and SPEI states no invented rate (D5)', () => {
@@ -123,8 +124,9 @@ test.describe('pricing catalog', () => {
 test.describe('pricing tokens (D7)', () => {
   test('known tokens fill; an unknown token stays visible', () => {
     const c = buildPricingCatalog({ ...UNSET, migrationPriceMxn: 999 })
+    // `{printAdPrice}` is gone with the printed ad, so it now stays visible like any unknown token.
     expect(fillPricingTokens('Print: {printAdPrice}. Mig: {migrationPrice}. {typo}', c, 'es')).toBe(
-      `Print: ${getExtra(c, 'print_ad').priceLabel.es}. Mig: $999 MXN, pago único. {typo}`,
+      'Print: {printAdPrice}. Mig: $999 MXN, pago único. {typo}',
     )
   })
 

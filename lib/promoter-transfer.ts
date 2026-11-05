@@ -118,9 +118,9 @@ export const TRANSFER_SKU_LABEL: Record<TransferSku, string> = {
   subdomain: 'Subdominio propio',
   ml_sync: 'Sincronización Mercado Libre',
   migration: 'Migración de tienda',
-  negocio_anual: 'Paquete Anual (instalación + 12 meses de Negocio)',
-  negocio_arranque: 'Paquete Arranque (instalación + 3 meses de Negocio)',
-  setup_gratis: 'Instalación en el plan Gratis',
+  negocio_anual: 'Plan Negocio · 1 año (tienda lista + 12 meses)',
+  negocio_arranque: 'Plan Negocio · 3 meses (tienda lista + 3 meses)',
+  setup_gratis: 'Plan Gratis · tienda lista',
 }
 
 // ── Transfer-details completeness (the "never a dead-end destination" guard) ──

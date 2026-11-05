@@ -105,16 +105,15 @@ test.describe('ml_sync promoter SKU (S6)', () => {
 
 // ── Route auth shapes (auth-before-flag; agnostic to the live flag value) ────────
 test.describe('ml-sync money routes · anonymous is rejected (S6)', () => {
-  test('POST /api/sell/ml/subscribe → 401 (no Clerk session)', async ({ request }) => {
+  // Mercado Libre sync is part of the Negocio plan now: its standalone purchase is retired (410 for everyone).
+  test('POST /api/sell/ml/subscribe → 410 (retired)', async ({ request }) => {
     const res = await request.post('/api/sell/ml/subscribe', { data: { cadence: 'recurring', interval: 'year' } })
-    expect(res.status()).toBe(401)
+    expect(res.status()).toBe(410)
   })
 
-  test('POST /api/promoter/close/ml-sync → 404 (hidden) or 401 (live, auth required)', async ({ request }) => {
-    // promoter.enabled + ml.sync_enabled gate the route; anon is 404 (hidden) or 401
-    // (live) — never 200. Agnostic to the live flag values (both-flag-states).
+  test('POST /api/promoter/close/ml-sync → 404 (hidden) or 410 (retired)', async ({ request }) => {
     const res = await request.post('/api/promoter/close/ml-sync', { data: { slug: 'x' } })
-    expect([401, 404]).toContain(res.status())
+    expect([404, 410]).toContain(res.status())
   })
 
   test('GET /api/admin/tenants/:id?sku=ml_sync → 401 (admin-gated, anon)', async ({ request }) => {

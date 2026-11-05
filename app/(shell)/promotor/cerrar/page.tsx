@@ -5,7 +5,7 @@ import { getPromoterByClerkId } from '@/lib/promoter'
 import PromoterCloseClient from './PromoterCloseClient'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Cerrar venta — Promotor', robots: { index: false } }
+export const metadata = { title: 'Abrir una tienda — Promotor', robots: { index: false } }
 
 /**
  * Authed promoter "close" workspace (epic 08 · S4). Where a logged-in promoter

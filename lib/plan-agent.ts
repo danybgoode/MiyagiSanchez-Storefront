@@ -34,10 +34,10 @@ export function planAgentView(plan: PlanState, now: Date = new Date()): PlanAgen
   const canYear = !(plan.reason === 'comp' || plan.reason === 'subscription' || plan.reason === 'unavailable')
   const summary =
     plan.reason === 'unavailable' ? 'No se pudo confirmar la suscripción de la tienda en este momento; inténtalo de nuevo en unos minutos.'
-    : plan.plan === 'trial' ? `La tienda está en su prueba de Negocio: le quedan ${left} día(s). Después pasa a Gratis sola, sin perder nada.`
-    : plan.plan === 'negocio' && plan.reason === 'one_time' ? `La tienda tiene Negocio pagado hasta ${plan.endsAt?.slice(0, 10)}.`
-    : plan.plan === 'negocio' ? 'La tienda tiene Negocio activo.'
-    : 'La tienda está en Gratis. Negocio agrega dominio propio, Mercado Libre, mucho más chat y la revisión del mes.'
+    : plan.plan === 'trial' ? `La tienda está en su prueba del Plan Negocio: le quedan ${left} día(s). Después sigue abierta en el Plan Gratis, sin perder sus productos.`
+    : plan.plan === 'negocio' && plan.reason === 'one_time' ? `La tienda tiene el Plan Negocio pagado hasta ${plan.endsAt?.slice(0, 10)}.`
+    : plan.plan === 'negocio' ? 'La tienda tiene el Plan Negocio activo.'
+    : 'La tienda está en el Plan Gratis. El Plan Negocio agrega dominio propio, Mercado Libre, mucho más chat y la revisión del mes.'
   return {
     summary,
     json: {

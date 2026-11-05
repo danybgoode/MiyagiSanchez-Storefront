@@ -1,11 +1,11 @@
 'use client'
 
+import { PACKAGES } from '@/lib/promoter-packages'
 import { useEffect, useState } from 'react'
 import { ESTADO_NAMES } from '@/lib/mx-locations'
 import { shopUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 import ListingStep from './ListingStep'
-import PrintAdStep from './PrintAdStep'
 import PreviewStep from './PreviewStep'
 import RelationshipStep from './RelationshipStep'
 
@@ -116,7 +116,7 @@ export default function PromoterCloseClient({
   return (
     <div className="max-w-xl mx-auto px-4 py-8 space-y-8">
       <header>
-        <h1 className="text-2xl font-bold">Cerrar venta</h1>
+        <h1 className="text-2xl font-bold">Abrir una tienda</h1>
         <p className="text-sm text-[var(--color-muted)] mt-1">
           Promotor <span className="font-mono font-semibold">{bound.code}</span>
           {bound.name && <span className="ml-2">· {bound.name}</span>}
@@ -139,7 +139,6 @@ export default function PromoterCloseClient({
       {shop && <ListingStep shop={shop} n={(n += 1)} />}
       {shop && previewEnabled && <PreviewStep shop={shop} n={(n += 1)} />}
       {shop && <CloseStep shop={shop} transferEnabled={transferEnabled} n={(n += 1)} />}
-      {shop && <PrintAdStep shop={shop} n={(n += 1)} />}
       {shop && <HandoffStep shop={shop} n={(n += 1)} />}
     </div>
   )
@@ -180,7 +179,7 @@ function BindStep({ onBound }: { onBound: (b: Bound) => void }) {
       <header>
         <h1 className="text-2xl font-bold">Vincula tu código</h1>
         <p className="text-sm text-[var(--color-muted)] mt-1">
-          Ingresa tu código de promotor (PRM-…) para empezar a cerrar ventas.
+          Ingresa tu código de promotor (PRM-…) para empezar a abrir tiendas.
         </p>
       </header>
       <div className="space-y-3">
@@ -357,13 +356,15 @@ function SetupStep({ n, shop, onShop }: { n: number; shop: Shop | null; onShop: 
  * redirect — the grant activates immediately, no charge.
  * (Print is a different flow — it needs ad content — so it's not in this picker.)
  */
+// The package name and price come from `lib/promoter-packages.ts`, never typed here.
+const packagePrice = (sku: keyof typeof PACKAGES) => `$${PACKAGES[sku].priceMxn.toLocaleString('en-US')}`
 const CLOSE_SKUS = [
   // plans-gratis-negocio S4 (D12): the three packages first — the deal a promoter says in one sentence. The custom
   // domain and ML sync are no longer sold on their own (they are part of Negocio).
-  { id: 'package/negocio_anual', label: 'Paquete Anual — instalación + 12 meses de Negocio', payLabel: 'Pagar la parte de Miyagi Sánchez' },
-  { id: 'package/negocio_arranque', label: 'Paquete Arranque — instalación + 3 meses de Negocio', payLabel: 'Pagar la parte de Miyagi Sánchez' },
-  { id: 'package/setup_gratis', label: 'Instalación en el plan Gratis', payLabel: 'Pagar la parte de Miyagi Sánchez' },
-  { id: 'migration', label: 'Migración de tienda', payLabel: 'Cobrar migración' },
+  { id: 'package/negocio_anual', label: `${PACKAGES.negocio_anual.label} (cobras ${packagePrice('negocio_anual')})`, payLabel: 'Pagar la parte de Miyagi Sánchez' },
+  { id: 'package/negocio_arranque', label: `${PACKAGES.negocio_arranque.label} (cobras ${packagePrice('negocio_arranque')})`, payLabel: 'Pagar la parte de Miyagi Sánchez' },
+  { id: 'package/setup_gratis', label: `${PACKAGES.setup_gratis.label} (cobras ${packagePrice('setup_gratis')})`, payLabel: 'Pagar la parte de Miyagi Sánchez' },
+  { id: 'migration', label: 'Migración desde otra plataforma', payLabel: 'Cobrar migración' },
 ] as const
 type CloseSkuId = (typeof CLOSE_SKUS)[number]['id']
 
@@ -447,7 +448,7 @@ function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: 
   // A transfer already exists for this shop+SKU — show its state instead of the picker.
   if (transfer) {
     return (
-      <Card n={n} title="Cobrar y pagar (a nombre del comerciante)">
+      <Card n={n} title="Cobra y pásanos nuestra parte">
         {transfer.status === 'pending' && (
           <div className="space-y-3">
             <p className="text-sm">
@@ -486,18 +487,18 @@ function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: 
   }
 
   return (
-    <Card n={2} title="Cobrar y pagar (a nombre del comerciante)">
+    <Card n={2} title="Cobra y pásanos nuestra parte">
       <p className="text-sm text-[var(--color-muted)]">
-        Cobra al comerciante (efectivo) y paga con tu tarjeta — o repórtale la transferencia a Miyagi. La
-        venta se atribuye a tu código y el beneficio queda activado en la tienda del comerciante.
+        Cobra al dueño del negocio (en efectivo o por transferencia) y pásanos solo nuestra parte. Con tu tarjeta, el
+        plan se activa al instante; por transferencia, en cuanto confirmamos que llegó. Lo demás es tuyo.
       </p>
       <label className="block text-sm">
-        <span className="text-[var(--color-muted)]">Producto</span>
+        <span className="text-[var(--color-muted)]">Qué vendes</span>
         <select
           value={sku}
           onChange={(e) => { setSku(e.target.value as CloseSkuId); setDone(null); setError(null) }}
           disabled={busy}
-          aria-label="Producto a cerrar"
+          aria-label="Qué vendes"
           className="mt-1 w-full rounded-lg border border-[var(--color-border)] px-3 py-2"
         >
           {CLOSE_SKUS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -523,11 +524,11 @@ function CloseStep({ shop, transferEnabled, n }: { shop: Shop; transferEnabled: 
           <div className="flex gap-2" role="radiogroup" aria-label="Forma de pago">
             <button type="button" onClick={() => setPayMethod('stripe')} disabled={busy}
               className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${payMethod === 'stripe' ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--fg-inverse)]' : 'border-[var(--color-border)]'}`}>
-              Tarjeta (Stripe)
+              Con mi tarjeta
             </button>
             <button type="button" onClick={() => setPayMethod('transfer')} disabled={busy}
               className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${payMethod === 'transfer' ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--fg-inverse)]' : 'border-[var(--color-border)]'}`}>
-              Transferir a Miyagi
+              Por transferencia
             </button>
           </div>
           {payMethod === 'transfer' && (

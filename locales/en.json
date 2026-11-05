@@ -1315,7 +1315,7 @@
         },
         {
           "title": "Then how do you make money?",
-          "body": "With ads in our print magazine and optional premium services. We never take your sale."
+          "body": "With the Negocio plan: businesses that want their own domain, Mercado Libre and more AI help pay a monthly fee. We never take a cut of your sales."
         },
         {
           "title": "Do I need technical skills?",
@@ -2490,83 +2490,106 @@
     },
     "promotor": {
       "metadata": {
-        "title": "Promoter Program — Miyagi Sánchez",
-        "description": "Open stores for the businesses on your street, take payment in person and keep the commission. Glossary, prices, scripts and the full walkthrough.",
-        "ogAlt": "Miyagi Sánchez Promoter Program: open the store, close in person, hand over the link."
+        "title": "Earn money opening online shops | Miyagi Sánchez Promoters",
+        "description": "You visit businesses in your area, leave them a ready online shop and keep most of what you charge. No inventory and no office.",
+        "ogAlt": "Miyagi Sánchez Promoters: open shops in your area and earn with each one."
       },
       "eyebrow": "Promoters",
-      "heroTitle": "Open the store. Close in person. Hand it over with one link.",
-      "heroLead": "You are Miyagi Sánchez on the ground. You walk into a business, you leave with their store already live, you take payment in person, and you keep your commission. Shopify asks them for a monthly fee before they have sold a peso; you hand them a store that costs nothing to run — and you get paid for the upgrades they actually want.",
-      "trustLine": "Commission on every close. Settled by transfer or in cash.",
-      "primaryCta": "Open my closing dashboard",
-      "applyCta": "Apply to be a promoter",
-      "secondaryCta": "Promoter handbook",
-      "priceDomainLabel": "Own domain, per year",
-      "priceSubdomainLabel": "Subdomain, per year",
-      "commissionLabel": "Your commission per sale",
-      "proofTitle": "Glossary: what you sell the merchant",
-      "proofLead": "The store is free and stays free: listings, payments, giveaways, events, pickup points, and AI agents can find it. You get paid for the upgrades a serious business wants. Learn these well enough to explain any one of them in thirty seconds.",
-      "glossary": [
-        {
-          "icon": "iconoir-globe",
-          "title": "Own domain",
-          "body": "Their store at theirshop.mx instead of a borrowed address: their brand, their direct traffic, and a name an AI agent can cite. {customDomainYearly}, renewed yearly."
-        },
-        {
-          "icon": "iconoir-internet",
-          "title": "Subdomain",
-          "body": "theirshop.miyagisanchez.com without buying a domain at all. {subdomainYearly}, and FREE the first year with your promoter code: the cheapest yes in your bag."
-        },
-        {
-          "icon": "iconoir-journal",
-          "title": "Print ad",
-          "body": "A space in the printed edition that circulates in their area. People who never search online walk to their door. Charged once; the price depends on the size and the edition."
-        },
-        {
-          "icon": "iconoir-shop",
-          "title": "Mercado Libre connection",
-          "body": "Their whole Mercado Libre catalog comes across to Miyagi Sánchez. You leave the store stocked on the first visit, not the fifth."
-        },
-        {
-          "icon": "iconoir-refresh",
-          "title": "A way off Shopify",
-          "body": "Photograph their catalog, or bring their Shopify, Tiendanube, WooCommerce or Big Cartel export, and their whole store lives here the same day — with no monthly bill waiting next month. Flat price up to a catalog size; a bigger one is quoted before anything is charged. The exact price is in your migration handbook."
-        }
-      ],
-      "stepsTitle": "How a close runs, start to finish",
+      "heroTitle": "Earn money putting businesses online.",
+      "heroLead": "You visit a business in your area, set up its online shop in a single visit and charge for it. Most of what you charge is yours.",
+      "trustLine": "No inventory, no office. The business owner pays you, on the spot.",
+      "primaryCta": "Open my panel",
+      "applyCta": "I want to be a promoter",
+      "secondaryCta": "See the quick guide",
+      "proofTitle": "What you sell: 3 options",
+      "proofLead": "In all three you set up the shop with its products. What changes is the plan it keeps.",
+      "stepsTitle": "How it works",
       "steps": [
         {
-          "title": "1 · Open the store",
-          "body": "Create their store from your dashboard (it stays unclaimed) and put the first listing in it while they watch. Seeing it live is the pitch."
+          "title": "1 · Set up the shop",
+          "body": "From your panel you create the business's shop and upload its products. From a photo, the AI fills in the name, description and price. The owner sees the shop online right then."
         },
         {
-          "title": "2 · Take the payment",
-          "body": "They pay you in cash; you put the domain, the subdomain or the ad on your own card. The sale is attributed to your code and the upgrade switches on in THEIR store."
+          "title": "2 · Get paid and pass us our share",
+          "body": "The owner pays you, in cash or by transfer. From your panel you pass us only our share, by transfer or with your card. The rest is yours."
         },
         {
-          "title": "3 · Hand it over on WhatsApp",
-          "body": "Send them the claim link. One tap, one sign-in, and the store moves to their account. Your commission stays with you."
+          "title": "3 · Hand over the shop",
+          "body": "You send a link by WhatsApp. One tap and the shop is in the owner's name."
         }
       ],
-      "pitchTitle": "The price your code unlocks",
-      "pitchBody": "Your promoter code (PRM-…) carries a price the merchant cannot get on their own, from anyone else, or tomorrow. That is your close: not a discount you ask for, one you arrive holding.",
+      "pitchTitle": "How much you can earn",
+      "pitchBody": "From day one you know what you charge, what you pass us and what you keep. No fees and no fine print. And if the business renews its Negocio plan in year two, you earn again.",
       "pitchStats": [
         {
-          "value": "PRM-",
-          "label": "your personal code"
+          "value": "3",
+          "label": "options to sell"
         },
         {
-          "value": "1 tap",
-          "label": "to claim it on WhatsApp"
+          "value": "1 visit",
+          "label": "to leave the shop ready"
         },
         {
-          "value": "0 friction",
-          "label": "the merchant types nothing"
+          "value": "1 link",
+          "label": "to hand it over by WhatsApp"
         }
       ],
+      "faqs": [
+        {
+          "title": "When do I get paid?",
+          "body": "On the spot: the business owner pays you. You only pass us our share."
+        },
+        {
+          "title": "How do I pay Miyagi Sánchez its share?",
+          "body": "From your panel. With your card, the business's plan turns on instantly. By transfer (SPEI, DiMo or CoDi), it turns on as soon as we confirm it arrived."
+        },
+        {
+          "title": "Do I need to know about computers?",
+          "body": "No. Your panel takes you step by step, and the AI fills in each product from a photo."
+        },
+        {
+          "title": "What if the business doesn't want a monthly fee?",
+          "body": "Offer the Free plan: the shop stays online forever with no monthly fee, and you charge for setting it up."
+        },
+        {
+          "title": "Do I earn anything later?",
+          "body": "Yes. If the business pays for its Negocio plan again in year two, you get a share of that payment."
+        }
+      ],
+      "guide": {
+        "title": "Promoter quick guide",
+        "lead": "Everything you need, on one page.",
+        "packagesTitle": "What you sell",
+        "colOption": "Option",
+        "colCharge": "You charge",
+        "colPay": "You pass us",
+        "colKeep": "You keep",
+        "renewalLine": "If the business renews its Negocio plan in year two, you get {renewalPct}% of that payment.",
+        "ratesPending": "Your share is confirmed with Miyagi Sánchez.",
+        "sayTitle": "What you say",
+        "say": [
+          "«Today I'll leave your shop online with your products, and you won't pay us anything else all year. It includes your own domain, like yourbusiness.com.»",
+          "«Today I'll leave your shop ready and you get the Negocio plan for three months. After that, you decide whether to keep it.»",
+          "«Today I'll leave your shop online, free forever: no monthly fee and no commission on your sales.»"
+        ],
+        "stepsTitle": "Step by step",
+        "steps": [
+          "Open your panel and create the business's shop.",
+          "Upload its products: take a photo and the AI fills in the rest.",
+          "Get paid and pass us our share from your panel.",
+          "Send the owner their link by WhatsApp so the shop is in their name."
+        ],
+        "payTitle": "How you pass us our share",
+        "payCard": "With your card: you pay from your panel and the plan turns on instantly.",
+        "payTransfer": "By transfer (SPEI, DiMo or CoDi): you report it in your panel and the plan turns on as soon as we confirm it arrived.",
+        "payKeep": "What you keep is yours from the moment the owner pays you.",
+        "back": "← Back",
+        "printHint": "To print or save as PDF: ⌘P or Ctrl+P",
+        "migrationLink": "Migration guide (if the business already sells on Shopify or another platform)"
+      },
       "apply": {
-        "title": "Apply to be a promoter",
-        "body": "Tell us who you are and where you work. We review your application and let you know within 2–3 business days.",
+        "title": "I want to be a promoter",
+        "body": "Leave us your details. We reply within 2 to 3 business days.",
         "form": {
           "nameLabel": "Name",
           "namePlaceholder": "Your full name",
@@ -2584,60 +2607,9 @@
           "genericError": "The application could not be sent. Try again."
         }
       },
-      "handbookTitle": "Promoter handbook",
-      "handbookLead": "The whole close, step by step, so you never have to ask anyone.",
-      "checklistTitle": "Closing checklist",
-      "checklist": [
-        {
-          "title": "1 · Open",
-          "body": "Create their store from your dashboard (it stays unclaimed) and add the first listing."
-        },
-        {
-          "title": "2 · Take payment",
-          "body": "Take cash and put the domain, the subdomain or the ad on your own card. The sale is attributed to your code."
-        },
-        {
-          "title": "3 · Design the ad (when it applies)",
-          "body": "If the close includes a print ad, arrange the design with the team. Designing it from your dashboard is coming soon."
-        },
-        {
-          "title": "4 · Hand over the link",
-          "body": "Send the claim link on WhatsApp. One tap, one sign-in, and the store moves to their account."
-        },
-        {
-          "title": "5 · Tell them",
-          "body": "Message them to confirm everything is switched on. The automatic receipt is coming soon."
-        }
-      ],
-      "scriptsTitle": "30-second scripts",
-      "scripts": [
-        {
-          "title": "Own domain",
-          "body": "\"Your store can live at yourname.mx instead of a long link. It looks like the business you already are, and people find you directly. It is {customDomainYearly}, and with my code I switch it on today.\""
-        },
-        {
-          "title": "Subdomain",
-          "body": "\"You can have your own address, yourname.miyagisanchez.com, without buying a domain. It is {subdomainYearly}, and with my code the first year is FREE. I can switch it on right now.\""
-        },
-        {
-          "title": "Print ad",
-          "body": "\"We come out in print and circulate in your area. People who never search online will hear about you. It is charged once, and with my code you get a price you cannot get on your own.\""
-        },
-        {
-          "title": "Mercado Libre connection",
-          "body": "\"If you already sell on Mercado Libre you never have to type it again: we connect your catalog and it is here today — and here there is no commission per sale.\""
-        },
-        {
-          "title": "A way off Shopify",
-          "body": "\"Are you paying a monthly fee on Shopify, Tiendanube, WooCommerce or Big Cartel? Here there is no monthly fee and no commission per sale. I photograph your catalog or bring your export, and in one visit your whole store is here. Flat price up to a catalog size; if yours is bigger I quote it before charging you anything.\""
-        }
-      ],
-      "paymentsTitle": "How payments work",
-      "paymentsBody": "You put the domain, the subdomain or the ad on your own card as you open the store. The merchant pays you in cash, or however you agree. Your commission is recorded to your account against your code, and the team settles it with you by transfer or in cash.",
-      "paymentsComingSoon": "Coming soon: take the full amount, transfer only what is owed, and keep your commission on the spot instead of waiting for settlement.",
-      "closingTitle": "Ready to close",
-      "closingBody": "Open your dashboard, link your code and start opening stores. Every close is commission with your name on it.",
-      "closingCta": "Open my closing dashboard"
+      "closingTitle": "Ready to start?",
+      "closingBody": "Open your panel, enter your promoter code and visit your first business.",
+      "closingCta": "Open my panel"
     },
     "promotorMigracion": {
       "title": "Migration handbook",
@@ -3302,12 +3274,12 @@
       },
       "pricing": {
         "heading": "Pricing",
-        "lead": "Selling is free (0% commission). There are two plans, Free and Negocio, and every price is public at miyagisanchez.com/mx/precios.",
+        "lead": "Your shop is free forever (0% commission). There are two plans, the Free plan and the Negocio plan, and every price is public at miyagisanchez.com/mx/precios.",
         "body": [
-          "Free, forever: your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.",
-          "Negocio: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop tries it free for {trialDays} days (without the custom domain, which comes once you pay).",
-          "If your trial ends or you cancel, your shop stays live and free at your URL miyagisanchez.com/mx/s/your-shop.",
-          "Separate extras: print ad, {printAdPrice}; assisted migration, {migrationPrice}.",
+          "Free plan, forever: your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.",
+          "Negocio plan: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop tries it for {trialDays} days without paying (the custom domain turns on when you sign up).",
+          "If your trial ends or you cancel, your shop stays open on the Free plan, at your URL miyagisanchez.com/mx/s/your-shop.",
+          "A separate service: assisted migration, {migrationPrice}.",
           "Your payment processor (Stripe or Mercado Pago) charges its own fee, not us, and the money goes straight to your account. Every price, with its sources: miyagisanchez.com/mx/precios."
         ]
       },
@@ -3354,38 +3326,38 @@
   },
   "precios": {
     "metadata": {
-      "title": "Pricing — selling is free | Miyagi Sánchez",
-      "description": "0% platform commission. What stays free forever, the optional extras with their real prices, and what your payment processor (not us) charges.",
-      "ogAlt": "Miyagi Sánchez pricing: selling is free, 0% commission"
+      "title": "Pricing: Free plan and Negocio plan | Miyagi Sánchez",
+      "description": "With the Free plan your online shop is free forever, with no commission. The Negocio plan adds your own domain, Mercado Libre and more AI help. Every new shop tries it without paying.",
+      "ogAlt": "Miyagi Sánchez pricing: the Free plan forever and the Negocio plan"
     },
     "eyebrow": "Pricing",
-    "heroTitle": "Selling is free. Negocio is optional.",
-    "heroLead": "0% platform commission. Your money goes straight to your account.",
-    "primaryCta": "Start free",
+    "heroTitle": "Your online shop, free forever.",
+    "heroLead": "With the Free plan you sell with no monthly fee and no commission. When you want more, the Negocio plan adds your own domain, Mercado Libre and more AI help. Every new shop uses it for {trialDays} days without paying.",
+    "primaryCta": "Open your shop for free",
     "plans": {
-      "title": "Two plans: Free and Negocio",
-      "lead": "Selling is free, with no commission. Negocio adds what helps your shop grow, and every new shop tries it free.",
+      "title": "Choose your plan",
+      "lead": "You start with {trialDays} days of the Negocio plan without paying. If you don't sign up afterwards, your shop stays open on the Free plan, with all your products.",
       "monthlySuffix": "or",
-      "recommended": "Free trial",
-      "cta": "Start free",
-      "ctaNegocio": "Try Negocio free",
+      "recommended": "{trialDays} days free",
+      "cta": "Open your shop for free",
+      "ctaNegocio": "Try it {trialDays} days free",
       "includesLabel": "Includes"
     },
     "extras": {
-      "title": "Optional extras",
-      "lead": "Separate services, each with its price: your ad in the print edition and assisted migration. Your shop stays live and free without them.",
+      "title": "A separate service",
+      "lead": "If you already sell on another platform, a consultant moves your whole shop over. It's optional: your shop works the same without it.",
       "fixedBadge": "Fixed price",
-      "quotedBadge": "On request",
+      "quotedBadge": "Quoted",
       "quotedCta": "Write to us"
     },
     "processors": {
-      "title": "What your payment processor charges (not us)",
-      "lead": "No commission does not mean free card payments: your processor charges its fee on each sale. That fee is theirs, not ours, and the money goes straight to your account.",
+      "title": "What your payment method charges (not us)",
+      "lead": "No commission doesn't mean card payments are free: Stripe or Mercado Pago charge their fee on each sale. That fee is theirs, not ours, and your money goes straight to your account.",
       "sourceLabel": "Source",
       "verifiedLabel": "verified on"
     },
     "compare": {
-      "title": "How does it compare with T1 and the rest?",
+      "title": "And against T1 and the rest?",
       "body": "Enter your sales and average ticket and see, line by line, what you would pay here and on T1, Shopify, Mercado Libre, Tiendanube or WooCommerce.",
       "cta": "Compare with your numbers"
     },
@@ -3393,16 +3365,16 @@
       "title": "Frequently asked questions",
       "items": [
         {
-          "q": "Are there plans or monthly fees?",
-          "a": "There are two: Free, forever, and Negocio, with your own domain, Mercado Libre sync and more. Every new shop tries Negocio free and, if you do not subscribe, stays on Free."
+          "q": "What happens when my {trialDays} days end?",
+          "a": "Your shop stays open on the Free plan, with your products, your address and your sales. It never closes and you don't have to do anything. Only the Negocio plan's extras pause: the Mercado Libre connection, the monthly check-in and the extra AI help, and a small «Shop powered by Miyagi Sánchez» link appears. Everything comes back as soon as you sign up for the Negocio plan."
         },
         {
-          "q": "What happens when my trial ends or I cancel Negocio?",
-          "a": "Your shop stays live and free at your miyagisanchez.com URL. You just stop having what Negocio includes."
+          "q": "Do I need a card to start?",
+          "a": "No. You open your shop and use the Negocio plan for {trialDays} days without giving any card."
         },
         {
-          "q": "Why no commission?",
-          "a": "We build on open infrastructure with minimal costs, and we earn from the optional extras, not from a share of your sales."
+          "q": "Why don't you charge commission?",
+          "a": "Because we earn from the Negocio plan, not from your sales. Every peso you sell is yours; only your payment method charges its fee."
         }
       ]
     }

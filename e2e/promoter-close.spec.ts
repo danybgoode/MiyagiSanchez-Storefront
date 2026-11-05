@@ -85,10 +85,7 @@ test.describe('promoter close · authed routes respect the kill-switch (flag on 
     '/api/promoter/me/bind',
     '/api/promoter/shop/setup',
     '/api/promoter/claim/link',
-    '/api/promoter/close/domain',
-    '/api/promoter/close/subdomain',
     '/api/promoter/close/print',
-    '/api/promoter/close/ml-sync',
     '/api/promoter/close/listing', // Sprint 5 · US-5.1
     '/api/promoter/close/migration', // platform-migrations S2 · US-2.1
   ]
@@ -96,6 +93,15 @@ test.describe('promoter close · authed routes respect the kill-switch (flag on 
     test(`POST ${path} → 404 (hidden) or 401 (live, auth required)`, async ({ request }) => {
       const res = await request.post(path, { data: {} })
       expect([401, 404]).toContain(res.status())
+    })
+  }
+
+  // The single-product closes are retired: the domain and ML sync are part of Negocio and the subdomain is free. Hidden
+  // (404, program off) or retired (410) — never a checkout.
+  for (const path of ['/api/promoter/close/domain', '/api/promoter/close/subdomain', '/api/promoter/close/ml-sync']) {
+    test(`POST ${path} → 404 (hidden) or 410 (retired)`, async ({ request }) => {
+      const res = await request.post(path, { data: {} })
+      expect([404, 410]).toContain(res.status())
     })
   }
 
@@ -107,12 +113,14 @@ test.describe('promoter close · authed routes respect the kill-switch (flag on 
 })
 
 test.describe('promoter close · resources mini-site renders es-MX (US-12)', () => {
-  test('GET /mx/vende/promotor → 200 with the es-MX glossary', async ({ request }) => {
+  test('GET /mx/vende/promotor → 200 with the three options a promoter sells', async ({ request }) => {
     const res = await request.get('/mx/vende/promotor', { headers: { Accept: 'text/html' } })
     expect(res.status()).toBe(200)
     const html = await res.text()
-    expect(html).toContain('Dominio propio')   // glossary term
-    expect(html).toContain('Subdominio')
+    // The three options, named after the two plans (Daniel, 2026-11-05), and none of the retired single products.
+    expect(html).toContain('Plan Negocio · 1 año')
+    expect(html).toContain('Plan Gratis · tienda lista')
+    expect(html).not.toContain('Anuncio impreso')
   })
 
   test('GET /mx/vende/promotor → the trust prompt resolves {url} to its own page (agent-discovery S1.2)', async ({ request }) => {
@@ -125,11 +133,16 @@ test.describe('promoter close · resources mini-site renders es-MX (US-12)', () 
     expect(html).toContain('https://miyagisanchez.com/mx/vende/promotor')
   })
 
-  test('GET /mx/vende/promotor/sell-sheet → 200 printable sell-sheet', async ({ request }) => {
+  test('GET /mx/vende/promotor/sell-sheet → 200 printable quick guide, money first', async ({ request }) => {
     const res = await request.get('/mx/vende/promotor/sell-sheet', { headers: { Accept: 'text/html' } })
     expect(res.status()).toBe(200)
     const html = await res.text()
-    expect(html).toContain('Guardar como PDF') // the .no-print toolbar hint
+    expect(html).toContain('guardar como PDF') // the .no-print toolbar hint
+    expect(html).toContain('data-testid="sell-sheet-packages"')
+    // The three options, and nothing retired or printed.
+    for (const sku of ['negocio_anual', 'negocio_arranque', 'setup_gratis']) expect(html).toContain(`sell-sheet-package-${sku}`)
+    expect(html).not.toContain('Anuncio impreso')
+    expect(html).not.toContain('rate-card')
   })
 })
 
