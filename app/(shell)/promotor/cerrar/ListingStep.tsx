@@ -19,6 +19,9 @@ export default function ListingStep({ shop, n }: { shop: Shop; n: number }) {
   const [photos, setPhotos] = useState<string[]>([])
   const [photoUrl, setPhotoUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+  // plans-gratis-negocio S5.1 (D14): fill the form from the first photo with AI — the promoter still reviews and saves.
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestNote, setSuggestNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
@@ -39,6 +42,29 @@ export default function ListingStep({ shop, n }: { shop: Shop; n: number }) {
       setPhotoUrl('')
     } catch {
       setError('Pega una URL de imagen válida (https).')
+    }
+  }
+
+  async function fillFromPhoto() {
+    if (!photos[0] || suggesting) return
+    setSuggesting(true); setSuggestNote(null); setError(null)
+    try {
+      const res = await fetch('/api/promoter/close/photo', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shopId: shop.shopId, imageUrl: photos[0] }),
+      })
+      const data = await res.json().catch(() => null) as { ok?: boolean; error?: string; message?: string; suggestion?: { title: string; description: string; category: string; price: number } | null } | null
+      if (!res.ok || !data?.ok) { setSuggestNote(data?.error ?? 'No pudimos revisar la foto. Llena el producto a mano.'); return }
+      if (!data.suggestion) { setSuggestNote(data.message ?? 'No pudimos leer el producto en la foto. Llénalo a mano.'); return }
+      setTitle(data.suggestion.title)
+      setDescription(data.suggestion.description)
+      setCategory(data.suggestion.category)
+      setPrice(String(data.suggestion.price))
+      setSuggestNote('Listo: revisa el nombre, el precio y la categoría antes de guardar.')
+    } catch {
+      setSuggestNote('Error de red. Llena el producto a mano o intenta de nuevo.')
+    } finally {
+      setSuggesting(false)
     }
   }
 
@@ -129,6 +155,14 @@ export default function ListingStep({ shop, n }: { shop: Shop; n: number }) {
                 <img src={url} alt="" className="h-16 w-16 rounded object-cover" />
               </button>)}
             </div>}
+            {photos.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button type="button" onClick={fillFromPhoto} disabled={suggesting || uploading} data-testid="promoter-photo-fill" className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm font-medium disabled:opacity-50">
+                  {suggesting ? 'Revisando la foto…' : 'Llenar con la foto (IA)'}
+                </button>
+                {suggestNote && <span className="text-xs text-[var(--color-muted)]">{suggestNote}</span>}
+              </div>
+            )}
           </div>
           {error && <p className="text-sm text-[color:var(--danger)]">{error}</p>}
           <button onClick={addListing} disabled={busy || uploading || title.trim().length < 3 || !category} className="rounded-lg bg-[var(--color-accent)] text-[var(--fg-inverse)] px-4 py-2 font-medium disabled:opacity-50">

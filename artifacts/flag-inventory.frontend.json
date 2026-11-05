@@ -336,7 +336,7 @@
         "app/api/orders/[id]/ship/route.ts:120",
         "app/api/webhooks/mercadopago/route.ts:176",
         "app/api/webhooks/mercadopago/route.ts:544",
-        "app/api/webhooks/stripe/route.ts:440",
+        "app/api/webhooks/stripe/route.ts:446",
         "lib/orders/manual-order-emails.ts:158"
       ]
     },
@@ -427,11 +427,12 @@
         "app/(shell)/promotor/cerrar/page.tsx:18",
         "app/(shell)/shop/manage/canal-propio/page.tsx:54",
         "app/api/print/submissions/[id]/checkout/route.ts:100",
-        "app/api/promoter/attribute/route.ts:22",
+        "app/api/promoter/attribute/route.ts:23",
         "app/api/promoter/claim/link/route.ts:23",
         "app/api/promoter/close/listing/route.ts:74",
         "app/api/promoter/close/migration/route.ts:27",
-        "app/api/promoter/close/package/[sku]/route.ts:28",
+        "app/api/promoter/close/package/[sku]/route.ts:30",
+        "app/api/promoter/close/photo/route.ts:30",
         "app/api/promoter/close/print/route.ts:36",
         "app/api/promoter/close/transfer/[id]/report/route.ts:20",
         "app/api/promoter/close/transfer/route.ts:21",
@@ -499,7 +500,7 @@
       "callsites": [
         "app/(shell)/promotor/cerrar/page.tsx:25",
         "app/api/promoter/close/migration/route.ts:56",
-        "app/api/promoter/close/package/[sku]/route.ts:53",
+        "app/api/promoter/close/package/[sku]/route.ts:71",
         "app/api/promoter/close/transfer/[id]/report/route.ts:20",
         "app/api/promoter/close/transfer/route.ts:21"
       ]

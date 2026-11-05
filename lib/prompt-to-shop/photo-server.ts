@@ -70,7 +70,7 @@ export async function photosUsedThisMonth(userId: string, now: Date = new Date()
  * Our own bucket's bytes, for the model. The URL was validated by `isOwnPhotoUrl` before this runs; `redirect:
  * 'error'` keeps it that way (a 3xx from an allowed host would otherwise be followed anywhere — the /api/img rule).
  */
-async function fetchOwnImage(url: string): Promise<{ mimeType: string; base64: string } | null> {
+export async function fetchOwnImage(url: string): Promise<{ mimeType: string; base64: string } | null> {
   try {
     const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) })
     if (!res.ok || !res.body) return null
