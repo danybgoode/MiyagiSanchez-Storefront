@@ -12,6 +12,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import { stripe } from '@/lib/stripe'
 import { checkRateLimit, getClientIp } from '@/lib/ratelimit'
 import { readOwnedShop } from '@/lib/plan-server'
+import { createBillingPortalSession } from '@/lib/stripe-subscriptions'
 import { startNegocioManage, type NegocioSubscriptionLike } from '@/lib/negocio-manage'
 
 export const dynamic = 'force-dynamic'
@@ -50,8 +51,7 @@ export async function POST(req: NextRequest) {
           created: s.created,
         }))
       },
-      createPortal: async (customerId, returnUrl) =>
-        (await stripe.billingPortal.sessions.create({ customer: customerId, return_url: returnUrl })).url,
+      createPortal: (customerId, returnUrl) => createBillingPortalSession(customerId, returnUrl),
     },
   )
   if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status })
