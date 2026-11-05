@@ -17,7 +17,7 @@ const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const INTERNAL_SECRET = process.env.MEDUSA_INTERNAL_SECRET ?? ''
 
 /** Metadata `kind` on the Stripe checkout session + subscription, so the webhook routes a Negocio purchase. */
-export const NEGOCIO_CHECKOUT_KIND = 'negocio'
+export { NEGOCIO_CHECKOUT_KIND } from './negocio-kind'
 
 export type NegocioSubscription = {
   active: boolean

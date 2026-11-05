@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { invoiceSubscriptionId } from '@/lib/negocio-checkout-rules'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
 import { db } from '@/lib/supabase'
@@ -1483,7 +1484,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 // ── invoice.payment_succeeded ─────────────────────────────────────────────────
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-  const stripeSubscriptionId = (invoice as unknown as Record<string, unknown>).subscription as string | undefined
+  const stripeSubscriptionId = invoiceSubscriptionId(invoice)
   if (!stripeSubscriptionId) return
 
   // Update billing period on the subscription
@@ -1570,7 +1571,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 // ── invoice.payment_failed ────────────────────────────────────────────────────
 
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  const stripeSubscriptionId = (invoice as unknown as Record<string, unknown>).subscription as string | undefined
+  const stripeSubscriptionId = invoiceSubscriptionId(invoice)
   if (!stripeSubscriptionId) return
 
   // Custom-domain paywall (S2.2): a failed renewal marks the Medusa sub past_due,

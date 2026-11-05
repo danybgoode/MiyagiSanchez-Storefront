@@ -64,7 +64,8 @@ export async function handleNegocioSubscriptionComplete(session: Stripe.Checkout
         seller_id: shopId,
         clerk_user_id: sellerClerkId,
         buyer_email: email || `${sellerClerkId}@seller.miyagisanchez.com`,
-        status: 'active',
+        // Bought during the free trial, Stripe holds it as `trialing` until the first charge; both are live for the plan.
+        status: mapNegocioStatus(stripeSub.status) === 'trialing' ? 'trialing' : 'active',
         payment_method: 'stripe',
         stripe_subscription_id: stripeSubscriptionId,
         stripe_customer_id: session.customer as string | null,
@@ -201,6 +202,8 @@ export async function handleNegocioInvoicePaid(
   stripeSubscriptionId: string,
   shopId?: string | null,
 ): Promise<void> {
+  // The $0 invoice that opens a free period is not a payment: no status flip, and no renewal share for a promoter.
+  if ((invoice.amount_paid ?? 0) <= 0) return
   await handleNegocioSubscriptionChanged({ id: stripeSubscriptionId, status: 'active' } as Stripe.Subscription, false)
   // A monthly payment in year 2 of a promoter's package earns that promoter 10% (D13), once per invoice.
   if (shopId && invoice.id) {

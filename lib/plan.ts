@@ -163,12 +163,15 @@ export function buildNegocioTrial(now: Date = new Date()): NegocioTrial {
 export function extendNegocioGrant(
   current: NegocioGrant | null,
   months: number,
-  opts?: { now?: Date; note?: string; paymentId?: string },
+  opts?: { now?: Date; note?: string; paymentId?: string; startAfter?: Date | null },
 ): NegocioGrant {
   const now = opts?.now ?? new Date()
   if (current?.type === 'comp') return current // permanent already; a payment cannot shorten or replace it
   const live = current?.type === 'one_time' && !!current.expires_at && Date.parse(current.expires_at) > now.getTime()
-  const from = live ? new Date(current!.expires_at!) : now
+  // The paid months start at the LATEST of: now, the end of a live paid term (a renewal adds on), and `startAfter`
+  // (the end of a live free trial). Paying during the trial never throws the remaining free days away.
+  const starts = [now.getTime(), live ? Date.parse(current!.expires_at!) : 0, opts?.startAfter ? opts.startAfter.getTime() : 0]
+  const from = new Date(Math.max(...starts))
   const grant = buildNegocioOneTimeGrant({ months, now: from, note: opts?.note })
   const payments = [...(current?.payments ?? []), ...(opts?.paymentId ? [opts.paymentId] : [])].slice(-NEGOCIO_GRANT_PAYMENTS_KEPT)
   // `granted_at` records when THIS payment happened, not where the term starts.
@@ -208,9 +211,12 @@ export function decideNegocioPayment(
   const current = readNegocioGrant(metadata)
   if (current?.payments?.includes(payment.paymentId)) return { action: 'replay' }
   if (current?.type === 'comp') return { action: 'comp' }
+  const now = payment.now ?? new Date()
+  const trial = readNegocioTrial(metadata)
+  const trialEnd = trial && Date.parse(trial.expires_at) > now.getTime() ? new Date(trial.expires_at) : null
   return {
     action: 'write',
-    grant: extendNegocioGrant(current, payment.months, { now: payment.now, note: payment.note, paymentId: payment.paymentId }),
+    grant: extendNegocioGrant(current, payment.months, { now, note: payment.note, paymentId: payment.paymentId, startAfter: trialEnd }),
     guard: guardFor(metadata, NEGOCIO_GRANT_KEY),
   }
 }

@@ -69,6 +69,7 @@ export async function createSubscriptionCheckout({
   promotionCodeId,
   paymentMethodCollection,
   idempotencyKey,
+  trialEnd,
 }: {
   priceId: string
   successUrl: string
@@ -79,11 +80,13 @@ export async function createSubscriptionCheckout({
   paymentMethodCollection?: 'always' | 'if_required'
   /** Stripe idempotency key: concurrent requests with the same key get the SAME session, never two. */
   idempotencyKey?: string
+  /** First charge at this unix time (a free period until then); omitted = charge today. At least 48 h ahead. */
+  trialEnd?: number | null
 }): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
-    subscription_data: { metadata },
+    subscription_data: { metadata, ...(trialEnd ? { trial_end: trialEnd } : {}) },
     customer_email: buyerEmail,
     success_url: successUrl,
     cancel_url: cancelUrl,

@@ -16,7 +16,7 @@ import { createOneTimeCheckout, createSubscriptionCheckout } from '@/lib/stripe-
 import { getNegocioSubscription, NEGOCIO_CHECKOUT_KIND } from '@/lib/negocio-subscription'
 import { resolvePlan } from '@/lib/plan-server'
 import { NEGOCIO_CURRENCY, NEGOCIO_PRICE_YEARLY_CENTS, NEGOCIO_YEARLY_MONTHS } from '@/lib/negocio-pricing'
-import { decideNegocioCheckout, type NegocioCadence } from '@/lib/negocio-checkout-rules'
+import { NEGOCIO_CHECKOUT_WINDOW_MS, decideNegocioCheckout, monthlyFirstChargeAt, type NegocioCadence } from '@/lib/negocio-checkout-rules'
 
 export { decideNegocioCheckout, coerceNegocioCadence, type NegocioCadence } from '@/lib/negocio-checkout-rules'
 
@@ -47,7 +47,7 @@ export async function startNegocioCheckout(input: {
   // Two concurrent requests for the same shop and cadence (two tabs, an agent retrying) get the SAME Stripe session
   // within a 10-minute window, so they can never become two subscriptions or two yearly payments (Codex security,
   // #473). Stripe keeps idempotency keys for 24 hours; the window bucket lets a deliberate retry after it start fresh.
-  const idempotencyKey = `negocio:${shopId}:${cadence}:${Math.floor(Date.now() / 600_000)}`
+  const idempotencyKey = `negocio:${shopId}:${cadence}:${Math.floor(Date.now() / NEGOCIO_CHECKOUT_WINDOW_MS)}`
   const metadata: Record<string, string> = {
     kind: NEGOCIO_CHECKOUT_KIND,
     shop_id: shopId,
@@ -67,6 +67,8 @@ export async function startNegocioCheckout(input: {
       metadata,
       buyerEmail: input.buyerEmail,
       idempotencyKey,
+      // During the free trial the first charge waits for its end (the card is saved today, nothing is charged).
+      trialEnd: monthlyFirstChargeAt(plan),
     })
     return { ok: true, url }
   }
