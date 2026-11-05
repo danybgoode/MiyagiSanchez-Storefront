@@ -33,7 +33,8 @@ test("Daniel's splits, exactly: charge, pay the platform, keep", () => {
   expect(packageSplit('negocio_anual', 55)).toEqual({ chargeCents: 200_000, keepCents: 110_000, payPlatformCents: 90_000 })
   expect(packageSplit('negocio_arranque', 50)).toEqual({ chargeCents: 60_000, keepCents: 30_000, payPlatformCents: 30_000 })
   expect(packageSplit('setup_gratis', 80)).toEqual({ chargeCents: 25_000, keepCents: 20_000, payPlatformCents: 5_000 })
-  expect(packageSentence('negocio_anual', 55)).toBe('Cobras $2,000 · nos pagas $900 · te quedas $1,100')
+  // Three plain sentences a promoter reads at a glance (Daniel, 2026-11-05).
+  expect(packageSentence('negocio_anual', 55)).toBe('Cobras $2,000. Le pasas $900 a Miyagi Sánchez. Te quedas $1,100')
 })
 
 test('what each package grants: 12 months, 3 months, nothing (the trial still runs)', () => {

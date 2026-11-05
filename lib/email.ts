@@ -546,24 +546,24 @@ export async function sendNegocioTrialNotice(ctx: {
 }): Promise<EmailSendResult> {
   const shopName = plainLine(ctx.shopName) || 'Tu tienda'
   const pesos = (n: number) => `$${n.toLocaleString('en-US')}`
-  const prices = `Negocio cuesta ${pesos(NEGOCIO_PRICE_MONTHLY_MXN)} al mes, o ${pesos(NEGOCIO_PRICE_YEARLY_MXN)} al año, que puedes pagar a meses sin intereses.`
+  const prices = `El Plan Negocio cuesta ${pesos(NEGOCIO_PRICE_MONTHLY_MXN)} al mes, o ${pesos(NEGOCIO_PRICE_YEARLY_MXN)} al año, que puedes pagar a meses sin intereses.`
   const endDate = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' }).format(new Date(ctx.endsAt))
   const href = `${SITE}/shop/manage/negocio`
   if (ctx.notice === 'five_days') {
-    return sendWithResult(ctx.to, `${shopName}: te quedan 5 días de Negocio`, [
-      h1('Tu prueba de Negocio termina pronto'),
-      p(esc('Este mes tu tienda ha tenido la prueba de Negocio: Mercado Libre sincronizado, muchas más respuestas del chat y tu revisión del mes. Con Negocio también puedes conectar tu propio dominio.')),
-      p(esc(`El ${endDate} pasa a Gratis por su cuenta. Sigue abierta, con todos tus productos y tu subdominio; no tienes que hacer nada.`)),
+    return sendWithResult(ctx.to, `${shopName}: te quedan 5 días del Plan Negocio`, [
+      h1('Tu prueba del Plan Negocio termina pronto'),
+      p(esc('Este mes tu tienda ha tenido el Plan Negocio: Mercado Libre sincronizado, muchas más respuestas del chat y tu revisión del mes. Al contratarlo también puedes conectar tu propio dominio.')),
+      p(esc(`El ${endDate} tu tienda pasa sola al Plan Gratis. Sigue abierta, con todos tus productos y tu subdominio; no tienes que hacer nada.`)),
       p(esc(prices)),
-      cta('Quedarme con Negocio', href),
+      cta('Quedarme con el Plan Negocio', href),
     ].join(''), undefined, undefined, 'es', `negocio-trial/${ctx.shopId}/five_days`)
   }
-  return sendWithResult(ctx.to, `${shopName} sigue abierta, ahora en Gratis`, [
-    h1('Terminó tu prueba de Negocio'),
-    p(esc('Tu tienda, tus productos y tu subdominio siguen igual. Puedes seguir vendiendo sin pagar nada.')),
-    p(esc(`Lo que cambia: el chat de tu tienda responde hasta ${PLAN_ALLOWANCES.gratis.chatAnswersPerMonth} preguntas al mes, y la sincronización con Mercado Libre queda en pausa hasta que vuelvas a Negocio.`)),
+  return sendWithResult(ctx.to, `${shopName} sigue abierta, ahora en el Plan Gratis`, [
+    h1('Terminó tu prueba del Plan Negocio'),
+    p(esc('Tu tienda sigue abierta en el Plan Gratis: tus productos y tu subdominio siguen igual, y puedes seguir vendiendo sin pagar nada.')),
+    p(esc(`Lo que cambia: el chat de tu tienda responde hasta ${PLAN_ALLOWANCES.gratis.chatAnswersPerMonth} preguntas al mes, la sincronización con Mercado Libre y la revisión del mes quedan en pausa, y aparece un pequeño enlace «Tienda impulsada por Miyagi Sánchez» al pie de tu tienda. Todo vuelve al contratar el Plan Negocio.`)),
     p(esc(prices)),
-    cta('Volver a Negocio', href),
+    cta('Volver al Plan Negocio', href),
   ].join(''), undefined, undefined, 'es', `negocio-trial/${ctx.shopId}/ended`)
 }
 
@@ -2217,7 +2217,7 @@ export async function sendPromoterApplicationApproved(ctx: {
     h1(`¡Felicidades, ${esc(ctx.name)}!`),
     p('Tu solicitud para ser promotor de Miyagi Sánchez fue aprobada. Este es tu código personal:'),
     amount(ctx.code, 'Tu código de promotor', true),
-    p('Para empezar a cerrar ventas:'),
+    p('Para empezar:'),
     table([
       ['1', 'Crea tu cuenta en miyagisanchez.com (o inicia sesión si ya tienes una)'],
       ['2', 'Entra a tu panel de promotor y captura tu código'],
@@ -2329,7 +2329,7 @@ export async function sendPromoterTransferRejected(ctx: {
     h1('Transferencia rechazada'),
     p(`No pudimos confirmar tu transferencia para ${esc(ctx.skuLabel)}.`),
     ctx.reason ? quote(ctx.reason) : '',
-    p('Puedes intentar de nuevo desde el flujo de cierre.'),
+    p('Puedes intentarlo de nuevo desde tu panel de promotor.'),
   ].join('')
   await send(ctx.to, subject, body)
 }

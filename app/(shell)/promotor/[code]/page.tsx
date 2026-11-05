@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { isEnabled } from '@/lib/flags'
 import { getPromoterByCode, listCommissionsForPromoter } from '@/lib/promoter'
 import { summarizeCommissions } from '@/lib/promoter-commission'
+import { PACKAGES } from '@/lib/promoter-packages'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Mis comisiones — Promotor', robots: { index: false } }
@@ -9,10 +10,18 @@ export const metadata = { title: 'Mis comisiones — Promotor', robots: { index:
 const mxn = (cents: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(cents / 100)
 
+// The options a promoter sells now take their names from lib/promoter-packages.ts; the older products stay named so
+// commissions earned on them before 2026-11 still read correctly.
 const SKU_LABEL: Record<string, string> = {
+  negocio_anual: PACKAGES.negocio_anual.label,
+  negocio_arranque: PACKAGES.negocio_arranque.label,
+  setup_gratis: PACKAGES.setup_gratis.label,
+  negocio_renewal: 'Renovación del Plan Negocio (año 2)',
+  migration: 'Migración desde otra plataforma',
   custom_domain: 'Dominio propio',
+  subdomain: 'Subdominio',
+  ml_sync: 'Sincronización con Mercado Libre',
   print_ad: 'Anuncio impreso',
-  migration: 'Migración de tienda',
 }
 
 /**

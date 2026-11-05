@@ -1169,7 +1169,7 @@
         },
         {
           "title": "¿Entonces cómo ganan ustedes?",
-          "body": "Con anuncios en nuestra revista impresa y servicios premium opcionales. Nunca tomamos un porcentaje de tu venta."
+          "body": "Con el Plan Negocio: los negocios que quieren su propio dominio, Mercado Libre y más ayuda de la IA pagan una mensualidad. Nunca tomamos un porcentaje de tus ventas."
         },
         {
           "title": "¿Necesito saber de tecnología?",
@@ -1196,7 +1196,7 @@
       },
       "pricingCallout": {
         "title": "¿Cuánto cuesta?",
-        "body": "Abrir tu tienda y vender es gratis, con 0% de comisión, y tu subdominio también. Negocio ({negocioMonthly}) suma tu propio dominio, Mercado Libre y más.",
+        "body": "Abrir tu tienda y vender es gratis, con 0% de comisión, y tu subdominio también. El Plan Negocio ({negocioMonthly}) te deja conectar tu propio dominio, sincronizar Mercado Libre y más.",
         "ctaLabel": "Ver precios"
       }
     },
@@ -2354,83 +2354,106 @@
     },
     "promotor": {
       "metadata": {
-        "title": "Programa de Promotores — Miyagi Sánchez",
-        "description": "Abre tiendas para los negocios de tu zona, cobra en persona y quédate la comisión. Glosario, precios, guiones y el paso a paso completo.",
-        "ogAlt": "Programa de Promotores de Miyagi Sánchez: abre la tienda, cierra en persona, entrega el enlace."
+        "title": "Gana dinero abriendo tiendas en línea | Promotores de Miyagi Sánchez",
+        "description": "Visitas negocios de tu zona, les dejas su tienda en línea lista y te quedas con la mayor parte de lo que cobras. Sin inventario y sin oficina.",
+        "ogAlt": "Promotores de Miyagi Sánchez: abre tiendas en tu zona y gana con cada una."
       },
       "eyebrow": "Promotores",
-      "heroTitle": "Abre la tienda, cierra en persona, entrega con un enlace.",
-      "heroLead": "Eres Miyagi Sánchez en la calle. Entras al negocio, sales con su tienda ya en línea, cobras en persona y te quedas tu comisión. Shopify le pide una mensualidad antes de que venda un solo peso; tú le dejas una tienda que no le cuesta nada operar — y cobras por los extras que sí quiere.",
-      "trustLine": "Comisión por cada venta cerrada. Liquidación por transferencia o efectivo.",
-      "primaryCta": "Abrir mi panel para cerrar",
-      "applyCta": "Aplica para ser promotor",
-      "secondaryCta": "Manual del promotor",
-      "priceDomainLabel": "Dominio propio al año",
-      "priceSubdomainLabel": "Subdominio al año",
-      "commissionLabel": "Tu comisión por venta",
-      "proofTitle": "Glosario: qué le vendes al comerciante",
-      "proofLead": "La tienda es gratis y se queda gratis: publica, cobra, corre sorteos, publica eventos, ofrece punto de entrega y la encuentran los agentes de IA. Tú cobras por los extras que quiere un negocio en serio. Apréndetelos para explicar cualquiera en treinta segundos.",
-      "glossary": [
-        {
-          "icon": "iconoir-globe",
-          "title": "Dominio propio",
-          "body": "Su tienda en sutienda.mx en lugar de una dirección prestada: su marca, su tráfico directo y un nombre que un agente de IA puede citar. {customDomainYearly}, se renueva cada año."
-        },
-        {
-          "icon": "iconoir-internet",
-          "title": "Subdominio",
-          "body": "sutienda.miyagisanchez.com sin comprar ningún dominio. {subdomainYearly}, y GRATIS el primer año con tu código de promotor: es el sí más fácil de tu maletín."
-        },
-        {
-          "icon": "iconoir-journal",
-          "title": "Anuncio impreso",
-          "body": "Un espacio en la edición impresa que circula en su zona. Gente que ni siquiera busca en internet llega caminando a su puerta. Se cobra una sola vez y el precio depende del tamaño y la edición."
-        },
-        {
-          "icon": "iconoir-shop",
-          "title": "Conexión Mercado Libre",
-          "body": "Su catálogo de Mercado Libre entra completo a Miyagi Sánchez. Dejas la tienda surtida en la primera visita, no en la quinta."
-        },
-        {
-          "icon": "iconoir-refresh",
-          "title": "Salida de Shopify",
-          "body": "Fotografías su catálogo, o traes su exportación de Shopify, Tiendanube, WooCommerce o Big Cartel, y su tienda entera queda aquí el mismo día — sin la mensualidad que le llegaría el mes que viene. Precio fijo hasta cierto tamaño de catálogo; uno más grande lleva cotización antes de cobrarle nada. El precio exacto está en tu manual de migración."
-        }
-      ],
-      "stepsTitle": "Cómo se cierra, de principio a fin",
+      "heroTitle": "Gana dinero dejando negocios en línea.",
+      "heroLead": "Visitas un negocio de tu zona, le armas su tienda en línea en una sola visita y le cobras. De lo que cobras, la mayor parte es para ti.",
+      "trustLine": "Sin inventario, sin oficina. El dueño del negocio te paga a ti, en el momento.",
+      "primaryCta": "Abrir mi panel",
+      "applyCta": "Quiero ser promotor",
+      "secondaryCta": "Ver la guía rápida",
+      "proofTitle": "Lo que vendes: 3 opciones",
+      "proofLead": "En las tres le armas su tienda con sus productos. Lo que cambia es el plan con el que se queda.",
+      "stepsTitle": "Así funciona",
       "steps": [
         {
-          "title": "1 · Abre la tienda",
-          "body": "Desde tu panel creas la tienda del comerciante (queda sin reclamar) y le subes la primera publicación mientras te ve. Verla en línea es el argumento."
+          "title": "1 · Arma su tienda",
+          "body": "Desde tu panel creas la tienda del negocio y le subes sus productos. Con una foto, la IA llena el nombre, la descripción y el precio. El dueño ve su tienda en línea en ese momento."
         },
         {
-          "title": "2 · Cobra",
-          "body": "Te paga en efectivo y tú pagas el dominio, el subdominio o el anuncio con tu tarjeta. La venta queda con tu código y el beneficio se activa en SU tienda."
+          "title": "2 · Cobra y pásanos nuestra parte",
+          "body": "El dueño te paga a ti, en efectivo o por transferencia. Desde tu panel nos pasas solo nuestra parte, por transferencia o con tu tarjeta. Lo demás es tuyo."
         },
         {
-          "title": "3 · Entrega por WhatsApp",
-          "body": "Le mandas el enlace de reclamo. Un toque, inicia sesión y la tienda pasa a su cuenta. Tu comisión se queda contigo."
+          "title": "3 · Entrégale su tienda",
+          "body": "Le mandas un enlace por WhatsApp. Con un toque, la tienda queda a su nombre."
         }
       ],
-      "pitchTitle": "El descuento que abre tu código",
-      "pitchBody": "Tu código de promotor (PRM-…) lleva un precio que el comerciante no consigue solo, ni de nadie más, ni mañana. Ese es tu cierre: no un descuento que pides, uno con el que llegas.",
+      "pitchTitle": "Cuánto puedes ganar",
+      "pitchBody": "Sabes desde el primer día cuánto cobras, cuánto nos pasas y cuánto te queda. Sin cuotas y sin letra chiquita. Y si el negocio renueva su Plan Negocio el segundo año, vuelves a ganar.",
       "pitchStats": [
         {
-          "value": "PRM-",
-          "label": "tu código personal"
+          "value": "3",
+          "label": "opciones para vender"
         },
         {
-          "value": "1 toque",
-          "label": "para reclamar por WhatsApp"
+          "value": "1 visita",
+          "label": "para dejar la tienda lista"
         },
         {
-          "value": "0 fricción",
-          "label": "el comerciante no captura nada"
+          "value": "1 enlace",
+          "label": "para entregarla por WhatsApp"
         }
       ],
+      "faqs": [
+        {
+          "title": "¿Cuándo me pagan?",
+          "body": "En el momento: el dueño del negocio te paga a ti. Tú solo nos pasas nuestra parte."
+        },
+        {
+          "title": "¿Cómo le pago su parte a Miyagi Sánchez?",
+          "body": "Desde tu panel. Con tu tarjeta, el plan del negocio se activa al instante. Por transferencia (SPEI, DiMo o CoDi), se activa en cuanto confirmamos que llegó."
+        },
+        {
+          "title": "¿Necesito saber de computadoras?",
+          "body": "No. Tu panel te lleva paso a paso, y la IA llena cada producto a partir de una foto."
+        },
+        {
+          "title": "¿Y si el negocio no quiere pagar mensualidad?",
+          "body": "Ofrécele el Plan Gratis: su tienda queda en línea para siempre, sin mensualidad, y tú cobras por dejársela lista."
+        },
+        {
+          "title": "¿Gano algo después?",
+          "body": "Sí. Si el negocio vuelve a pagar su Plan Negocio el segundo año, te llevas una parte de ese pago."
+        }
+      ],
+      "guide": {
+        "title": "Guía rápida del promotor",
+        "lead": "Todo lo que necesitas, en una hoja.",
+        "packagesTitle": "Lo que vendes",
+        "colOption": "Opción",
+        "colCharge": "Cobras",
+        "colPay": "Nos pasas",
+        "colKeep": "Te quedas",
+        "renewalLine": "Si el negocio renueva su Plan Negocio el segundo año, te llevas el {renewalPct}% de ese pago.",
+        "ratesPending": "Tu parte se confirma con Miyagi Sánchez.",
+        "sayTitle": "Qué le dices",
+        "say": {
+          "negocio_anual": "«Hoy te dejo tu tienda en línea con tus productos, y en todo el año no nos pagas nada más. Si tienes un dominio, como tunegocio.com, también lo conectamos.»",
+          "negocio_arranque": "«Hoy te dejo tu tienda lista y tienes el Plan Negocio tres meses. Después tú decides si sigues.»",
+          "setup_gratis": "«Hoy te dejo tu tienda en línea, gratis para siempre: sin mensualidad y sin comisión por vender.»"
+        },
+        "stepsTitle": "Paso a paso",
+        "steps": [
+          "Abre tu panel y crea la tienda del negocio.",
+          "Súbele sus productos: toma una foto y la IA llena el resto.",
+          "Cobra y pásanos nuestra parte desde tu panel.",
+          "Mándale su enlace por WhatsApp para que la tienda quede a su nombre."
+        ],
+        "payTitle": "Cómo nos pasas nuestra parte",
+        "payCard": "Con tu tarjeta: pagas desde tu panel y el plan se activa al instante.",
+        "payTransfer": "Por transferencia (SPEI, DiMo o CoDi): la reportas en tu panel y el plan se activa en cuanto confirmamos que llegó.",
+        "payKeep": "Lo que te queda es tuyo desde que el dueño te paga.",
+        "back": "← Volver",
+        "printHint": "Para imprimir o guardar como PDF: ⌘P o Ctrl+P",
+        "migrationLink": "Guía de migración (si el negocio ya vende en Shopify u otra plataforma)"
+      },
       "apply": {
-        "title": "Aplica para ser promotor",
-        "body": "Cuéntanos quién eres y dónde trabajas. Revisamos tu solicitud y te avisamos en 2–3 días hábiles.",
+        "title": "Quiero ser promotor",
+        "body": "Déjanos tus datos. Te contestamos en 2 a 3 días hábiles.",
         "form": {
           "nameLabel": "Nombre",
           "namePlaceholder": "Tu nombre completo",
@@ -2448,60 +2471,9 @@
           "genericError": "No se pudo enviar la solicitud. Intenta de nuevo."
         }
       },
-      "handbookTitle": "Manual del promotor",
-      "handbookLead": "El cierre completo, paso a paso, para que no tengas que preguntarle nada a nadie.",
-      "checklistTitle": "Checklist de cierre",
-      "checklist": [
-        {
-          "title": "1 · Abre",
-          "body": "Crea la tienda del comerciante desde tu panel (queda sin reclamar) y súbele la primera publicación."
-        },
-        {
-          "title": "2 · Cobra",
-          "body": "Cobra en efectivo y paga el dominio, el subdominio o el anuncio con tu propia tarjeta. La venta queda atribuida a tu código."
-        },
-        {
-          "title": "3 · Diseña el anuncio (cuando aplique)",
-          "body": "Si el cierre lleva anuncio impreso, coordina el diseño con el equipo. Diseñarlo desde tu panel llega pronto."
-        },
-        {
-          "title": "4 · Entrega el enlace",
-          "body": "Manda el enlace de reclamo por WhatsApp. Un toque, inicia sesión y la tienda pasa a su cuenta."
-        },
-        {
-          "title": "5 · Avisa",
-          "body": "Mándale un mensaje confirmando que ya quedó todo activado. El recibo automático llega pronto."
-        }
-      ],
-      "scriptsTitle": "Guiones de 30 segundos",
-      "scripts": [
-        {
-          "title": "Dominio propio",
-          "body": "«Tu tienda puede vivir en tunombre.mx en lugar de una liga larga. Se ve como el negocio que ya eres y te encuentran directo. Son {customDomainYearly} y con mi código te lo dejo activado hoy.»"
-        },
-        {
-          "title": "Subdominio",
-          "body": "«Puedes tener tu propia dirección, tunombre.miyagisanchez.com, sin comprar dominio. Son {subdomainYearly} y con mi código el primer año va GRATIS. Te lo activo ahorita.»"
-        },
-        {
-          "title": "Anuncio impreso",
-          "body": "«Salimos impresos y circulamos en tu zona. Gente que ni busca en internet se va a enterar de ti. Se paga una sola vez y con mi código tienes un precio que por tu cuenta no consigues.»"
-        },
-        {
-          "title": "Conexión Mercado Libre",
-          "body": "«Si ya vendes en Mercado Libre no vuelves a capturar nada: conectamos tu catálogo y hoy mismo queda igualito aquí — y aquí no hay comisión por venta.»"
-        },
-        {
-          "title": "Salida de Shopify",
-          "body": "«¿Estás pagando mensualidad en Shopify, Tiendanube, WooCommerce o Big Cartel? Aquí no hay mensualidad ni comisión por venta. Fotografío tu catálogo o traigo tu exportación y en una visita queda tu tienda completa. Precio fijo hasta cierto tamaño; si tu catálogo es más grande, te cotizo antes de cobrarte nada.»"
-        }
-      ],
-      "paymentsTitle": "Cómo funcionan los pagos",
-      "paymentsBody": "Pagas el dominio, el subdominio o el anuncio con tu propia tarjeta al momento de abrir la tienda. El comerciante te paga a ti en efectivo, o como acuerden. Tu comisión queda registrada en tu cuenta con tu código y el equipo la liquida contigo por transferencia o efectivo.",
-      "paymentsComingSoon": "Muy pronto: cobras el total, transfieres solo lo que se debe y tu comisión se queda contigo en el momento, sin esperar la liquidación.",
-      "closingTitle": "Listo para cerrar",
-      "closingBody": "Abre tu panel, vincula tu código y empieza a abrir tiendas. Cada cierre es comisión con tu nombre.",
-      "closingCta": "Abrir mi panel para cerrar"
+      "closingTitle": "¿Listo para empezar?",
+      "closingBody": "Abre tu panel, pon tu código de promotor y visita tu primer negocio.",
+      "closingCta": "Abrir mi panel"
     },
     "promotorMigracion": {
       "title": "Manual de migración",
@@ -2514,7 +2486,7 @@
         },
         {
           "title": "El total de productos",
-          "body": "Cuántos productos tiene en total — decide si el cierre es precio fijo o necesita cotización (ver abajo)."
+          "body": "Cuántos productos tiene en total — decide si la migración es a precio fijo o necesita cotización (ver abajo)."
         },
         {
           "title": "Su logo y colores",
@@ -2555,8 +2527,8 @@
           "body": "Si viene de Shopify, revisa el reporte de qué corresponde y qué no antes de seguir — es lo que decide si el caso es precio fijo, cotización o \"muy personalizado\"."
         },
         {
-          "title": "3 · Decide el precio (ver abajo) y cierra",
-          "body": "Desde /promotor/cerrar, elige \"Migración de tienda\" y cobra según corresponda."
+          "title": "3 · Decide el precio (ver abajo) y cobra",
+          "body": "Desde /promotor/cerrar, elige \"Migración desde otra plataforma\" y cobra según corresponda."
         },
         {
           "title": "4 · Revisa y publica con el comerciante",
@@ -2567,7 +2539,7 @@
       "decision": [
         {
           "title": "Precio fijo",
-          "body": "Catálogo dentro del límite de la migración de precio fijo (revisa el número exacto arriba, junto al precio) y sin nada fuera de lo común. Cierra directo desde /promotor/cerrar sin ID de cotización."
+          "body": "Catálogo dentro del límite de la migración de precio fijo (revisa el número exacto arriba, junto al precio) y sin nada fuera de lo común. Cóbrala directo desde tu panel (/promotor/cerrar) sin ID de cotización."
         },
         {
           "title": "Cotización",
@@ -3302,12 +3274,12 @@
       },
       "pricing": {
         "heading": "Precios",
-        "lead": "Vender es gratis (0% de comisión). Hay dos planes, Gratis y Negocio, y todos los precios son públicos en miyagisanchez.com/mx/precios.",
+        "lead": "Tu tienda es gratis para siempre (0% de comisión). Hay dos planes, el Plan Gratis y el Plan Negocio, y todos los precios son públicos en miyagisanchez.com/mx/precios.",
         "body": [
-          "Gratis, para siempre: tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, el marketplace, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».",
-          "Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva lo prueba {trialDays} días gratis (sin el dominio propio, que llega al pagar).",
-          "Si tu prueba termina o cancelas, tu tienda sigue activa y gratis en tu URL miyagisanchez.com/mx/s/tu-tienda.",
-          "Extras aparte: anuncio impreso, {printAdPrice}; migración con consultor, {migrationPrice}.",
+          "Plan Gratis, para siempre: tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, el marketplace, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».",
+          "Plan Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva lo prueba {trialDays} días sin pagar (el dominio propio se activa al contratar).",
+          "Si tu prueba termina o cancelas, tu tienda sigue abierta en el Plan Gratis, en tu URL miyagisanchez.com/mx/s/tu-tienda.",
+          "Servicio aparte: migración con consultor, {migrationPrice}.",
           "Tu pasarela de pago (Stripe o Mercado Pago) cobra su propia comisión, no nosotros, y el dinero llega directo a tu cuenta. Todos los precios, con sus fuentes: miyagisanchez.com/mx/precios."
         ]
       },
@@ -3354,33 +3326,33 @@
   },
   "precios": {
     "metadata": {
-      "title": "Precios — vender es gratis | Miyagi Sánchez",
-      "description": "0% de comisión de la plataforma. Lo que es gratis para siempre, los extras opcionales con su precio real y lo que cobra tu pasarela de pago (no nosotros).",
-      "ogAlt": "Precios de Miyagi Sánchez: vender es gratis, 0% de comisión"
+      "title": "Precios: Plan Gratis y Plan Negocio | Miyagi Sánchez",
+      "description": "Con el Plan Gratis tu tienda en línea es gratis para siempre y sin comisión. El Plan Negocio te deja conectar tu propio dominio, sincronizar Mercado Libre y tener más ayuda de la IA. Toda tienda nueva lo prueba sin pagar.",
+      "ogAlt": "Precios de Miyagi Sánchez: Plan Gratis para siempre y Plan Negocio"
     },
     "eyebrow": "Precios",
-    "heroTitle": "Vender es gratis. Negocio es opcional.",
-    "heroLead": "0% de comisión de la plataforma. Tu dinero llega directo a tu cuenta.",
-    "primaryCta": "Empieza gratis",
+    "heroTitle": "Tu tienda en línea, gratis para siempre.",
+    "heroLead": "Con el Plan Gratis vendes sin mensualidad y sin comisión. Cuando quieras más, el Plan Negocio te deja conectar tu propio dominio, sincronizar Mercado Libre y tener más ayuda de la IA. Toda tienda nueva lo usa {trialDays} días sin pagar.",
+    "primaryCta": "Abre tu tienda gratis",
     "plans": {
-      "title": "Dos planes: Gratis y Negocio",
-      "lead": "Vender es gratis, sin comisión. Negocio agrega lo que hace crecer a tu tienda, y toda tienda nueva lo prueba gratis.",
+      "title": "Elige tu plan",
+      "lead": "Empiezas con {trialDays} días del Plan Negocio sin pagar. Si después no lo contratas, tu tienda sigue abierta en el Plan Gratis, con todos tus productos.",
       "monthlySuffix": "o",
-      "recommended": "Prueba gratis",
-      "cta": "Empieza gratis",
-      "ctaNegocio": "Prueba Negocio gratis",
+      "recommended": "{trialDays} días gratis",
+      "cta": "Abre tu tienda gratis",
+      "ctaNegocio": "Pruébalo {trialDays} días gratis",
       "includesLabel": "Incluye"
     },
     "extras": {
-      "title": "Extras opcionales",
-      "lead": "Servicios aparte, con su precio: tu anuncio en la edición impresa y la migración con consultor. Tu tienda sigue activa y gratis sin ellos.",
+      "title": "Servicio aparte",
+      "lead": "Si ya vendes en otra plataforma, un consultor pasa tu tienda completa. Es opcional: tu tienda funciona igual sin esto.",
       "fixedBadge": "Precio fijo",
       "quotedBadge": "Se cotiza",
       "quotedCta": "Escríbenos"
     },
     "processors": {
-      "title": "Lo que cobra tu pasarela (no nosotros)",
-      "lead": "Sin comisión no significa tarjetas gratis: tu pasarela de pago cobra su tarifa por cada venta. Esa tarifa es suya, no nuestra, y el dinero llega directo a tu cuenta.",
+      "title": "Lo que cobra tu forma de pago (no nosotros)",
+      "lead": "Sin comisión no quiere decir que cobrar con tarjeta sea gratis: Stripe o Mercado Pago cobran su tarifa en cada venta. Esa tarifa es de ellos, no nuestra, y tu dinero llega directo a tu cuenta.",
       "sourceLabel": "Fuente",
       "verifiedLabel": "verificado el"
     },
@@ -3393,16 +3365,16 @@
       "title": "Preguntas frecuentes",
       "items": [
         {
-          "q": "¿Hay planes o mensualidades?",
-          "a": "Hay dos: Gratis, para siempre, y Negocio, con dominio propio, sincronización con Mercado Libre y más. Toda tienda nueva prueba Negocio gratis y, si no lo contratas, sigue en Gratis."
+          "q": "¿Qué pasa cuando terminan mis {trialDays} días?",
+          "a": "Tu tienda sigue abierta en el Plan Gratis, con tus productos, tu dirección y tus ventas. Nunca se cierra y no tienes que hacer nada. Solo se pausa lo del Plan Negocio: la conexión con Mercado Libre, el chequeo mensual de tu tienda y la ayuda extra de la IA, y aparece un pequeño enlace «Tienda impulsada por Miyagi Sánchez». Todo vuelve en cuanto contratas el Plan Negocio."
         },
         {
-          "q": "¿Qué pasa si termina mi prueba o cancelo Negocio?",
-          "a": "Tu tienda sigue activa y gratis en tu URL de miyagisanchez.com. Solo dejas de tener lo que incluye Negocio."
+          "q": "¿Necesito tarjeta para empezar?",
+          "a": "No. Abres tu tienda y usas el Plan Negocio {trialDays} días sin dar ninguna tarjeta."
         },
         {
           "q": "¿Por qué no cobran comisión?",
-          "a": "Construimos sobre infraestructura abierta y con costos mínimos, y ganamos con los extras opcionales, no con un porcentaje de tus ventas."
+          "a": "Porque ganamos con el Plan Negocio, no con tus ventas. Cada peso que vendes es tuyo; solo tu forma de pago cobra su tarifa."
         }
       ]
     }

@@ -31,9 +31,9 @@ export type PackageDef = { priceMxn: number; negocioMonths: number; label: strin
 
 /** The packages' list prices and what each grants. Prices are Daniel's (2026-11-04); the split is the rate. */
 export const PACKAGES: Readonly<Record<PackageSku, PackageDef>> = Object.freeze({
-  negocio_anual: { priceMxn: 2000, negocioMonths: 12, label: 'Paquete Anual', summary: 'Instalación + 12 meses de Negocio' },
-  negocio_arranque: { priceMxn: 600, negocioMonths: 3, label: 'Paquete Arranque', summary: 'Instalación + 3 meses de Negocio' },
-  setup_gratis: { priceMxn: 250, negocioMonths: 0, label: 'Instalación Gratis', summary: 'Instalación en el plan Gratis' },
+  negocio_anual: { priceMxn: 2000, negocioMonths: 12, label: 'Plan Negocio · 1 año', summary: 'Le armas su tienda y tiene el Plan Negocio 12 meses' },
+  negocio_arranque: { priceMxn: 600, negocioMonths: 3, label: 'Plan Negocio · 3 meses', summary: 'Le armas su tienda y tiene el Plan Negocio 3 meses' },
+  setup_gratis: { priceMxn: 250, negocioMonths: 0, label: 'Plan Gratis · tienda lista', summary: 'Le armas su tienda en el Plan Gratis, sin mensualidad' },
 })
 
 export type PackageSplit = { chargeCents: number; keepCents: number; payPlatformCents: number }
@@ -50,7 +50,7 @@ const pesos = (cents: number) => '$' + Math.round(cents / 100).toLocaleString('e
 /** "Cobras $2,000 · nos pagas $900 · te quedas $1,100". */
 export function packageSentence(sku: PackageSku, ratePct: number): string {
   const s = packageSplit(sku, ratePct)
-  return `Cobras ${pesos(s.chargeCents)} · nos pagas ${pesos(s.payPlatformCents)} · te quedas ${pesos(s.keepCents)}`
+  return `Cobras ${pesos(s.chargeCents)}. Le pasas ${pesos(s.payPlatformCents)} a Miyagi Sánchez. Te quedas ${pesos(s.keepCents)}`
 }
 
 /** The renewal window after the first Negocio package payment: months [12, 24). */

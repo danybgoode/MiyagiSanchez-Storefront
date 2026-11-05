@@ -143,24 +143,22 @@ test.describe('subdomain-checkout · cadence + coupon', () => {
 
 // ── 5. Route guard + UCP manifest ─────────────────────────────────────────────
 
-test.describe('subdomain-checkout · buy route requires auth', () => {
-  test('POST /api/sell/shop/subdomain/subscribe → 401 anonymously (auth before secret)', async ({ request }) => {
+// The subdomain is free on every plan, so its purchase is retired: 410 for everyone, before any auth.
+test.describe('subdomain-checkout · the buy route is retired', () => {
+  test('POST /api/sell/shop/subdomain/subscribe → 410', async ({ request }) => {
     const res = await request.post('/api/sell/shop/subdomain/subscribe', {
       data: { cadence: 'one_time', promoterCode: 'PRM-ABC123' },
     })
-    expect(res.status()).toBe(401)
+    expect(res.status()).toBe(410)
   })
 })
 
-test.describe('subdomain-checkout · UCP manifest advertises the subdomain SKU', () => {
-  test('GET /api/ucp/manifest lists the subdomain SKU + both cadences', async ({ request }) => {
+test.describe('subdomain-checkout · the UCP manifest says the subdomain is free', () => {
+  test('GET /api/ucp/manifest says the subdomain is free and sells no cadence', async ({ request }) => {
     const res = await request.get('/api/ucp/manifest')
     expect(res.ok()).toBeTruthy()
-    const body = await res.text()
-    expect(body).toContain('seller_subdomain_subscription')
-    expect(body).toContain('get_subdomain_entitlement')
-    expect(body).toContain('start_subdomain_subscription')
-    expect(body).toContain('one_time')
-    expect(body).toContain('recurring')
+    const sub = JSON.stringify((await res.json()).endpoints?.seller_subdomain_subscription ?? null)
+    expect(sub).toContain('is FREE on every plan')
+    expect(sub).not.toContain('one_time')
   })
 })

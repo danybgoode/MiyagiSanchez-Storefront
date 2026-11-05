@@ -127,11 +127,11 @@ test.describe('domain connect/provision routes · auth boundary', () => {
     expect(res.status()).toBe(401)
   })
 
-  // Sprint 2: the buy route is also auth-gated (a checkout can't be started
-  // anonymously). Live card purchase is owed to Daniel (sprint-2.md smoke).
-  test('POST /api/sell/shop/domain/subscribe rejects anonymous', async ({ request }) => {
+  // The standalone domain purchase is retired: the custom domain is part of the Negocio plan. The route answers 410 to
+  // everyone (no checkout can start), so the purchase is retired (plans-gratis-negocio S2/S3): 410 for everyone, before any auth.
+  test('POST /api/sell/shop/domain/subscribe is retired (410)', async ({ request }) => {
     const res = await request.post('/api/sell/shop/domain/subscribe')
-    expect(res.status()).toBe(401)
+    expect(res.status()).toBe(410)
   })
 })
 

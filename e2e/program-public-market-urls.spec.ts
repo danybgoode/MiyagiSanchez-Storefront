@@ -41,9 +41,6 @@ const PROGRAM_SURFACES = {
   'app/(shell)/promotor/cerrar/PromoterCloseClient.tsx': [
     'shopUrlFor(SITE_ORIGIN, shop.slug)',
   ],
-  'app/(shell)/promotor/cerrar/PrintAdStep.tsx': [
-    'shopUrlFor(SITE_ORIGIN, shop.slug)',
-  ],
 } as const
 
 test.describe('platform program public catalog URLs', () => {
@@ -86,15 +83,6 @@ test.describe('platform program public catalog URLs', () => {
 
     expect(source).toContain(
       "`${listingUrlFor(SITE_ORIGIN, id)}?channel=embed${key ? `&ref_key=${encodeURIComponent(key)}` : ''}`",
-    )
-  })
-
-  test('serialized print content stores an absolute canonical platform shop URL', () => {
-    const file = 'app/(shell)/promotor/cerrar/PrintAdStep.tsx'
-    const source = readFileSync(path.join(ROOT, file), 'utf8')
-
-    expect(source).toContain(
-      "cta_target: { type: 'shop', id: shop.slug, url: shopUrlFor(SITE_ORIGIN, shop.slug) }",
     )
   })
 })

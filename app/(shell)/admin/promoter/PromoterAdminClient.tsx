@@ -33,10 +33,10 @@ const SKU_LABEL: Record<PromoterSku, string> = {
   subdomain: 'Subdominio propio',
   ml_sync: 'Sincronización Mercado Libre',
   migration: 'Migración de tienda',
-  negocio_anual: 'Paquete Anual (instalación + 12 meses de Negocio)',
-  negocio_arranque: 'Paquete Arranque (instalación + 3 meses de Negocio)',
-  setup_gratis: 'Instalación en Gratis',
-  negocio_renewal: 'Renovación de Negocio (año 2)',
+  negocio_anual: 'Plan Negocio · 1 año (tienda lista + 12 meses)',
+  negocio_arranque: 'Plan Negocio · 3 meses (tienda lista + 3 meses)',
+  setup_gratis: 'Plan Gratis · tienda lista',
+  negocio_renewal: 'Renovación del Plan Negocio (año 2)',
 }
 
 /**

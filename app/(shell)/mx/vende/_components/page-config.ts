@@ -13,10 +13,6 @@ import {
 import { buildAgentPrompt } from '@/lib/agent-prompt'
 import type { PromoterSettings } from '@/lib/promoter'
 import type { PromoterSku } from '@/lib/promoter-skus'
-import {
-  buildPromoterEarningsTable,
-  type PromoterSkuEarnings,
-} from '@/lib/promoter-earnings'
 import type { PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 import { marketBasePath } from '@/lib/markets'
@@ -324,32 +320,12 @@ export function buildMigracionBigcartelPageConfig(copy: SellerAcquisitionCopy): 
 }
 
 /**
- * Promoter resources mini-site (epic 08 · S4 · US-12). A STANDALONE content page —
- * it sells SKUs + a glossary, not a seller archetype — so it deliberately does NOT
+ * Promoter resources mini-site (epic 08 · S4 · US-12; rewritten 2026-11-05 around the three options a promoter sells).
+ * A STANDALONE content page — it explains the promoter's deal, not a seller archetype — so it deliberately does NOT
  * register as a 6th SellerPersonaId. It reuses the SellerAcquisitionPage component
  * but builds its config directly (plain hrefs to the close workspace + sell-sheet),
  * bypassing the persona-keyed baseConfig. es-MX only (rule #5), like the rest of /mx/vende.
  */
-// The glossary in locales/*.json is ordered [Dominio propio, Subdominio, Anuncio impreso, Conexión
-// Mercado Libre] — this mirrors that order so each proof point can be paired with its SKU's computed
-// earnings. Keep the two in sync if the glossary is ever reordered.
-const GLOSSARY_SKU_ORDER: PromoterSku[] = ['custom_domain', 'subdomain', 'print_ad', 'ml_sync']
-
-/**
- * Append the computed regular/promoter price + commission to a glossary body — degrades to the
- * body unchanged when nothing is configured yet (never a "$0"/placeholder). `subdomain` is skipped
- * by the caller: its glossary copy already states the promoter angle in words (the future
- * free-first-year grant, US-3.2), and appending the *current* checkout-discount math there would
- * contradict that framing.
- */
-function withEarningsLine(body: string, earnings: PromoterSkuEarnings): string {
-  if (earnings.variablePrice) {
-    return earnings.commissionPct != null ? `${body} Tu comisión: ${earnings.commissionPct}%.` : body
-  }
-  if (earnings.commissionMxn == null) return body
-  return `${body} Con tu código: $${earnings.promoterPriceMxn} MXN para el comerciante · tu comisión: $${earnings.commissionMxn} MXN.`
-}
-
 export function buildPromoterPageConfig(
   copy: SellerAcquisitionCopy,
   opts: {
@@ -358,13 +334,12 @@ export function buildPromoterPageConfig(
     isBoundPromoter?: boolean
     commissionRates?: Record<PromoterSku, number>
     promoterSettings?: PromoterSettings
-    /** Sprint 3 (US-3.1) — per-SKU promoter price overrides + the bundle offer. */
+    /** Accepted for older callers; the page no longer shows per-SKU promoter prices (the three options carry their own). */
     skuPrices?: PromoterSkuPrices
   },
 ): SellerAcquisitionPageConfig {
   const page = copy.promotor
   const isBoundPromoter = opts.isBoundPromoter ?? false
-  const promoterSettings: PromoterSettings = opts.promoterSettings ?? { enabled: false, discount_type: 'fixed', discount_amount_cents: 0 , bundle_skus: [], bundle_price_mxn: null }
   const commissionRates: Record<PromoterSku, number> = opts.commissionRates ?? {
     custom_domain: 0,
     print_ad: 0,
@@ -376,10 +351,9 @@ export function buildPromoterPageConfig(
     setup_gratis: 0,
     negocio_renewal: 0,
   }
-  const skuPrices: PromoterSkuPrices = opts.skuPrices ?? {}
-  const earningsTable = buildPromoterEarningsTable(commissionRates, promoterSettings, skuPrices)
   const anualKeepMxn = Math.round(packageSplit('negocio_anual', commissionRates.negocio_anual ?? 0).keepCents / 100)
   const gratisKeepMxn = Math.round(packageSplit('setup_gratis', commissionRates.setup_gratis ?? 0).keepCents / 100)
+  const renewalPct = commissionRates.negocio_renewal ?? 0
   const pesosStat = (n: number) => '$' + n.toLocaleString('en-US')
   // The close workspace (`/promotor/cerrar`) 404s when the program is off — hide both CTAs
   // that point there rather than link to a dead page (epic 08 · promoter-funnel-fixes S1.2).
@@ -411,34 +385,24 @@ export function buildPromoterPageConfig(
     // is configured.
     // plans-gratis-negocio S4.1 (D12): what a promoter keeps per package, from the live rates. The old "max
     // commission %" stat is gone: the free-plan setup's 80% would read as the headline and mislead.
+    // What a promoter keeps, from the live rates (Daniel, 2026-11-05: the money must be the clearest thing on the page).
     heroStats: anualKeepMxn > 0
       ? [
-          { value: pesosStat(anualKeepMxn), label: 'te quedas por cada Paquete Anual' },
-          { value: pesosStat(gratisKeepMxn), label: 'te quedas por cada instalación en Gratis' },
+          { value: pesosStat(anualKeepMxn), label: `te quedas por cada ${PACKAGES.negocio_anual.label}` },
+          { value: pesosStat(gratisKeepMxn), label: `te quedas por cada ${PACKAGES.setup_gratis.label}` },
         ]
       : [],
     proofTitle: page.proofTitle,
     proofLead: page.proofLead,
-    // The glossary maps onto proof points (icon/title/body), with the computed regular/promoter
-    // price + commission appended per SKU (US-1.4) — degrades to the plain glossary body until a
-    // rate is configured.
-    proofPoints: [
-      ...PACKAGE_SKUS.map((sku) => ({
-        icon: sku === 'setup_gratis' ? 'iconoir-shop' : 'iconoir-sparks',
-        title: PACKAGES[sku].label,
-        body: commissionRates[sku]
-          ? `${PACKAGES[sku].summary}. ${packageSentence(sku, commissionRates[sku])}.`
-          : `${PACKAGES[sku].summary}. Cobras $${PACKAGES[sku].priceMxn.toLocaleString('en-US')}; tu parte se confirma con Miyagi Sánchez.`,
-      })),
-      ...page.glossary.map((raw, i) => {
-      // The glossary's prices are `{token}`s (pricing-page D8) — filled from the price modules here.
-      const point = { ...raw, body: fillFixedPricingTokens(raw.body, 'es') }
-      const sku = GLOSSARY_SKU_ORDER[i]
-      if (sku === 'subdomain') return point
-      const earnings = earningsTable.find((r) => r.sku === sku)
-      return earnings ? { ...point, body: withEarningsLine(point.body, earnings) } : point
-    }).filter((_, i) => GLOSSARY_SKU_ORDER[i] === 'print_ad'),
-    ],
+    // Only the three options a promoter sells, each with its money in three plain sentences. No print ads and no
+    // retired extras (Daniel, 2026-11-05).
+    proofPoints: PACKAGE_SKUS.map((sku) => ({
+      icon: sku === 'setup_gratis' ? 'iconoir-shop' : 'iconoir-sparks',
+      title: PACKAGES[sku].label,
+      body: commissionRates[sku]
+        ? `${PACKAGES[sku].summary}. ${packageSentence(sku, commissionRates[sku])}.`
+        : `${PACKAGES[sku].summary}. Cobras $${PACKAGES[sku].priceMxn.toLocaleString('en-US')}; tu parte se confirma con Miyagi Sánchez.`,
+    })),
     stepsTitle: page.stepsTitle,
     steps: page.steps,
     agentTitle: copy.shared.selfCheck.title,
@@ -449,13 +413,14 @@ export function buildPromoterPageConfig(
     // SKU has a configured rate; degrades to the original placeholder stats until then.
     socialStats: anualKeepMxn > 0
       ? [
-          page.pitchStats[0],
-          page.pitchStats[1],
-          { value: pesosStat(anualKeepMxn * 5), label: 'cerrando 5 Paquetes Anuales al mes' },
+          { value: pesosStat(anualKeepMxn), label: `por cada ${PACKAGES.negocio_anual.label}` },
+          { value: pesosStat(anualKeepMxn * 5), label: 'al mes, si dejas 5 tiendas así' },
+          ...(renewalPct > 0 ? [{ value: `${renewalPct}%`, label: 'de cada renovación al segundo año' }] : [page.pitchStats[2]]),
         ]
       : page.pitchStats,
     faqTitle: copy.shared.faqTitle,
-    faqs: copy.shared.faqs,
+    // The promoter's own questions: the shared set talks to a MERCHANT about their sales.
+    faqs: page.faqs,
     closingTitle: page.closingTitle,
     closingBody: page.closingBody,
     closingCta: primaryOrApplyCta('promotor-closing-cta'),

@@ -219,7 +219,7 @@ function planRows(): PlanRow[] {
   return [
     {
       id: 'gratis',
-      name: { es: 'Gratis', en: 'Free' },
+      name: { es: 'Plan Gratis', en: 'Free plan' },
       priceLabel: { es: 'Gratis, para siempre', en: 'Free, forever' },
       yearlyLabel: null,
       monthlyMxn: null,
@@ -233,12 +233,12 @@ function planRows(): PlanRow[] {
         { es: 'Agentes de IA (UCP/MCP)', en: 'AI agents (UCP/MCP)' },
         { es: 'La IA que arma tu tienda', en: 'The AI that builds your shop' },
         { es: `${gratis.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${gratis.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
-        { es: 'Un pequeño enlace «Tienda impulsada por Miyagi Sánchez»', en: 'A small «Shop powered by Miyagi Sánchez» link' },
+        { es: 'Un pequeño enlace «Tienda impulsada por Miyagi Sánchez» al pie de tu tienda', en: 'A small «Shop powered by Miyagi Sánchez» link at the foot of your shop' },
       ],
     },
     {
       id: 'negocio',
-      name: { es: 'Negocio', en: 'Negocio' },
+      name: { es: 'Plan Negocio', en: 'Negocio plan' },
       priceLabel: { es: `${monthly} MXN/mes`, en: `${monthly} MXN/month` },
       yearlyLabel: {
         es: `${yearly} MXN/año (también a meses sin intereses)`,
@@ -247,14 +247,14 @@ function planRows(): PlanRow[] {
       monthlyMxn: NEGOCIO_PRICE_MONTHLY_MXN,
       yearlyMxn: NEGOCIO_PRICE_YEARLY_MXN,
       includes: [
-        { es: 'Todo lo de Gratis', en: 'Everything in Free' },
-        { es: 'Dominio propio (tutienda.com), una vez que pagas Negocio', en: 'Your own domain (yourshop.com), once you pay for Negocio' },
+        { es: 'Todo lo del Plan Gratis', en: 'Everything in the Free plan' },
+        { es: 'Conecta tu propio dominio (tunegocio.com), en cuanto contratas', en: 'Connect your own domain (yourbusiness.com), as soon as you sign up' },
         { es: 'Sincronización con Mercado Libre', en: 'Mercado Libre sync' },
-        { es: 'Sin el enlace de la plataforma en tu tienda', en: 'No platform link on your shop' },
+        { es: 'Tu tienda sin el enlace de Miyagi Sánchez', en: 'Your shop without the Miyagi Sánchez link' },
         { es: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
         { es: `Más fotos: ${negocio.photosPerMonth} al mes para convertir en productos`, en: `More photos: ${negocio.photosPerMonth} a month to turn into products` },
         { es: 'El chequeo mensual de tu tienda', en: 'The monthly check-in on your shop' },
-        { es: `${NEGOCIO_TRIAL_DAYS} días gratis para toda tienda nueva (el dominio propio no entra en la prueba)`, en: `${NEGOCIO_TRIAL_DAYS} days free for every new shop (the custom domain is not part of the trial)` },
+        { es: `Pruébalo ${NEGOCIO_TRIAL_DAYS} días sin pagar (tu propio dominio se activa al contratar)`, en: `Try it ${NEGOCIO_TRIAL_DAYS} days without paying (your own domain turns on when you sign up)` },
       ],
     },
   ]
@@ -262,7 +262,9 @@ function planRows(): PlanRow[] {
 
 /** The extras still sold on their own (plans-gratis-negocio D16): the subdomain is free now and the custom domain and
  *  ML sync live inside Negocio. The SKUs stay in `PROMOTER_SKUS` (Sprint 4 retires them); only the LIST is filtered. */
-const EXTRA_SKUS_SOLD: readonly PromoterSku[] = ['print_ad', 'migration']
+// Daniel, 2026-11-05: printed ads are not sold, so the price list shows only the migration, and no copy may name a
+// print-ad price (the `{printAdPrice}` token is gone with it).
+const EXTRA_SKUS_SOLD: readonly PromoterSku[] = ['migration']
 
 /** The SKUs that were ever sold as an extra (each has a row). The promoter packages and the renewal share are not
  *  extras: they are promoter deals (lib/promoter-packages.ts), never on the price list. */
@@ -422,7 +424,7 @@ export function buildPricingCatalog(input: PricingCatalogInput): PricingCatalog 
 
 export function getExtra(catalog: PricingCatalog, sku: PromoterSku): ExtraRow {
   const row = catalog.extras.find((r) => r.sku === sku)
-  // Unreachable while extraRows maps PROMOTER_SKUS — kept so a broken invariant fails loudly.
+  // Only the extras on the price list have a row (the migration since 2026-11-05): asking for any other fails loudly.
   if (!row) throw new Error(`pricing-catalog: no row for ${sku}`)
   return row
 }
@@ -455,7 +457,6 @@ export function fixedPricingTokens(locale: PricingLocale): Record<string, string
 export function pricingTokens(catalog: PricingCatalog, locale: PricingLocale): Record<string, string> {
   return {
     ...fixedPricingTokens(locale),
-    printAdPrice: getExtra(catalog, 'print_ad').priceLabel[locale],
     migrationPrice: getExtra(catalog, 'migration').priceLabel[locale],
   }
 }
