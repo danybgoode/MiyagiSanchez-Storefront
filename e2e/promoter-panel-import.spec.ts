@@ -222,3 +222,16 @@ test('a migration charge has the same ownership rule as a package close', () => 
   expect(src.indexOf('promoterMayCloseShop(')).toBeGreaterThan(-1)
   expect(src.indexOf('promoterMayCloseShop(')).toBeLessThan(src.indexOf('resolveMigrationCharge('))
 })
+
+test('the image bytes uploaded are exactly the image: never a shared pool buffer (Codex security, #480)', () => {
+  const src = readFileSync('lib/image-ingest.ts', 'utf8')
+  expect(src).not.toContain('Buffer.concat(chunks)')
+  expect(src).toContain('const out = new Uint8Array(total)')
+})
+
+test('an import request body is read with a cap, refused by its declared size, never parsed whole first', () => {
+  const src = readFileSync('lib/promoter-import-server.ts', 'utf8')
+  expect(src).toContain('if (Number.isFinite(declared) && declared > maxBytes) return { ok: false, tooBig: true }')
+  expect(src).toContain('if (total > maxBytes)')
+  expect(src).not.toContain('await req.json()')
+})

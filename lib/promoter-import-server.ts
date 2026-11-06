@@ -23,6 +23,34 @@ export type PromoterImportContext = {
   body: Record<string, unknown>
 }
 
+/**
+ * Read a JSON body without ever holding more than `maxBytes` (Codex security, #480: `req.json()` buffered and parsed a
+ * body of any size before the route could check it). A declared size over the cap is refused before reading; the
+ * stream is counted as it arrives. `null` = too big or not JSON.
+ */
+export async function readJsonCapped(req: NextRequest, maxBytes: number): Promise<{ ok: true; value: unknown } | { ok: false; tooBig: boolean }> {
+  const declared = Number(req.headers.get('content-length') ?? '')
+  if (Number.isFinite(declared) && declared > maxBytes) return { ok: false, tooBig: true }
+  const reader = req.body?.getReader()
+  if (!reader) return { ok: false, tooBig: false }
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > maxBytes) { await reader.cancel().catch(() => undefined); return { ok: false, tooBig: true } }
+    chunks.push(value)
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const c of chunks) { bytes.set(c, offset); offset += c.byteLength }
+  try { return { ok: true, value: JSON.parse(new TextDecoder().decode(bytes)) } } catch { return { ok: false, tooBig: false } }
+}
+
+/** The largest import request: a catalog file of a few MB, as JSON text. */
+export const MAX_IMPORT_BODY_BYTES = 4 * 1024 * 1024
+
 export async function promoterImportPreamble(
   req: NextRequest,
   opts: { needsConnector: boolean },
@@ -40,10 +68,9 @@ export async function promoterImportPreamble(
   if (!rl.allowed) return fail(429, 'Vas muy rápido. Espera un momento.')
 
   let body: Record<string, unknown> = {}
-  try {
-    const parsed: unknown = await req.json()
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed as Record<string, unknown>
-  } catch { /* validated by the caller */ }
+  const read = await readJsonCapped(req, MAX_IMPORT_BODY_BYTES)
+  if (!read.ok && read.tooBig) return fail(413, 'Ese archivo es demasiado grande. Pídele una lista más corta o la Migración con consultor.')
+  if (read.ok && read.value && typeof read.value === 'object' && !Array.isArray(read.value)) body = read.value as Record<string, unknown>
 
   const shopId = typeof body.shopId === 'string' ? body.shopId : undefined
   const slug = typeof body.slug === 'string' ? body.slug : undefined

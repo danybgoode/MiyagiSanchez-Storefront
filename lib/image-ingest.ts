@@ -91,7 +91,12 @@ async function ingestOne(url: string, userId: string): Promise<string | null> {
       chunks.push(bytes)
     }
     if (total === 0) return null
-    const buf = Buffer.concat(chunks).buffer.slice(0) as ArrayBuffer
+    // Copy exactly `total` bytes into a fresh buffer. `Buffer.concat(...).buffer` can be Node's SHARED allocation pool
+    // for small sizes, and uploading it would publish other requests' memory next to the image (Codex security, #480).
+    const out = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength }
+    const buf = out.buffer
     const key = `listing-images/${userId}/import/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
     return await uploadToR2(buf, key, type)
   } catch {
