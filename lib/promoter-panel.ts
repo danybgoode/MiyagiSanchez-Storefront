@@ -32,8 +32,31 @@ export function stepTwoPath(sellsToday: unknown): StepTwoPath {
 /** How many products an import in the panel brings (D4). */
 export const PROMOTER_IMPORT_CAP = MIGRATION_FLAT_LISTING_CAP
 
-export function importCapPlan(total: number): { take: number; overCap: number } {
+/**
+ * How many of `total` new products an import may add, given the products the shop ALREADY has (pr-reviewer, #480):
+ * the 150 are for opening the shop, so re-sending a file or confirming a batch twice can't add products 151–300.
+ * An unreadable count is never passed here — the caller fails closed first.
+ */
+export function importCapPlan(total: number, alreadyInShop = 0): { take: number; overCap: number } {
   const safe = Number.isFinite(total) && total > 0 ? Math.floor(total) : 0
-  const take = Math.min(safe, PROMOTER_IMPORT_CAP)
+  const have = Number.isFinite(alreadyInShop) && alreadyInShop > 0 ? Math.floor(alreadyInShop) : 0
+  const room = Math.max(0, PROMOTER_IMPORT_CAP - have)
+  const take = Math.min(safe, room)
   return { take, overCap: safe - take }
+}
+
+/**
+ * One import at a time per shop (Codex security, #480): two simultaneous imports both passed the "already have it?"
+ * check and created the same products. The lock is a dated key on the shop's metadata, claimed with a guarded write;
+ * a lock older than the TTL is stale (a crashed request) and may be taken over.
+ */
+export const IMPORT_LOCK_KEY = 'import_lock'
+export const IMPORT_LOCK_TTL_MS = 10 * 60 * 1000
+
+export function importLockState(metadata: unknown, now: Date = new Date()): 'free' | 'busy' {
+  const meta = metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : {}
+  const lock = meta[IMPORT_LOCK_KEY] as { at?: unknown } | null | undefined
+  if (!lock || typeof lock !== 'object' || typeof lock.at !== 'string') return 'free'
+  const at = Date.parse(lock.at)
+  return Number.isFinite(at) && now.getTime() - at < IMPORT_LOCK_TTL_MS ? 'busy' : 'free'
 }

@@ -312,7 +312,9 @@ export function parseCsvRows(text: string, delimiter: ',' | ';' | '\t' = ','): s
       else cell += char
       continue
     }
-    if (char === '"') quoted = true
+    // A quote opens a quoted cell only at its START (RFC 4180). A quote inside a cell is a character: a hand-made
+    // «Pizza 12"» must not swallow every following row into one cell (pr-reviewer, #480).
+    if (char === '"' && cell.trim() === '') { quoted = true; cell = '' }
     else if (char === delimiter) { row.push(cell.trim()); cell = '' }
     else if (char === '\n' || char === '\r') {
       if (char === '\r' && text[i + 1] === '\n') i++

@@ -12,6 +12,9 @@ import { getPromoterByClerkId } from '@/lib/promoter'
 import { resolveTargetShop, type TargetShop } from '@/lib/promoter-server'
 import { promoterShopEditAccess } from '@/lib/promoter-shop-access'
 import { shopEditRefusal } from '@/lib/promoter-close'
+import { db } from '@/lib/supabase'
+import { guardFor } from '@/lib/plan'
+import { IMPORT_LOCK_KEY, importLockState } from '@/lib/promoter-panel'
 
 export type PromoterImportContext = {
   userId: string
@@ -53,3 +56,68 @@ export async function promoterImportPreamble(
 
   return { ok: true, ctx: { userId: user.id, promoter, shop, body } }
 }
+
+export type ImportLock = { at: string; by: string }
+
+/**
+ * Claim the shop's import lock (one import at a time per shop — Codex security, #480). The write is guarded on exactly
+ * what was read (absent, JSON null, or the stale lock it replaces), so of two simultaneous requests only one lands.
+ * `busy` = another import is running; `unavailable` = the write could not be made (the caller answers 503).
+ */
+export async function claimShopImportLock(shop: TargetShop, promoterId: string): Promise<{ ok: true; lock: ImportLock } | { ok: false; reason: 'busy' | 'unavailable' }> {
+  if (importLockState(shop.metadata) === 'busy') return { ok: false, reason: 'busy' }
+  const guard = guardFor(shop.metadata, IMPORT_LOCK_KEY)
+  const lock: ImportLock = { at: new Date().toISOString(), by: promoterId }
+  const { data, error } = await db.rpc('merge_shop_metadata', {
+    p_shop_id: shop.id,
+    p_patch: { [IMPORT_LOCK_KEY]: lock },
+    p_guard_key: IMPORT_LOCK_KEY,
+    p_guard_mode: guard.mode,
+    p_expected: guard.mode === 'equals' ? guard.expected : null,
+  })
+  if (error) return { ok: false, reason: 'unavailable' }
+  // Zero rows: the guard fired — another request claimed it between our read and our write.
+  return Array.isArray(data) && data.length > 0 ? { ok: true, lock } : { ok: false, reason: 'busy' }
+}
+
+/** Release our own lock (guarded on its exact value, so a takeover after a stale lock is never undone). Best-effort:
+ *  an unreleased lock expires after `IMPORT_LOCK_TTL_MS`. */
+export async function releaseShopImportLock(shopId: string, lock: ImportLock): Promise<void> {
+  await db.rpc('merge_shop_metadata', {
+    p_shop_id: shopId,
+    p_patch: { [IMPORT_LOCK_KEY]: null },
+    p_guard_key: IMPORT_LOCK_KEY,
+    p_guard_mode: 'equals',
+    p_expected: lock,
+  }).then(() => undefined, () => undefined)
+}
+
+/** How many products the shop already has (the 150 cap counts them). `null` = could not read: fail closed. */
+export async function countShopListings(shopId: string): Promise<number | null> {
+  const { count, error } = await db
+    .from('marketplace_listings')
+    .select('id', { count: 'exact', head: true })
+    .eq('shop_id', shopId)
+    .neq('status', 'deleted')
+  return error || typeof count !== 'number' ? null : count
+}
+
+/** Which of these titles the shop already has (lower-cased). `null` = could not read: fail closed, never "none". */
+export async function existingShopTitles(shopId: string, titles: string[]): Promise<Set<string> | null> {
+  const have = new Set<string>()
+  const unique = [...new Set(titles.map((t) => t.trim()).filter(Boolean))]
+  for (let i = 0; i < unique.length; i += 100) {
+    const { data, error } = await db
+      .from('marketplace_listings')
+      .select('title')
+      .eq('shop_id', shopId)
+      .neq('status', 'deleted')
+      .in('title', unique.slice(i, i + 100))
+    if (error) return null
+    for (const row of (data ?? []) as Array<{ title: string | null }>) have.add((row.title ?? '').trim().toLowerCase())
+  }
+  return have
+}
+
+export const IMPORT_BUSY = 'Ya se están agregando productos a esta tienda. Espera a que termine.'
+export const IMPORT_UNAVAILABLE = 'No pudimos revisar la tienda ahora. Intenta de nuevo en un momento.'

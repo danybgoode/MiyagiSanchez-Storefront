@@ -11,11 +11,10 @@
  * them. Images are copied into our storage through the DNS-pinned fetch (`ingestImageUrls`).
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/supabase'
-import { CATALOG_CATEGORY_KEYS, parseCatalogRecords, validateRows } from '@/lib/catalog-import'
+import { CATALOG_CATEGORY_KEYS, MAX_IMPORT_ROWS, parseCatalogRecords, validateRows } from '@/lib/catalog-import'
 import { ingestImageUrls } from '@/lib/image-ingest'
 import { importCapPlan } from '@/lib/promoter-panel'
-import { promoterImportPreamble } from '@/lib/promoter-import-server'
+import { IMPORT_BUSY, IMPORT_UNAVAILABLE, claimShopImportLock, countShopListings, existingShopTitles, promoterImportPreamble, releaseShopImportLock } from '@/lib/promoter-import-server'
 import { afterPromoterProductsAdded, createPromoterProduct, resolvePromoterListingStatus } from '@/lib/promoter-listing-server'
 import { prepareImportRecords } from '@/lib/promoter-file-import'
 
@@ -42,41 +41,51 @@ export async function POST(req: NextRequest) {
 
   const read = parseCatalogRecords(fileText, fileName)
   if (read.fileErrors.length || read.records.length === 0) return NextResponse.json({ ok: false, error: unreadable }, { status: 422 })
+  // Never validate more than the parser's own row limit (Codex security, #480): a long file can't cost unbounded work.
+  const records = read.records.slice(0, MAX_IMPORT_ROWS)
 
-  const staged = validateRows(prepareImportRecords(read.records, defaultCategory))
+  const staged = validateRows(prepareImportRecords(records, defaultCategory))
   const valid = staged.filter((r) => r.valid)
-  if (valid.length === 0) return NextResponse.json({ ok: false, error: unreadable }, { status: 422 })
+  const invalid = staged.length - valid.length
+  if (valid.length === 0) return NextResponse.json({ ok: false, error: unreadable, invalid }, { status: 422 })
 
-  // Skip what the shop already has (a retry after a timeout must not double products).
-  const { data: existing } = await db.from('marketplace_listings').select('title').eq('shop_id', shop.id).limit(2000)
-  const have = new Set(((existing ?? []) as Array<{ title: string | null }>).map((r) => (r.title ?? '').trim().toLowerCase()))
-  const fresh = valid.filter((r) => !have.has(r.row.title.trim().toLowerCase()))
+  const claim = await claimShopImportLock(shop, promoter.id)
+  if (!claim.ok) return NextResponse.json({ ok: false, error: claim.reason === 'busy' ? IMPORT_BUSY : IMPORT_UNAVAILABLE }, { status: claim.reason === 'busy' ? 409 : 503 })
+  try {
+    // Skip what the shop already has, and count it toward the 150 — both read fail-closed (pr-reviewer, #480).
+    const [have, already] = await Promise.all([existingShopTitles(shop.id, valid.map((r) => r.row.title)), countShopListings(shop.id)])
+    if (!have || already === null) return NextResponse.json({ ok: false, error: IMPORT_UNAVAILABLE }, { status: 503 })
+    const fresh = valid.filter((r) => !have.has(r.row.title.trim().toLowerCase()))
 
-  const plan = importCapPlan(fresh.length)
-  const rows = fresh.slice(0, plan.take)
-  if (rows.length === 0) return NextResponse.json({ ok: true, imported: 0, skipped: valid.length, overCap: 0 })
+    const plan = importCapPlan(fresh.length, already)
+    const rows = fresh.slice(0, plan.take)
+    const overCap = plan.overCap + Math.max(0, read.records.length - records.length)
+    if (rows.length === 0) return NextResponse.json({ ok: true, imported: 0, failed: 0, skipped: valid.length - fresh.length, invalid, overCap })
 
-  const status = await resolvePromoterListingStatus({ shop, promoterCode: promoter.code, clerkUserId: userId })
-  if (!status.ok) return NextResponse.json({ ok: false, error: status.error }, { status: status.status })
+    const status = await resolvePromoterListingStatus({ shop, promoterCode: promoter.code, clerkUserId: userId })
+    if (!status.ok) return NextResponse.json({ ok: false, error: status.error }, { status: status.status })
 
-  let imported = 0
-  let failed = 0
-  for (const { row } of rows) {
-    const ingest = row.images?.length ? await ingestImageUrls(`promoter-${promoter.id}`, row.images, row.title) : { images: [] }
-    const created = await createPromoterProduct(shop, status.privatePreview, {
-      title: row.title,
-      description: row.description ?? null,
-      category: row.category,
-      priceCents: typeof row.price === 'number' ? Math.round(row.price * 100) : null,
-      currency: row.currency ?? 'MXN',
-      quantity: typeof row.quantity === 'number' ? row.quantity : null,
-      images: ingest.images,
-      sourcePlatform: platform,
-    })
-    if (created.ok) imported += 1
-    else failed += 1
+    let imported = 0
+    let failed = 0
+    for (const { row } of rows) {
+      const ingest = row.images?.length ? await ingestImageUrls(`promoter-${promoter.id}`, row.images, row.title) : { images: [] }
+      const created = await createPromoterProduct(shop, status.privatePreview, {
+        title: row.title,
+        description: row.description ?? null,
+        category: row.category,
+        priceCents: typeof row.price === 'number' ? Math.round(row.price * 100) : null,
+        currency: row.currency ?? 'MXN',
+        quantity: typeof row.quantity === 'number' ? row.quantity : null,
+        images: ingest.images,
+        sourcePlatform: platform,
+      })
+      if (created.ok) imported += 1
+      else failed += 1
+    }
+
+    if (imported > 0) await afterPromoterProductsAdded(shop.id, status.privatePreview)
+    return NextResponse.json({ ok: true, imported, failed, skipped: valid.length - fresh.length, invalid, overCap })
+  } finally {
+    await releaseShopImportLock(shop.id, claim.lock)
   }
-
-  if (imported > 0) await afterPromoterProductsAdded(shop.id, status.privatePreview)
-  return NextResponse.json({ ok: true, imported, failed, skipped: valid.length - fresh.length, overCap: plan.overCap })
 }

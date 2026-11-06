@@ -14,7 +14,7 @@ import { db } from '@/lib/supabase'
 import { importApprovedItems } from '@/lib/supply-import'
 import { refreshBatchCounts, type SupplyItem } from '@/lib/supply'
 import { importCapPlan } from '@/lib/promoter-panel'
-import { promoterImportPreamble } from '@/lib/promoter-import-server'
+import { IMPORT_BUSY, IMPORT_UNAVAILABLE, claimShopImportLock, countShopListings, promoterImportPreamble, releaseShopImportLock } from '@/lib/promoter-import-server'
 import { afterPromoterProductsAdded, resolvePromoterListingStatus } from '@/lib/promoter-listing-server'
 
 export const dynamic = 'force-dynamic'
@@ -35,35 +35,62 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Esa búsqueda es de otra tienda.' }, { status: 403 })
   }
 
-  const { data: all } = await db
-    .from('supply_items')
-    .select('*')
-    .eq('batch_id', batch.id)
-    .not('status', 'in', '("imported","duplicate")')
-    .order('created_at', { ascending: true })
-    .limit(2000)
-  const pending = (all ?? []) as SupplyItem[]
-  const plan = importCapPlan(pending.length)
-  const items = pending.slice(0, plan.take)
-  if (items.length === 0) return NextResponse.json({ ok: true, imported: 0, duplicate: 0, failed: 0, overCap: 0 })
+  const claim = await claimShopImportLock(shop, promoter.id)
+  if (!claim.ok) return NextResponse.json({ ok: false, error: claim.reason === 'busy' ? IMPORT_BUSY : IMPORT_UNAVAILABLE }, { status: claim.reason === 'busy' ? 409 : 503 })
+  try {
+    // Claim the batch itself: only a batch still in review can be imported, once (Codex security, #480 — two confirms
+    // read the same pending items). The conditional write is read back; zero rows = someone else claimed it.
+    const { data: claimed, error: claimErr } = await db
+      .from('supply_batches')
+      .update({ status: 'importing', error_message: null })
+      .eq('id', batch.id)
+      .eq('status', 'reviewing')
+      .select('id')
+    if (claimErr) return NextResponse.json({ ok: false, error: IMPORT_UNAVAILABLE }, { status: 503 })
+    if (!claimed || claimed.length === 0) return NextResponse.json({ ok: false, error: 'Esos productos ya se agregaron.' }, { status: 409 })
 
-  const status = await resolvePromoterListingStatus({ shop, promoterCode: promoter.code, clerkUserId: userId })
-  if (!status.ok) return NextResponse.json({ ok: false, error: status.error }, { status: status.status })
+    const already = await countShopListings(shop.id)
+    if (already === null) {
+      await db.from('supply_batches').update({ status: 'reviewing' }).eq('id', batch.id)
+      return NextResponse.json({ ok: false, error: IMPORT_UNAVAILABLE }, { status: 503 })
+    }
+    const { data: all } = await db
+      .from('supply_items')
+      .select('*')
+      .eq('batch_id', batch.id)
+      .not('status', 'in', '("imported","duplicate")')
+      .order('created_at', { ascending: true })
+      .limit(2000)
+    const pending = (all ?? []) as SupplyItem[]
+    const plan = importCapPlan(pending.length, already)
+    const items = pending.slice(0, plan.take)
 
-  await db.from('supply_batches').update({ status: 'importing', error_message: null }).eq('id', batch.id)
-  const { imported, duplicate, failed } = await importApprovedItems(items, {
-    targetStatus: status.privatePreview ? 'draft' : 'published',
-    // Into the shop the promoter opened — never a new unclaimed seller.
-    resolveSeller: async () => ({ sellerSlug: shop.slug, mirrorId: shop.id }),
-  })
+    const status = await resolvePromoterListingStatus({ shop, promoterCode: promoter.code, clerkUserId: userId })
+    if (!status.ok) {
+      await db.from('supply_batches').update({ status: 'reviewing' }).eq('id', batch.id)
+      return NextResponse.json({ ok: false, error: status.error }, { status: status.status })
+    }
 
-  await refreshBatchCounts(batch.id)
-  await db.from('supply_batches').update({
-    status: failed > 0 ? 'failed' : 'imported',
-    imported_at: new Date().toISOString(),
-    error_message: failed > 0 ? `${failed} producto(s) fallaron durante la importación` : null,
-  }).eq('id', batch.id)
+    const { imported, duplicate, failed } = items.length === 0
+      ? { imported: 0, duplicate: 0, failed: 0 }
+      : await importApprovedItems(items, {
+          // Medusa reads anything but 'draft' as published; the listings mirror stores this value as given, and its
+          // live value is 'active' — 'published' there made the products invisible (pr-reviewer, #480).
+          targetStatus: status.privatePreview ? 'draft' : 'active',
+          // Into the shop the promoter opened — never a new unclaimed seller.
+          resolveSeller: async () => ({ sellerSlug: shop.slug, mirrorId: shop.id }),
+        })
 
-  if (imported > 0) await afterPromoterProductsAdded(shop.id, status.privatePreview)
-  return NextResponse.json({ ok: true, imported, duplicate, failed, overCap: plan.overCap })
+    await refreshBatchCounts(batch.id)
+    await db.from('supply_batches').update({
+      status: failed > 0 ? 'failed' : 'imported',
+      imported_at: new Date().toISOString(),
+      error_message: failed > 0 ? `${failed} producto(s) fallaron durante la importación` : null,
+    }).eq('id', batch.id)
+
+    if (imported > 0) await afterPromoterProductsAdded(shop.id, status.privatePreview)
+    return NextResponse.json({ ok: true, imported, duplicate, failed, overCap: plan.overCap })
+  } finally {
+    await releaseShopImportLock(shop.id, claim.lock)
+  }
 }

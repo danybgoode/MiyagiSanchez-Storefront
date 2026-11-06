@@ -71,14 +71,27 @@ async function ingestOne(url: string, userId: string): Promise<string | null> {
       if (!location || hop >= MAX_REDIRECTS) return null
       target = new URL(location, target)
       if (!isSafePublicUrl(target.href)) return null
+      await res.body?.cancel().catch(() => undefined) // free the socket before the next hop
       res = await pinnedFetch(target, { signal: controller.signal, redirect: 'manual' })
     }
     if (!res.ok) return null
     const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
     const ext = EXT_BY_TYPE[type]
     if (!ext) return null
-    const buf = await res.arrayBuffer()
-    if (buf.byteLength === 0 || buf.byteLength > MAX_BYTES) return null
+    // Never hold more than MAX_BYTES (Codex security, #480): a declared size over the cap is refused before reading, and
+    // the body is streamed with a running total, aborting the moment it passes the cap.
+    const declared = Number(res.headers.get('content-length') ?? '')
+    if (Number.isFinite(declared) && declared > MAX_BYTES) return null
+    const chunks: Uint8Array[] = []
+    let total = 0
+    for await (const chunk of res.body ?? []) {
+      const bytes = chunk as Uint8Array
+      total += bytes.byteLength
+      if (total > MAX_BYTES) { controller.abort(); return null }
+      chunks.push(bytes)
+    }
+    if (total === 0) return null
+    const buf = Buffer.concat(chunks).buffer.slice(0) as ArrayBuffer
     const key = `listing-images/${userId}/import/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
     return await uploadToR2(buf, key, type)
   } catch {

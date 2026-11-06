@@ -10,7 +10,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { detectCsvDelimiter, normalizeHeaderKey, parseCatalogRecords, parseCsvRows, validateRows } from '../lib/catalog-import'
-import { PROMOTER_IMPORT_CAP, importCapPlan, stepTwoPath, SELLS_TODAY } from '../lib/promoter-panel'
+import { IMPORT_LOCK_KEY, IMPORT_LOCK_TTL_MS, PROMOTER_IMPORT_CAP, importCapPlan, importLockState, stepTwoPath, SELLS_TODAY } from '../lib/promoter-panel'
 import { prepareImportRecords, stripHtml } from '../lib/promoter-file-import'
 
 const WOO_HEADER =
@@ -131,4 +131,94 @@ test('imported images are fetched through the DNS-pinned fetch, redirects re-che
   expect(src).toContain("pinnedFetch(target, { signal: controller.signal, redirect: 'manual' })")
   expect(src).not.toMatch(/fetch\(url, \{[^}]*redirect: 'follow'/)
   expect(src).toContain('if (!isSafePublicUrl(target.href)) return null')
+})
+
+// ── #480 review fixes ─────────────────────────────────────────────────────────────────────────────────────────────
+
+test('the cap counts what the shop already has, so repeating an import can never pass 150', () => {
+  expect(importCapPlan(100, 0)).toEqual({ take: 100, overCap: 0 })
+  expect(importCapPlan(100, 120)).toEqual({ take: 30, overCap: 70 })
+  expect(importCapPlan(100, 150)).toEqual({ take: 0, overCap: 100 })
+  expect(importCapPlan(100, 400)).toEqual({ take: 0, overCap: 100 })
+})
+
+test('one import at a time per shop: a fresh lock is busy, a stale or missing one is free', () => {
+  const now = new Date('2026-11-06T12:00:00Z')
+  expect(importLockState({}, now)).toBe('free')
+  expect(importLockState({ [IMPORT_LOCK_KEY]: null }, now)).toBe('free')
+  expect(importLockState({ [IMPORT_LOCK_KEY]: { at: new Date(now.getTime() - 60_000).toISOString() } }, now)).toBe('busy')
+  expect(importLockState({ [IMPORT_LOCK_KEY]: { at: new Date(now.getTime() - IMPORT_LOCK_TTL_MS - 1).toISOString() } }, now)).toBe('free')
+})
+
+test('stripHtml can never output markup, however the input is escaped or nested (CodeQL, #480)', () => {
+  for (const input of ['&lt;script&gt;alert(1)&lt;/script&gt;', '&amp;lt;b&amp;gt;bold', '<scr<x>ipt>x</script>', 'a < b > c']) {
+    expect(stripHtml(input)).not.toMatch(/[<>]/)
+  }
+  expect(stripHtml('Pan &amp; café')).toBe('Pan & café')
+})
+
+test('a stray quote inside a cell is a character, never the start of a quoted cell spanning rows', () => {
+  const csv = 'title,price,category\nPizza 12",150,otros\nTaco al pastor,20,otros\n'
+  const rows = parseCsvRows(csv, ',')
+  expect(rows).toHaveLength(3)
+  expect(rows[1][0]).toBe('Pizza 12"')
+  expect(validateRows(parseCatalogRecords(csv, 'p.csv').records).filter((r) => r.valid)).toHaveLength(2)
+})
+
+test('a Spanish WooCommerce export: «Tipo» is the product type, variations dropped, the parent takes the lowest price', () => {
+  const csv = [
+    'ID,Tipo,SKU,Nombre,Precio normal,Inventario,Categorías,Superior',
+    '201,variable,PLA-1,Playera bordada,,,Ropa,',
+    '202,variación,PLA-1-M,Playera bordada - M,250,4,,id:201',
+    '203,variación,PLA-1-G,Playera bordada - G,230,3,,id:201',
+    '204,simple,GOR-1,Gorra,180,9,Ropa,',
+  ].join('\n')
+  const staged = validateRows(prepareImportRecords(parseCatalogRecords(csv, 'productos.csv').records, 'moda'))
+  expect(staged.map((s) => [s.row.title, s.row.price, s.valid])).toEqual([
+    ['Playera bordada', 230, true],
+    ['Gorra', 180, true],
+  ])
+})
+
+test('two different products that share a name are both kept; only true duplicates collapse', () => {
+  const kept = prepareImportRecords([
+    { external_id: '1', title: 'Vela', category: 'hogar', price: '100' },
+    { external_id: '2', title: 'Vela', category: 'hogar', price: '150' },
+  ], null)
+  expect(kept).toHaveLength(2)
+  const collapsed = prepareImportRecords([
+    { identificador_de_url: 'vela', external_id: 'V-1', title: 'Vela', category: 'hogar', price: '100' },
+    { identificador_de_url: 'vela', external_id: 'V-2', title: 'Vela', category: 'hogar', price: '100' },
+  ], null)
+  expect(collapsed).toHaveLength(1)
+})
+
+test('the import routes claim the shop lock, release it in a finally, and read fail-closed', () => {
+  for (const route of ['app/api/promoter/import/file/route.ts', 'app/api/promoter/import/shopify/route.ts']) {
+    const src = readFileSync(route, 'utf8')
+    expect(src.indexOf('claimShopImportLock(')).toBeGreaterThan(-1)
+    expect(src).toContain('finally {\n    await releaseShopImportLock(shop.id, claim.lock)')
+    expect(src).toContain('IMPORT_UNAVAILABLE')
+  }
+  const shopify = readFileSync('app/api/promoter/import/shopify/route.ts', 'utf8')
+  // The batch is claimed with a conditional write, read back.
+  expect(shopify).toContain(".eq('status', 'reviewing')\n      .select('id')")
+  // The mirror's live value, never 'published' (pr-reviewer, #480).
+  expect(shopify).toContain("targetStatus: status.privatePreview ? 'draft' : 'active'")
+  const file = readFileSync('app/api/promoter/import/file/route.ts', 'utf8')
+  expect(file).toContain('read.records.slice(0, MAX_IMPORT_ROWS)')
+  expect(file).toContain('if (!have || already === null)')
+})
+
+test('an image larger than the cap is refused by its declared size and never read past the cap', () => {
+  const src = readFileSync('lib/image-ingest.ts', 'utf8')
+  expect(src).toContain('if (Number.isFinite(declared) && declared > MAX_BYTES) return null')
+  expect(src).toContain('if (total > MAX_BYTES) { controller.abort(); return null }')
+  expect(src).not.toContain('await res.arrayBuffer()')
+})
+
+test('a migration charge has the same ownership rule as a package close', () => {
+  const src = readFileSync('app/api/promoter/close/migration/route.ts', 'utf8')
+  expect(src.indexOf('promoterMayCloseShop(')).toBeGreaterThan(-1)
+  expect(src.indexOf('promoterMayCloseShop(')).toBeLessThan(src.indexOf('resolveMigrationCharge('))
 })
