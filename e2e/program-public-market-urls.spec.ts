@@ -38,9 +38,6 @@ const PROGRAM_SURFACES = {
   'app/(shell)/promotor/cerrar/PreviewStep.tsx': [
     'shopUrlFor(SITE_ORIGIN, shop.slug)',
   ],
-  'app/(shell)/promotor/cerrar/PromoterCloseClient.tsx': [
-    'shopUrlFor(SITE_ORIGIN, shop.slug)',
-  ],
 } as const
 
 test.describe('platform program public catalog URLs', () => {

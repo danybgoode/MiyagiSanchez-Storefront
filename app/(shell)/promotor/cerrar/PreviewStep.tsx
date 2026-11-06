@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { shopUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
+import type { Dictionary } from '@/lib/dictionary'
 
 /**
  * Promoter workspace — private preview + activation step
@@ -42,12 +43,14 @@ const STATUS_LABEL: Record<string, string> = {
   activated: 'Tienda activa (pública)',
 }
 
-export default function PreviewStep({ shop, n }: { shop: Shop; n: number }) {
+export default function PreviewStep({ shop, n, relationshipId = null, panelCopy }: { shop: Shop; n: number; relationshipId?: string | null; panelCopy: Dictionary['promotorPanel'] }) {
   const [state, setState] = useState<State | null>(null)
   const [link, setLink] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<null | 'mint' | 'revoke' | 'activate' | 'refresh'>(null)
+  const [consentBusy, setConsentBusy] = useState(false)
+  const [consentNote, setConsentNote] = useState<string | null>(null)
 
   const loadState = useCallback(async () => {
     try {
@@ -116,11 +119,38 @@ export default function PreviewStep({ shop, n }: { shop: Shop; n: number }) {
   const status = state?.status
   const activated = status === 'activated'
 
+  // The owner approved their shop through the preview link; this records that approval on their relationship (moved
+  // here from the old «Datos del comercio» form, promoter-panel S2). The route accepts it only once the preview is
+  // `approved`, so the button shows only then (pr-reviewer, #481: it showed in exactly the states the route refuses).
+  async function registerConsent() {
+    if (!relationshipId) return
+    setConsentBusy(true); setConsentNote(null)
+    try {
+      const res = await fetch(`/api/promoter/relationship/${encodeURIComponent(relationshipId)}/consent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) { setConsentNote(data.error ?? panelCopy.errors.network); return }
+      setConsentNote(data.auditRecorded === false ? panelCopy.entrega.consentAudit : panelCopy.entrega.consentDone)
+      await loadState()
+    } catch { setConsentNote(panelCopy.errors.network) }
+    finally { setConsentBusy(false) }
+  }
+
   return (
     <section className="rounded-lg border border-[var(--color-border)] p-4 space-y-3">
       <h2 className="font-semibold">
         <span className="text-[var(--color-muted)] mr-2">{n}.</span>Vista previa privada y activación
       </h2>
+      {relationshipId && status === 'approved' ? (
+        <div className="grid gap-2">
+          <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{panelCopy.entrega.consentHint}</p>
+          <button type="button" className="btn btn-secondary btn-sm" style={{ justifySelf: 'start' }} onClick={registerConsent} disabled={consentBusy} data-testid="panel-consent">
+            {consentBusy ? panelCopy.entrega.consentSaving : panelCopy.entrega.consent}
+          </button>
+        </div>
+      ) : null}
+      {consentNote ? <p className="text-sm" role="status">{consentNote}</p> : null}
 
       {status && (
         <p className="text-sm">

@@ -8,6 +8,7 @@
  * never the mirror/seller id). The merchant claims it via the WhatsApp link
  * (POST /api/promoter/claim/link). Clerk- + `promoter.enabled`-gated.
  */
+import { CATALOG_CATEGORY_KEYS } from '@/lib/catalog-import'
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { revalidateTag } from 'next/cache'
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
     colonia?: string
     merchant_email?: string
     operating_market?: unknown
+    main_category?: unknown
   } = {}
   try { body = await req.json() } catch { /* validated below */ }
   const name = (body.name ?? '').trim()
@@ -96,8 +98,18 @@ export async function POST(req: NextRequest) {
     ? merchantEmailRaw
     : null
 
-  const metadata = (locationDetail || merchantEmail)
-    ? { ...(locationDetail ? { location_detail: locationDetail } : {}), ...(merchantEmail ? { merchant_email: merchantEmail } : {}) }
+  // promoter-panel D6: the «Categoría principal» picked in «El negocio» — a catalog key or nothing. An import gives it
+  // to every row whose platform category isn't one of ours (D3), so it is stored on the shop.
+  const mainCategory = typeof body.main_category === 'string' && (CATALOG_CATEGORY_KEYS as readonly string[]).includes(body.main_category)
+    ? body.main_category
+    : null
+
+  const metadata = (locationDetail || merchantEmail || mainCategory)
+    ? {
+        ...(locationDetail ? { location_detail: locationDetail } : {}),
+        ...(merchantEmail ? { merchant_email: merchantEmail } : {}),
+        ...(mainCategory ? { main_category: mainCategory } : {}),
+      }
     : undefined
 
   // Mint the unclaimed Medusa seller (the storefront's only read model).

@@ -60,3 +60,33 @@ export function importLockState(metadata: unknown, now: Date = new Date()): 'fre
   const at = Date.parse(lock.at)
   return Number.isFinite(at) && now.getTime() - at < IMPORT_LOCK_TTL_MS ? 'busy' : 'free'
 }
+
+const onlyDigits = (v: string) => v.replace(/\D/g, '')
+
+/**
+ * The WhatsApp as the promoter sees it: a Mexican number as its 10 digits; any other country kept whole with its `+`,
+ * so saving never turns a `+1…` number into a `+52…` one (pr-reviewer, #481).
+ */
+export function whatsappForDisplay(e164: string | null | undefined): string {
+  if (!e164) return ''
+  return e164.startsWith('+52') ? onlyDigits(e164).slice(-10) : e164
+}
+
+/** 10 digits (Mexico), or a full international number with its `+` (11–15 digits). */
+export function whatsappIsValid(value: string): boolean {
+  const d = onlyDigits(value)
+  return value.trim().startsWith('+') ? d.length >= 11 && d.length <= 15 : d.length === 10
+}
+
+/** What the form sends: an international number as typed (with `+`), a Mexican one as its digits. */
+export function whatsappForSave(value: string): string {
+  return value.trim().startsWith('+') ? value.trim() : onlyDigits(value)
+}
+
+/**
+ * The lead's `current_channels` after a save: our «¿Vende hoy en otra plataforma?» answer replaces only our own value,
+ * and anything else already there (a founding-merchant application's free text) stays (pr-reviewer, #481).
+ */
+export function mergeCurrentChannels(existing: readonly string[], ours: SellsToday | null): string[] {
+  return [...existing.filter((c) => !isSellsToday(c)), ...(ours ? [ours] : [])]
+}

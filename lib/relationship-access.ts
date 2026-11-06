@@ -484,7 +484,7 @@ export async function scopedRelationshipCandidates(actor: RelationshipActor): Pr
 
 // ── Client DTO ──────────────────────────────────────────────────────────────
 
-/** The camelCase shape every route hands back to `RelationshipStep`. */
+/** The camelCase shape every route hands back to the panel's «El negocio» step (`NegocioStep`). */
 export interface RelationshipDTO {
   id: string
   businessName: string

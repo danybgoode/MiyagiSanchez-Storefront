@@ -5418,5 +5418,120 @@
     "s_f834061e3863469f": "Cuántos pagos",
     "s_fa5c65a24285b39b": "Sin conexión. No pudimos cancelar el link.",
     "s_fd0137cd1dfed775": "Concepto"
+  },
+  "promotorPanel": {
+    "header": {
+      "title": "Tu panel de promotor",
+      "lead": "Abre la tienda de un negocio en una sola visita."
+    },
+    "steps": {
+      "negocio": "El negocio",
+      "productos": "Sus productos",
+      "cobra": "Cobra",
+      "entrega": "Entrégala",
+      "of": "Paso {n} de 4"
+    },
+    "bind": {
+      "title": "Pon tu código de promotor",
+      "hint": "Te lo mandamos por correo cuando te aprobamos. Empieza con PRM-.",
+      "placeholder": "PRM-XXXX",
+      "button": "Entrar a mi panel",
+      "busy": "Entrando…",
+      "error": "Ese código no existe o ya está en otra cuenta. Revísalo o escríbenos."
+    },
+    "negocio": {
+      "lead": "Lo que te cuente el dueño. Solo necesitas el nombre del negocio y su WhatsApp.",
+      "recent": "Tus negocios recientes",
+      "newOne": "+ Otro negocio",
+      "name": "Nombre del negocio",
+      "owner": "Nombre del dueño (opcional)",
+      "whatsapp": "WhatsApp del dueño",
+      "whatsappHint": "10 dígitos. Ahí le llega su recibo y el enlace de su tienda.",
+      "cp": "Código postal",
+      "cpButton": "Buscar",
+      "cpBusy": "Buscando…",
+      "cpManual": "No sé el código postal",
+      "colonia": "Colonia",
+      "estado": "Estado",
+      "municipio": "Municipio o alcaldía",
+      "sells": "¿Qué vende?",
+      "category": "Categoría principal",
+      "sellsToday": "¿Vende hoy en otra plataforma?",
+      "channel": "¿Por dónde prefiere que le hablen?",
+      "interest": "¿Qué tan interesado está?",
+      "notes": "Notas",
+      "notesPlaceholder": "Lo que te dijo: dudas, horarios, lo que le preocupa",
+      "more": "Más datos",
+      "email": "Correo del dueño",
+      "emailHint": "Si lo pones, su recibo también le llega por correo.",
+      "phone": "Otro teléfono",
+      "instagram": "Instagram",
+      "choose": "Elige…",
+      "open": "Abrir su tienda",
+      "opening": "Abriendo su tienda…",
+      "save": "Guardar para después",
+      "saving": "Guardando…",
+      "continue": "Seguir a sus productos",
+      "saved": "Guardado. Lo encuentras en Mis negocios cuando vuelvas.",
+      "created": "Listo, la tienda de {nombre} ya existe. Está en privado hasta que el dueño la apruebe.",
+      "dupe": "Ya tienes un negocio registrado con esos datos: «{nombre}». ¿Es el mismo?",
+      "dupeNoName": "Ya tienes un negocio registrado con esos datos. ¿Es el mismo?",
+      "dupeYes": "Sí, seguir con ese",
+      "dupeNo": "No, es otro",
+      "nameRequired": "Escribe el nombre del negocio.",
+      "whatsappRequired": "Escribe el WhatsApp del dueño (10 dígitos).",
+      "notYours": "Ese negocio lo registró otro promotor. Sigue con uno nuevo.",
+      "linkError": "La tienda se abrió, pero no pudimos ligarla a este negocio. Vuelve a tocar «Guardar para después».",
+      "shapes": {
+        "products": "Productos",
+        "services": "Servicios",
+        "food": "Comida",
+        "made_to_order": "Hecho a pedido",
+        "rentals": "Rentas",
+        "digital": "Digital"
+      },
+      "sellsTodayOptions": {
+        "none": "No, solo en su local",
+        "social": "Instagram o WhatsApp",
+        "mercadolibre": "Mercado Libre",
+        "shopify": "Shopify",
+        "tiendanube": "Tiendanube",
+        "woocommerce": "WooCommerce",
+        "bigcartel": "Big Cartel",
+        "other": "Otra"
+      },
+      "channels": {
+        "whatsapp": "WhatsApp",
+        "phone": "Llamada",
+        "email": "Correo",
+        "instagram": "Instagram",
+        "in_person": "En persona"
+      },
+      "interestOptions": {
+        "unknown": "Todavía no sé",
+        "strong": "Muy interesado",
+        "medium": "Lo está pensando",
+        "weak": "Poco interesado",
+        "disqualified": "No le interesa"
+      },
+      "auditWarning": "Se guardó, pero no se pudo registrar el historial del cambio. Vuelve a tocar «Guardar para después».",
+      "suggestions": "¿Es alguno de estos negocios que ya tienes?",
+      "whatsappInvalid": "Escribe el WhatsApp del dueño: 10 dígitos, o el número completo con + si no es de México.",
+      "market": "País de la tienda",
+      "marketMx": "México",
+      "marketUs": "Estados Unidos",
+      "description": "Descripción del negocio (opcional)",
+      "dupeElsewhere": "Otro promotor ya registró un negocio con esos datos. Si es otro negocio, sigue; si es el mismo, ya tiene quien lo atienda."
+    },
+    "errors": {
+      "network": "No se pudo guardar. Revisa tu conexión e intenta otra vez."
+    },
+    "entrega": {
+      "consent": "Guardar la aprobación del dueño",
+      "consentHint": "El dueño ya aprobó su tienda desde el enlace que le mandaste. Guárdalo para que quede en su registro.",
+      "consentSaving": "Guardando…",
+      "consentDone": "Aprobación guardada.",
+      "consentAudit": "La aprobación se guardó, pero no su historial. Vuelve a tocar el botón."
+    }
   }
 }
