@@ -5645,7 +5645,8 @@
       "statusUnavailable": "No pudimos leer el estado de tu plan en este momento. Vuelve a abrir el enlace en un rato.",
       "titleGeneric": "Tu recibo",
       "paidNoPromoter": "Pagaste {monto} el {fecha}.",
-      "ended": "Tu Plan Negocio terminó el {fecha}. Puedes renovarlo desde tu panel."
+      "ended": "Tu Plan Negocio terminó el {fecha}. Puedes renovarlo desde tu panel.",
+      "issuedBy": "Este recibo lo emitió {promotor} ({codigo}) para registrar lo que le pagaste en persona. Si la cantidad o el plan no coinciden con lo que pagaste, escríbenos."
     }
   }
 }

@@ -175,5 +175,8 @@ test('the page: noindex, a bad token or a missing shop is a 404, and help reache
   expect(page).toContain('if (!payload) notFound()')
   expect(page).toContain('if (!view) notFound()')
   expect(page).toContain('contactMailto(')
+  // It says who issued it: the promoter's record of a cash payment, with a way to dispute it (Codex security lens, #483).
+  expect(page).toContain('fillTemplate(t.issuedBy, values)')
+  expect(es.promotorPanel.recibo.issuedBy).toContain('escríbenos')
   expect(JSON.stringify(es.promotorPanel.recibo)).not.toMatch(/cerrar|cierre/i)
 })

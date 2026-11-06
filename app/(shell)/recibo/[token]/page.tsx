@@ -54,6 +54,9 @@ export default async function ReceiptPage({ params }: { params: Promise<{ token:
         <p role="status" style={{ margin: 0, fontWeight: 600, color: tone }}>{statusLine}</p>
       </div>
       <div className="grid gap-2">
+        {/* The receipt is the promoter's record of a cash payment, not Miyagi Sánchez's confirmation of it: say who issued
+            it and what to do if it is wrong (Codex security lens, #483). */}
+        {view.promoterCode ? <p className="t-small" style={{ margin: 0 }} data-testid="receipt-issued-by">{fillTemplate(t.issuedBy, values)}</p> : null}
         <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{t.help}</p>
         <a className="btn btn-secondary" style={{ justifySelf: 'start' }} href={contactMailto(view.shopName ? fillTemplate(t.title, values) : t.titleGeneric)}>{t.helpCta}</a>
       </div>

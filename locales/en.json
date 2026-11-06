@@ -5645,7 +5645,8 @@
       "statusUnavailable": "We couldn't read your plan's status right now. Open the link again in a little while.",
       "titleGeneric": "Your receipt",
       "paidNoPromoter": "You paid {monto} on {fecha}.",
-      "ended": "Your Negocio plan ended on {fecha}. You can renew it from your dashboard."
+      "ended": "Your Negocio plan ended on {fecha}. You can renew it from your dashboard.",
+      "issuedBy": "{promotor} ({codigo}) issued this receipt to record what you paid them in person. If the amount or the plan doesn't match what you paid, write to us."
     }
   }
 }
