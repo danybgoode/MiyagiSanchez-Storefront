@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* Tailwind v4's preflight resets buttons to `cursor: default` (v3 left the browser's pointer). Only `.btn` set it back,
+   so every raw-Tailwind button — 110 files, the promoter workspace and /admin/promoter among them — read as not
+   clickable (Daniel, 2026-11-05). This is Tailwind's own documented upgrade fix, in the base layer so any utility
+   (`cursor-not-allowed`, `cursor-wait`) still wins. A disabled button keeps the default arrow. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label:has(> input[type="file"]:not(:disabled)),
+  input[type="file"]:not(:disabled)::file-selector-button {
+    cursor: pointer;
+  }
+}
+
 /* ============================================================================
    Miyagi Sánchez — globals.css
    Design System v2 integrated. Tokens from miyagi-s-nchez-design-system.
