@@ -20,10 +20,14 @@ const WOO_TYPES = new Set(['simple', 'variable', 'variation', 'grouped', 'extern
  * stripping turned `&lt;script&gt;` into a literal tag, and a nested `<scr<x>ipt>` survived one pass).
  */
 export function stripHtml(input: string): string {
-  return input
-    .replace(/<\s*br\s*\/?>/gi, '\n')
-    .replace(/<\/\s*(p|div|li|h[1-6])\s*>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
+  let text = input.replace(/<\s*br\s*\/?>/gi, '\n').replace(/<\/\s*(p|div|li|h[1-6])\s*>/gi, '\n')
+  // Repeat until nothing changes: one pass leaves `<scr<x>ipt>` as `<script>` (CodeQL js/incomplete-multi-character-sanitization).
+  let previous: string
+  do {
+    previous = text
+    text = text.replace(/<[^>]*>/g, '')
+  } while (text !== previous)
+  return text
     .replace(/&nbsp;/g, ' ')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
