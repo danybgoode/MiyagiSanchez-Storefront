@@ -245,13 +245,13 @@
         "app/(shell)/shop/manage/import/page.tsx:43",
         "app/(shell)/shop/manage/shopify/import/page.tsx:18",
         "app/(shell)/shop/manage/shopify/import/parity/[batchId]/page.tsx:32",
-        "app/api/promoter/close/migration/route.ts:27",
+        "app/api/promoter/close/migration/route.ts:28",
         "app/api/sell/shopify/import/fetch/route.ts:28",
         "app/api/sell/shopify/import/parity/estimate/route.ts:23",
         "app/api/sell/shopify/import/parity/route.ts:17",
         "app/api/sell/shopify/import/route.ts:25",
         "app/api/ucp/mcp/route.ts:4286",
-        "lib/promoter-import-server.ts:29"
+        "lib/promoter-import-server.ts:60"
       ]
     },
     {
@@ -431,7 +431,7 @@
         "app/api/promoter/attribute/route.ts:23",
         "app/api/promoter/claim/link/route.ts:23",
         "app/api/promoter/close/listing/route.ts:65",
-        "app/api/promoter/close/migration/route.ts:27",
+        "app/api/promoter/close/migration/route.ts:28",
         "app/api/promoter/close/package/[sku]/route.ts:30",
         "app/api/promoter/close/photo/route.ts:31",
         "app/api/promoter/close/transfer/[id]/report/route.ts:20",
@@ -443,7 +443,7 @@
         "app/api/promoter/validate-code/route.ts:24",
         "lib/domain-subscription-checkout.ts:90",
         "lib/ml-sync-subscription-checkout.ts:69",
-        "lib/promoter-import-server.ts:28",
+        "lib/promoter-import-server.ts:59",
         "lib/subdomain-subscription-checkout.ts:95"
       ]
     },
@@ -499,7 +499,7 @@
       "enforcement": "frontend",
       "callsites": [
         "app/(shell)/promotor/cerrar/page.tsx:26",
-        "app/api/promoter/close/migration/route.ts:56",
+        "app/api/promoter/close/migration/route.ts:62",
         "app/api/promoter/close/package/[sku]/route.ts:71",
         "app/api/promoter/close/transfer/[id]/report/route.ts:20",
         "app/api/promoter/close/transfer/route.ts:21"
