@@ -32,9 +32,6 @@ const PROGRAM_SURFACES = {
   'app/(shell)/partner/page.tsx': [
     'shopUrlFor(SITE_ORIGIN, g.shop.slug)',
   ],
-  'app/(shell)/promotor/cerrar/ListingStep.tsx': [
-    'shopUrlFor(SITE_ORIGIN, shop.slug)',
-  ],
   'app/(shell)/promotor/cerrar/PreviewStep.tsx': [
     'shopUrlFor(SITE_ORIGIN, shop.slug)',
   ],

@@ -5532,6 +5532,54 @@
       "consentSaving": "Guardando…",
       "consentDone": "Aprobación guardada.",
       "consentAudit": "La aprobación se guardó, pero no su historial. Vuelve a tocar el botón."
+    },
+    "productos": {
+      "leadCards": "Toma la foto, pon el precio y guarda. Con 3 productos su tienda ya se ve viva.",
+      "takePhoto": "Tomar foto",
+      "gallery": "Elegir de la galería",
+      "uploading": "Subiendo fotos…",
+      "photos": "{n} de 6 fotos",
+      "removePhoto": "Quitar foto",
+      "fillFromPhoto": "Llenar los datos con la foto",
+      "filling": "Revisando la foto…",
+      "filled": "Listo: revisa el nombre, el precio y la categoría antes de guardar.",
+      "fillFailed": "No pudimos leer el producto en la foto. Llénalo a mano.",
+      "name": "Nombre del producto",
+      "price": "Precio",
+      "stock": "¿Cuántos tiene?",
+      "category": "Categoría",
+      "description": "Descripción (opcional)",
+      "choose": "Elige…",
+      "save": "Guardar producto",
+      "saving": "Guardando…",
+      "saved": "Guardado. ¿Otro?",
+      "counter": "{n} productos agregados en esta visita",
+      "nameRequired": "Escribe el nombre del producto (al menos 3 letras).",
+      "categoryRequired": "Elige la categoría.",
+      "uploadFailed": "Una o más fotos no se pudieron subir. Intenta otra vez.",
+      "shopify": {
+        "lead": "Trae su catálogo de Shopify completo. Solo escribe la dirección de su tienda.",
+        "field": "Dirección de su tienda",
+        "placeholder": "mitienda.com",
+        "search": "Buscar sus productos",
+        "searching": "Buscando…",
+        "found": "Encontramos {n} productos.",
+        "add": "Agregar los {n} a su tienda",
+        "adding": "Agregando… puede tardar un par de minutos.",
+        "error": "No pudimos leer esa tienda. Revisa la dirección con el dueño."
+      },
+      "file": {
+        "lead": "Pídele que descargue su lista de productos (un archivo .csv) desde su plataforma.",
+        "howTo": "Cómo descargarla",
+        "upload": "Subir el archivo",
+        "uploading": "Leyendo el archivo…"
+      },
+      "mercadolibre": "Su catálogo de Mercado Libre se conecta después, desde su propio panel, cuando la tienda ya sea suya. Por ahora sube aquí sus productos principales.",
+      "imported": "Agregamos {n} productos a su tienda.",
+      "skipped": "{n} ya estaban en su tienda.",
+      "invalid": "{n} no se pudieron leer (les falta nombre o categoría).",
+      "overCap": "Hay {n} productos más. Agregamos aquí sus 150 principales; para traer todo, ofrécele la Migración con consultor en el paso Cobra.",
+      "orByHand": "También puedes agregar productos a mano:"
     }
   }
 }

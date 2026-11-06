@@ -2,7 +2,8 @@
 
 import { PACKAGES, packageSplit, type PackageSku } from '@/lib/promoter-packages'
 import { useEffect, useState } from 'react'
-import ListingStep from './ListingStep'
+import ProductosStep from './ProductosStep'
+import type { SellsToday } from '@/lib/promoter-panel'
 import PreviewStep from './PreviewStep'
 import NegocioStep from './NegocioStep'
 import type { Dictionary } from '@/lib/dictionary'
@@ -50,11 +51,13 @@ export default function PromoterCloseClient({
   const [shop, setShop] = useState<Shop | null>(null)
   // The lead (merchant_relationships) the promoter is working on; the preview step records in-person consent on it.
   const [relationshipId, setRelationshipId] = useState<string | null>(null)
+  // From «El negocio»: step 2's path and the default category for a new product.
+  const [choices, setChoices] = useState<{ sellsToday: SellsToday | null; mainCategory: string | null }>({ sellsToday: null, mainCategory: null })
 
   if (!bound) return <BindStep copy={copy} onBound={setBound} />
 
-  // Steps 2–4 keep their running numbers until Sprints 3–4 rebuild them on the same shell.
-  let n = 1
+  // «Cobra» and «Entrégala» keep their running numbers until Sprint 4 rebuilds them on the same shell.
+  let n = 2
   return (
     <div className="max-w-xl mx-auto px-4 py-8 grid gap-6" data-testid="promoter-panel">
       <header className="grid gap-1">
@@ -75,8 +78,9 @@ export default function PromoterCloseClient({
         shop={shop}
         onShop={setShop}
         onRelationship={(id) => setRelationshipId(id)}
+        onChoices={setChoices}
       />
-      {shop && <div id="panel-productos"><ListingStep shop={shop} n={(n += 1)} /></div>}
+      {shop && <ProductosStep copy={copy} shop={shop} sellsToday={choices.sellsToday} mainCategory={choices.mainCategory} />}
       {shop && previewEnabled && <PreviewStep shop={shop} n={(n += 1)} relationshipId={relationshipId} panelCopy={copy} />}
       {shop && <CloseStep shop={shop} transferEnabled={transferEnabled} packageRates={packageRates} n={(n += 1)} />}
       {shop && <HandoffStep shop={shop} n={(n += 1)} />}
