@@ -180,7 +180,7 @@ export default async function MarketDocument({
             href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
           />
           {/* iOS PWA: explicit apple-touch-icon for Safari (stable URL beats Next.js hashed path) */}
-          <link rel="apple-touch-icon" href="/apple-icon.png" />
+          <link rel="apple-touch-icon" href="/apple-icon" />
 
           {/* iOS PWA: splash screens for every iPhone viewport.
               Apple fetches these once at Add-to-Home-Screen time.
