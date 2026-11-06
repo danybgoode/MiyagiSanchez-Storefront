@@ -5642,7 +5642,10 @@
       "notFound": "Este recibo no existe o el enlace está incompleto.",
       "emailSubject": "Tu recibo de {negocio} en Miyagi Sánchez",
       "emailCta": "Ver mi recibo",
-      "statusUnavailable": "No pudimos leer el estado de tu plan en este momento. Vuelve a abrir el enlace en un rato."
+      "statusUnavailable": "No pudimos leer el estado de tu plan en este momento. Vuelve a abrir el enlace en un rato.",
+      "titleGeneric": "Tu recibo",
+      "paidNoPromoter": "Pagaste {monto} el {fecha}.",
+      "ended": "Tu Plan Negocio terminó el {fecha}. Puedes renovarlo desde tu panel."
     }
   }
 }

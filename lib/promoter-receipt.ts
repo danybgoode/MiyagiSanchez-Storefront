@@ -55,26 +55,44 @@ export function verifyReceiptToken(token: string, secret: string): ReceiptPayloa
 }
 
 /**
- * What the merchant reads. `active` = the Plan Negocio is on (our share arrived: card, or an approved transfer);
- * `ready` = the free-plan setup is done; `pending` = Miyagi Sánchez hasn't confirmed the promoter's payment yet;
- * `problem` = the promoter's transfer was rejected — the merchant should write to us.
+ * What the merchant reads, in this order (pr-reviewer, #483):
+ * 1. The latest transfer for this package is `pending`/`reported` → `pending`: a sale still being confirmed never
+ *    borrows an earlier sale's «Activo».
+ * 2. Our share never arrived → `problem` when that transfer was rejected (the merchant should write to us), else
+ *    `pending`.
+ * 3. It arrived: the free setup is `ready`; a Negocio package is `active` while the grant runs, and `ended` once it ran
+ *    out — never «Activo hasta» a date already past. A grant with no end date (a permanent one) is `active`.
  */
-export type ReceiptStatus = { kind: 'active'; endsAt: string | null } | { kind: 'ready' } | { kind: 'pending' } | { kind: 'problem' }
+export type ReceiptStatus =
+  | { kind: 'active'; endsAt: string | null }
+  | { kind: 'ended'; endsAt: string }
+  | { kind: 'ready' }
+  | { kind: 'pending' }
+  | { kind: 'problem' }
 
 export function receiptStatus(input: {
   sku: PackageSku
   attributionPaid: boolean
   transferStatus: string | null
   negocioEndsAt: string | null
+  now: Date
 }): ReceiptStatus {
-  if (input.attributionPaid) return PACKAGES[input.sku].negocioMonths > 0 ? { kind: 'active', endsAt: input.negocioEndsAt } : { kind: 'ready' }
-  if (input.transferStatus === 'rejected') return { kind: 'problem' }
-  return { kind: 'pending' }
+  if (input.transferStatus === 'pending' || input.transferStatus === 'reported') return { kind: 'pending' }
+  if (!input.attributionPaid) return input.transferStatus === 'rejected' ? { kind: 'problem' } : { kind: 'pending' }
+  if (PACKAGES[input.sku].negocioMonths === 0) return { kind: 'ready' }
+  const ends = input.negocioEndsAt ? Date.parse(input.negocioEndsAt) : NaN
+  if (input.negocioEndsAt && Number.isFinite(ends) && ends <= input.now.getTime()) return { kind: 'ended', endsAt: input.negocioEndsAt }
+  return { kind: 'active', endsAt: input.negocioEndsAt }
 }
 
-/** `$2,000 MXN` — one format everywhere a receipt shows an amount (D10). */
+/**
+ * `$2,000 MXN` — one format everywhere a receipt shows an amount (D10). Centavos show only when there are some
+ * (`$1,499.50 MXN`): a money receipt never rounds (pr-reviewer, #483 — migration and discounted grosses carry them).
+ */
 export function formatReceiptAmount(cents: number): string {
-  return `$${Math.round(cents / 100).toLocaleString('en-US')} MXN`
+  const whole = Math.trunc(cents / 100)
+  const centavos = Math.abs(cents % 100)
+  return `$${whole.toLocaleString('en-US')}${centavos ? `.${String(centavos).padStart(2, '0')}` : ''} MXN`
 }
 
 /** The WhatsApp link the promoter opens, to the owner's number, with the message from the locale. */

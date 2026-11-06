@@ -5642,7 +5642,10 @@
       "notFound": "This receipt doesn't exist or the link is incomplete.",
       "emailSubject": "Your receipt for {negocio} on Miyagi Sánchez",
       "emailCta": "See my receipt",
-      "statusUnavailable": "We couldn't read your plan's status right now. Open the link again in a little while."
+      "statusUnavailable": "We couldn't read your plan's status right now. Open the link again in a little while.",
+      "titleGeneric": "Your receipt",
+      "paidNoPromoter": "You paid {monto} on {fecha}.",
+      "ended": "Your Negocio plan ended on {fecha}. You can renew it from your dashboard."
     }
   }
 }

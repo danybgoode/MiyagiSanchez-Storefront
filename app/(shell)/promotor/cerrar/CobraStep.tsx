@@ -63,6 +63,8 @@ export default function CobraStep({ copy, shop, transferEnabled, packageRates }:
       setTransfer(null)
       return
     }
+    // A switched option never keeps showing the previous option's transfer while this one loads (pr-reviewer, #483).
+    setTransfer(null)
     const transferSku = sku ?? 'migration'
     let cancelled = false
     fetch(`/api/promoter/close/transfer?shopId=${encodeURIComponent(shop.shopId)}&sku=${transferSku}`)

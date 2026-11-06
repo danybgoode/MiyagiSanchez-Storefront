@@ -5,63 +5,23 @@
  * The status reads LIVE on every visit: the attribution turns `paid` when our share lands (card webhook, or the admin
  * approving a transfer), so the same link reads «Pendiente» today and «Activo» tomorrow without a second message.
  *
- * Three states, never two: a read that fails is `unavailable`, never «Pendiente». Telling a merchant their payment is
- * still being confirmed because WE could not read the table would be a confident falsehood.
+ * Three states, never two: a read that fails is `unavailable`, never «Pendiente» and never a 404. The decisions and
+ * the queries live in `lib/promoter-receipt-read.ts`, testable with an injected database.
  */
 import 'server-only'
 import { db } from '@/lib/supabase'
-import { getPromoterById } from '@/lib/promoter'
-import { readNegocioGrant } from '@/lib/plan'
-import { resolveTargetShop } from '@/lib/promoter-server'
-import { receiptStatus, type ReceiptPayload, type ReceiptStatus } from '@/lib/promoter-receipt'
+import type { ReceiptPayload } from '@/lib/promoter-receipt'
+import { readReceiptViewWith, type ReceiptDb, type ReceiptView } from '@/lib/promoter-receipt-read'
 
 export function receiptSecret(): string | null {
   return process.env.CLAIM_JWT_SECRET || null
 }
 
-export type ReceiptView = {
-  shopName: string
-  promoterName: string | null
-  promoterCode: string
-  status: ReceiptStatus | { kind: 'unavailable' }
-}
+export type { ReceiptView } from '@/lib/promoter-receipt-read'
 
-/** Everything the receipt page shows, or null when the shop or the promoter no longer exists (the page then 404s). */
-export async function readReceiptView(payload: ReceiptPayload): Promise<ReceiptView | null> {
-  const [shop, promoter] = await Promise.all([resolveTargetShop({ shopId: payload.shopId }), getPromoterById(payload.promoterId)])
-  if (!shop || !promoter) return null
-
-  const [attribution, transfer] = await Promise.all([
-    db
-      .from('marketplace_promoter_attributions')
-      .select('status')
-      .eq('promoter_id', payload.promoterId)
-      .eq('seller_id', payload.shopId)
-      .eq('sku', payload.sku)
-      .is('payment_ref', null)
-      .maybeSingle(),
-    db
-      .from('marketplace_promoter_transfers')
-      .select('status')
-      .eq('promoter_id', payload.promoterId)
-      .eq('seller_id', payload.shopId)
-      .eq('sku', payload.sku)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ])
-
-  const base = { shopName: shop.name, promoterName: promoter.name ?? null, promoterCode: promoter.code }
-  if (attribution.error || transfer.error) return { ...base, status: { kind: 'unavailable' } }
-  return {
-    ...base,
-    status: receiptStatus({
-      sku: payload.sku,
-      attributionPaid: (attribution.data as { status?: string } | null)?.status === 'paid',
-      transferStatus: (transfer.data as { status?: string } | null)?.status ?? null,
-      negocioEndsAt: readNegocioGrant(shop.metadata)?.expires_at ?? null,
-    }),
-  }
+/** Everything the receipt page shows, or null when the shop or the promoter is confirmed gone (the page then 404s). */
+export function readReceiptView(payload: ReceiptPayload): Promise<ReceiptView | null> {
+  return readReceiptViewWith(db as unknown as ReceiptDb, payload, new Date())
 }
 
 /**

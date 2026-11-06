@@ -53,6 +53,9 @@ export default function EntregaStep({ copy, shop, previewEnabled, relationshipId
         <p className="t-small" style={{ margin: 'var(--s-1) 0 0', color: 'var(--fg-muted)' }}>{t.lead}</p>
       </div>
 
+      {/* With previews on, the owner reviews and approves first; the claim link comes after (the old order). */}
+      {previewEnabled ? <PreviewStep shop={shop} relationshipId={relationshipId} panelCopy={copy} /> : null}
+
       {previewEnabled ? null : (
         <a className="btn btn-secondary" style={{ justifySelf: 'start' }} href={shopUrlFor(SITE_ORIGIN, shop.slug)} target="_blank" rel="noreferrer">{t.see}</a>
       )}
@@ -71,8 +74,6 @@ export default function EntregaStep({ copy, shop, previewEnabled, relationshipId
         </button>
       )}
       {error ? <p className="text-sm" role="alert" style={{ margin: 0, color: 'var(--danger)' }}>{error}</p> : null}
-
-      {previewEnabled ? <PreviewStep shop={shop} relationshipId={relationshipId} panelCopy={copy} /> : null}
     </section>
   )
 }

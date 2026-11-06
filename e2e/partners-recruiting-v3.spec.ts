@@ -38,8 +38,11 @@ const PROMOTER_IDENTITY_BY_ID_CONSUMERS = [
   'app/api/admin/promoter/transfers/[id]/approve/route.ts',
   'app/api/admin/promoter/transfers/[id]/reject/route.ts',
   'lib/promoter-close-notify.ts',
-  'lib/promoter-receipt-server.ts', // promoter-panel S4: the receipt page names the promoter who was paid
 ] as const
+// Not a resolver consumer, on purpose: lib/promoter-receipt-read.ts reads only `name, code` of the promoter id inside a
+// SIGNED receipt token (minted for a promoter-track identity by /api/promoter/close/receipt), with no track filter, so
+// a promoter later moved to another track does not turn every receipt they issued into a 404 (pr-reviewer, #483).
+// It grants nothing and computes no economics.
 
 function sourceFilesBelow(relativeDirectory: string): string[] {
   const found: string[] = []

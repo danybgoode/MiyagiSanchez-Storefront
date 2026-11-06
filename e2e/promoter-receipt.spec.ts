@@ -13,6 +13,7 @@ import {
   signReceiptToken,
   verifyReceiptToken,
 } from '../lib/promoter-receipt'
+import { readReceiptViewWith } from '../lib/promoter-receipt-read'
 
 const SECRET = 'test-secret-for-receipts'
 const PAYLOAD = { shopId: 'shop-1', sku: 'negocio_anual' as const, promoterId: 'prm-1', amountCents: 200000, issuedAt: '2026-11-06T18:00:00.000Z' }
@@ -41,33 +42,103 @@ test.describe('the receipt token', () => {
 })
 
 test.describe('the status the merchant reads', () => {
-  test('our share paid: Negocio packages read Activo (with the end date), the free setup reads Listo', () => {
-    expect(receiptStatus({ sku: 'negocio_anual', attributionPaid: true, transferStatus: 'approved', negocioEndsAt: '2027-11-06T00:00:00.000Z' }))
-      .toEqual({ kind: 'active', endsAt: '2027-11-06T00:00:00.000Z' })
-    expect(receiptStatus({ sku: 'negocio_arranque', attributionPaid: true, transferStatus: null, negocioEndsAt: null })).toEqual({ kind: 'active', endsAt: null })
-    expect(receiptStatus({ sku: 'setup_gratis', attributionPaid: true, transferStatus: null, negocioEndsAt: null })).toEqual({ kind: 'ready' })
+  const NOW = new Date('2026-11-06T18:00:00.000Z')
+  const base = { sku: 'negocio_anual' as const, attributionPaid: true, transferStatus: null as string | null, negocioEndsAt: '2027-11-06T00:00:00.000Z', now: NOW }
+
+  test('our share paid: a running Negocio grant reads Activo with its end date; the free setup reads Listo', () => {
+    expect(receiptStatus(base)).toEqual({ kind: 'active', endsAt: '2027-11-06T00:00:00.000Z' })
+    expect(receiptStatus({ ...base, transferStatus: 'approved' })).toEqual({ kind: 'active', endsAt: '2027-11-06T00:00:00.000Z' })
+    expect(receiptStatus({ ...base, negocioEndsAt: null })).toEqual({ kind: 'active', endsAt: null })
+    expect(receiptStatus({ ...base, sku: 'setup_gratis', negocioEndsAt: null })).toEqual({ kind: 'ready' })
   })
 
-  test('not paid yet: Pendiente, whatever the transfer says, unless it was rejected', () => {
+  test('a grant that ran out reads «terminó», never «Activo hasta» a past date (pr-reviewer, #483)', () => {
+    expect(receiptStatus({ ...base, negocioEndsAt: '2026-11-01T00:00:00.000Z' })).toEqual({ kind: 'ended', endsAt: '2026-11-01T00:00:00.000Z' })
+    expect(receiptStatus({ ...base, negocioEndsAt: NOW.toISOString() })).toMatchObject({ kind: 'ended' })
+  })
+
+  test('a repeat sale still being confirmed reads Pendiente, even with an earlier paid sale (pr-reviewer, #483)', () => {
+    expect(receiptStatus({ ...base, transferStatus: 'pending' })).toEqual({ kind: 'pending' })
+    expect(receiptStatus({ ...base, transferStatus: 'reported' })).toEqual({ kind: 'pending' })
+  })
+
+  test('not paid: Pendiente, or a problem when the transfer was rejected', () => {
     for (const transferStatus of [null, 'pending', 'reported', 'approved']) {
-      expect(receiptStatus({ sku: 'negocio_anual', attributionPaid: false, transferStatus, negocioEndsAt: null })).toEqual({ kind: 'pending' })
+      expect(receiptStatus({ ...base, attributionPaid: false, transferStatus })).toEqual({ kind: 'pending' })
     }
-    expect(receiptStatus({ sku: 'negocio_anual', attributionPaid: false, transferStatus: 'rejected', negocioEndsAt: null })).toEqual({ kind: 'problem' })
-  })
-
-  test('a failed read is «unavailable», never «Pendiente» (three states, never two)', () => {
-    const server = readFileSync('lib/promoter-receipt-server.ts', 'utf8')
-    expect(server).toContain("if (attribution.error || transfer.error) return { ...base, status: { kind: 'unavailable' } }")
-    const page = readFileSync('app/(shell)/recibo/[token]/page.tsx', 'utf8')
-    expect(page).toContain(': t.statusUnavailable')
-    expect(es.promotorPanel.recibo.statusUnavailable).toBeTruthy()
+    expect(receiptStatus({ ...base, attributionPaid: false, transferStatus: 'rejected' })).toEqual({ kind: 'problem' })
   })
 })
 
-test('one amount format everywhere: $2,000 MXN, also in the transfer-approved and card emails', () => {
+/** A fake supabase-js builder: records every filter, answers each table with the result given. */
+function fakeDb(answers: Record<string, { data: unknown; error: unknown }>) {
+  const calls: Record<string, string[]> = {}
+  const db = {
+    from(table: string) {
+      const log = (calls[table] = [] as string[])
+      const q = {
+        select: (c: string) => (log.push(`select ${c}`), q),
+        eq: (c: string, v: string) => (log.push(`eq ${c}=${v}`), q),
+        is: (c: string, v: null) => (log.push(`is ${c}=${v}`), q),
+        order: (c: string, o: { ascending: boolean }) => (log.push(`order ${c} ${o.ascending ? 'asc' : 'desc'}`), q),
+        limit: (n: number) => (log.push(`limit ${n}`), q),
+        maybeSingle: () => Promise.resolve(answers[table] ?? { data: null, error: null }),
+      }
+      return q
+    },
+  }
+  return { db, calls }
+}
+
+test.describe('the receipt reads (injected database)', () => {
+  const NOW = new Date('2026-11-06T18:00:00.000Z')
+  const live = {
+    marketplace_shops: { data: { name: 'Tacos Beto', metadata: {} }, error: null },
+    marketplace_promoters: { data: { name: 'Ana', code: 'PRM-1' }, error: null },
+    marketplace_promoter_attributions: { data: { status: 'paid' }, error: null },
+    marketplace_promoter_transfers: { data: null, error: null },
+  }
+
+  test('the attribution and the latest transfer are read for THIS promoter, shop and package', async () => {
+    const { db, calls } = fakeDb(live)
+    await readReceiptViewWith(db, { v: 1, typ: 'receipt', ...PAYLOAD }, NOW)
+    expect(calls.marketplace_promoter_attributions).toEqual([
+      'select status', 'eq promoter_id=prm-1', 'eq seller_id=shop-1', 'eq sku=negocio_anual', 'is payment_ref=null',
+    ])
+    expect(calls.marketplace_promoter_transfers).toEqual([
+      'select status', 'eq promoter_id=prm-1', 'eq seller_id=shop-1', 'eq sku=negocio_anual', 'order created_at desc', 'limit 1',
+    ])
+    // The promoter is read by id with NO track filter: a moved promoter's receipts keep working.
+    expect(calls.marketplace_promoters).toEqual(['select name, code', 'eq id=prm-1'])
+  })
+
+  test('a failed read renders «unavailable», never «Pendiente» and never a 404', async () => {
+    for (const table of Object.keys(live)) {
+      const { db } = fakeDb({ ...live, [table]: { data: null, error: { message: 'timeout' } } })
+      const view = await readReceiptViewWith(db, { v: 1, typ: 'receipt', ...PAYLOAD }, NOW)
+      expect(view, table).not.toBeNull()
+      expect(view!.status, table).toEqual({ kind: 'unavailable' })
+    }
+    const page = readFileSync('app/(shell)/recibo/[token]/page.tsx', 'utf8')
+    expect(page).toContain(': t.statusUnavailable')
+  })
+
+  test('a shop or promoter confirmed gone is null (the page 404s)', async () => {
+    for (const table of ['marketplace_shops', 'marketplace_promoters']) {
+      const { db } = fakeDb({ ...live, [table]: { data: null, error: null } })
+      expect(await readReceiptViewWith(db, { v: 1, typ: 'receipt', ...PAYLOAD }, NOW), table).toBeNull()
+    }
+  })
+})
+
+test('one amount format everywhere: $2,000 MXN, centavos only when there are some', () => {
   expect(formatReceiptAmount(200000)).toBe('$2,000 MXN')
   expect(formatReceiptAmount(25000)).toBe('$250 MXN')
-  expect(readFileSync('app/api/admin/promoter/transfers/[id]/approve/route.ts', 'utf8')).toContain('amountMxn: formatReceiptAmount(transfer.gross_amount_cents)')
+  expect(formatReceiptAmount(149950)).toBe('$1,499.50 MXN')
+  expect(formatReceiptAmount(100005)).toBe('$1,000.05 MXN')
+  const approve = readFileSync('app/api/admin/promoter/transfers/[id]/approve/route.ts', 'utf8')
+  expect(approve).toContain('amountMxn: formatReceiptAmount(transfer.gross_amount_cents)')
+  expect(approve).toContain('owedMxn: formatReceiptAmount(transfer.owed_cents)')
   expect(readFileSync('lib/promoter-package-server.ts', 'utf8')).toContain('amountMxn: formatReceiptAmount(gross)')
 })
 

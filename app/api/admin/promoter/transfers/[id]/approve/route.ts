@@ -79,7 +79,7 @@ export const POST = withAdmin(async (_req: Request, { params }: { params: Promis
       sendPromoterTransferApproved({
         to: email,
         skuLabel: TRANSFER_SKU_LABEL[transfer.sku],
-        owedMxn: `$${(transfer.owed_cents / 100).toFixed(2)} MXN`,
+        owedMxn: formatReceiptAmount(transfer.owed_cents),
       }).catch((e) => console.error('[promoter-transfers] approved email failed:', e))
     }
   }

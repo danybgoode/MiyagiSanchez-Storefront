@@ -17,17 +17,19 @@ export const metadata: Metadata = { robots: { index: false, follow: false }, ref
 export default async function ReceiptPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const secret = receiptSecret()
-  const payload = secret ? verifyReceiptToken(decodeURIComponent(token), secret) : null
+  // Next hands the segment already decoded; a receipt token is base64url, so it never needs decoding again.
+  const payload = secret ? verifyReceiptToken(token, secret) : null
   if (!payload) notFound()
   const view = await readReceiptView(payload)
   if (!view) notFound()
 
   const t = (await getOverriddenDictionary('es')).promotorPanel.recibo
+  // A failed read leaves the names unknown: the receipt still renders from the signed token (amount, option, date).
   const values = {
-    negocio: view.shopName,
+    negocio: view.shopName ?? '',
     monto: formatReceiptAmount(payload.amountCents),
-    promotor: view.promoterName?.trim() || view.promoterCode,
-    codigo: view.promoterCode,
+    promotor: view.promoterName?.trim() || view.promoterCode || '',
+    codigo: view.promoterCode ?? '',
     fecha: formatReceiptDate(payload.issuedAt),
     opcion: PACKAGES[payload.sku].label,
   }
@@ -35,6 +37,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ token:
   const statusLine =
     s.kind === 'active'
       ? s.endsAt ? fillTemplate(t.active, { fecha: formatReceiptDate(s.endsAt) }) : t.activeNoDate
+      : s.kind === 'ended' ? fillTemplate(t.ended, { fecha: formatReceiptDate(s.endsAt) })
       : s.kind === 'ready' ? t.ready
       : s.kind === 'pending' ? t.pending
       : s.kind === 'problem' ? t.problem
@@ -43,16 +46,16 @@ export default async function ReceiptPage({ params }: { params: Promise<{ token:
 
   return (
     <main className="mx-auto max-w-xl px-5 py-12 grid gap-5" data-testid="receipt-page" data-status={s.kind}>
-      <h1 className="t-h2" style={{ margin: 0, letterSpacing: 0 }}>{fillTemplate(t.title, values)}</h1>
+      <h1 className="t-h2" style={{ margin: 0, letterSpacing: 0 }}>{view.shopName ? fillTemplate(t.title, values) : t.titleGeneric}</h1>
       <div className="card-panel grid gap-3" style={{ padding: 'var(--s-5)' }}>
         <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{values.monto}</p>
-        <p style={{ margin: 0 }}>{fillTemplate(t.paid, values)}</p>
+        <p style={{ margin: 0 }}>{fillTemplate(view.promoterCode ? t.paid : t.paidNoPromoter, values)}</p>
         <p style={{ margin: 0 }}>{fillTemplate(t.for, values)}</p>
         <p role="status" style={{ margin: 0, fontWeight: 600, color: tone }}>{statusLine}</p>
       </div>
       <div className="grid gap-2">
         <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{t.help}</p>
-        <a className="btn btn-secondary" style={{ justifySelf: 'start' }} href={contactMailto(fillTemplate(t.title, values))}>{t.helpCta}</a>
+        <a className="btn btn-secondary" style={{ justifySelf: 'start' }} href={contactMailto(view.shopName ? fillTemplate(t.title, values) : t.titleGeneric)}>{t.helpCta}</a>
       </div>
     </main>
   )
