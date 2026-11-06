@@ -5532,6 +5532,54 @@
       "consentSaving": "Saving…",
       "consentDone": "Approval saved.",
       "consentAudit": "The approval was saved, but not its history. Tap the button again."
+    },
+    "productos": {
+      "leadCards": "Take the photo, set the price and save. With 3 products their shop already looks alive.",
+      "takePhoto": "Take photo",
+      "gallery": "Choose from gallery",
+      "uploading": "Uploading photos…",
+      "photos": "{n} of 6 photos",
+      "removePhoto": "Remove photo",
+      "fillFromPhoto": "Fill in the details from the photo",
+      "filling": "Checking the photo…",
+      "filled": "Done: check the name, price and category before saving.",
+      "fillFailed": "We couldn't read the product in the photo. Fill it in by hand.",
+      "name": "Product name",
+      "price": "Price",
+      "stock": "How many do they have?",
+      "category": "Category",
+      "description": "Description (optional)",
+      "choose": "Choose…",
+      "save": "Save product",
+      "saving": "Saving…",
+      "saved": "Saved. Another one?",
+      "counter": "{n} products added in this visit",
+      "nameRequired": "Write the product name (at least 3 letters).",
+      "categoryRequired": "Choose the category.",
+      "uploadFailed": "One or more photos couldn't be uploaded. Try again.",
+      "shopify": {
+        "lead": "Bring their whole Shopify catalog. Just type their store's address.",
+        "field": "Their store's address",
+        "placeholder": "mystore.com",
+        "search": "Find their products",
+        "searching": "Searching…",
+        "found": "We found {n} products.",
+        "add": "Add the {n} to their shop",
+        "adding": "Adding… it can take a couple of minutes.",
+        "error": "We couldn't read that store. Check the address with the owner."
+      },
+      "file": {
+        "lead": "Ask them to download their product list (a .csv file) from their platform.",
+        "howTo": "How to download it",
+        "upload": "Upload the file",
+        "uploading": "Reading the file…"
+      },
+      "mercadolibre": "Their Mercado Libre catalog connects later, from their own panel, once the shop is theirs. For now, add their main products here.",
+      "imported": "We added {n} products to their shop.",
+      "skipped": "{n} were already in their shop.",
+      "invalid": "{n} couldn't be read (missing a name or category).",
+      "overCap": "There are {n} more products. We added their main 150 here; to bring everything, offer the Migration with a consultant in the Get paid step.",
+      "orByHand": "You can also add products by hand:"
     }
   }
 }

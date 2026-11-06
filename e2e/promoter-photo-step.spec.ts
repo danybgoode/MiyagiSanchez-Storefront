@@ -95,6 +95,6 @@ test('the promoter spends from their own subject, and the route is limited to sh
   expect(route.indexOf('promoterShopEditAccess(')).toBeGreaterThan(-1)
   expect(route.indexOf('promoterShopEditAccess(')).toBeLessThan(route.indexOf('suggestFromPhoto('))
   // The suggestion only fills the form: publishing is still the existing listing route.
-  const ui = readFileSync('app/(shell)/promotor/cerrar/ListingStep.tsx', 'utf8')
+  const ui = readFileSync('app/(shell)/promotor/cerrar/ProductosStep.tsx', 'utf8')
   expect(ui).toContain("fetch('/api/promoter/close/photo'")
 })
