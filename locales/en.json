@@ -5520,7 +5520,8 @@
       "market": "Shop's country",
       "marketMx": "Mexico",
       "marketUs": "United States",
-      "description": "Business description (optional)"
+      "description": "Business description (optional)",
+      "dupeElsewhere": "Another promoter already registered a business with those details. If it's a different business, carry on; if it's the same one, someone is already looking after it."
     },
     "errors": {
       "network": "It couldn't be saved. Check your connection and try again."

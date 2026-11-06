@@ -5,9 +5,10 @@
  * Two arms, selected by whether the body carries `relationshipId`:
  *   - CREATE (no `relationshipId`): the caller must be a BOUND promoter (the
  *     field-intake story — mirrors `/api/promoter/preview`'s exact 403 shape).
- *     Runs the dedupe precedence (shop_id → phone_e164 → email_normalized,
- *     `lib/merchant-identity.ts#decideDedupeMatch`) BEFORE inserting; a hit
- *     returns 409 with the existing id + `matchReason` unless the caller
+ *     Runs the dedupe precedence (shop_id → phone_e164 → whatsapp_e164 →
+ *     email_normalized, `lib/merchant-identity.ts#decideDedupeMatch`) BEFORE
+ *     inserting; a hit returns 409 — with the existing id + `matchReason` only
+ *     when the record is the caller's own (`dedupeConflictBody`) — unless the caller
  *     passes `confirmNew: true`. A dedupe LOOKUP that itself fails to read
  *     (a DB error) refuses the create rather than assuming "no duplicate" —
  *     these columns are deliberately unindexed-unique, so a fail-open read
@@ -53,6 +54,7 @@ import {
   normalizeEmail,
   isFuzzyNameMatch,
   decideDedupeMatch,
+  dedupeConflictBody,
   type DedupeCandidateRows,
 } from '@/lib/merchant-identity'
 import { isPreferredChannel } from '@/lib/preferred-channels'
@@ -153,12 +155,12 @@ function normalizeOrReject(
 /** A9: a dedupe LOOKUP that fails to read must refuse the create, never
  *  silently proceed as "no duplicate found" — these columns have no unique
  *  constraint to catch it at insert time. */
-type DedupeLookup = { ok: true; row: { id: string } | null } | { ok: false }
+type DedupeLookup = { ok: true; row: { id: string; promoter_id: string | null } | null } | { ok: false }
 
 async function lookupDedupe(column: 'shop_id' | 'phone_e164' | 'whatsapp_e164' | 'email_normalized', value: string): Promise<DedupeLookup> {
-  const { data, error } = await db.from('merchant_relationships').select('id').eq(column, value).limit(1).maybeSingle()
+  const { data, error } = await db.from('merchant_relationships').select('id, promoter_id').eq(column, value).limit(1).maybeSingle()
   if (error) return { ok: false }
-  return { ok: true, row: (data as { id: string } | null) ?? null }
+  return { ok: true, row: (data as { id: string; promoter_id: string | null } | null) ?? null }
 }
 
 /** A11/A12: bounded, actor-scoped, ACTUALLY-normalized fuzzy business-name
@@ -374,10 +376,10 @@ export async function POST(req: NextRequest) {
     }
     const decision = decideDedupeMatch(candidates)
     if (decision.matched) {
-      return NextResponse.json(
-        { ok: false, error: 'Ya existe un registro con estos datos.', relationshipId: decision.relationshipId, matchReason: decision.matchReason },
-        { status: 409 },
-      )
+      // Only the promoter's own record comes back with its id (see `dedupeConflictBody`).
+      const owner = (Object.values(candidates) as Array<{ id: string; promoter_id?: string | null } | null | undefined>)
+        .find((row) => row?.id === decision.relationshipId)?.promoter_id
+      return NextResponse.json(dedupeConflictBody(decision, owner, auth.actor.promoterId), { status: 409 })
     }
   }
 

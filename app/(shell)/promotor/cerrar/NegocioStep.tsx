@@ -112,7 +112,8 @@ export default function NegocioStep({
   const [message, setMessage] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [dupe, setDupe] = useState<{ id: string; name: string } | null>(null)
+  // `id: null` = another promoter's record: the 409 says only that it exists.
+  const [dupe, setDupe] = useState<{ id: string | null; name: string } | null>(null)
   const [suggestions, setSuggestions] = useState<Recent[]>([])
   // Which button hit the duplicate, so «No, es otro» repeats THAT action with confirmNew.
   const [lastAction, setLastAction] = useState<'open' | 'save'>('save')
@@ -265,6 +266,10 @@ export default function NegocioStep({
       }),
     })
     const data = await res.json().catch(() => ({}))
+    if (res.status === 409 && data.elsewhere) {
+      setDupe({ id: null, name: '' })
+      return null
+    }
     if (res.status === 409 && data.relationshipId) {
       // The 409 carries the id and why it matched, not the name: show it when we know it.
       const match = recent.find((r) => r.id === data.relationshipId)?.businessName ?? ''
@@ -502,9 +507,9 @@ export default function NegocioStep({
 
       {dupe ? (
         <div className="grid gap-2 rounded-lg border border-[var(--color-border)] p-3" role="alert">
-          <p className="t-small" style={{ margin: 0 }}>{dupe.name ? t.dupe.replace('{nombre}', dupe.name) : t.dupeNoName}</p>
+          <p className="t-small" style={{ margin: 0 }}>{dupe.id === null ? t.dupeElsewhere : dupe.name ? t.dupe.replace('{nombre}', dupe.name) : t.dupeNoName}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => load(dupe.id)} disabled={busy !== null}>{t.dupeYes}</button>
+            {dupe.id !== null ? <button type="button" className="btn btn-primary btn-sm" onClick={() => load(dupe.id as string)} disabled={busy !== null}>{t.dupeYes}</button> : null}
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => (lastAction === 'open' ? open(true) : save(true))} disabled={busy !== null}>{t.dupeNo}</button>
           </div>
         </div>

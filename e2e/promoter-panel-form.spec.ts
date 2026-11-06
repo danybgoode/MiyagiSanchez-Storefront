@@ -93,3 +93,10 @@ test('the US market and the description stay available (a seller market cannot c
   expect(STEP).toContain('operating_market: market')
   expect(STEP).toContain('description: description.trim() || undefined')
 })
+
+test("the create route reads each dedupe hit's owner and lets dedupeConflictBody decide what the 409 reveals", () => {
+  const route = readFileSync('app/api/promoter/relationship/route.ts', 'utf8')
+  expect(route).toContain(".select('id, promoter_id').eq(column, value)")
+  expect(route).toContain('dedupeConflictBody(decision, owner, auth.actor.promoterId)')
+  expect(route).not.toMatch(/error: 'Ya existe un registro con estos datos\.', relationshipId: decision\.relationshipId/)
+})

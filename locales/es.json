@@ -5520,7 +5520,8 @@
       "market": "País de la tienda",
       "marketMx": "México",
       "marketUs": "Estados Unidos",
-      "description": "Descripción del negocio (opcional)"
+      "description": "Descripción del negocio (opcional)",
+      "dupeElsewhere": "Otro promotor ya registró un negocio con esos datos. Si es otro negocio, sigue; si es el mismo, ya tiene quien lo atienda."
     },
     "errors": {
       "network": "No se pudo guardar. Revisa tu conexión e intenta otra vez."

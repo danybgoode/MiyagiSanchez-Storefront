@@ -6,6 +6,7 @@ import {
   businessNameSimilarity,
   isFuzzyNameMatch,
   decideDedupeMatch,
+  dedupeConflictBody,
   FUZZY_NAME_THRESHOLD,
   type DedupeCandidateRows,
 } from '../lib/merchant-identity'
@@ -103,6 +104,16 @@ test.describe('decideDedupeMatch — the precedence rule (build contract, sprint
     expect(decideDedupeMatch({ ...none, byWhatsapp: { id: 'wa-hit' } })).toEqual({ matched: true, relationshipId: 'wa-hit', matchReason: 'whatsapp_e164' })
     expect(decideDedupeMatch({ ...none, byPhone: { id: 'phone-hit' }, byWhatsapp: { id: 'wa-hit' } }).matched && decideDedupeMatch({ ...none, byPhone: { id: 'phone-hit' }, byWhatsapp: { id: 'wa-hit' } })).toMatchObject({ matchReason: 'phone_e164' })
     expect(decideDedupeMatch({ ...none, byWhatsapp: { id: 'wa-hit' }, byEmail: { id: 'email-hit' } })).toMatchObject({ matchReason: 'whatsapp_e164' })
+  })
+
+  test("a 409 names the promoter's OWN record, but never another promoter's id or match reason (Codex security lens, #481)", () => {
+    const hit = { matched: true as const, relationshipId: 'rel-1', matchReason: 'whatsapp_e164' as const }
+    expect(dedupeConflictBody(hit, 'p-me', 'p-me')).toMatchObject({ relationshipId: 'rel-1', matchReason: 'whatsapp_e164' })
+    for (const owner of ['p-other', null, undefined]) {
+      const body = dedupeConflictBody(hit, owner, 'p-me')
+      expect(body).toMatchObject({ elsewhere: true })
+      expect(JSON.stringify(body)).not.toMatch(/rel-1|whatsapp_e164|matchReason/)
+    }
   })
 
   test('no candidates → no match', () => {
