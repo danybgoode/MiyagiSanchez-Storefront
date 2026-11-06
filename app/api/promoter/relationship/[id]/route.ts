@@ -1,7 +1,7 @@
 /**
  * GET /api/promoter/relationship/[id] — resume a saved merchant relationship
  * record (founding-merchant-activation-ops S1.2). Powers the "resume by id
- * from localStorage" requirement in `RelationshipStep`.
+ * from localStorage" requirement in `NegocioStep`.
  *
  * Scope: the caller's own `promoter_id`, the assigned steward (S2 C1, floored
  * to `viewer` by an explicit `partner_grants` `viewer` grant — S2 D1), an
@@ -13,7 +13,7 @@
  * record.
  *
  * Also returns a lightweight `shop` summary when the relationship already has
- * one linked (S1 cross-review B2) — `RelationshipStep` hands this up to
+ * one linked (S1 cross-review B2) — `NegocioStep` hands this up to
  * `PromoterCloseClient` so switching to (or resuming) a relationship that
  * already has a shop REHYDRATES that shop instead of leaving the promoter
  * looking at a stale/blank one that invites creating a duplicate.

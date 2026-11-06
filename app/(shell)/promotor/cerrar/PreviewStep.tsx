@@ -42,12 +42,14 @@ const STATUS_LABEL: Record<string, string> = {
   activated: 'Tienda activa (pública)',
 }
 
-export default function PreviewStep({ shop, n }: { shop: Shop; n: number }) {
+export default function PreviewStep({ shop, n, relationshipId = null }: { shop: Shop; n: number; relationshipId?: string | null }) {
   const [state, setState] = useState<State | null>(null)
   const [link, setLink] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<null | 'mint' | 'revoke' | 'activate' | 'refresh'>(null)
+  const [consentBusy, setConsentBusy] = useState(false)
+  const [consentNote, setConsentNote] = useState<string | null>(null)
 
   const loadState = useCallback(async () => {
     try {
@@ -116,11 +118,36 @@ export default function PreviewStep({ shop, n }: { shop: Shop; n: number }) {
   const status = state?.status
   const activated = status === 'activated'
 
+  // The owner approved in person: recorded on their relationship (moved here from the old «Datos del comercio» form,
+  // promoter-panel S2), then the state is read again so «Publicar» unlocks.
+  async function registerConsent() {
+    if (!relationshipId) return
+    setConsentBusy(true); setConsentNote(null)
+    try {
+      const res = await fetch(`/api/promoter/relationship/${encodeURIComponent(relationshipId)}/consent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) { setConsentNote(data.error ?? 'No se pudo guardar. Revisa tu conexión e intenta otra vez.'); return }
+      setConsentNote('Aprobada: ya puede publicarse.')
+      await loadState()
+    } catch { setConsentNote('No se pudo guardar. Revisa tu conexión e intenta otra vez.') }
+    finally { setConsentBusy(false) }
+  }
+
   return (
     <section className="rounded-lg border border-[var(--color-border)] p-4 space-y-3">
       <h2 className="font-semibold">
         <span className="text-[var(--color-muted)] mr-2">{n}.</span>Vista previa privada y activación
       </h2>
+      {relationshipId && status && status !== 'approved' && status !== 'activated' ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={registerConsent} disabled={consentBusy} data-testid="panel-consent">
+            {consentBusy ? 'Guardando…' : 'El dueño vio su tienda y está de acuerdo'}
+          </button>
+        </div>
+      ) : null}
+      {consentNote ? <p className="text-sm" role="status">{consentNote}</p> : null}
 
       {status && (
         <p className="text-sm">

@@ -410,7 +410,7 @@
         "app/(shell)/admin/promoter/activacion/page.tsx:18",
         "app/(shell)/admin/relaciones/conciliacion/page.tsx:19",
         "app/(shell)/admin/relaciones/page.tsx:21",
-        "app/(shell)/promotor/cerrar/page.tsx:28",
+        "app/(shell)/promotor/cerrar/page.tsx:29",
         "app/(shell)/promotor/relaciones/page.tsx:19",
         "lib/merchant-lifecycle-sweep.ts:587",
         "lib/relationship-access.ts:126"
@@ -425,7 +425,7 @@
       "callsites": [
         "app/(shell)/mx/vende/promotor/page.tsx:45",
         "app/(shell)/promotor/[code]/page.tsx:35",
-        "app/(shell)/promotor/cerrar/page.tsx:19",
+        "app/(shell)/promotor/cerrar/page.tsx:20",
         "app/(shell)/shop/manage/canal-propio/page.tsx:54",
         "app/api/print/submissions/[id]/checkout/route.ts:100",
         "app/api/promoter/attribute/route.ts:23",
@@ -439,7 +439,7 @@
         "app/api/promoter/me/bind/route.ts:24",
         "app/api/promoter/preview/activate/route.ts:57",
         "app/api/promoter/preview/route.ts:38",
-        "app/api/promoter/shop/setup/route.ts:32",
+        "app/api/promoter/shop/setup/route.ts:33",
         "app/api/promoter/validate-code/route.ts:24",
         "lib/domain-subscription-checkout.ts:90",
         "lib/ml-sync-subscription-checkout.ts:69",
@@ -482,12 +482,12 @@
       "enforcement": "frontend",
       "callsites": [
         "app/(shell)/preview/[token]/page.tsx:38",
-        "app/(shell)/promotor/cerrar/page.tsx:27",
+        "app/(shell)/promotor/cerrar/page.tsx:28",
         "app/api/preview/[token]/decision/route.ts:40",
         "app/api/preview/[token]/verify/start/route.ts:25",
         "app/api/promoter/preview/activate/route.ts:60",
         "app/api/promoter/preview/route.ts:41",
-        "app/api/promoter/shop/setup/route.ts:169",
+        "app/api/promoter/shop/setup/route.ts:181",
         "lib/promoter-listing-server.ts:44"
       ]
     },
@@ -498,7 +498,7 @@
       "criticality": "medium",
       "enforcement": "frontend",
       "callsites": [
-        "app/(shell)/promotor/cerrar/page.tsx:26",
+        "app/(shell)/promotor/cerrar/page.tsx:27",
         "app/api/promoter/close/migration/route.ts:62",
         "app/api/promoter/close/package/[sku]/route.ts:71",
         "app/api/promoter/close/transfer/[id]/report/route.ts:20",

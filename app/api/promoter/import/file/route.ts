@@ -34,9 +34,9 @@ export async function POST(req: NextRequest) {
   const unreadable = 'No pudimos leer este archivo. Pídele que lo descargue otra vez desde su plataforma.'
   if (!fileText.trim() || fileText.length > MAX_FILE_CHARS) return NextResponse.json({ ok: false, error: unreadable }, { status: 422 })
 
-  const defaultCategory = typeof body.defaultCategory === 'string' && (CATALOG_CATEGORY_KEYS as readonly string[]).includes(body.defaultCategory)
-    ? body.defaultCategory
-    : null
+  // The category asked for, or the shop's «Categoría principal» from «El negocio» (D6), or none (rows then fail clearly).
+  const isKey = (v: unknown): v is string => typeof v === 'string' && (CATALOG_CATEGORY_KEYS as readonly string[]).includes(v)
+  const defaultCategory = isKey(body.defaultCategory) ? body.defaultCategory : isKey(shop.metadata.main_category) ? shop.metadata.main_category : null
   const platform = body.platform === 'tiendanube' || body.platform === 'woocommerce' ? body.platform : null
 
   const read = parseCatalogRecords(fileText, fileName)

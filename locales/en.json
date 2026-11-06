@@ -5418,5 +5418,105 @@
     "s_f834061e3863469f": "How many payments",
     "s_fa5c65a24285b39b": "No connection. We could not cancel the link.",
     "s_fd0137cd1dfed775": "Concept"
+  },
+  "promotorPanel": {
+    "header": {
+      "title": "Your promoter panel",
+      "lead": "Open a business's shop in a single visit."
+    },
+    "steps": {
+      "negocio": "The business",
+      "productos": "Their products",
+      "cobra": "Get paid",
+      "entrega": "Hand it over",
+      "of": "Step {n} of 4"
+    },
+    "bind": {
+      "title": "Enter your promoter code",
+      "hint": "We emailed it to you when you were approved. It starts with PRM-.",
+      "placeholder": "PRM-XXXX",
+      "button": "Open my panel",
+      "busy": "Opening…",
+      "error": "That code doesn't exist or is already on another account. Check it or write to us."
+    },
+    "negocio": {
+      "lead": "What the owner tells you. You only need the business name and their WhatsApp.",
+      "recent": "Your recent businesses",
+      "newOne": "+ Another business",
+      "name": "Business name",
+      "owner": "Owner's name (optional)",
+      "whatsapp": "Owner's WhatsApp",
+      "whatsappHint": "10 digits. Their receipt and shop link go there.",
+      "cp": "Postal code",
+      "cpButton": "Look up",
+      "cpBusy": "Looking up…",
+      "cpManual": "I don't know the postal code",
+      "colonia": "Neighbourhood",
+      "estado": "State",
+      "municipio": "Municipality",
+      "sells": "What do they sell?",
+      "category": "Main category",
+      "sellsToday": "Do they sell on another platform today?",
+      "channel": "How do they prefer to be contacted?",
+      "interest": "How interested are they?",
+      "notes": "Notes",
+      "notesPlaceholder": "What they told you: questions, hours, what worries them",
+      "more": "More details",
+      "email": "Owner's email",
+      "emailHint": "If you add it, their receipt also arrives by email.",
+      "phone": "Another phone",
+      "instagram": "Instagram",
+      "choose": "Choose…",
+      "open": "Open their shop",
+      "opening": "Opening their shop…",
+      "save": "Save for later",
+      "saving": "Saving…",
+      "continue": "Go to their products",
+      "saved": "Saved. You'll find it in your recent businesses when you come back.",
+      "created": "Done, {nombre}'s shop exists. It stays private until the owner approves it.",
+      "dupe": "You already have a business with those details: «{nombre}». Is it the same one?",
+      "dupeNoName": "You already have a business with those details. Is it the same one?",
+      "dupeYes": "Yes, continue with that one",
+      "dupeNo": "No, it's another one",
+      "nameRequired": "Write the business name.",
+      "whatsappRequired": "Write the owner's WhatsApp (10 digits).",
+      "notYours": "Another promoter registered that business. Continue with a new one.",
+      "linkError": "The shop is open, but we couldn't link it to this business. Tap «Save for later» again.",
+      "shapes": {
+        "products": "Products",
+        "services": "Services",
+        "food": "Food",
+        "made_to_order": "Made to order",
+        "rentals": "Rentals",
+        "digital": "Digital"
+      },
+      "sellsTodayOptions": {
+        "none": "No, only in their shop",
+        "social": "Instagram or WhatsApp",
+        "mercadolibre": "Mercado Libre",
+        "shopify": "Shopify",
+        "tiendanube": "Tiendanube",
+        "woocommerce": "WooCommerce",
+        "bigcartel": "Big Cartel",
+        "other": "Other"
+      },
+      "channels": {
+        "whatsapp": "WhatsApp",
+        "phone": "Call",
+        "email": "Email",
+        "instagram": "Instagram",
+        "in_person": "In person"
+      },
+      "interestOptions": {
+        "unknown": "I don't know yet",
+        "strong": "Very interested",
+        "medium": "Thinking about it",
+        "weak": "Not very interested",
+        "disqualified": "Not interested"
+      }
+    },
+    "errors": {
+      "network": "It couldn't be saved. Check your connection and try again."
+    }
   }
 }
