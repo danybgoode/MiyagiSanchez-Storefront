@@ -68,7 +68,7 @@ function MetricCard({
         {healthBadge(metric.health)}
       </div>
       {onDrillThrough && metric.value !== null && metric.value > 0 ? (
-        <button type="button" onClick={onDrillThrough} className="text-2xl font-bold text-left hover:underline">
+        <button type="button" onClick={onDrillThrough} className="btn btn-ghost text-2xl font-bold" style={{ justifySelf: 'start', paddingInline: 0 }}>
           {fmt(metric.value)}
         </button>
       ) : (
@@ -169,6 +169,9 @@ export default function ActivacionScorecardClient() {
   }, [debouncedQuery])
 
   useEffect(() => {
+    // Loading the scorecard is this effect's synchronization job (an external read); `load` owns the setState calls,
+    // and a stale response is dropped by the request id above.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 
@@ -251,7 +254,7 @@ export default function ActivacionScorecardClient() {
               {scorecard.freshness.staleRelationshipIds.length > 0 && (
                 <button
                   type="button"
-                  className="underline"
+                  className="btn btn-ghost btn-sm"
                   onClick={() => setDrillThrough({ label: 'Comercios con emisión pendiente hacia Golden Beans', ids: scorecard.freshness.staleRelationshipIds })}
                 >
                   ver {scorecard.freshness.staleRelationshipIds.length}
@@ -307,7 +310,7 @@ export default function ActivacionScorecardClient() {
                       {row.count.value !== null && row.count.value > 0 ? (
                         <button
                           type="button"
-                          className="underline"
+                          className="btn btn-ghost btn-sm"
                           onClick={() => setDrillThrough({ label: `${STAGE_LABEL[row.stage] ?? row.stage} — llegó o superó`, ids: row.drillThroughIds })}
                         >
                           {fmtNumber(row.count.value)}
@@ -336,7 +339,7 @@ export default function ActivacionScorecardClient() {
             <div className="rounded-lg border border-[var(--color-border)] p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-sm">{drillThrough.label}</h2>
-                <button type="button" className="text-xs underline" onClick={() => setDrillThrough(null)}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDrillThrough(null)}>
                   cerrar
                 </button>
               </div>

@@ -434,6 +434,7 @@
         "app/api/promoter/close/migration/route.ts:28",
         "app/api/promoter/close/package/[sku]/route.ts:30",
         "app/api/promoter/close/photo/route.ts:31",
+        "app/api/promoter/close/receipt/route.ts:31",
         "app/api/promoter/close/transfer/[id]/report/route.ts:20",
         "app/api/promoter/close/transfer/route.ts:21",
         "app/api/promoter/me/bind/route.ts:24",

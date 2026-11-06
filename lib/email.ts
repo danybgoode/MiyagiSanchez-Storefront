@@ -435,6 +435,27 @@ export async function sendShopClaimLink(ctx: { to: string; shopName: string; cla
   ].join(''))
 }
 
+/**
+ * «El recibo del negocio» by email (promoter-panel S4.1, D10), sent the moment the promoter taps «Sí, ya me pagó» when
+ * the owner left an email. Every word arrives from the `promotorPanel.recibo` locale block, filled by the caller; this
+ * only lays it out and escapes it. One per shop and option (the idempotency key), so a second tap never emails twice.
+ */
+export async function sendPromoterReceipt(ctx: {
+  to: string
+  subject: string
+  heading: string
+  lines: string[]
+  ctaLabel: string
+  receiptUrl: string
+  idempotencyKey: string
+}): Promise<EmailSendResult> {
+  return sendWithResult(ctx.to, plainLine(ctx.subject), [
+    h1(plainLine(ctx.heading)),
+    ...ctx.lines.map((line) => p(esc(line))),
+    cta(ctx.ctaLabel, ctx.receiptUrl),
+  ].join(''), undefined, undefined, 'es', ctx.idempotencyKey)
+}
+
 /** Notify the account that now owns the shop, once Medusa confirms a new transfer. */
 export async function sendShopClaimedWelcome(ctx: { to: string; shopName: string; shopSlug: string; market: 'mx' | 'us'; sellerId: string }): Promise<void> {
   const shopUrl = `${SITE}/${ctx.market}/s/${encodeURIComponent(ctx.shopSlug)}`

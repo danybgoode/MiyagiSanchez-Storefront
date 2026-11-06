@@ -18,6 +18,7 @@ import { markAttributionPaid } from '@/lib/promoter'
 import { notifyMerchantCloseReceipt } from '@/lib/promoter-close-notify'
 import { applyNegocioPayment } from '@/lib/negocio-webhook'
 import { PACKAGES, isPackageSku, packageSplit, type PackageSku } from '@/lib/promoter-packages'
+import { formatReceiptAmount } from '@/lib/promoter-receipt'
 
 export const PROMOTER_PACKAGE_CHECKOUT_KIND = 'promoter_package'
 
@@ -125,7 +126,7 @@ export async function handlePromoterPackageComplete(session: Stripe.Checkout.Ses
   notifyMerchantCloseReceipt({
     shopId,
     promoterId,
-    items: [{ label: PACKAGES[sku].summary, amountMxn: `$${(gross / 100).toLocaleString('en-US')} MXN` }],
+    items: [{ label: PACKAGES[sku].summary, amountMxn: formatReceiptAmount(gross) }],
   }).catch((e) => console.error('[promoter package] receipt failed:', e))
   tg.alert(`✅ Paquete ${PACKAGES[sku].label} pagado por el promotor${months ? ` — Negocio ${months} meses` : ''}\nShop: ${shopId}`)
 }

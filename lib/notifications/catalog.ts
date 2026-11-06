@@ -526,6 +526,12 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     sender: 'sendMerchantCloseReceipt', origin: 'lib/promoter-close-notify.ts',
   },
   {
+    key: 'promoter.merchant_payment_receipt',
+    trigger: 'El promotor marca «Sí, ya me pagó»: el dueño recibe su recibo (también por WhatsApp, desde el teléfono del promotor).',
+    from: 'promoter', to: 'seller', channels: ['email'], domain: 'promoter',
+    sender: 'sendPromoterReceipt', origin: 'app/api/promoter/close/receipt/route.ts',
+  },
+  {
     key: 'promoter.preview_approval_code',
     trigger: 'Se pide al comercio un código para aprobar su vista previa.',
     from: 'promoter', to: 'seller', channels: ['email'], domain: 'promoter',

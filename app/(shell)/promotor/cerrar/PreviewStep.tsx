@@ -43,7 +43,7 @@ const STATUS_LABEL: Record<string, string> = {
   activated: 'Tienda activa (pública)',
 }
 
-export default function PreviewStep({ shop, n, relationshipId = null, panelCopy }: { shop: Shop; n: number; relationshipId?: string | null; panelCopy: Dictionary['promotorPanel'] }) {
+export default function PreviewStep({ shop, relationshipId = null, panelCopy }: { shop: Shop; relationshipId?: string | null; panelCopy: Dictionary['promotorPanel'] }) {
   const [state, setState] = useState<State | null>(null)
   const [link, setLink] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -138,10 +138,8 @@ export default function PreviewStep({ shop, n, relationshipId = null, panelCopy 
   }
 
   return (
-    <section className="rounded-lg border border-[var(--color-border)] p-4 space-y-3">
-      <h2 className="font-semibold">
-        <span className="text-[var(--color-muted)] mr-2">{n}.</span>Vista previa privada y activación
-      </h2>
+    <div className="grid gap-3 border-t border-[var(--color-border)] pt-4" data-testid="panel-preview">
+      <h3 className="text-sm font-semibold" style={{ margin: 0 }}>Vista previa privada y activación</h3>
       {relationshipId && status === 'approved' ? (
         <div className="grid gap-2">
           <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{panelCopy.entrega.consentHint}</p>
@@ -188,19 +186,16 @@ export default function PreviewStep({ shop, n, relationshipId = null, panelCopy 
               <div className="flex gap-2">
                 <input readOnly value={link}
                   className="flex-1 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm font-mono" />
-                <button type="button" onClick={copy}
-                  className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm font-medium">
+                <button type="button" onClick={copy} className="btn btn-secondary btn-sm">
                   {copied ? 'Copiado ✓' : 'Copiar'}
                 </button>
               </div>
-              <button type="button" onClick={revoke} disabled={busy !== null}
-                className="text-xs underline text-[var(--color-muted)] disabled:opacity-50">
+              <button type="button" onClick={revoke} disabled={busy !== null} className="btn btn-ghost btn-sm">
                 {busy === 'revoke' ? 'Revocando…' : 'Revocar este enlace'}
               </button>
             </div>
           ) : (
-            <button onClick={mint} disabled={busy !== null}
-              className="rounded-lg bg-[var(--color-accent)] text-[var(--fg-inverse)] px-4 py-2 font-medium disabled:opacity-50">
+            <button type="button" onClick={mint} disabled={busy !== null} className="btn btn-primary" style={{ justifySelf: 'start' }}>
               {busy === 'mint' ? 'Generando…' : 'Generar enlace de vista previa'}
             </button>
           )}
@@ -223,13 +218,11 @@ export default function PreviewStep({ shop, n, relationshipId = null, panelCopy 
           )}
 
           <div className="flex items-center gap-3 border-t border-[var(--color-border)] pt-3">
-            <button onClick={activate} disabled={busy !== null || !state?.canActivate}
-              className="rounded-lg bg-[var(--color-accent)] text-[var(--fg-inverse)] px-4 py-2 font-medium disabled:opacity-50">
+            <button type="button" onClick={activate} disabled={busy !== null || !state?.canActivate} className="btn btn-primary">
               {busy === 'activate' ? 'Activando…' : 'Activar tienda'}
             </button>
-            <button onClick={() => { setBusy('refresh'); loadState().finally(() => setBusy(null)) }}
-              disabled={busy !== null}
-              className="text-sm underline text-[var(--color-muted)] disabled:opacity-50">
+            <button type="button" onClick={() => { setBusy('refresh'); loadState().finally(() => setBusy(null)) }}
+              disabled={busy !== null} className="btn btn-ghost btn-sm">
               Actualizar estado
             </button>
           </div>
@@ -238,6 +231,6 @@ export default function PreviewStep({ shop, n, relationshipId = null, panelCopy 
           )}
         </>
       )}
-    </section>
+    </div>
   )
 }

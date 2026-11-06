@@ -22,6 +22,7 @@ const PROMOTER_IDENTITY_BY_CLERK_ID_CONSUMERS = [
   'app/api/promoter/close/migration/route.ts',
   'app/api/promoter/close/package/[sku]/route.ts',
   'app/api/promoter/close/photo/route.ts',
+  'app/api/promoter/close/receipt/route.ts', // promoter-panel S4: the merchant's receipt
   // close/print and rate-card are retired (410, no printed ads since 2026-11-05): they read no identity at all.
   'app/api/promoter/close/transfer/[id]/report/route.ts',
   'app/api/promoter/close/transfer/route.ts',
@@ -37,6 +38,7 @@ const PROMOTER_IDENTITY_BY_ID_CONSUMERS = [
   'app/api/admin/promoter/transfers/[id]/approve/route.ts',
   'app/api/admin/promoter/transfers/[id]/reject/route.ts',
   'lib/promoter-close-notify.ts',
+  'lib/promoter-receipt-server.ts', // promoter-panel S4: the receipt page names the promoter who was paid
 ] as const
 
 function sourceFilesBelow(relativeDirectory: string): string[] {
