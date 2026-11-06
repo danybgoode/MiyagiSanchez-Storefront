@@ -494,6 +494,15 @@ export const COMMUNICATION_FIXTURES: Record<string, CommunicationFixture> = {
     claimUrl: `${URL}/reclamar/muestra`,
     toMerchantDirectly: true,
   }),
+  'promoter.merchant_payment_receipt': (to) => email.sendPromoterReceipt({
+    to,
+    subject: `Tu recibo de ${SELLER_SHOP} en Miyagi Sánchez`,
+    heading: `Recibo de ${SELLER_SHOP}`,
+    lines: ['Pagaste $2,000 MXN a Ana (PRM-MUESTRA) el 6 de noviembre de 2026.', 'Por: Plan Negocio · 1 año.'],
+    ctaLabel: 'Ver mi recibo',
+    receiptUrl: `${URL}/recibo/muestra`,
+    idempotencyKey: 'sample/promoter-receipt',
+  }),
   'promoter.preview_approval_code': (to) => email.sendPreviewApprovalCode({ to, code: '905172', shopName: SELLER_SHOP }),
 
   // ── Referrals ───────────────────────────────────────────────────────────────

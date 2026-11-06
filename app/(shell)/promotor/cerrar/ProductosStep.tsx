@@ -274,7 +274,7 @@ function ProductCard({ copy, shop, currency, defaultCategory, onSaved }: { copy:
         <div className="grid gap-2">
           <div className="flex flex-wrap gap-2">
             {photos.map((url) => (
-              <button key={url} type="button" title={t.removePhoto} aria-label={t.removePhoto} onClick={() => setPhotos((cur) => cur.filter((p) => p !== url))}>
+              <button key={url} type="button" className="btn btn-ghost" style={{ padding: 0 }} title={t.removePhoto} aria-label={t.removePhoto} onClick={() => setPhotos((cur) => cur.filter((p) => p !== url))}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- the promoter's own just-uploaded photo */}
                 <img src={url} alt="" className="h-16 w-16 rounded object-cover" />
               </button>

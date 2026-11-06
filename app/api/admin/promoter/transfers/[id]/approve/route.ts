@@ -21,6 +21,7 @@ import { resolveTargetShop } from '@/lib/promoter-server'
 import { TRANSFER_SKU_LABEL } from '@/lib/promoter-transfer'
 import { getSellerEmail, sendPromoterTransferApproved } from '@/lib/email'
 import { notifyMerchantCloseReceipt } from '@/lib/promoter-close-notify'
+import { formatReceiptAmount } from '@/lib/promoter-receipt'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,7 @@ export const POST = withAdmin(async (_req: Request, { params }: { params: Promis
     promoterId: transfer.promoter_id,
     items: [{
       label: TRANSFER_SKU_LABEL[transfer.sku],
-      amountMxn: `$${(transfer.gross_amount_cents / 100).toFixed(2)} MXN`,
+      amountMxn: formatReceiptAmount(transfer.gross_amount_cents),
     }],
   }).catch((e) => console.error('[promoter-transfers] merchant receipt failed:', e))
 
@@ -78,7 +79,7 @@ export const POST = withAdmin(async (_req: Request, { params }: { params: Promis
       sendPromoterTransferApproved({
         to: email,
         skuLabel: TRANSFER_SKU_LABEL[transfer.sku],
-        owedMxn: `$${(transfer.owed_cents / 100).toFixed(2)} MXN`,
+        owedMxn: formatReceiptAmount(transfer.owed_cents),
       }).catch((e) => console.error('[promoter-transfers] approved email failed:', e))
     }
   }

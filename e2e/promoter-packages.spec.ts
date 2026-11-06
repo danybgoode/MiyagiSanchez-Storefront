@@ -67,9 +67,12 @@ test('a package transfer is charged at its own list price, never through the pro
 })
 
 test('the close workspace offers the three packages first, and the card path pays only the platform share', () => {
-  const ui = readFileSync('app/(shell)/promotor/cerrar/PromoterCloseClient.tsx', 'utf8')
-  for (const sku of PACKAGE_SKUS) expect(ui).toContain(`id: 'package/${sku}'`)
-  expect(ui).not.toContain("id: 'domain'")
+  // promoter-panel S4: «Cobra» lives in its own step; the option list is the three packages, then the migration.
+  const ui = readFileSync('app/(shell)/promotor/cerrar/CobraStep.tsx', 'utf8')
+  const options = ui.slice(ui.indexOf('const PACKAGE_OPTIONS'), ui.indexOf('\n', ui.indexOf('const PACKAGE_OPTIONS')))
+  for (const sku of PACKAGE_SKUS) expect(options).toContain(`'${sku}'`)
+  expect(ui).toContain('<option value="migration">')
+  expect(ui).not.toMatch(/close\/(domain|ml-sync|subdomain)/)
   const card = readFileSync('lib/promoter-package-server.ts', 'utf8')
   expect(card).toContain('amountCents: split.payPlatformCents')
   expect(card).toContain("paymentMethodTypes: ['card']")
