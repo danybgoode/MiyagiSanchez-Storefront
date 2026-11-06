@@ -11,7 +11,7 @@
  */
 import 'server-only'
 import { db } from '@/lib/supabase'
-import { isSelfOwned, promoterOpenedShop } from '@/lib/promoter-close'
+import { decideShopEdit, isSelfOwned, promoterOpenedShop, type ShopEditDecision } from '@/lib/promoter-close'
 
 export async function promoterMayCloseShop(input: {
   promoter: { id: string; code: string; clerk_user_id?: string | null }
@@ -29,4 +29,26 @@ export async function promoterMayCloseShop(input: {
     .limit(1)
   if (error) return false
   return Array.isArray(data) && data.length > 0
+}
+
+/**
+ * May THIS promoter write to THIS shop? (promoter-panel D1.) Unclaimed, AND opened by them or linked to their own
+ * relationship row. A relationship that could not be read is `unavailable` (fail closed, never "not yours" and never
+ * "ok"): the caller answers 503.
+ */
+export async function promoterShopEditAccess(input: {
+  promoter: { id: string; code: string }
+  shop: { id: string; sourceUrl: string | null; clerkUserId?: string | null }
+}): Promise<ShopEditDecision | 'unavailable'> {
+  const claimed = !!input.shop.clerkUserId
+  const openedByPromoter = promoterOpenedShop(input.shop.sourceUrl, input.promoter.code)
+  if (claimed || openedByPromoter) return decideShopEdit({ claimed, openedByPromoter, linkedToPromoter: false })
+  const { data, error } = await db
+    .from('merchant_relationships')
+    .select('id')
+    .eq('promoter_id', input.promoter.id)
+    .eq('shop_id', input.shop.id)
+    .limit(1)
+  if (error) return 'unavailable'
+  return decideShopEdit({ claimed, openedByPromoter, linkedToPromoter: Array.isArray(data) && data.length > 0 })
 }

@@ -3,9 +3,9 @@
  *
  * A bound promoter turns a photo they just uploaded into a suggested product card for the shop they are opening
  * (epic 08 · plans-gratis-negocio S5.1, README D14). The answer only FILLS the workspace form; publishing still goes
- * through `/api/promoter/close/listing`, unchanged. NOTE (pr-reviewer, #475): that route checks only that the shop
- * exists, not that this promoter opened it or that it is unclaimed — a pre-existing gap left as a product call. THIS
- * route is limited to shops the promoter may close (`promoterMayCloseShop`); only the shop's NAME reaches the model.
+ * through `/api/promoter/close/listing`. Both routes write only to a shop this promoter opened (or holds a
+ * relationship for) that nobody has claimed (`promoterShopEditAccess`, promoter-panel D1); only the shop's NAME reaches
+ * the model.
  *
  * Auth: Clerk session + a bound promoter. Allowance: the promoter's own daily vision budget (fails closed).
  */
@@ -16,7 +16,8 @@ import { checkRateLimit } from '@/lib/ratelimit'
 import { db } from '@/lib/supabase'
 import { getPromoterByClerkId } from '@/lib/promoter'
 import { resolveTargetShop } from '@/lib/promoter-server'
-import { promoterMayCloseShop } from '@/lib/promoter-shop-access'
+import { promoterShopEditAccess } from '@/lib/promoter-shop-access'
+import { shopEditRefusal } from '@/lib/promoter-close'
 import { budgetPeriod } from '@/lib/prompt-to-shop/allowance'
 import { photoHosts, fetchOwnImage } from '@/lib/prompt-to-shop/photo-server'
 import { callModelBody, MODEL_CONFIGURED } from '@/lib/prompt-to-shop/server'
@@ -44,9 +45,9 @@ export async function POST(req: NextRequest) {
   const shop = await resolveTargetShop({ shopId: text(body.shopId), slug: text(body.slug) })
   if (!shop) return NextResponse.json({ ok: false, error: 'Tienda no encontrada.' }, { status: 404 })
   // Same rule as the package close (Codex security, #474): only a shop this promoter opened or holds a relationship with.
-  if (!(await promoterMayCloseShop({ promoter, shop }))) {
-    return NextResponse.json({ ok: false, error: 'Solo puedes usar la foto en tiendas que abriste tú.' }, { status: 403 })
-  }
+  // Same rule as adding a product (promoter-panel D1): opened by this promoter and not yet claimed.
+  const refusal = shopEditRefusal(await promoterShopEditAccess({ promoter, shop }))
+  if (refusal) return NextResponse.json({ ok: false, error: refusal.error }, { status: refusal.status })
 
   const result = await suggestFromPhoto(
     { promoterClerkId: user.id, imageUrl: body.imageUrl, shopName: shop.name ?? null },

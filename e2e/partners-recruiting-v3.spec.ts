@@ -28,6 +28,7 @@ const PROMOTER_IDENTITY_BY_CLERK_ID_CONSUMERS = [
   'app/api/promoter/preview/activate/route.ts',
   'app/api/promoter/preview/route.ts',
   'app/api/promoter/shop/setup/route.ts',
+  'lib/promoter-import-server.ts', // promoter-panel S1: the import routes' shared preamble
 ] as const
 const PARTNER_IDENTITY_BY_ID_CONSUMERS = [
   'lib/portfolio/partner-portfolio-auth.ts',

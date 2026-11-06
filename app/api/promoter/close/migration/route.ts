@@ -12,6 +12,7 @@
  * net-remittance close instead of Stripe — same resolved amount, nothing
  * activates until admin approval.
  */
+import { promoterMayCloseShop } from '@/lib/promoter-shop-access'
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { checkRateLimit, getClientIp } from '@/lib/ratelimit'
@@ -51,6 +52,11 @@ export async function POST(req: NextRequest) {
 
   const shop = await resolveTargetShop({ shopId: body.shopId, slug: body.slug })
   if (!shop) return NextResponse.json({ ok: false, error: 'Tienda no encontrada.' }, { status: 404 })
+  // The same rule as a package close (pr-reviewer, #480): only a shop this promoter opened or holds a relationship for,
+  // never their own. Before this any promoter could start a migration charge on any shop.
+  if (!(await promoterMayCloseShop({ promoter, shop }))) {
+    return NextResponse.json({ ok: false, error: 'Solo puedes cobrar en las tiendas que tú abriste.' }, { status: 403 })
+  }
 
   if (body.paymentMethod === 'transfer') {
     if (!(await isEnabled('promoter.transfer_enabled'))) {

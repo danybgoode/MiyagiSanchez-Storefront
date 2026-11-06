@@ -8,6 +8,7 @@
  * throws, never blocks the product).
  */
 
+import { pinnedFetch } from './ssrf-fetch'
 import { uploadToR2, isR2Configured } from './r2'
 
 const MAX_IMAGES_PER_PRODUCT = 6
@@ -46,19 +47,56 @@ export interface IngestResult {
   failed: number
 }
 
-/** Fetch one remote image and upload it to R2. Returns null on any failure. */
+/** How many redirects an image fetch follows; each hop is re-checked and re-pinned. */
+const MAX_REDIRECTS = 3
+
+/**
+ * Fetch one remote image and upload it to R2. Returns null on any failure.
+ *
+ * The URL comes from an uploaded file or a scraped catalog, so this is a server-side fetch of an untrusted address.
+ * Since 2026-11-05 (promoter-panel S1.3, which lets promoters import files) it dials through `pinnedFetch`: the host is
+ * resolved once, private and reserved addresses are refused, and the connection goes to exactly the address that was
+ * checked (no DNS-rebinding window). Redirects are followed by hand, each hop checked again, instead of `fetch`'s
+ * `redirect: 'follow'`, which would dial wherever a public server pointed — internal addresses included.
+ */
 async function ingestOne(url: string, userId: string): Promise<string | null> {
   if (!isSafePublicUrl(url)) return null
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(url, { signal: controller.signal, redirect: 'follow' })
+    let target = new URL(url)
+    let res = await pinnedFetch(target, { signal: controller.signal, redirect: 'manual' })
+    for (let hop = 0; res.status >= 300 && res.status < 400; hop++) {
+      const location = res.headers.get('location')
+      if (!location || hop >= MAX_REDIRECTS) return null
+      target = new URL(location, target)
+      if (!isSafePublicUrl(target.href)) return null
+      await res.body?.cancel().catch(() => undefined) // free the socket before the next hop
+      res = await pinnedFetch(target, { signal: controller.signal, redirect: 'manual' })
+    }
     if (!res.ok) return null
     const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
     const ext = EXT_BY_TYPE[type]
     if (!ext) return null
-    const buf = await res.arrayBuffer()
-    if (buf.byteLength === 0 || buf.byteLength > MAX_BYTES) return null
+    // Never hold more than MAX_BYTES (Codex security, #480): a declared size over the cap is refused before reading, and
+    // the body is streamed with a running total, aborting the moment it passes the cap.
+    const declared = Number(res.headers.get('content-length') ?? '')
+    if (Number.isFinite(declared) && declared > MAX_BYTES) return null
+    const chunks: Uint8Array[] = []
+    let total = 0
+    for await (const chunk of res.body ?? []) {
+      const bytes = chunk as Uint8Array
+      total += bytes.byteLength
+      if (total > MAX_BYTES) { controller.abort(); return null }
+      chunks.push(bytes)
+    }
+    if (total === 0) return null
+    // Copy exactly `total` bytes into a fresh buffer. `Buffer.concat(...).buffer` can be Node's SHARED allocation pool
+    // for small sizes, and uploading it would publish other requests' memory next to the image (Codex security, #480).
+    const out = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength }
+    const buf = out.buffer
     const key = `listing-images/${userId}/import/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
     return await uploadToR2(buf, key, type)
   } catch {
