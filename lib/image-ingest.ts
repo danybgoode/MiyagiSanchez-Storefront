@@ -8,6 +8,7 @@
  * throws, never blocks the product).
  */
 
+import { pinnedFetch } from './ssrf-fetch'
 import { uploadToR2, isR2Configured } from './r2'
 
 const MAX_IMAGES_PER_PRODUCT = 6
@@ -46,13 +47,32 @@ export interface IngestResult {
   failed: number
 }
 
-/** Fetch one remote image and upload it to R2. Returns null on any failure. */
+/** How many redirects an image fetch follows; each hop is re-checked and re-pinned. */
+const MAX_REDIRECTS = 3
+
+/**
+ * Fetch one remote image and upload it to R2. Returns null on any failure.
+ *
+ * The URL comes from an uploaded file or a scraped catalog, so this is a server-side fetch of an untrusted address.
+ * Since 2026-11-05 (promoter-panel S1.3, which lets promoters import files) it dials through `pinnedFetch`: the host is
+ * resolved once, private and reserved addresses are refused, and the connection goes to exactly the address that was
+ * checked (no DNS-rebinding window). Redirects are followed by hand, each hop checked again, instead of `fetch`'s
+ * `redirect: 'follow'`, which would dial wherever a public server pointed — internal addresses included.
+ */
 async function ingestOne(url: string, userId: string): Promise<string | null> {
   if (!isSafePublicUrl(url)) return null
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(url, { signal: controller.signal, redirect: 'follow' })
+    let target = new URL(url)
+    let res = await pinnedFetch(target, { signal: controller.signal, redirect: 'manual' })
+    for (let hop = 0; res.status >= 300 && res.status < 400; hop++) {
+      const location = res.headers.get('location')
+      if (!location || hop >= MAX_REDIRECTS) return null
+      target = new URL(location, target)
+      if (!isSafePublicUrl(target.href)) return null
+      res = await pinnedFetch(target, { signal: controller.signal, redirect: 'manual' })
+    }
     if (!res.ok) return null
     const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
     const ext = EXT_BY_TYPE[type]

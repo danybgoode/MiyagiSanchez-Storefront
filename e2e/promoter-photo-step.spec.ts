@@ -91,8 +91,9 @@ test('no model credential: "fill it by hand", and nothing is spent', async () =>
 test('the promoter spends from their own subject, and the route is limited to shops they opened', () => {
   expect(promoterPhotoSubject('p1')).toBe('photo_analysis:promoter:p1')
   const route = readFileSync('app/api/promoter/close/photo/route.ts', 'utf8')
-  expect(route.indexOf('promoterMayCloseShop(')).toBeGreaterThan(-1)
-  expect(route.indexOf('promoterMayCloseShop(')).toBeLessThan(route.indexOf('suggestFromPhoto('))
+  // The same write rule as adding a product (promoter-panel D1): opened by this promoter and not yet claimed.
+  expect(route.indexOf('promoterShopEditAccess(')).toBeGreaterThan(-1)
+  expect(route.indexOf('promoterShopEditAccess(')).toBeLessThan(route.indexOf('suggestFromPhoto('))
   // The suggestion only fills the form: publishing is still the existing listing route.
   const ui = readFileSync('app/(shell)/promotor/cerrar/ListingStep.tsx', 'utf8')
   expect(ui).toContain("fetch('/api/promoter/close/photo'")

@@ -241,6 +241,11 @@ const HEADER_ALIASES: Record<string, keyof CatalogImportRow> = {
   images: 'images', imagenes: 'images', image_url: 'images', imagen: 'images',
   weight_grams: 'weight_grams', peso: 'weight_grams', peso_gramos: 'weight_grams',
   unit_cost: 'unit_cost', costo: 'unit_cost', costo_unitario: 'unit_cost', cost: 'unit_cost',
+  // Platform exports (promoter-panel D3): WooCommerce's documented schema and Tiendanube's productos.csv — see the
+  // sources above normalizeHeaderKey. Units in a header stay distinct («Peso (kg)» → peso_kg, never grams).
+  name: 'title', regular_price: 'price', precio_normal: 'price',
+  categories: 'category', categorias: 'category',
+  inventario: 'quantity',
   // Autos vehicle specs (cars-vertical S2.3)
   make: 'make', marca: 'make',
   model: 'model', modelo: 'model',
@@ -268,20 +273,57 @@ const AUTOS_TRANSMISSION_VALUES = new Set(
 )
 
 /** Split a single CSV line into cells (RFC-ish: handles quotes + escaped quotes). */
-function parseCsvLine(line: string): string[] {
-  const cells: string[] = []
+/**
+ * A header as the alias table spells it: lowercase, accents removed, every run of spaces or punctuation → "_", trimmed.
+ * «Regular price» → regular_price, «Categorías» → categorias, «In stock?» → in_stock, «Peso (kg)» → peso_kg.
+ * Before 2026-11-05 headers were only lowercased, so «Descripción» or «Categorías» from a real export never matched.
+ */
+export function normalizeHeaderKey(header: string): string {
+  return header
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9ñ]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+/** The delimiter a CSV uses: comma, semicolon (Excel in Spanish) or tab — whichever the header row has most of. */
+export function detectCsvDelimiter(headerLine: string): ',' | ';' | '\t' {
+  const count = (c: string) => headerLine.split(c).length - 1
+  const options: Array<',' | ';' | '\t'> = [',', ';', '\t']
+  return options.reduce((best, c) => (count(c) > count(best) ? c : best), ',')
+}
+
+/**
+ * Split a whole CSV text into rows of cells, honouring quotes: a quoted cell may hold the delimiter, a doubled quote
+ * ("") and LINE BREAKS. Exports put multi-line HTML descriptions in quotes; splitting on every newline first (as
+ * this parser did before 2026-11-05) broke each such product into several invalid rows.
+ */
+export function parseCsvRows(text: string, delimiter: ',' | ';' | '\t' = ','): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
   let cell = ''
   let quoted = false
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    const next = line[i + 1]
-    if (char === '"' && quoted && next === '"') { cell += '"'; i++ }
-    else if (char === '"') { quoted = !quoted }
-    else if (char === ',' && !quoted) { cells.push(cell.trim()); cell = '' }
-    else { cell += char }
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (quoted) {
+      if (char === '"' && text[i + 1] === '"') { cell += '"'; i++ }
+      else if (char === '"') quoted = false
+      else cell += char
+      continue
+    }
+    if (char === '"') quoted = true
+    else if (char === delimiter) { row.push(cell.trim()); cell = '' }
+    else if (char === '\n' || char === '\r') {
+      if (char === '\r' && text[i + 1] === '\n') i++
+      row.push(cell.trim()); cell = ''
+      if (row.some((c) => c !== '')) rows.push(row)
+      row = []
+    } else cell += char
   }
-  cells.push(cell.trim())
-  return cells
+  row.push(cell.trim())
+  if (row.some((c) => c !== '')) rows.push(row)
+  return rows
 }
 
 function looksLikeJson(text: string): boolean {
@@ -466,6 +508,50 @@ function stageRow(raw: Record<string, unknown>, line: number): StagedRow {
   return { line, row, issues, valid: !issues.some((i) => i.level === 'error') }
 }
 
+export type CatalogRecordsResult = {
+  format: 'json' | 'csv' | null
+  records: Array<Record<string, unknown>>
+  fileErrors: ImportIssue[]
+}
+
+/**
+ * Read a CSV or JSON catalog into raw records keyed by the canonical field names (headers through the alias table),
+ * WITHOUT validating them. `parseCatalogFile` validates these; the promoter file import (promoter-panel D3) first
+ * fills what an export lacks (a Miyagi Sánchez category) and then validates.
+ */
+export function parseCatalogRecords(text: string, fileName = ''): CatalogRecordsResult {
+  const trimmed = text.replace(/^\uFEFF/, '').trim()
+  if (!trimmed) return { format: null, records: [], fileErrors: [{ line: null, message: 'El archivo está vacío.', level: 'error' }] }
+  const isJson = /\.json$/i.test(fileName) || (!/\.csv$/i.test(fileName) && looksLikeJson(trimmed))
+  if (isJson) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(trimmed)
+    } catch {
+      return { format: 'json', records: [], fileErrors: [{ line: null, message: 'El archivo JSON no es válido. Pégalo de nuevo en tu IA para que lo corrija.', level: 'error' }] }
+    }
+    const arr = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : null)
+    if (!arr) return { format: 'json', records: [], fileErrors: [{ line: null, message: 'El JSON debe ser un arreglo de productos ([ … ]).', level: 'error' }] }
+    return { format: 'json', records: arr.map((r) => (r && typeof r === 'object' ? r as Record<string, unknown> : {})), fileErrors: [] }
+  }
+  const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? ''
+  const rows = parseCsvRows(trimmed, detectCsvDelimiter(firstLine))
+  if (rows.length < 2) {
+    return { format: 'csv', records: [], fileErrors: [{ line: null, message: 'El CSV necesita una fila de encabezados y al menos un producto.', level: 'error' }] }
+  }
+  const headers = rows[0].map((h) => {
+    const key = normalizeHeaderKey(h)
+    return HEADER_ALIASES[key] ?? HEADER_ALIASES[h.toLowerCase()] ?? key
+  })
+  const records = rows.slice(1).map((cells) => {
+    const obj: Record<string, unknown> = {}
+    // The first column that maps to a field wins, so «Regular price» is not overwritten by a later empty column.
+    headers.forEach((key, idx) => { if (cells[idx] !== undefined && cells[idx] !== '' && obj[key] === undefined) obj[key] = cells[idx] })
+    return obj
+  })
+  return { format: 'csv', records, fileErrors: [] }
+}
+
 /**
  * Parse a CSV or JSON catalog file and validate every row.
  * Returns staged rows (with per-row issues) plus any file-level errors.
@@ -497,17 +583,9 @@ export function parseCatalogFile(text: string, fileName = ''): CatalogParseResul
     rawRows = arr.map((r) => (r && typeof r === 'object' ? r as Record<string, unknown> : {}))
   } else {
     format = 'csv'
-    const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-    if (lines.length < 2) {
-      return { format, staged: [], fileErrors: [{ line: null, message: 'El CSV necesita una fila de encabezados y al menos un producto.', level: 'error' }] }
-    }
-    const headers = parseCsvLine(lines[0]).map((h) => HEADER_ALIASES[h.toLowerCase()] ?? h.toLowerCase())
-    rawRows = lines.slice(1).map((line) => {
-      const cells = parseCsvLine(line)
-      const obj: Record<string, unknown> = {}
-      headers.forEach((key, idx) => { if (cells[idx] !== undefined && cells[idx] !== '') obj[key] = cells[idx] })
-      return obj
-    })
+    const read = parseCatalogRecords(trimmed, fileName || 'file.csv')
+    if (read.fileErrors.length) return { format, staged: [], fileErrors: read.fileErrors }
+    rawRows = read.records
   }
 
   if (rawRows.length > MAX_IMPORT_ROWS) {
