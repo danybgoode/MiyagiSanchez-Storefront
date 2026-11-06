@@ -155,7 +155,7 @@ function normalizeOrReject(
  *  constraint to catch it at insert time. */
 type DedupeLookup = { ok: true; row: { id: string } | null } | { ok: false }
 
-async function lookupDedupe(column: 'shop_id' | 'phone_e164' | 'email_normalized', value: string): Promise<DedupeLookup> {
+async function lookupDedupe(column: 'shop_id' | 'phone_e164' | 'whatsapp_e164' | 'email_normalized', value: string): Promise<DedupeLookup> {
   const { data, error } = await db.from('merchant_relationships').select('id').eq(column, value).limit(1).maybeSingle()
   if (error) return { ok: false }
   return { ok: true, row: (data as { id: string } | null) ?? null }
@@ -357,6 +357,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'No se pudo verificar duplicados. Inténtalo de nuevo.' }, { status: 500 })
       }
       candidates.byPhone = r.row
+    }
+    if (whatsappE164) {
+      const r = await lookupDedupe('whatsapp_e164', whatsappE164)
+      if (!r.ok) {
+        return NextResponse.json({ ok: false, error: 'No se pudo verificar duplicados. Inténtalo de nuevo.' }, { status: 500 })
+      }
+      candidates.byWhatsapp = r.row
     }
     if (emailNormalized) {
       const r = await lookupDedupe('email_normalized', emailNormalized)

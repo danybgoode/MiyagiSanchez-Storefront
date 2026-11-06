@@ -99,6 +99,12 @@ test.describe('businessNameSimilarity / isFuzzyNameMatch — suggest, never merg
 test.describe('decideDedupeMatch — the precedence rule (build contract, sprint-1.md)', () => {
   const none: DedupeCandidateRows = { byShopId: null, byPhone: null, byEmail: null }
 
+  test('whatsapp_e164 alone wins, and ranks after phone and before email (promoter-panel S2)', () => {
+    expect(decideDedupeMatch({ ...none, byWhatsapp: { id: 'wa-hit' } })).toEqual({ matched: true, relationshipId: 'wa-hit', matchReason: 'whatsapp_e164' })
+    expect(decideDedupeMatch({ ...none, byPhone: { id: 'phone-hit' }, byWhatsapp: { id: 'wa-hit' } }).matched && decideDedupeMatch({ ...none, byPhone: { id: 'phone-hit' }, byWhatsapp: { id: 'wa-hit' } })).toMatchObject({ matchReason: 'phone_e164' })
+    expect(decideDedupeMatch({ ...none, byWhatsapp: { id: 'wa-hit' }, byEmail: { id: 'email-hit' } })).toMatchObject({ matchReason: 'whatsapp_e164' })
+  })
+
   test('no candidates → no match', () => {
     expect(decideDedupeMatch(none)).toEqual({ matched: false })
   })

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { shopUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
+import type { Dictionary } from '@/lib/dictionary'
 
 /**
  * Promoter workspace — private preview + activation step
@@ -42,7 +43,7 @@ const STATUS_LABEL: Record<string, string> = {
   activated: 'Tienda activa (pública)',
 }
 
-export default function PreviewStep({ shop, n, relationshipId = null }: { shop: Shop; n: number; relationshipId?: string | null }) {
+export default function PreviewStep({ shop, n, relationshipId = null, panelCopy }: { shop: Shop; n: number; relationshipId?: string | null; panelCopy: Dictionary['promotorPanel'] }) {
   const [state, setState] = useState<State | null>(null)
   const [link, setLink] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -118,8 +119,9 @@ export default function PreviewStep({ shop, n, relationshipId = null }: { shop: 
   const status = state?.status
   const activated = status === 'activated'
 
-  // The owner approved in person: recorded on their relationship (moved here from the old «Datos del comercio» form,
-  // promoter-panel S2), then the state is read again so «Publicar» unlocks.
+  // The owner approved their shop through the preview link; this records that approval on their relationship (moved
+  // here from the old «Datos del comercio» form, promoter-panel S2). The route accepts it only once the preview is
+  // `approved`, so the button shows only then (pr-reviewer, #481: it showed in exactly the states the route refuses).
   async function registerConsent() {
     if (!relationshipId) return
     setConsentBusy(true); setConsentNote(null)
@@ -128,10 +130,10 @@ export default function PreviewStep({ shop, n, relationshipId = null }: { shop: 
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok || !data.ok) { setConsentNote(data.error ?? 'No se pudo guardar. Revisa tu conexión e intenta otra vez.'); return }
-      setConsentNote('Aprobada: ya puede publicarse.')
+      if (!res.ok || !data.ok) { setConsentNote(data.error ?? panelCopy.errors.network); return }
+      setConsentNote(data.auditRecorded === false ? panelCopy.entrega.consentAudit : panelCopy.entrega.consentDone)
       await loadState()
-    } catch { setConsentNote('No se pudo guardar. Revisa tu conexión e intenta otra vez.') }
+    } catch { setConsentNote(panelCopy.errors.network) }
     finally { setConsentBusy(false) }
   }
 
@@ -140,10 +142,11 @@ export default function PreviewStep({ shop, n, relationshipId = null }: { shop: 
       <h2 className="font-semibold">
         <span className="text-[var(--color-muted)] mr-2">{n}.</span>Vista previa privada y activación
       </h2>
-      {relationshipId && status && status !== 'approved' && status !== 'activated' ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="btn btn-secondary btn-sm" onClick={registerConsent} disabled={consentBusy} data-testid="panel-consent">
-            {consentBusy ? 'Guardando…' : 'El dueño vio su tienda y está de acuerdo'}
+      {relationshipId && status === 'approved' ? (
+        <div className="grid gap-2">
+          <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{panelCopy.entrega.consentHint}</p>
+          <button type="button" className="btn btn-secondary btn-sm" style={{ justifySelf: 'start' }} onClick={registerConsent} disabled={consentBusy} data-testid="panel-consent">
+            {consentBusy ? panelCopy.entrega.consentSaving : panelCopy.entrega.consent}
           </button>
         </div>
       ) : null}

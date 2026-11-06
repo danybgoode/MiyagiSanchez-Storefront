@@ -5472,7 +5472,7 @@
       "save": "Save for later",
       "saving": "Saving…",
       "continue": "Go to their products",
-      "saved": "Saved. You'll find it in your recent businesses when you come back.",
+      "saved": "Saved. You'll find it in My businesses when you come back.",
       "created": "Done, {nombre}'s shop exists. It stays private until the owner approves it.",
       "dupe": "You already have a business with those details: «{nombre}». Is it the same one?",
       "dupeNoName": "You already have a business with those details. Is it the same one?",
@@ -5513,10 +5513,24 @@
         "medium": "Thinking about it",
         "weak": "Not very interested",
         "disqualified": "Not interested"
-      }
+      },
+      "auditWarning": "Saved, but the change history couldn't be recorded. Tap «Save for later» again.",
+      "suggestions": "Is it one of these businesses you already have?",
+      "whatsappInvalid": "Write the owner's WhatsApp: 10 digits, or the full number with + if it isn't Mexican.",
+      "market": "Shop's country",
+      "marketMx": "Mexico",
+      "marketUs": "United States",
+      "description": "Business description (optional)"
     },
     "errors": {
       "network": "It couldn't be saved. Check your connection and try again."
+    },
+    "entrega": {
+      "consent": "Save the owner's approval",
+      "consentHint": "The owner already approved their shop from the link you sent. Save it so it stays on their record.",
+      "consentSaving": "Saving…",
+      "consentDone": "Approval saved.",
+      "consentAudit": "The approval was saved, but not its history. Tap the button again."
     }
   }
 }

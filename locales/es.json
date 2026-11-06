@@ -5472,7 +5472,7 @@
       "save": "Guardar para después",
       "saving": "Guardando…",
       "continue": "Seguir a sus productos",
-      "saved": "Guardado. Lo encuentras en tus negocios recientes cuando vuelvas.",
+      "saved": "Guardado. Lo encuentras en Mis negocios cuando vuelvas.",
       "created": "Listo, la tienda de {nombre} ya existe. Está en privado hasta que el dueño la apruebe.",
       "dupe": "Ya tienes un negocio registrado con esos datos: «{nombre}». ¿Es el mismo?",
       "dupeNoName": "Ya tienes un negocio registrado con esos datos. ¿Es el mismo?",
@@ -5513,10 +5513,24 @@
         "medium": "Lo está pensando",
         "weak": "Poco interesado",
         "disqualified": "No le interesa"
-      }
+      },
+      "auditWarning": "Se guardó, pero no se pudo registrar el historial del cambio. Vuelve a tocar «Guardar para después».",
+      "suggestions": "¿Es alguno de estos negocios que ya tienes?",
+      "whatsappInvalid": "Escribe el WhatsApp del dueño: 10 dígitos, o el número completo con + si no es de México.",
+      "market": "País de la tienda",
+      "marketMx": "México",
+      "marketUs": "Estados Unidos",
+      "description": "Descripción del negocio (opcional)"
     },
     "errors": {
       "network": "No se pudo guardar. Revisa tu conexión e intenta otra vez."
+    },
+    "entrega": {
+      "consent": "Guardar la aprobación del dueño",
+      "consentHint": "El dueño ya aprobó su tienda desde el enlace que le mandaste. Guárdalo para que quede en su registro.",
+      "consentSaving": "Guardando…",
+      "consentDone": "Aprobación guardada.",
+      "consentAudit": "La aprobación se guardó, pero no su historial. Vuelve a tocar el botón."
     }
   }
 }

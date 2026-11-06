@@ -77,7 +77,7 @@ export default function PromoterCloseClient({
         onRelationship={(id) => setRelationshipId(id)}
       />
       {shop && <div id="panel-productos"><ListingStep shop={shop} n={(n += 1)} /></div>}
-      {shop && previewEnabled && <PreviewStep shop={shop} n={(n += 1)} relationshipId={relationshipId} />}
+      {shop && previewEnabled && <PreviewStep shop={shop} n={(n += 1)} relationshipId={relationshipId} panelCopy={copy} />}
       {shop && <CloseStep shop={shop} transferEnabled={transferEnabled} packageRates={packageRates} n={(n += 1)} />}
       {shop && <HandoffStep shop={shop} n={(n += 1)} />}
     </div>
