@@ -74,7 +74,8 @@ export async function activatePromoterOneTimeGrant(input: {
       tg.alert(`⚠️ Paquete aprobado en una tienda que ya tenía Negocio sin costo — revisar reembolso.\nShop: ${shopId}\nPromotor: ${promoterId}`)
       return { ok: true }
     }
-    if (outcome !== 'none') tg.alert(`✅ Paquete aprobado — ${packageGrantsLine(sku)}\nShop: ${shopId}\nPromotor: ${promoterId}`)
+    // Only when this approval wrote a grant: a re-approval that finds every grant counted (`replay`) says nothing new.
+    if (outcome === 'written') tg.alert(`✅ Paquete aprobado — ${packageGrantsLine(sku)}\nShop: ${shopId}\nPromotor: ${promoterId}`)
     return { ok: true }
   }
   const grantKey = SKU_GRANT_KEYS[sku]

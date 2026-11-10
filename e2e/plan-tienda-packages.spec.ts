@@ -270,6 +270,8 @@ test.describe('retired packages are refused for sale and still read (D11)', () =
     expect(card).not.toContain('isSellablePackageSku')
     const approve = readFileSync('lib/promoter-grant-server.ts', 'utf8')
     expect(approve).toContain('if (isPackageSku(sku)) {')
+    // A re-approval that finds every grant counted sends no second ✅ (verifier N3, PR 486).
+    expect(approve).toContain("if (outcome === 'written') tg.alert(`✅ Paquete aprobado")
     expect(approve).not.toContain('isSellablePackageSku')
   })
 })
