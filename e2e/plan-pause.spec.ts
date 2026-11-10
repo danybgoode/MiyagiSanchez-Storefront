@@ -21,6 +21,7 @@ import {
   planPauseClaimArgs,
   planPauseClearArgs,
   planPauseMarketOf,
+  planPauseLogSummary,
   runPlanPause,
   type PauseCallResult,
   type PauseCandidate,
@@ -533,5 +534,24 @@ test.describe('the legacy marker guard (verifier S1)', () => {
   test('the route answers 409 for the refusal and 503 for a failed read', () => {
     const src = readFileSync('app/api/cron/plan-pause/route.ts', 'utf8')
     expect(src).toContain("result.ok ? 200 : result.error === 'legacy_marker_missing' ? 409 : 503")
+  })
+})
+
+test.describe('the server log carries counts only (Codex security, PR 487)', () => {
+  test('no shop id, slug or name reaches the log line; the counts by outcome and reason do', async () => {
+    const shops = [shop('tienda-secreta-1'), { ...shop('tienda-secreta-2'), name: 'Panadería Lupita' }, shop('tienda-us', {})]
+    const { deps } = harness({ shops, market: (s) => (s.id === 'tienda-us' ? 'other' : 'mx') })
+    const run = await runPlanPause(deps, { dryRun: true })
+    const line = JSON.stringify(planPauseLogSummary(run))
+    for (const leak of ['tienda-secreta-1', 'tienda-secreta-2', 'Panadería Lupita', 'tienda-us', 'zz-legacy']) expect(line).not.toContain(leak)
+    expect(planPauseLogSummary(run)).toMatchObject({ ok: true, dryRun: true, read: 4, byResult: { would_pause: 2 }, left: { not_mx: 1, legacy: 1 } })
+    // The caller's answer still has the list.
+    expect(run.ok && run.candidates.map((c) => c.shopId)).toEqual(['tienda-secreta-1', 'tienda-secreta-2'])
+  })
+  test('the route logs the summary, never the run', () => {
+    const src = readFileSync('app/api/cron/plan-pause/route.ts', 'utf8')
+    expect(src).toContain("console.info('[plan-pause] run', JSON.stringify(planPauseLogSummary(result)))")
+    expect(src).not.toMatch(/console\.\w+\([^)]*JSON\.stringify\(result\)/)
+    expect(src).toContain('return NextResponse.json(result,')
   })
 })

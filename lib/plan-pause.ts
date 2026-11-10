@@ -518,3 +518,39 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
 
   return { ok: true, dryRun: opts.dryRun, read: shops.length, candidates, paused, left, unavailable, unavailableBy, failed }
 }
+
+/**
+ * What the server LOG keeps of a run: counts only, by outcome and reason — never a shop id, slug or name (Codex
+ * security, PR 487). A log line is read by more people and kept longer than the answer to the authenticated cron
+ * caller, which still carries the list a person reads for the dry run. Nothing here is copied from a candidate.
+ */
+export type PlanPauseLogSummary =
+  | { ok: false; error: string; read: number }
+  | {
+      ok: true
+      dryRun: boolean
+      read: number
+      paused: number
+      failed: number
+      unavailable: number
+      left: Record<string, number>
+      unavailableBy: Record<string, number>
+      byResult: Record<string, number>
+    }
+
+export function planPauseLogSummary(run: PlanPauseRun): PlanPauseLogSummary {
+  if (!run.ok) return { ok: false, error: run.error, read: run.read }
+  const byResult: Record<string, number> = {}
+  for (const c of run.candidates) byResult[c.result] = (byResult[c.result] ?? 0) + 1
+  return {
+    ok: true,
+    dryRun: run.dryRun,
+    read: run.read,
+    paused: run.paused,
+    failed: run.failed,
+    unavailable: run.unavailable,
+    left: { ...run.left },
+    unavailableBy: { ...run.unavailableBy },
+    byResult,
+  }
+}

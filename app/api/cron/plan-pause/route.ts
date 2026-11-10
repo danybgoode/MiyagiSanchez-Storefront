@@ -17,7 +17,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { cronSecretMatches } from '@/lib/prompt-to-shop/nudges'
-import { runPlanPause } from '@/lib/plan-pause'
+import { planPauseLogSummary, runPlanPause } from '@/lib/plan-pause'
 import { planPauseDeps } from '@/lib/plan-pause-server'
 
 export const runtime = 'nodejs'
@@ -32,7 +32,8 @@ export async function GET(req: NextRequest) {
   // Live ONLY on an explicit `dry_run=0`. No parameter, or any other value (`dry_run=false`, a typo), is a dry run.
   const dryRun = req.nextUrl.searchParams.get('dry_run') !== '0'
   const result = await runPlanPause(planPauseDeps(), { dryRun })
-  console.info('[plan-pause] run', JSON.stringify(result))
+  // Counts only in the server log; the list (ids, slugs, names) goes only to the authenticated caller (Codex security).
+  console.info('[plan-pause] run', JSON.stringify(planPauseLogSummary(result)))
   // 409 when the legacy marking has not run (the run refused on purpose); 503 when the shops could not be read.
   return NextResponse.json(result, { status: result.ok ? 200 : result.error === 'legacy_marker_missing' ? 409 : 503 })
 }
