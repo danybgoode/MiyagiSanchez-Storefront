@@ -83,7 +83,8 @@ import { isPublicDomainShape } from '@/lib/ssrf-guard'
 import { downloadArtworkBytes } from '@/lib/artwork-url-fetch'
 import { resolvePlan } from '@/lib/plan-server'
 import { planAgentView } from '@/lib/plan-agent'
-import { coerceNegocioCadence, startNegocioCheckout } from '@/lib/negocio-checkout'
+import { coerceNegocioCadence, startPlanCheckout } from '@/lib/negocio-checkout'
+import type { PaidPlan } from '@/lib/plan-kind'
 import { buildStoreConfigSnapshot } from '@/lib/store-config'
 import { stageBulkActionAsAgent, applyBulkBatchAsAgent, getBulkBatch, type BulkActionPayload, type BulkFilterParams } from '@/lib/catalog-bulk'
 import { applyStoreConfig } from '@/lib/apply-config-manifest'
@@ -1040,7 +1041,7 @@ const TOOLS = [
   },
   {
     name: 'get_plan',
-    description: "SELLER TOOL. Read YOUR OWN shop's Miyagi Sánchez plan. `plan` is one of five: `negocio` (Plan Negocio), `trial` (the free Negocio trial, with its end date), `tienda` (Plan Tienda), `gratis` (Plan Gratis, kept only by shops that existed before Plan Tienda) or `unpaid` (no active plan). `reason` says why: comp, one_time, subscription, trial, tienda_one_time, tienda_subscription, trial_ended, legacy, unpaid, or unavailable (the subscription could not be read just now: retry, and do not treat it as Gratis or as unpaid). Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop (a partner credential may read it too). Returns the plan, why, when it ends and days left, exactly what it includes (custom domain, Mercado Libre sync, the «Tienda impulsada por Miyagi Sánchez» badge, the monthly check-in, chat answers and photos per month), Negocio's prices, and which checkout can be started now. Use before start_negocio.",
+    description: "SELLER TOOL. Read YOUR OWN shop's Miyagi Sánchez plan. `plan` is one of five: `negocio` (Plan Negocio), `trial` (the free Negocio trial, with its end date), `tienda` (Plan Tienda), `gratis` (Plan Gratis, kept only by shops that existed before Plan Tienda) or `unpaid` (no active plan). `reason` says why: comp, one_time, subscription, trial, tienda_one_time, tienda_subscription, trial_ended, legacy, unpaid, or unavailable (the subscription could not be read just now: retry, and do not treat it as Gratis or as unpaid). Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop (a partner credential may read it too). Returns the plan, why, when it ends and days left, exactly what it includes (custom domain, Mercado Libre sync, the «Tienda impulsada por Miyagi Sánchez» badge, the monthly check-in, chat answers and photos per month), the prices of Plan Tienda and Plan Negocio (IVA included), and which checkout of each can be started now (`can_start_tienda`, `can_start`). Use before start_tienda or start_negocio.",
     inputSchema: { type: 'object', properties: {} },
   },
   {
@@ -1050,6 +1051,17 @@ const TOOLS = [
       type: 'object',
       properties: {
         cadence: { type: 'string', enum: ['month', 'year'], description: "'month' (monthly subscription) or 'year' (one payment, 12 months, meses sin intereses)" },
+      },
+      required: ['cadence'],
+    },
+  },
+  {
+    name: 'start_tienda',
+    description: "SELLER TOOL. Start the Stripe checkout for Plan Tienda on YOUR OWN shop. Requires the shop OWNER's agent token (Authorization: Bearer ms_agent_…); a partner credential cannot start a payment. `cadence`: 'month' (a monthly subscription) or 'year' (one card payment for 12 months; a second year is added after the current end). Prices come from get_plan (`tienda_price`), IVA included. Returns a Stripe checkout URL the merchant opens to pay; Plan Tienda turns on by itself once the payment lands, and paying during the free trial starts the year (or the first monthly charge) when the trial ends. Refused when the shop is on Plan Negocio, already pays Plan Tienda monthly, asks for monthly while a paid Tienda year is running, or its subscriptions could not be read; an unclaimed shop must be claimed first.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cadence: { type: 'string', enum: ['month', 'year'], description: "'month' (monthly subscription) or 'year' (one card payment, 12 months)" },
       },
       required: ['cadence'],
     },
@@ -4323,13 +4335,27 @@ async function handleGetPlan(args: Record<string, unknown>, authHeader?: string 
 }
 
 async function handleStartNegocio(args: Record<string, unknown>, authHeader?: string | null) {
+  return handleStartPlan('negocio', args, authHeader)
+}
+
+async function handleStartTienda(args: Record<string, unknown>, authHeader?: string | null) {
+  return handleStartPlan('tienda', args, authHeader)
+}
+
+/**
+ * `start_negocio` and `start_tienda` (plan-tienda S2.3): ONE body, so the two tools cannot drift apart in auth or
+ * refusals — the owner's own token only, never a partner, never an unclaimed shop, and the plan's own checkout rules.
+ */
+async function handleStartPlan(plan: PaidPlan, args: Record<string, unknown>, authHeader?: string | null) {
+  const tool = plan === 'negocio' ? 'start_negocio' : 'start_tienda'
+  const name = plan === 'negocio' ? 'Negocio' : 'el Plan Tienda'
   // Not in PARTNER_READ_TOOLS: only the shop owner's own token can start a payment.
-  const agentAuth = await resolveToolShop(authHeader, args, 'start_negocio')
+  const agentAuth = await resolveToolShop(authHeader, args, tool)
   if (!agentAuth.ok) return { isError: true, content: [{ type: 'text', text: agentAuth.message ?? `Unauthorized. ${AGENT_AUTH_HINT}` }] }
   // Only the shop OWNER's token may start a payment. `resolveToolShop` limits only the VIEWER partner role to
   // PARTNER_READ_TOOLS, so a manager partner would pass it — refuse every partner credential here (pr-reviewer, #473).
   if (agentAuth.partner) {
-    return { isError: true, content: [{ type: 'text', text: 'Solo el dueño de la tienda puede iniciar el pago de Negocio, con su propio token.' }] }
+    return { isError: true, content: [{ type: 'text', text: `Solo el dueño de la tienda puede iniciar el pago de ${name}, con su propio token.` }] }
   }
   const shop = agentAuth.shop
   const cadence = coerceNegocioCadence(args.cadence)
@@ -4337,20 +4363,21 @@ async function handleStartNegocio(args: Record<string, unknown>, authHeader?: st
   if (!shop.clerk_user_id) {
     return { isError: true, content: [{ type: 'text', text: 'Esta tienda aún no tiene dueño: primero hay que reclamarla.' }] }
   }
-  const result = await startNegocioCheckout({
+  const result = await startPlanCheckout(plan, {
     shopId: shop.id,
     shopMetadata: shop.metadata,
     sellerClerkId: shop.clerk_user_id,
     cadence,
   }).catch((e: unknown) => {
-    console.error('[mcp start_negocio] checkout failed:', e)
+    console.error(`[mcp ${tool}] checkout failed:`, e)
     return { ok: false as const, status: 502, error: 'No se pudo iniciar el pago.' }
   })
   if (!result.ok) return { isError: true, content: [{ type: 'text', text: result.error }] }
+  const how = cadence === 'month' ? 'mensual' : plan === 'negocio' ? 'anual, con meses sin intereses' : 'anual, en un solo pago'
   return {
     content: [
-      { type: 'text', text: `Abre este enlace para pagar Negocio (${cadence === 'month' ? 'mensual' : 'anual, con meses sin intereses'}): ${result.url}` },
-      { type: 'text', text: JSON.stringify({ checkout_url: result.url, cadence }, null, 2) },
+      { type: 'text', text: `Abre este enlace para pagar ${name} (${how}): ${result.url}` },
+      { type: 'text', text: JSON.stringify({ checkout_url: result.url, cadence, plan }, null, 2) },
     ],
   }
 }
@@ -4770,6 +4797,7 @@ async function handleMcpMethod(
       case 'start_shopify_migration':   { const r = await handleStartShopifyMigration(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'get_plan':                  { const r = await handleGetPlan(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'start_negocio':             { const r = await handleStartNegocio(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
+      case 'start_tienda':              { const r = await handleStartTienda(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'get_domain_entitlement':    { const r = await handleGetDomainEntitlement(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'start_domain_subscription': { const r = await handleStartDomainSubscription(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }
       case 'get_subdomain_entitlement':    { const r = await handleGetSubdomainEntitlement(args, authHeader); return { content: r.content, ...(r.isError ? { isError: true } : {}) } }

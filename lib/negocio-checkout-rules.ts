@@ -163,4 +163,4 @@ export function subscriptionPeriod(sub: unknown): { start: number; end: number }
 
 // `mapNegocioStatus` (Stripe status → a Negocio status, with `unpaid` folded into `past_due` and `paused` /
 // `incomplete` dropped) was removed by plan-tienda S2.2: the webhook now sends Stripe's status AS IS and the Backend
-// decides what is live (Backend #228; sprint-2 build contract). See `lib/plan-subscription-sync.ts`.
+// decides what is live (Backend PR 228; sprint-2 build contract). See `lib/plan-subscription-sync.ts`.

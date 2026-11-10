@@ -4,7 +4,7 @@
  * Server-side bridge to the Medusa Commerce Plan Tienda subscription (epic 08 · plan-tienda-three-free-months S2.2,
  * README D3). The mirror of `lib/negocio-subscription.ts`: the monthly Plan Tienda is a Medusa Commerce plan of kind
  * `tienda_plan`, seeded by `scripts/seed-tienda-plan.mjs` through `POST /internal/setup-tienda-plan`, and read and
- * lapsed through `/internal/tienda-subscription` (Backend #228). The body is the shared
+ * lapsed through `/internal/tienda-subscription` (Backend PR 228). The body is the shared
  * `lib/plan-subscription-bridge.ts`; only the route differs.
  *
  * The Backend scopes every read and write to the Tienda plan's own row, so a Tienda subscription can never answer as

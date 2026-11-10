@@ -2,7 +2,7 @@
  * lib/plan-subscription-answer.ts — what a Backend `GET /internal/<plan>-subscription` answer means (plan-tienda
  * S2.2). Pure, so the three states are tested without a backend; `lib/plan-subscription-bridge.ts` is the I/O.
  *
- * The Backend answers (Backend #228, the same for Plan Negocio and Plan Tienda):
+ * The Backend answers (Backend PR 228, the same for Plan Negocio and Plan Tienda):
  *   200 `{ active, plan_id, stripe_price_id, price_cents, subscription_id }`  — a real read;
  *   200 `{ active: false, reason: 'no_plan', plan_id: null }`                 — the plan is not seeded;
  *   200 `{ active: false, reason: 'error', … }`                               — a read FAILED.

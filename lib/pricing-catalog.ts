@@ -30,6 +30,10 @@ import {
   NEGOCIO_PRICE_YEARLY_MXN,
   NEGOCIO_TRIAL_DAYS,
 } from './negocio-pricing'
+import {
+  TIENDA_PRICE_MONTHLY_MXN,
+  TIENDA_PRICE_YEARLY_MXN,
+} from './tienda-pricing'
 import { PLAN_ALLOWANCES } from './plan-allowances'
 
 export type PricingLocale = 'es' | 'en'
@@ -88,17 +92,23 @@ export interface ProcessorRow {
   verifiedAt: string | null
 }
 
-/** One plan on the price list (plans-gratis-negocio D16): what it costs and what it includes. */
+/**
+ * One plan on the price list (plans-gratis-negocio D16; plan-tienda-three-free-months S2.3): what it costs and what it
+ * includes. Since plan-tienda the list holds the two PAID plans only, Plan Tienda and Plan Negocio: Plan Gratis is no
+ * longer offered to a new shop (it lives on only for the shops that carry the legacy marker, README D1/D2).
+ */
 export interface PlanRow {
-  id: 'gratis' | 'negocio'
+  id: 'tienda' | 'negocio'
   name: Localized
-  /** The headline price: «Gratis, para siempre» or the monthly figure. */
+  /** The headline price: «Desde $19 al mes» for Plan Tienda, the monthly figure for Plan Negocio. */
   priceLabel: Localized
-  /** The yearly alternative, or `null` for Gratis. */
-  yearlyLabel: Localized | null
-  /** Whole MXN; `null` for Gratis. Numbers come from `lib/negocio-pricing.ts`, never typed here. */
-  monthlyMxn: number | null
-  yearlyMxn: number | null
+  /** The second price line: every way to pay, with the amounts. */
+  priceDetail: Localized
+  /** «IVA incluido»: the prices include IVA (Daniel, 2026-11-09), and every page that shows them says so (D5). */
+  ivaLabel: Localized
+  /** Whole MXN, from the plan's pricing module — never typed here. */
+  monthlyMxn: number
+  yearlyMxn: number
   includes: Localized[]
 }
 
@@ -121,12 +131,25 @@ function formatPct(n: number): string {
   return `${Number(n.toFixed(2))}%`
 }
 
+/**
+ * The free trial's length as copy says it: «3 meses» once it is a whole number of months of at least two (90 days →
+ * 3 meses), otherwise «30 días». Derived from `NEGOCIO_TRIAL_DAYS`, never typed: the pages say «3 meses gratis» only
+ * once the trial really is 90 days (plan-tienda D7, sprint 3; D20 deploys sprints 2 and 3 together), and say the true
+ * length before that.
+ */
+export function trialLengthLabel(days: number, locale: PricingLocale): string {
+  if (days >= 60 && days % 30 === 0) return locale === 'es' ? `${days / 30} meses` : `${days / 30} months`
+  return locale === 'es' ? `${days} días` : `${days} days`
+}
+
 /** The yearly price as a monthly equivalent, rounded to whole pesos (199 → 17, 499 → 42, 299 → 25). */
 export function yearlyAsMonthly(yearlyMxn: number): number {
   return Math.round(yearlyMxn / 12)
 }
 
 const QUOTED: Localized = { es: 'Precio a cotizar', en: 'Price on request' }
+
+const IVA_INCLUDED: Localized = { es: 'IVA incluido', en: 'IVA (VAT) included' }
 
 function yearlyLabel(yearly: number, monthly: number | null): Localized {
   const eq = yearlyAsMonthly(yearly)
@@ -210,51 +233,71 @@ const FREE_ITEMS: FreeItem[] = [
   },
 ]
 
-/** The two plans (plans-gratis-negocio D16). Prices are formatted from `lib/negocio-pricing.ts`; allowances from `PLAN_ALLOWANCES`. */
+/**
+ * What Plan Tienda includes: today's Plan Gratis list, at Plan Tienda's own AI amounts (plan-tienda S1.3). Exported
+ * because «Tu suscripción» shows the same list to a legacy shop as what it keeps on Plan Gratis — the two are the same
+ * features, one with a price.
+ */
+export function tiendaIncludes(): Localized[] {
+  const tienda = PLAN_ALLOWANCES.tienda
+  return [
+    { es: 'Tu tienda y su URL', en: 'Your shop and its URL' },
+    { es: 'Tu subdominio (tu-tienda.miyagisanchez.com)', en: 'Your subdomain (your-shop.miyagisanchez.com)' },
+    { es: '0% de comisión de la plataforma', en: '0% platform commission' },
+    { es: 'Todos los métodos de pago', en: 'Every payment method' },
+    { es: 'El marketplace, ofertas y mensajes', en: 'The marketplace, offers and messages' },
+    { es: 'Agentes de IA (UCP/MCP)', en: 'AI agents (UCP/MCP)' },
+    { es: 'La IA que arma tu tienda', en: 'The AI that builds your shop' },
+    { es: `${tienda.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${tienda.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
+    { es: 'Un pequeño enlace «Tienda impulsada por Miyagi Sánchez» al pie de tu tienda', en: 'A small «Shop powered by Miyagi Sánchez» link at the foot of your shop' },
+  ]
+}
+
+/** The two paid plans (plan-tienda S2.3). Prices are formatted from their modules; allowances from `PLAN_ALLOWANCES`. */
 function planRows(): PlanRow[] {
-  const gratis = PLAN_ALLOWANCES.gratis
   const negocio = PLAN_ALLOWANCES.negocio
   const monthly = formatPesos(NEGOCIO_PRICE_MONTHLY_MXN)
   const yearly = formatPesos(NEGOCIO_PRICE_YEARLY_MXN)
+  const tiendaFrom = formatPesos(yearlyAsMonthly(TIENDA_PRICE_YEARLY_MXN))
+  const tiendaYearly = formatPesos(TIENDA_PRICE_YEARLY_MXN)
+  const tiendaMonthly = formatPesos(TIENDA_PRICE_MONTHLY_MXN)
   return [
     {
-      id: 'gratis',
-      name: { es: 'Plan Gratis', en: 'Free plan' },
-      priceLabel: { es: 'Gratis, para siempre', en: 'Free, forever' },
-      yearlyLabel: null,
-      monthlyMxn: null,
-      yearlyMxn: null,
-      includes: [
-        { es: 'Tu tienda y su URL', en: 'Your shop and its URL' },
-        { es: 'Tu subdominio (tu-tienda.miyagisanchez.com)', en: 'Your subdomain (your-shop.miyagisanchez.com)' },
-        { es: '0% de comisión de la plataforma', en: '0% platform commission' },
-        { es: 'Todos los métodos de pago', en: 'Every payment method' },
-        { es: 'El marketplace, ofertas y mensajes', en: 'The marketplace, offers and messages' },
-        { es: 'Agentes de IA (UCP/MCP)', en: 'AI agents (UCP/MCP)' },
-        { es: 'La IA que arma tu tienda', en: 'The AI that builds your shop' },
-        { es: `${gratis.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${gratis.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
-        { es: 'Un pequeño enlace «Tienda impulsada por Miyagi Sánchez» al pie de tu tienda', en: 'A small «Shop powered by Miyagi Sánchez» link at the foot of your shop' },
-      ],
+      id: 'tienda',
+      name: { es: 'Plan Tienda', en: 'Tienda plan' },
+      priceLabel: { es: `Desde ${tiendaFrom} al mes`, en: `From ${tiendaFrom} a month` },
+      priceDetail: {
+        es: `${tiendaYearly} MXN al año, en un solo pago, o ${tiendaMonthly} MXN al mes`,
+        en: `${tiendaYearly} MXN a year, in one payment, or ${tiendaMonthly} MXN a month`,
+      },
+      ivaLabel: IVA_INCLUDED,
+      monthlyMxn: TIENDA_PRICE_MONTHLY_MXN,
+      yearlyMxn: TIENDA_PRICE_YEARLY_MXN,
+      includes: tiendaIncludes(),
     },
     {
       id: 'negocio',
       name: { es: 'Plan Negocio', en: 'Negocio plan' },
       priceLabel: { es: `${monthly} MXN/mes`, en: `${monthly} MXN/month` },
-      yearlyLabel: {
-        es: `${yearly} MXN/año (también a meses sin intereses)`,
-        en: `${yearly} MXN/year (interest-free installments available)`,
+      priceDetail: {
+        es: `o ${yearly} MXN/año (también a meses sin intereses)`,
+        en: `or ${yearly} MXN/year (interest-free installments available)`,
       },
+      ivaLabel: IVA_INCLUDED,
       monthlyMxn: NEGOCIO_PRICE_MONTHLY_MXN,
       yearlyMxn: NEGOCIO_PRICE_YEARLY_MXN,
       includes: [
-        { es: 'Todo lo del Plan Gratis', en: 'Everything in the Free plan' },
+        { es: 'Todo lo del Plan Tienda', en: 'Everything in the Tienda plan' },
         { es: 'Conecta tu propio dominio (tunegocio.com), en cuanto contratas', en: 'Connect your own domain (yourbusiness.com), as soon as you sign up' },
         { es: 'Sincronización con Mercado Libre', en: 'Mercado Libre sync' },
         { es: 'Tu tienda sin el enlace de Miyagi Sánchez', en: 'Your shop without the Miyagi Sánchez link' },
         { es: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${negocio.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
         { es: `Más fotos: ${negocio.photosPerMonth} al mes para convertir en productos`, en: `More photos: ${negocio.photosPerMonth} a month to turn into products` },
         { es: 'El chequeo mensual de tu tienda', en: 'The monthly check-in on your shop' },
-        { es: `Pruébalo ${NEGOCIO_TRIAL_DAYS} días sin pagar (tu propio dominio se activa al contratar)`, en: `Try it ${NEGOCIO_TRIAL_DAYS} days without paying (your own domain turns on when you sign up)` },
+        {
+          es: `${trialLengthLabel(NEGOCIO_TRIAL_DAYS, 'es')} gratis para empezar, sin tarjeta (tu propio dominio se activa al contratar)`,
+          en: `${trialLengthLabel(NEGOCIO_TRIAL_DAYS, 'en')} free to start, no card (your own domain turns on when you sign up)`,
+        },
       ],
     },
   ]
@@ -445,12 +488,17 @@ export function fixedPricingTokens(locale: PricingLocale): Record<string, string
   return {
     subdomainPrice: yearlyLabel(SUBDOMAIN_PRICE_YEARLY_MXN, SUBDOMAIN_PRICE_MONTHLY_MXN)[locale],
     trialDays: String(NEGOCIO_TRIAL_DAYS),
+    trialLength: trialLengthLabel(NEGOCIO_TRIAL_DAYS, locale),
     subdomainYearly: `${formatPesos(SUBDOMAIN_PRICE_YEARLY_MXN)} MXN ${perYear}`,
     customDomainPrice: yearlyLabel(CUSTOM_DOMAIN_PRICE_MXN, null)[locale],
     customDomainYearly: `${formatPesos(CUSTOM_DOMAIN_PRICE_MXN)} MXN ${perYear}`,
     mlSyncPrice: yearlyLabel(ML_SYNC_PRICE_YEARLY_MXN, ML_SYNC_PRICE_MONTHLY_MXN)[locale],
     negocioMonthly: `${formatPesos(NEGOCIO_PRICE_MONTHLY_MXN)} MXN ${locale === 'es' ? 'al mes' : 'a month'}`,
     negocioYearly: `${formatPesos(NEGOCIO_PRICE_YEARLY_MXN)} MXN ${perYear}`,
+    // Plan Tienda (plan-tienda D5): «desde $19 al mes» is the yearly price over twelve months, never typed.
+    tiendaFrom: `${locale === 'es' ? 'desde' : 'from'} ${formatPesos(yearlyAsMonthly(TIENDA_PRICE_YEARLY_MXN))} ${locale === 'es' ? 'al mes' : 'a month'}`,
+    tiendaYearly: `${formatPesos(TIENDA_PRICE_YEARLY_MXN)} MXN ${perYear}`,
+    tiendaMonthly: `${formatPesos(TIENDA_PRICE_MONTHLY_MXN)} MXN ${locale === 'es' ? 'al mes' : 'a month'}`,
   }
 }
 

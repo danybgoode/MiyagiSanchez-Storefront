@@ -1,7 +1,7 @@
 /**
  * lib/plan-subscription-sync.ts — keeping Medusa Commerce's record of a monthly plan subscription in step with
  * Stripe (epic 08 · plan-tienda-three-free-months S2.2, README D6/D19; the sprint-2 build contract added at review of
- * Backend #228).
+ * Backend PR 228).
  *
  * THE RULES, and why each exists:
  *
@@ -14,7 +14,7 @@
  *   2. Stripe's status is sent AS IS (`unpaid`, `paused`, `incomplete`, `incomplete_expired` included). The old map
  *      folded `unpaid` into `past_due` — which the plan seam counts as live, so a subscription Stripe had stopped
  *      collecting kept its plan forever — and dropped the other three. The Backend decides what is live and what is
- *      final (Backend #228). A status Stripe adds later that we do not know is NOT guessed: it alerts.
+ *      final (Backend PR 228). A status Stripe adds later that we do not know is NOT guessed: it alerts.
  *   3. Each plan's status goes to ITS route: a Tienda subscription is never PATCHed on the Negocio route or the reverse
  *      (the Backend scopes each route to its own plan row and would answer `updated: 0`, but a mis-route must not
  *      depend on that). The plan is the RETRIEVED subscription's `metadata.kind`, which our server wrote at checkout
@@ -33,7 +33,7 @@
 import { PLAN_DISPLAY_NAMES, paidPlanOfKind, paidPlanOfLookupKey, type PaidPlan } from './plan-kind'
 import type { PlanSubscription } from './plan-subscription-answer'
 
-/** Every status a Stripe subscription can have today, all accepted by the Backend's PATCH (Backend #228). */
+/** Every status a Stripe subscription can have today, all accepted by the Backend's PATCH (Backend PR 228). */
 export const STRIPE_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
   'active', 'trialing', 'past_due', 'unpaid', 'paused', 'incomplete', 'canceled', 'incomplete_expired',
 ])

@@ -1,6 +1,6 @@
 /**
  * The webhook keeps Medusa Commerce in step with Stripe for both monthly plans (epic 08 · plan-tienda-three-free-months
- * S2.2; the sprint-2 build contract added at review of Backend #228; README D19).
+ * S2.2; the sprint-2 build contract added at review of Backend PR 228; README D19).
  *
  *   - The PATCH body comes from the subscription RETRIEVED from Stripe, never from the event: a delayed event cannot
  *     restore a plan.

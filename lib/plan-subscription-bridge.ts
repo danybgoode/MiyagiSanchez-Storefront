@@ -5,7 +5,7 @@
  * made plan-neutral by plan-tienda-three-free-months S2.2, README D3). Medusa Commerce is the SOURCE OF TRUTH for
  * "does this shop have a live monthly subscription to this plan?" (AGENTS rule #1). Plan Negocio and Plan Tienda have
  * the same two internal routes on the Backend (`/internal/negocio-subscription`, `/internal/tienda-subscription`,
- * Backend #228), so both plans go through this one file and cannot drift apart: `lib/negocio-subscription.ts` and
+ * Backend PR 228), so both plans go through this one file and cannot drift apart: `lib/negocio-subscription.ts` and
  * `lib/tienda-subscription.ts` only name their route.
  *
  * Three states, never two: a read that FAILED is reported as `unavailable: true`, so the plan seam can say "could
@@ -49,7 +49,7 @@ export async function getPlanSubscription(route: PlanSubscriptionRoute, sellerCl
 /**
  * Send a plan subscription's status, by its Stripe id, to the Backend's lapse path. `status` is STRIPE'S status as it
  * is (`active`, `unpaid`, `incomplete_expired`, …): the Backend decides what is live and what is final (Backend
- * #228). Returns `{ updated }` = rows written or already cancelled; 0 means nothing matched, which the caller must
+ * PR 228). Returns `{ updated }` = rows written or already cancelled; 0 means nothing matched, which the caller must
  * treat as a failure on a money path.
  */
 export async function setPlanSubscriptionStatus(route: PlanSubscriptionRoute, stripeSubscriptionId: string, status: string): Promise<number> {

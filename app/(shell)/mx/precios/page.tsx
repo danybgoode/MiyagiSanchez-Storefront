@@ -20,7 +20,11 @@ import { PreciosTrackedLink, PreciosViewed } from './_components/PreciosTracking
 
 const BASE_URL = 'https://miyagisanchez.com'
 const PAGE_PATH = '/mx/precios'
-const meta = es.precios.metadata
+const meta = {
+  title: es.precios.metadata.title,
+  // The description says the trial length as a `{token}` (it follows NEGOCIO_TRIAL_DAYS), so it is filled here.
+  description: fillFixedPricingTokens(es.precios.metadata.description, 'es'),
+}
 
 // No manual `images` — the sibling opengraph-image.tsx is picked up by Next's file convention.
 export const metadata: Metadata = {
@@ -38,13 +42,13 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image', title: meta.title, description: meta.description },
 }
 
-/** JSON-LD `Offer`s for Negocio's fixed prices only (D9) — an admin-set price never gets one. */
+/** JSON-LD `Offer`s for the two paid plans' fixed prices only (D9) — an admin-set price never gets one. The prices
+ *  include IVA (plan-tienda D5), which schema.org says with `valueAddedTaxIncluded`. */
 function offersJsonLd(catalog: PricingCatalog) {
-  const negocio = catalog.plans.find((p) => p.id === 'negocio')
-  const offers = [
-    ...(negocio?.yearlyMxn != null ? [{ name: 'Plan Negocio (anual)', price: negocio.yearlyMxn, unit: 'ANN' }] : []),
-    ...(negocio?.monthlyMxn != null ? [{ name: 'Plan Negocio (mensual)', price: negocio.monthlyMxn, unit: 'MON' }] : []),
-  ].map((o) => ({
+  const offers = catalog.plans.flatMap((plan) => [
+    { name: `${plan.name.es} (anual)`, price: plan.yearlyMxn, unit: 'ANN' },
+    { name: `${plan.name.es} (mensual)`, price: plan.monthlyMxn, unit: 'MON' },
+  ]).map((o) => ({
     '@type': 'Offer',
     name: o.name,
     price: String(o.price),
@@ -54,6 +58,7 @@ function offersJsonLd(catalog: PricingCatalog) {
       price: String(o.price),
       priceCurrency: 'MXN',
       unitCode: o.unit,
+      valueAddedTaxIncluded: true,
     },
   }))
   return {
@@ -104,7 +109,8 @@ const SECTION = { marginBottom: 'var(--s-10)' } as const
 export default async function PreciosPage() {
   const [dict, catalog] = await Promise.all([getOverriddenDictionary('es'), getPricingCatalog()])
   const ui = dict.precios
-  // The copy says the trial length as `{trialDays}`, never a typed number, so it follows `NEGOCIO_TRIAL_DAYS`.
+  // The copy says the trial length as `{trialLength}` and Plan Tienda's prices as `{tienda…}` tokens, never typed, so
+  // they follow `NEGOCIO_TRIAL_DAYS` and `lib/tienda-pricing.ts`.
   const fill = (text: string) => fillFixedPricingTokens(text, 'es')
 
   return (
@@ -131,9 +137,8 @@ export default async function PreciosPage() {
               {plan.id === 'negocio' ? <span className="badge badge-success" style={{ alignSelf: 'flex-start' }}>{fill(ui.plans.recommended)}</span> : null}
               <h3 className="t-h3" style={{ letterSpacing: 0, margin: 0 }}>{plan.name.es}</h3>
               <p className="t-h4" data-testid={`precios-plan-${plan.id}-price`} style={{ letterSpacing: 0, margin: 0, color: 'var(--accent)' }}>{plan.priceLabel.es}</p>
-              {plan.yearlyLabel ? (
-                <p className="t-small" data-testid={`precios-plan-${plan.id}-yearly`} style={{ margin: 0, fontWeight: 600 }}>{ui.plans.monthlySuffix} {plan.yearlyLabel.es}</p>
-              ) : null}
+              <p className="t-small" data-testid={`precios-plan-${plan.id}-detail`} style={{ margin: 0, fontWeight: 600 }}>{plan.priceDetail.es}</p>
+              <p className="t-small" data-testid={`precios-plan-${plan.id}-iva`} style={{ margin: 0, color: 'var(--fg-muted)' }}>{plan.ivaLabel.es}</p>
               <p className="t-small" style={{ color: 'var(--fg-muted)', margin: 0 }}>{ui.plans.includesLabel}:</p>
               <ul style={{ margin: 0, paddingLeft: 'var(--s-4)', display: 'grid', gap: 'var(--s-1)' }}>
                 {plan.includes.map((line) => (
@@ -141,7 +146,7 @@ export default async function PreciosPage() {
                 ))}
               </ul>
               <PreciosTrackedLink href={sellerLandingPath('mx')} event="precios_signup_clicked" className={plan.id === 'negocio' ? 'btn btn-primary' : 'btn btn-secondary'} testId={`precios-plan-${plan.id}-cta`}>
-                {plan.id === 'negocio' ? fill(ui.plans.ctaNegocio) : ui.plans.cta}
+                {fill(plan.id === 'negocio' ? ui.plans.ctaNegocio : ui.plans.cta)}
                 <i className="iconoir-arrow-right" aria-hidden="true" />
               </PreciosTrackedLink>
             </article>

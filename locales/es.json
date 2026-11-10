@@ -3274,11 +3274,11 @@
       },
       "pricing": {
         "heading": "Precios",
-        "lead": "Tu tienda es gratis para siempre (0% de comisión). Hay dos planes, el Plan Gratis y el Plan Negocio, y todos los precios son públicos en miyagisanchez.com/mx/precios.",
+        "lead": "Abrir tu tienda no cuesta: empiezas con {trialLength} del Plan Negocio gratis, sin tarjeta y con 0% de comisión. Después hay dos planes, el Plan Tienda y el Plan Negocio, y todos los precios, con IVA incluido, son públicos en miyagisanchez.com/mx/precios.",
         "body": [
-          "Plan Gratis, para siempre: tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, el marketplace, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».",
-          "Plan Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva lo prueba {trialDays} días sin pagar (el dominio propio se activa al contratar).",
-          "Si tu prueba termina o cancelas, tu tienda sigue abierta en el Plan Gratis, en tu URL miyagisanchez.com/mx/s/tu-tienda.",
+          "Plan Tienda: {tiendaFrom} ({tiendaYearly} en un solo pago, o {tiendaMonthly}). Tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, el marketplace, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».",
+          "Plan Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva empieza con {trialLength} gratis (el dominio propio se activa al contratar).",
+          "Cuando terminan tus {trialLength} gratis eliges un plan; si no, tu tienda se pausa sin borrar nada y vuelve en cuanto pagas. Las tiendas que ya existían antes de los planes de pago siguen en el Plan Gratis.",
           "Servicio aparte: migración con consultor, {migrationPrice}.",
           "Tu pasarela de pago (Stripe o Mercado Pago) cobra su propia comisión, no nosotros, y el dinero llega directo a tu cuenta. Todos los precios, con sus fuentes: miyagisanchez.com/mx/precios."
         ]
@@ -3326,21 +3326,20 @@
   },
   "precios": {
     "metadata": {
-      "title": "Precios: Plan Gratis y Plan Negocio | Miyagi Sánchez",
-      "description": "Con el Plan Gratis tu tienda en línea es gratis para siempre y sin comisión. El Plan Negocio te deja conectar tu propio dominio, sincronizar Mercado Libre y tener más ayuda de la IA. Toda tienda nueva lo prueba sin pagar.",
-      "ogAlt": "Precios de Miyagi Sánchez: Plan Gratis para siempre y Plan Negocio"
+      "title": "Precios: Plan Tienda y Plan Negocio | Miyagi Sánchez",
+      "description": "Abre tu tienda en línea con Miyagi Sánchez y empieza con {trialLength} del Plan Negocio gratis, sin tarjeta. Después sigues con el Plan Tienda o el Plan Negocio, sin comisión por venta y con IVA incluido.",
+      "ogAlt": "Precios de Miyagi Sánchez: Plan Tienda y Plan Negocio, con IVA incluido"
     },
     "eyebrow": "Precios",
-    "heroTitle": "Tu tienda en línea, gratis para siempre.",
-    "heroLead": "Con el Plan Gratis vendes sin mensualidad y sin comisión. Cuando quieras más, el Plan Negocio te deja conectar tu propio dominio, sincronizar Mercado Libre y tener más ayuda de la IA. Toda tienda nueva lo usa {trialDays} días sin pagar.",
-    "primaryCta": "Abre tu tienda gratis",
+    "heroTitle": "Tu propia tienda en línea, sin comisión por venta.",
+    "heroLead": "Empiezas con {trialLength} del Plan Negocio gratis, sin tarjeta. Después eliges: el Plan Tienda, {tiendaFrom}, o el Plan Negocio, con tu propio dominio, Mercado Libre y más ayuda de la IA. Todos los precios incluyen IVA.",
+    "primaryCta": "Abre tu tienda",
     "plans": {
       "title": "Elige tu plan",
-      "lead": "Empiezas con {trialDays} días del Plan Negocio sin pagar. Si después no lo contratas, tu tienda sigue abierta en el Plan Gratis, con todos tus productos.",
-      "monthlySuffix": "o",
-      "recommended": "{trialDays} días gratis",
-      "cta": "Abre tu tienda gratis",
-      "ctaNegocio": "Pruébalo {trialDays} días gratis",
+      "lead": "{trialLength} gratis del Plan Negocio para empezar, sin tarjeta. Cuando terminen, sigues con el plan que te quede mejor. Los precios incluyen IVA: es lo que pagas.",
+      "recommended": "{trialLength} gratis para empezar",
+      "cta": "Abre tu tienda",
+      "ctaNegocio": "Empieza con {trialLength} gratis",
       "includesLabel": "Incluye"
     },
     "extras": {
@@ -3365,24 +3364,28 @@
       "title": "Preguntas frecuentes",
       "items": [
         {
-          "q": "¿Qué pasa cuando terminan mis {trialDays} días?",
-          "a": "Tu tienda sigue abierta en el Plan Gratis, con tus productos, tu dirección y tus ventas. Nunca se cierra y no tienes que hacer nada. Solo se pausa lo del Plan Negocio: la conexión con Mercado Libre, el chequeo mensual de tu tienda y la ayuda extra de la IA, y aparece un pequeño enlace «Tienda impulsada por Miyagi Sánchez». Todo vuelve en cuanto contratas el Plan Negocio."
+          "q": "¿Qué pasa cuando terminan mis {trialLength} gratis?",
+          "a": "Eliges con qué plan sigues: el Plan Tienda, {tiendaFrom}, o el Plan Negocio. Si no eliges ninguno, tu tienda se pausa: no se borra nada, tus productos, tu dirección y tus ventas se quedan guardados, y vuelve en cuanto pagas un plan. Si tu tienda ya existía antes de los planes de pago, sigue en el Plan Gratis como siempre."
         },
         {
-          "q": "¿El Plan Negocio mensual se cobra solo?",
-          "a": "Sí. Es una suscripción: se cobra sola cada mes a tu tarjeta, y la cancelas cuando quieras desde «Tu suscripción». El anual es un solo pago por 12 meses (también a meses sin intereses) y no se renueva solo."
+          "q": "¿El pago mensual se cobra solo?",
+          "a": "Sí. El mensual, del Plan Tienda o del Plan Negocio, es una suscripción: se cobra sola cada mes a tu tarjeta, y la cancelas cuando quieras desde «Tu suscripción». El anual es un solo pago por 12 meses y no se renueva solo; el del Plan Negocio también puede ser a meses sin intereses."
         },
         {
-          "q": "Si contrato durante mis {trialDays} días gratis, ¿pierdo los días que me quedan?",
-          "a": "No. El mensual te cobra por primera vez cuando terminan tus días gratis. El anual se paga el día que lo contratas, pero sus 12 meses empiezan cuando terminan tus días gratis."
+          "q": "Si contrato durante mis {trialLength} gratis, ¿pierdo el tiempo que me queda?",
+          "a": "No. El mensual te cobra por primera vez cuando termina tu tiempo gratis. El anual se paga el día que lo contratas, pero sus 12 meses empiezan cuando termina."
         },
         {
           "q": "¿Necesito tarjeta para empezar?",
-          "a": "No. Abres tu tienda y usas el Plan Negocio {trialDays} días sin dar ninguna tarjeta."
+          "a": "No. Abres tu tienda y usas el Plan Negocio {trialLength} sin dar ninguna tarjeta."
+        },
+        {
+          "q": "¿Los precios incluyen IVA?",
+          "a": "Sí. El Plan Tienda ({tiendaYearly}, o {tiendaMonthly}) y el Plan Negocio ({negocioYearly}, o {negocioMonthly}) ya incluyen IVA: es lo que pagas, sin sumar nada."
         },
         {
           "q": "¿Por qué no cobran comisión?",
-          "a": "Porque ganamos con el Plan Negocio, no con tus ventas. Cada peso que vendes es tuyo; solo tu forma de pago cobra su tarifa."
+          "a": "Porque ganamos con los planes, no con tus ventas. Cada peso que vendes es tuyo; solo tu forma de pago cobra su tarifa."
         }
       ]
     }

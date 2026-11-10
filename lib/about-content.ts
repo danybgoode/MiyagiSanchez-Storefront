@@ -267,22 +267,22 @@ const ABOUT_SECTION_TEMPLATES: AboutSection[] = [
     // hand-typed copy this replaced had already drifted from the locales (`/s/` vs `/mx/s/`).
     es: {
       heading: 'Precios',
-      lead: 'Tu tienda es gratis para siempre (0% de comisión). Hay dos planes, el Plan Gratis y el Plan Negocio, y todos los precios son públicos en miyagisanchez.com/mx/precios.',
+      lead: 'Abrir tu tienda no cuesta: empiezas con {trialLength} del Plan Negocio gratis, sin tarjeta y con 0% de comisión. Después hay dos planes, el Plan Tienda y el Plan Negocio, y todos los precios, con IVA incluido, son públicos en miyagisanchez.com/mx/precios.',
       body: [
-        'Plan Gratis, para siempre: tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, el marketplace, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».',
-        'Plan Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva lo prueba {trialDays} días sin pagar (el dominio propio se activa al contratar).',
-        'Si tu prueba termina o cancelas, tu tienda sigue abierta en el Plan Gratis, en tu URL miyagisanchez.com/mx/s/tu-tienda.',
+        'Plan Tienda: {tiendaFrom} ({tiendaYearly} en un solo pago, o {tiendaMonthly}). Tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, el marketplace, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».',
+        'Plan Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva empieza con {trialLength} gratis (el dominio propio se activa al contratar).',
+        'Cuando terminan tus {trialLength} gratis eliges un plan; si no, tu tienda se pausa sin borrar nada y vuelve en cuanto pagas. Las tiendas que ya existían antes de los planes de pago siguen en el Plan Gratis.',
         'Servicio aparte: migración con consultor, {migrationPrice}.',
         'Tu pasarela de pago (Stripe o Mercado Pago) cobra su propia comisión, no nosotros, y el dinero llega directo a tu cuenta. Todos los precios, con sus fuentes: miyagisanchez.com/mx/precios.',
       ],
     },
     en: {
       heading: 'Pricing',
-      lead: 'Your shop is free forever (0% commission). There are two plans, the Free plan and the Negocio plan, and every price is public at miyagisanchez.com/mx/precios.',
+      lead: 'Opening your shop costs nothing: you start with {trialLength} of the Negocio plan free, with no card and 0% commission. After that there are two plans, the Tienda plan and the Negocio plan, and every price, IVA (VAT) included, is public at miyagisanchez.com/mx/precios.',
       body: [
-        'Free plan, forever: your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.',
-        'Negocio plan: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop tries it for {trialDays} days without paying (the custom domain turns on when you sign up).',
-        'If your trial ends or you cancel, your shop stays open on the Free plan, at your URL miyagisanchez.com/mx/s/your-shop.',
+        'Tienda plan: {tiendaFrom} ({tiendaYearly} in one payment, or {tiendaMonthly}). Your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.',
+        'Negocio plan: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop starts with {trialLength} free (the custom domain turns on when you sign up).',
+        'When your {trialLength} free end you choose a plan; if you don\'t, your shop is paused with nothing deleted and comes back as soon as you pay. Shops that existed before the paid plans stay on the Free plan.',
         'A separate service: assisted migration, {migrationPrice}.',
         'Your payment processor (Stripe or Mercado Pago) charges its own fee, not us, and the money goes straight to your account. Every price, with its sources: miyagisanchez.com/mx/precios.',
       ],

@@ -6,7 +6,7 @@
  *   1. Find or create the Stripe Product + monthly Price — $29 MXN/mo, IVA included — on the PLATFORM Stripe account
  *      (the platform is the payee). Idempotent through the Price `lookup_key`.
  *   2. POST the price id to the Backend's `/internal/setup-tienda-plan`, which upserts the ONE Medusa Commerce
- *      SubscriptionPlan (`metadata.kind = tienda_plan`; Backend #228).
+ *      SubscriptionPlan (`metadata.kind = tienda_plan`; Backend PR 228).
  *
  * ⚠️  RUN ORDER: after the Backend deploy that ships /internal/setup-tienda-plan, with PROD credentials (sk_live,
  *     the production Backend URL and MEDUSA_INTERNAL_SECRET from the VM env files), not the dev .env.local. Until it
