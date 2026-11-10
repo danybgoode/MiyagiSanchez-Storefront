@@ -1,0 +1,343 @@
+/**
+ * lib/plan-pause.ts — the pause for lack of a plan, decided in ONE pure place (epic 08 · plan-tienda-three-free-months
+ * S3.3 / S3.4, README D9 / D10).
+ *
+ * The seller's status (active, paused) is Medusa's, changed only through `POST /internal/sellers/:id/status`. That
+ * route takes a `reason` but does not store it, so the Backend cannot say WHY a seller is paused. The record that a
+ * pause is the PLAN's is ours: `marketplace_shops.metadata.plan_pause = { paused_at }`, claimed before the Backend is
+ * asked to pause, and cleared only after the Backend set the seller active again. A payment restores a shop only
+ * while that record is there, so an admin pause (which never writes it) is never lifted by a payment (D10).
+ *
+ * Validate, then claim, then apply — three positions, never two:
+ *   validate — `decidePlanPause`, pure: owned, legacy marker ABSENT, plan read uncached as `unpaid`, a free or paid
+ *              term that has ended, not already claimed. Anything it could not read is `unavailable`, never `pause`.
+ *   claim    — `plan_pause` written with a guard matching what was read (absent, or JSON null after a release), read
+ *              back from the row the write returned.
+ *   apply    — the Backend status route. A failure releases the claim (guard `equals` on what was written) so a later
+ *              run retries; an answer that the seller is already paused (by someone else) releases it too, so the
+ *              payment path never lifts a pause that is not the plan's.
+ *
+ * PURE + next-free + no `server-only`: the cron shell, the webhook and the Playwright `api` runner import it.
+ */
+import {
+  NEGOCIO_GRANT_KEY,
+  NEGOCIO_TRIAL_KEY,
+  TIENDA_GRANT_KEY,
+  keyedGuardFor,
+  readNegocioGrant,
+  readNegocioTrial,
+  readTiendaGrant,
+  type KeyedMetadataGuard,
+  type PlanLegacyState,
+  type PlanState,
+} from './plan'
+
+export const PLAN_PAUSE_KEY = 'plan_pause'
+
+/** The reason sent to the Backend status route when the plan job pauses a shop. */
+export const PLAN_PAUSE_REASON = 'plan_unpaid'
+/** The reason sent when a payment brings the shop back. */
+export const PLAN_RESTORE_REASON = 'plan_paid'
+
+export type PlanPause = { paused_at: string }
+
+/**
+ * Is there a plan-pause claim on this shop? ANY non-null value under the key counts: only service-role code writes
+ * it, so a malformed value is still our claim, and treating it as "none" would let the job pause twice or the
+ * payment path skip a restore. JSON null is what a release writes, so it means "no claim".
+ */
+export function hasPlanPause(metadata: unknown): boolean {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false
+  const meta = metadata as Record<string, unknown>
+  return PLAN_PAUSE_KEY in meta && meta[PLAN_PAUSE_KEY] !== null && meta[PLAN_PAUSE_KEY] !== undefined
+}
+
+/** The claim's value exactly as stored (for an `equals` guard), or null when there is none. */
+export function rawPlanPause(metadata: unknown): unknown {
+  return hasPlanPause(metadata) ? (metadata as Record<string, unknown>)[PLAN_PAUSE_KEY] : null
+}
+
+/** The claim the job writes. */
+export function buildPlanPause(now: Date): PlanPause {
+  return { paused_at: now.toISOString() }
+}
+
+/**
+ * Did this shop have a plan that ENDED — a trial, or a dated Negocio or Tienda grant whose end has passed? A shop
+ * that never had any (an owner who claimed a shop and never opened the panel, so the trial was never stamped) is
+ * not "after its free months": it is left alone until its trial starts and ends. A decision the lock did not spell
+ * out; it follows the sprint's acceptance ("whose three months ended").
+ */
+export function hadPlanThatEnded(metadata: unknown, now: Date): boolean {
+  const ended = (iso: string | undefined) => !!iso && Date.parse(iso) <= now.getTime()
+  const trial = readNegocioTrial(metadata)
+  if (trial && ended(trial.expires_at)) return true
+  const negocio = readNegocioGrant(metadata)
+  if (negocio?.type === 'one_time' && ended(negocio.expires_at)) return true
+  const tienda = readTiendaGrant(metadata)
+  return !!tienda && ended(tienda.expires_at)
+}
+
+export type PausableShop = { clerk_user_id: string | null; metadata: unknown }
+
+export type PlanPauseWhy =
+  | 'unpaid' // pause
+  | 'unowned'
+  | 'legacy' // the marker is there: Plan Gratis for good
+  | 'legacy_unreadable' // something is under the marker key that we cannot read: never paused (lib/plan.ts)
+  | 'already_claimed'
+  | 'has_plan' // a live plan, or legacy Gratis
+  | 'never_started' // no trial or grant ever ended
+  | 'plan_unreadable' // the plan could not be read (a failed lookup, or `unavailable`)
+
+export type PlanPauseDecision =
+  | { action: 'pause'; why: 'unpaid' }
+  | { action: 'leave'; why: Exclude<PlanPauseWhy, 'unpaid' | 'plan_unreadable'> }
+  | { action: 'unavailable'; why: 'plan_unreadable' }
+
+/**
+ * Pause, leave, or "could not tell". `plan` is the plan resolved UNCACHED (`resolvePlan`), or null when the read
+ * failed. Only ONE combination pauses; everything else leaves, and a plan we could not read is `unavailable`.
+ *
+ * Order matters only for the label: the facts that make a shop unpausable whatever its plan (unowned, legacy,
+ * already claimed) are checked before the plan read's outcome, so a dry run names the real reason a shop is safe.
+ */
+export function decidePlanPause(shop: PausableShop, plan: PlanState | null, legacy: PlanLegacyState, now: Date): PlanPauseDecision {
+  if (!shop.clerk_user_id) return { action: 'leave', why: 'unowned' }
+  if (legacy === 'marked') return { action: 'leave', why: 'legacy' }
+  if (legacy === 'unreadable') return { action: 'leave', why: 'legacy_unreadable' }
+  if (hasPlanPause(shop.metadata)) return { action: 'leave', why: 'already_claimed' }
+  if (!plan || plan.reason === 'unavailable') return { action: 'unavailable', why: 'plan_unreadable' }
+  if (plan.plan !== 'unpaid' || plan.reason !== 'unpaid') return { action: 'leave', why: 'has_plan' }
+  if (!hadPlanThatEnded(shop.metadata, now)) return { action: 'leave', why: 'never_started' }
+  return { action: 'pause', why: 'unpaid' }
+}
+
+// ── The claim and its release (exact RPC arguments, pure so the guards are asserted without a database) ──
+
+/**
+ * The `merge_shop_metadata_guards` arguments for the claim. It guards `plan_pause` as read (absent, or JSON null after
+ * an earlier release) AND the three keys the plan was decided from, as read: a grant or a trial written between the
+ * plan read and this claim makes the claim match no row, so a shop that just paid is never claimed on a stale "unpaid".
+ */
+export function planPauseClaimArgs(shopId: string, metadata: unknown, claim: PlanPause): { p_shop_id: string; p_patch: Record<string, PlanPause>; p_guards: KeyedMetadataGuard[] } {
+  return {
+    p_shop_id: shopId,
+    p_patch: { [PLAN_PAUSE_KEY]: claim },
+    p_guards: [PLAN_PAUSE_KEY, NEGOCIO_GRANT_KEY, TIENDA_GRANT_KEY, NEGOCIO_TRIAL_KEY].map((k) => keyedGuardFor(metadata, k)),
+  }
+}
+
+/**
+ * The `merge_shop_metadata` arguments that clear a claim: JSON null, and only if the key still holds exactly
+ * `expected` (what this run wrote, or what the restore read). A newer claim is never cleared by an older actor.
+ */
+export function planPauseClearArgs(shopId: string, expected: unknown) {
+  return { p_shop_id: shopId, p_patch: { [PLAN_PAUSE_KEY]: null }, p_guard_key: PLAN_PAUSE_KEY, p_guard_mode: 'equals' as const, p_expected: expected }
+}
+
+/** Did the row a claim write returned carry exactly that claim? "The call did not error" is not "it is claimed". */
+export function claimLanded(returnedMetadata: unknown, claim: PlanPause): boolean {
+  const raw = rawPlanPause(returnedMetadata) as { paused_at?: unknown } | null
+  return !!raw && typeof raw === 'object' && raw.paused_at === claim.paused_at
+}
+
+// ── The job's runner (the I/O is injected, so the claim → call → release order is tested without a database) ──
+
+export type PauseCandidate = {
+  id: string
+  slug: string | null
+  name: string | null
+  clerk_user_id: string | null
+  metadata: unknown
+}
+
+/** What the Backend said when asked to pause. */
+export type PauseCallResult =
+  | { outcome: 'paused' } // the seller is paused now
+  | { outcome: 'already_paused' } // 409 no_change: paused before, by someone else
+  | { outcome: 'failed'; detail: string } // definitely did not apply
+  | { outcome: 'unknown'; detail: string } // we cannot tell (a timeout, a gateway error, an answer we cannot read)
+
+/**
+ * The shape `changeSellerStatus` (lib/admin/tenant-status.ts) answers with, restated structurally so this pure module
+ * does not import a server-only file. Only the fields read below.
+ */
+export type StatusChangeAnswer =
+  | { ok: 'unknown'; message: string }
+  | { ok: true; to: string; complete: boolean }
+  | { ok: false; status: number; message: string }
+
+/** The Backend's answer to a pause request, as the runner's four outcomes. */
+export function pauseOutcomeOf(result: StatusChangeAnswer): PauseCallResult {
+  if (result.ok === 'unknown') return { outcome: 'unknown', detail: result.message }
+  if (result.ok === false) {
+    // The Backend answers 409 only for `no_change` (`planSellerStatusChange`): the seller was already paused.
+    if (result.status === 409) return { outcome: 'already_paused' }
+    return { outcome: 'failed', detail: `HTTP ${result.status}: ${result.message}` }
+  }
+  // `to` is the status the seller ACTUALLY holds: a pause whose every unlink failed leaves it active.
+  if (result.to === 'paused') return { outcome: 'paused' }
+  return { outcome: 'failed', detail: `the Backend left the seller ${result.to} (no product could be unlinked)` }
+}
+
+/** The seller's status before the claim: the validate step's last read. */
+export type SellerStatusFact = 'active' | 'paused' | 'deleted' | 'unavailable' | 'no_seller'
+
+export interface PlanPauseDeps {
+  /** One page of owned shops, in a stable order; null = could not read (the run reports unavailable, never "nobody"). */
+  readPage: (from: number, to: number) => Promise<PauseCandidate[] | null>
+  pageSize: number
+  /** The plan, resolved uncached; null = could not read. */
+  readPlan: (shop: PauseCandidate) => Promise<PlanState | null>
+  /** The legacy state, from the metadata read with the shop. Injected so the shell and the spec use one reader. */
+  readLegacy: (metadata: unknown) => PlanLegacyState
+  /** The Medusa seller's current status. */
+  readSellerStatus: (shop: PauseCandidate) => Promise<SellerStatusFact>
+  /** Write `plan_pause = claim`, guarded on what was read; true only when the returned row carries exactly it. */
+  claim: (shop: PauseCandidate, claim: PlanPause) => Promise<boolean>
+  /** Ask the Backend to pause the seller with `PLAN_PAUSE_REASON`. */
+  pause: (shop: PauseCandidate) => Promise<PauseCallResult>
+  /** Clear the claim (guard `equals` on `claim`); true when it was cleared. */
+  release: (shop: PauseCandidate, claim: PlanPause) => Promise<boolean>
+  alert: (message: string) => void
+  now: () => Date
+}
+
+export type PlanPauseEntry = {
+  shopId: string
+  slug: string | null
+  name: string | null
+  /** What happened to this shop on this run (a dry run stops at `would_pause`). */
+  result:
+    | 'would_pause'
+    | 'paused'
+    | 'already_paused'
+    | 'not_active'
+    | 'seller_unavailable'
+    | 'no_seller'
+    | 'claim_lost'
+    | 'paid_meanwhile'
+    | 'plan_unavailable'
+    | 'failed'
+    | 'unknown'
+  detail?: string
+}
+
+export type PlanPauseRun =
+  | {
+      ok: true
+      dryRun: boolean
+      read: number
+      /** Every shop the decision said to pause, with what became of it. */
+      candidates: PlanPauseEntry[]
+      paused: number
+      left: Record<string, number>
+      unavailable: number
+      failed: number
+    }
+  | { ok: false; error: 'unavailable'; read: number }
+
+/** Upper bound on pages: a paging bug must end the run loudly, never loop forever. */
+const MAX_PAGES = 200
+
+/**
+ * The daily job. Reads every owned shop page by page, decides each, and for a `pause`: validate the seller is active
+ * → claim → pause → (release on failure). `dryRun` reads and decides and writes NOTHING — no claim, no Backend write
+ * — and returns the list. A page that cannot be read fails the whole run (`unavailable`): a half-read population
+ * reported as complete would hide shops.
+ */
+export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean }): Promise<PlanPauseRun> {
+  const shops: PauseCandidate[] = []
+  for (let page = 0; ; page += 1) {
+    if (page >= MAX_PAGES) return { ok: false, error: 'unavailable', read: shops.length }
+    const from = page * deps.pageSize
+    const rows = await deps.readPage(from, from + deps.pageSize - 1)
+    if (!rows) return { ok: false, error: 'unavailable', read: shops.length }
+    shops.push(...rows)
+    if (rows.length < deps.pageSize) break
+  }
+
+  const now = deps.now()
+  const candidates: PlanPauseEntry[] = []
+  const left: Record<string, number> = {}
+  let unavailable = 0
+  let paused = 0
+  let failed = 0
+  const entry = (shop: PauseCandidate, result: PlanPauseEntry['result'], detail?: string): PlanPauseEntry => ({
+    shopId: shop.id,
+    slug: shop.slug,
+    name: shop.name,
+    result,
+    ...(detail ? { detail } : {}),
+  })
+
+  for (const shop of shops) {
+    const legacy = deps.readLegacy(shop.metadata)
+    // The plan is read only when the cheap facts do not already settle it (an unowned or legacy shop costs no
+    // Backend round trip); `decidePlanPause` checks those first, so passing null for them changes nothing.
+    const settled = decidePlanPause(shop, null, legacy, now)
+    const plan = settled.action === 'leave' ? null : await deps.readPlan(shop).catch(() => null)
+    const decision = settled.action === 'leave' ? settled : decidePlanPause(shop, plan, legacy, now)
+    if (decision.action === 'unavailable') { unavailable += 1; continue }
+    if (decision.action === 'leave') { left[decision.why] = (left[decision.why] ?? 0) + 1; continue }
+
+    // VALIDATE: the seller must be active now. Already paused (by an admin) or deleted: not ours to touch.
+    const status = await deps.readSellerStatus(shop).catch((): SellerStatusFact => 'unavailable')
+    if (status === 'no_seller') { candidates.push(entry(shop, 'no_seller')); failed += 1; continue }
+    if (status === 'unavailable') { candidates.push(entry(shop, 'seller_unavailable')); unavailable += 1; continue }
+    if (status !== 'active') { candidates.push(entry(shop, 'not_active', status)); continue }
+
+    if (opts.dryRun) { candidates.push(entry(shop, 'would_pause')); continue }
+
+    // CLAIM — the record that this pause is the plan's, written before the Backend is asked.
+    const claim = buildPlanPause(now)
+    const claimed = await deps.claim(shop, claim).catch(() => false)
+    if (!claimed) { candidates.push(entry(shop, 'claim_lost')); continue }
+
+    // Re-validate after the claim, before anything irreversible: a monthly subscription is not in the metadata the
+    // claim guarded, so one activated in the last instant is caught here. If its payment hook ran before our claim it
+    // found nothing to restore, so pausing now would leave a PAID shop dark.
+    const recheck = await deps.readPlan(shop).catch(() => null)
+    if (!recheck || recheck.plan !== 'unpaid' || recheck.reason !== 'unpaid') {
+      await deps.release(shop, claim).catch(() => false)
+      candidates.push(entry(shop, recheck ? 'paid_meanwhile' : 'plan_unavailable'))
+      if (!recheck) unavailable += 1
+      continue
+    }
+
+    // APPLY.
+    const result = await deps.pause(shop).catch((e): PauseCallResult => ({ outcome: 'unknown', detail: e instanceof Error ? e.message : String(e) }))
+    if (result.outcome === 'paused') { candidates.push(entry(shop, 'paused')); paused += 1; continue }
+
+    if (result.outcome === 'unknown') {
+      // We do not know whether the Backend paused it. Read the status back before deciding the claim's fate:
+      // releasing over a pause that DID land would leave a paused shop that a payment cannot bring back.
+      const after = await deps.readSellerStatus(shop).catch((): SellerStatusFact => 'unavailable')
+      if (after === 'paused') { candidates.push(entry(shop, 'paused', 'confirmed by re-read')); paused += 1; continue }
+      if (after === 'active') {
+        await deps.release(shop, claim).catch(() => false)
+        candidates.push(entry(shop, 'failed', result.detail)); failed += 1
+        deps.alert(`⚠️ Pausa por falta de plan: el backend no respondió claro y la tienda sigue activa; se reintenta mañana.\nShop: ${shop.slug ?? shop.id}\n${result.detail}`)
+        continue
+      }
+      // Still unknown: keep the claim (a payment can then always restore) and ask a person.
+      candidates.push(entry(shop, 'unknown', result.detail)); failed += 1
+      deps.alert(`🚨 Pausa por falta de plan: NO sabemos si la tienda quedó en pausa — revisar a mano en /admin/tenants.\nShop: ${shop.slug ?? shop.id}\n${result.detail}`)
+      continue
+    }
+
+    // `already_paused` (someone else paused it after our read) or `failed`: the claim must not stay. For an admin
+    // pause, a claim left behind would let a payment lift it; for a failure, it would stop a later run retrying.
+    const released = await deps.release(shop, claim).catch(() => false)
+    if (result.outcome === 'already_paused') {
+      candidates.push(entry(shop, 'already_paused', released ? undefined : 'claim NOT released'))
+      if (!released) deps.alert(`🚨 Pausa por falta de plan: la tienda ya estaba en pausa por otra razón y NO se pudo quitar nuestra marca plan_pause — quitarla a mano, o un pago la reactivaría.\nShop: ${shop.slug ?? shop.id}`)
+      continue
+    }
+    candidates.push(entry(shop, 'failed', `${result.detail}${released ? '' : ' · claim NOT released'}`)); failed += 1
+    deps.alert(`⚠️ Pausa por falta de plan FALLÓ${released ? ' (se reintenta mañana)' : ' y NO se pudo liberar la marca — quitar plan_pause a mano'}.\nShop: ${shop.slug ?? shop.id}\n${result.detail}`)
+  }
+
+  return { ok: true, dryRun: opts.dryRun, read: shops.length, candidates, paused, left, unavailable, failed }
+}
