@@ -74,6 +74,12 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
  * ledger — and the claim is cleared afterwards (`lib/plan-restore.ts`). No `plan_pause`, no restore: an admin pause is
  * never lifted here. A replay finds no claim and restores nothing twice. It never throws into the payment path that
  * called it (the payment already landed); a failed restore alerts on Telegram for hand repair.
+ *
+ * It returns nothing, so it can never turn a plan step into `retry` (PR 485's outcome model). ALERT, not retry, on
+ * purpose: a Stripe retry would not even reach this hook on the one-time path (the replayed grant returns `done`
+ * before it), and on the subscription path it would repeat the ✅ alert and D19 for a fault that is the Backend's,
+ * not the payment's. The `plan_pause` claim is kept on a failed restore, so the person the alert reaches (or a later
+ * payment) still knows the pause is the plan's and can finish it from /admin/tenants.
  */
 async function afterPlanPaid(input: { plan: PaidPlan; shopId: string; paymentRef: string }): Promise<void> {
   const outcome = await restorePlanPausedShop(input.shopId)

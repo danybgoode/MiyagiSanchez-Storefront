@@ -108,6 +108,11 @@ test.describe('the payment paths call the restore', () => {
     expect(webhook).toMatch(/async function afterPlanPaid[\s\S]{0,200}restorePlanPausedShop\(input\.shopId\)/)
     expect(shell).toMatch(/changeSellerStatus\(\{ medusaSellerId, status: 'active', reason: PLAN_RESTORE_REASON \}\)/)
   })
+  test('a failed restore can never make a plan step `retry`: the hook returns nothing (PR 485 outcome model)', () => {
+    expect(webhook).toMatch(/async function afterPlanPaid\(input: \{ plan: PaidPlan; shopId: string; paymentRef: string \}\): Promise<void>/)
+    // Every call is a statement whose result is ignored, followed by the step's own outcome.
+    expect(webhook).not.toMatch(/return await afterPlanPaid|= await afterPlanPaid/)
+  })
   test('every recorded payment reaches it: monthly activation, one-time, the promoter wrappers, and a monthly plan back to live', () => {
     expect(webhook).toMatch(/await afterPlanPaid\(\{ plan, shopId, paymentRef: stripeSubscriptionId \}\)/)
     expect(webhook).toMatch(/await afterPlanPaid\(\{ plan, shopId, paymentRef: session\.id \}\)/)
