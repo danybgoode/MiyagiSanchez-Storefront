@@ -135,8 +135,10 @@ test.describe('negocio_upgrade — 20% of the FIRST Plan Negocio payment within 
     expect(both).toContain('await recordUpgradeShare(input)')
     // The upgrade's row is keyed by the decision's ref, never by the Stripe payment id.
     const up = shares.slice(shares.indexOf('export async function recordUpgradeShare'), shares.indexOf('export async function recordNegocioPaymentShares'))
-    expect(up).toContain('paymentRef: decision.paymentRef')
+    const steps = readFileSync('lib/promoter-upgrade-share.ts', 'utf8')
+    expect(steps).toContain('paymentRef: decision.paymentRef')
+    expect(up).toContain('return await runUpgradeShare(')
     // Could not read the later packages ≠ none.
-    expect(up).toContain('if (laterError) throw')
+    expect(up).toContain("if (error) throw new Error(`Negocio package read failed: ${error.message}`)")
   })
 })

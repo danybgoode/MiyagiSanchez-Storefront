@@ -19,6 +19,7 @@ import { db } from '@/lib/supabase'
 import { tg } from '@/lib/telegram'
 import { accrueCommissionOutcome } from '@/lib/promoter'
 import { accrualSettles } from '@/lib/promoter-commission'
+import { runUpgradeShare } from '@/lib/promoter-upgrade-share'
 import {
   NEGOCIO_PACKAGE_SKUS,
   RENEWAL_ANCHOR_SKUS,
@@ -26,7 +27,6 @@ import {
   TIENDA_RENEWAL_SKU,
   UPGRADE_SKU,
   decideRenewalShare,
-  decideUpgradeShare,
   type RenewalSku,
   type ShareSku,
 } from '@/lib/promoter-packages'
@@ -162,47 +162,67 @@ export async function recordUpgradeShare(input: { shopId: string; paymentRef: st
   const { shopId, paymentRef, grossCents, paidAt } = input
   if (!shopId || !paymentRef || !(grossCents > 0)) return 'not_attributed'
   try {
-    // The shop's LATEST paid tienda_anual: each one opens its own 12 months and its own single share.
-    const { data: anchorRow, error } = await db
-      .from('marketplace_promoter_attributions')
-      .select('id, promoter_id, created_at')
-      .eq('seller_id', shopId)
-      .eq('sku', 'tienda_anual')
-      .eq('status', 'paid')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (error) throw new Error(`tienda_anual attribution read failed: ${error.message}`)
-    const anchor = anchorRow as { id: string; promoter_id: string; created_at: string } | null
-    let negocioPackageAfterAnchor = false
-    if (anchor) {
-      const { data: later, error: laterError } = await db
-        .from('marketplace_promoter_attributions')
-        .select('id')
-        .eq('seller_id', shopId)
-        .in('sku', [...NEGOCIO_PACKAGE_SKUS])
-        .eq('status', 'paid')
-        .gt('created_at', anchor.created_at)
-        .limit(1)
-        .maybeSingle()
-      // Could not look ≠ none: refuse to decide rather than pay a share that a package may have superseded.
-      if (laterError) throw new Error(`Negocio package read failed: ${laterError.message}`)
-      negocioPackageAfterAnchor = !!later
-    }
-    const decision = decideUpgradeShare({
-      anchor: anchor ? { attributionId: anchor.id, paidAt: new Date(anchor.created_at) } : null,
-      paidAt,
-      negocioPackageAfterAnchor,
-    })
-    if (decision.action === 'skip' || !anchor) return decision.action === 'skip' ? decision.reason : 'no_anchor'
-    // `paymentRef` (this Stripe payment) is not the row's key: the anchor's ref is, so a second payment collides.
-    return await recordShareAttribution({
-      sku: UPGRADE_SKU,
-      promoterId: anchor.promoter_id,
-      shopId,
-      paymentRef: decision.paymentRef,
-      grossCents,
-      cadence: 'upgrade',
+    // Validate → claim → apply (lib/promoter-upgrade-share.ts): a Negocio package that lands between the check and the
+    // share's row is seen by the re-check after the claim, and no 20% accrues.
+    return await runUpgradeShare({ paidAt, grossCents }, {
+      readAnchor: async () => {
+        // The shop's LATEST paid tienda_anual attribution. A repeat sale by the SAME promoter updates that row in place
+        // (`markAttributionPaid`, one row per promoter, shop and sku), keeping the FIRST sale's `created_at`: so the
+        // window and the single share belong to that first sale, and a repeat sale by the same promoter opens neither.
+        // A tienda_anual sold by ANOTHER promoter is its own row, its own window and its own share.
+        const { data, error } = await db
+          .from('marketplace_promoter_attributions')
+          .select('id, promoter_id, created_at')
+          .eq('seller_id', shopId)
+          .eq('sku', 'tienda_anual')
+          .eq('status', 'paid')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (error) throw new Error(`tienda_anual attribution read failed: ${error.message}`)
+        const row = data as { id: string; promoter_id: string; created_at: string } | null
+        return row ? { attributionId: row.id, promoterId: row.promoter_id, paidAt: new Date(row.created_at) } : null
+      },
+      negocioPackageAfter: async (after) => {
+        const { data, error } = await db
+          .from('marketplace_promoter_attributions')
+          .select('id')
+          .eq('seller_id', shopId)
+          .in('sku', [...NEGOCIO_PACKAGE_SKUS])
+          .eq('status', 'paid')
+          .gt('created_at', after.toISOString())
+          .limit(1)
+          .maybeSingle()
+        // Could not look ≠ none: refuse to decide rather than pay a share that a package may have superseded.
+        if (error) throw new Error(`Negocio package read failed: ${error.message}`)
+        return !!data
+      },
+      claim: async ({ promoterId, paymentRef: ref, grossCents: gross }) => {
+        // `claimed` does not accrue: the accrual pays only `paid` rows. `ref` is the anchor's, not this payment's.
+        const { data, error } = await db
+          .from('marketplace_promoter_attributions')
+          .insert({ promoter_id: promoterId, seller_id: shopId, sku: UPGRADE_SKU, gross_amount_cents: gross, cadence: 'upgrade', status: 'claimed', payment_ref: ref })
+          .select('id, status')
+          .maybeSingle()
+        if (!error && data) return data as { id: string; status: string }
+        if (error && error.code !== '23505') throw new Error(`negocio_upgrade claim failed: ${error.message}`)
+        const { data: existing, error: readError } = await db.from('marketplace_promoter_attributions').select('id, status').eq('payment_ref', ref).maybeSingle()
+        if (readError || !existing) throw new Error(`negocio_upgrade row exists by payment_ref but could not be read${readError ? `: ${readError.message}` : ''}`)
+        return existing as { id: string; status: string }
+      },
+      voidClaim: async (id) => {
+        const { error } = await db.from('marketplace_promoter_attributions').update({ status: 'void' }).eq('id', id).eq('status', 'claimed')
+        if (error) throw new Error(`negocio_upgrade void failed: ${error.message}`)
+      },
+      confirmClaim: async (id) => {
+        const { error } = await db.from('marketplace_promoter_attributions').update({ status: 'paid' }).eq('id', id).eq('status', 'claimed')
+        if (error) throw new Error(`negocio_upgrade confirm failed: ${error.message}`)
+        // Read back: the conditional write may have lost to a concurrent void or confirm; the row's state decides.
+        const { data, error: readError } = await db.from('marketplace_promoter_attributions').select('status').eq('id', id).maybeSingle()
+        if (readError || !data) throw new Error(`negocio_upgrade read-back failed${readError ? `: ${readError.message}` : ''}`)
+        return (data as { status: string }).status
+      },
+      accrue: (id) => accrueCommissionOutcome(id),
     })
   } catch (e) {
     alertShareFailed(UPGRADE_SKU, shopId, paymentRef, e)
