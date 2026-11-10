@@ -112,3 +112,34 @@ test('the webhook uses this order, and each share entry point says whether it la
   const shares = readFileSync('lib/promoter-renewal-server.ts', 'utf8')
   expect(shares).toContain("return renewal !== 'failed' && upgrade !== 'failed'")
 })
+
+test.describe('the D10 restore step (plan-tienda S3.4, verifier S4)', () => {
+  function steps(grant: 'written' | 'replay' | 'comp', restore: () => Promise<void>, log: string[]): OneTimeStepsDeps {
+    return {
+      applyGrant: async () => grant,
+      shares: async () => true,
+      attribution: async () => true,
+      firstTime: async (g) => { log.push(`first:${g}`) },
+      onGrantFailed: () => {},
+      restore: async () => { log.push('restore'); await restore() },
+    }
+  }
+  test('runs on the delivery that wrote the grant AND on every replay; the first-time steps only once', async () => {
+    const written: string[] = []
+    await runOneTimeSteps(steps('written', async () => {}, written))
+    expect(written).toEqual(['first:written', 'restore'])
+    const replay: string[] = []
+    await runOneTimeSteps(steps('replay', async () => {}, replay))
+    expect(replay).toEqual(['restore'])
+  })
+  test('never on a comp shop (never paused for lack of a plan)', async () => {
+    const log: string[] = []
+    await runOneTimeSteps(steps('comp', async () => {}, log))
+    expect(log).toEqual(['first:comp'])
+  })
+  test('a restore that throws never changes the outcome: the payment is not resent for it', async () => {
+    const log: string[] = []
+    const out = await runOneTimeSteps(steps('written', async () => { throw new Error('backend down') }, log))
+    expect(out.outcome).toBe('done')
+  })
+})

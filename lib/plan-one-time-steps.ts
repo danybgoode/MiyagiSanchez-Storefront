@@ -15,8 +15,13 @@
  *   3. attribution     — whenever the deps provide one. Idempotent: `markAttributionPaid` looks the row up by
  *                        (promoter, shop, sku) and updates it, a racing insert hits `marketplace_promoter_attributions_uniq`
  *                        (23505, handled), and its accrual is exactly-once by `UNIQUE(attribution_id)`.
- *   4. first time only — the ✅ alert, D19, the D10 hook: never on a replay, so a redelivery repeats none of them.
- *                        They run even when a share failed: the grant DID land, and the redelivery will be a replay.
+ *   4. first time only — the ✅ alert and D19: never on a replay, so a redelivery repeats none of them. They run
+ *                        even when a share failed: the grant DID land, and the redelivery will be a replay.
+ *   5. restore         — the D10 hook (plan-tienda S3.4), on written AND on replay (verifier S4): a delivery that died
+ *                        after the grant but before the restore leaves a paid shop paused, and only a replay can still
+ *                        reach it. Idempotent by the `plan_pause` claim (no claim, no call). Never on `comp` (a
+ *                        permanent Negocio is never paused for lack of a plan). It never throws and never decides the
+ *                        outcome: a failed restore alerts, it does not make Stripe resend the payment.
  * A failed share or attribution answers `retry` (500), so Stripe delivers again and the redelivery completes only the
  * missing step — the ones that landed collide on their keys and add nothing.
  */
@@ -34,6 +39,8 @@ export type OneTimeStepsDeps = {
   firstTime: (outcome: Exclude<PlanPaymentOutcome, 'replay'>) => Promise<void>
   /** Said when the grant failed. */
   onGrantFailed: (e: unknown) => void
+  /** Bring a shop paused for lack of a plan back (D10). Runs on written and on replay; must not throw. */
+  restore?: () => Promise<void>
 }
 
 export async function runOneTimeSteps(deps: OneTimeStepsDeps): Promise<{ outcome: PlanWebhookOutcome; grant: PlanPaymentOutcome | null }> {
@@ -48,5 +55,6 @@ export async function runOneTimeSteps(deps: OneTimeStepsDeps): Promise<{ outcome
   const sharesOk = grant === 'comp' ? true : await deps.shares().catch(() => false)
   const attributionOk = await deps.attribution().catch(() => false)
   if (grant !== 'replay') await deps.firstTime(grant)
+  if ((grant === 'written' || grant === 'replay') && deps.restore) await deps.restore().catch(() => {})
   return { outcome: sharesOk && attributionOk ? 'done' : 'retry', grant }
 }

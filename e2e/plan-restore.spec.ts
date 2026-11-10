@@ -113,12 +113,24 @@ test.describe('the payment paths call the restore', () => {
     expect(webhook).toMatch(/async function afterPlanPaid\(input: \{ plan: PaidPlan; shopId: string; paymentRef: string \}\): Promise<void>/)
     // Every call is a statement whose result is ignored, followed by the step's own outcome.
     expect(webhook).not.toMatch(/return await afterPlanPaid|= await afterPlanPaid/)
+    // The yearly step swallows anything the hook might throw, and its result never reaches the outcome.
+    expect(readFileSync('lib/plan-one-time-steps.ts', 'utf8')).toContain("if ((grant === 'written' || grant === 'replay') && deps.restore) await deps.restore().catch(() => {})")
   })
+  test('a replayed grant and a subscription event that moves a plan to live also restore (verifier S4)', () => {
+    // The yearly path (sprint 4's step model): the restore is its own step, run on written AND replay
+    // (lib/plan-one-time-steps.ts, specced in e2e/plan-one-time-steps.spec.ts), never inside the first-time steps.
+    expect(webhook).toContain('restore: () => afterPlanPaid({ plan, shopId, paymentRef: session.id }),')
+    const firstTime = webhook.slice(webhook.indexOf('firstTime: async (grant) => {'), webhook.indexOf('restore: () => afterPlanPaid'))
+    expect(firstTime).not.toContain('afterPlanPaid')
+    const event = webhook.slice(webhook.indexOf('export async function handlePlanSubscriptionEvent'))
+    expect(event.slice(0, event.indexOf('\n}\n'))).toMatch(/out\.status === 'active' \|\| out\.status === 'trialing'\)\) \{\s*await afterPlanPaid/)
+  })
+
   test('every recorded payment reaches it: monthly activation, one-time, the promoter wrappers, and a monthly plan back to live', () => {
     expect(webhook).toMatch(/await afterPlanPaid\(\{ plan, shopId, paymentRef: stripeSubscriptionId \}\)/)
-    expect(webhook).toMatch(/await afterPlanPaid\(\{ plan, shopId, paymentRef: session\.id \}\)/)
-    expect(webhook).toMatch(/if \(outcome === 'written'\) await afterPlanPaid\(\{ plan: 'negocio'/)
-    expect(webhook).toMatch(/if \(outcome === 'written'\) await afterPlanPaid\(\{ plan: 'tienda'/)
+    expect(webhook).toMatch(/restore: \(\) => afterPlanPaid\(\{ plan, shopId, paymentRef: session\.id \}\)/)
+    expect(webhook).toMatch(/if \(outcome === 'written' \|\| outcome === 'replay'\) await afterPlanPaid\(\{ plan: 'negocio'/)
+    expect(webhook).toMatch(/if \(outcome === 'written' \|\| outcome === 'replay'\) await afterPlanPaid\(\{ plan: 'tienda'/)
     expect(webhook).toMatch(/out\.status === 'active' \|\| out\.status === 'trialing'\)\) \{\s*await afterPlanPaid/)
   })
 })
