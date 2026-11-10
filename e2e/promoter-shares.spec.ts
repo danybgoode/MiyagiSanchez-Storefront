@@ -17,6 +17,20 @@ import {
 
 const PACKAGE_PAID = new Date('2026-11-10T12:00:00.000Z')
 
+test('tienda_renewal is wired into both Plan Tienda payment paths, after the status landed and only for real money', () => {
+  const webhook = readFileSync('lib/negocio-webhook.ts', 'utf8')
+  const yearly = webhook.slice(webhook.indexOf('export async function handlePlanOneTimeComplete'), webhook.indexOf('function syncDeps('))
+  expect(yearly).toContain("if (plan === 'negocio') return recordNegocioPaymentShares(")
+  expect(yearly).toContain('accrueTiendaPaymentShare({ ...input, amountCents: session.amount_total ?? 0 })')
+  const invoice = webhook.slice(webhook.indexOf('export async function handlePlanInvoicePaid'), webhook.indexOf('export async function handlePlanInvoiceFailed'))
+  const zero = invoice.indexOf('if ((invoice.amount_paid ?? 0) <= 0) return')
+  const patched = invoice.indexOf("if (out.outcome !== 'patched' || !shopId || !invoice.id) return result")
+  const tienda = invoice.indexOf('accrueTiendaPaymentShare({ shopId, paymentRef: invoice.id, amountCents: invoice.amount_paid ?? 0, paidAt })')
+  expect(zero).toBeGreaterThan(-1)
+  expect(patched).toBeGreaterThan(zero)
+  expect(tienda).toBeGreaterThan(patched)
+})
+
 test.describe('tienda_renewal — 10% of a Plan Tienda payment in year 2 (S4.2)', () => {
   const tienda = (sku: string | null, paidAt: string) =>
     decideRenewalShare({ renewalSku: 'tienda_renewal', anchor: sku ? { sku, paidAt: PACKAGE_PAID } : null, paidAt: new Date(paidAt) })
@@ -104,10 +118,11 @@ test.describe('negocio_upgrade — 20% of the FIRST Plan Negocio payment within 
 
   test('wired into the merchant Negocio payments only — yearly (not a promoter checkout) and every paid invoice; never a package', () => {
     const webhook = readFileSync('lib/negocio-webhook.ts', 'utf8')
-    const yearly = webhook.slice(webhook.indexOf('export async function handleNegocioOneTimeComplete'), webhook.indexOf('export async function handleNegocioSubscriptionChanged'))
-    expect(yearly).toContain("if (outcome === 'written' && !promoterSku) {")
-    expect(yearly.indexOf('recordNegocioPaymentShares(')).toBeGreaterThan(yearly.indexOf("if (outcome === 'written' && !promoterSku) {"))
-    const invoice = webhook.slice(webhook.indexOf('export async function handleNegocioInvoicePaid'))
+    const yearly = webhook.slice(webhook.indexOf('export async function handlePlanOneTimeComplete'), webhook.indexOf('function syncDeps('))
+    // A checkout carrying a promoter_sku is a promoter's sale: no share.
+    expect(yearly.indexOf('if (promoterSku) return true')).toBeGreaterThan(-1)
+    expect(yearly.indexOf('if (promoterSku) return true')).toBeLessThan(yearly.indexOf('recordNegocioPaymentShares('))
+    const invoice = webhook.slice(webhook.indexOf('export async function handlePlanInvoicePaid'))
     expect(invoice).toContain('if ((invoice.amount_paid ?? 0) <= 0) return')
     expect(invoice).toContain('recordNegocioPaymentShares({ shopId, paymentRef: invoice.id')
     expect(webhook).not.toContain('recordRenewalShare(')

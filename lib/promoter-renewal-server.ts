@@ -133,7 +133,8 @@ export function recordRenewalShare(input: { shopId: string; paymentRef: string; 
  * WIRING (the orchestrator, after rebasing on sprint 2, which owns the Plan Tienda payment paths): call this ONCE per
  * merchant Plan Tienda payment that was RECORDED — never for a replay, and never for a promoter package's Tienda grant
  * (that is a package sale, written by `applyPackageGrants`, not a merchant payment):
- *   1. the yearly one-time Plan Tienda checkout, where its grant write came back `written`:
+ *   1. the yearly one-time Plan Tienda checkout, where its grant write came back `written` OR `replay` (a redelivery
+ *      after a failed share must still record it; the `payment_ref` key makes the second call add nothing):
  *      `{ shopId, paymentRef: session.id, amountCents: session.amount_total ?? 0, paidAt: new Date(completedAt * 1000) }`
  *      (the event's own timestamp, never processing time — Codex security, #474);
  *   2. every paid monthly Plan Tienda invoice, only when `invoice.amount_paid > 0` (a $0 free-period invoice is not a
@@ -218,7 +219,10 @@ export async function recordUpgradeShare(input: { shopId: string; paymentRef: st
  * promoter who sells a Negocio package to a Tienda shop they opened kept the package share; paying them 20% more of
  * their own sale would pay twice for one move up.
  */
-export async function recordNegocioPaymentShares(input: { shopId: string; paymentRef: string; grossCents: number; paidAt: Date }): Promise<void> {
-  await recordRenewalShare(input)
-  await recordUpgradeShare(input)
+export async function recordNegocioPaymentShares(input: { shopId: string; paymentRef: string; grossCents: number; paidAt: Date }): Promise<boolean> {
+  // Both are always tried; false when either did not land (it alerted), so the webhook answers `retry` and the
+  // redelivery records only the missing one — the other collides on its `payment_ref` and adds nothing.
+  const renewal = await recordRenewalShare(input)
+  const upgrade = await recordUpgradeShare(input)
+  return renewal !== 'failed' && upgrade !== 'failed'
 }

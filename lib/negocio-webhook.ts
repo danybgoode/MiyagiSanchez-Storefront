@@ -22,9 +22,11 @@
  * 500 so Stripe delivers the event again (PR 485 review). That is safe because every step that can fail runs FIRST
  * and is idempotent: the grant is replay-checked by payment id, `/store/subscriptions` dedupes on the Stripe
  * subscription id, the status PATCH is a conditional write of the freshly retrieved status. The steps that are not
- * safe to repeat (the ✅ alert, the renewal share, the promoter attribution, D19, the D10 hook) run only AFTER the
- * money step landed, so a retried delivery either repeats nothing (a replayed grant returns early) or runs them for
- * the first time. `final` is a failure no retry can fix (an unpaid session, missing metadata): alert, answer 200.
+ * safe to repeat (the ✅ alert, D19, the D10 hook) run only AFTER the money step landed, and only on the delivery
+ * that wrote it. The promoter shares and the attribution run on EVERY delivery whose grant is counted, a replay
+ * included, because each is idempotent by its own key (lib/plan-one-time-steps.ts): a share that failed after the
+ * grant landed answers `retry`, and the redelivery records only what is missing (plan-tienda S4, the PR 485 gap).
+ * `final` is a failure no retry can fix (an unpaid session, missing metadata): alert, answer 200.
  *
  * server-only.
  */
@@ -49,7 +51,8 @@ import {
 } from '@/lib/plan-subscription-sync'
 import { markAttributionPaid, isPromoterSku } from '@/lib/promoter'
 import { releaseCustomDomainForShop } from '@/lib/domain-lapse-server'
-import { recordNegocioPaymentShares } from '@/lib/promoter-renewal-server'
+import { accrueTiendaPaymentShare, recordNegocioPaymentShares } from '@/lib/promoter-renewal-server'
+import { runOneTimeSteps } from '@/lib/plan-one-time-steps'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const MEDUSA_PUB_KEY = process.env.MEDUSA_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -200,45 +203,43 @@ export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session
     tg.alert(`🚨 ${name} (pago único) PAGADO con datos inválidos — revisar.\nSession: ${session.id}`)
     return 'final'
   }
-  let outcome: PlanPaymentOutcome
-  try {
-    outcome = await applyPlanPayment(
-      plan,
-      { shopId, paymentId: session.id, months, note: promoterSku ? `promoter ${promoterSku}` : `yearly ${months}m` },
-      PLAN_PAYMENT_DB,
-    )
-  } catch (e) {
-    console.error(`[${plan} one-time] grant write failed:`, e)
-    tg.alert(`🚨 ${name} (pago único) PAGADO pero NO activado — Stripe lo reintentará; si sigue, reparar a mano.\nShop: ${shopId}\nSession: ${session.id}\nError: ${errText(e)}`)
-    // Retried: the grant is replay-checked by the session id, and nothing below has run yet.
-    return 'retry'
-  }
-  if (outcome === 'replay') return 'done' // already counted: no second attribution, no second alert
-
-  if (plan === 'negocio') {
-    // A merchant's own yearly payment may be the year-2 renewal of a promoter's package (D13): 10% to that promoter.
-    // (A promoter package itself is a different checkout kind, so it never counts as its own renewal.) Plan Tienda's
-    // renewal share is sprint 4's (plan-tienda D14), not this.
-    if (outcome === 'written' && !promoterSku) {
-      // When the payment COMPLETED (the event's own timestamp, seconds) — never the webhook's processing time nor the
-      // session's creation, which can sit on the other side of a renewal boundary (Codex security, #474).
-      const paidAt = completedAt ? new Date(completedAt * 1000) : new Date()
-      await recordNegocioPaymentShares({ shopId, paymentRef: session.id, grossCents: session.amount_total ?? 0, paidAt })
-    }
-    const promoterId = session.metadata?.promoter_id
-    if (promoterId && isPromoterSku(promoterSku)) {
-      await markAttributionPaid({ promoterId, sellerId: shopId, sku: promoterSku, grossAmountCents: session.amount_total ?? 0, cadence: 'one_time' })
-    }
-  }
-  tg.alert(
-    outcome === 'comp'
-      ? `ℹ️ Negocio pagado en una tienda que ya lo tenía sin costo — revisar si hay que reembolsar.\nShop: ${shopId}\nSession: ${session.id}`
-      : `✅ ${name} activado (${months} meses)\nShop: ${shopId}`,
-  )
-  if (outcome !== 'written') return 'done'
-  if (plan === 'negocio') await cancelTiendaUnderNegocio(shopId, session.metadata?.seller_clerk_id)
-  await afterPlanPaid({ plan, shopId, paymentRef: session.id })
-  return 'done'
+  const paidAt = completedAt ? new Date(completedAt * 1000) : new Date()
+  const { outcome } = await runOneTimeSteps({
+    applyGrant: () =>
+      applyPlanPayment(plan, { shopId, paymentId: session.id, months, note: promoterSku ? `promoter ${promoterSku}` : `yearly ${months}m` }, PLAN_PAYMENT_DB),
+    onGrantFailed: (e) => {
+      console.error(`[${plan} one-time] grant write failed:`, e)
+      tg.alert(`🚨 ${name} (pago único) PAGADO pero NO activado — Stripe lo reintentará; si sigue, reparar a mano.\nShop: ${shopId}\nSession: ${session.id}\nError: ${errText(e)}`)
+    },
+    // The merchant's own payment may earn a promoter a share (D13, plan-tienda D14): the Negocio renewal or the move
+    // up from a Plan Tienda package; for Plan Tienda, the Tienda renewal. A checkout carrying a `promoter_sku` is a
+    // promoter's sale, never a share. Paid at the event's own timestamp, never processing time (Codex security, #474).
+    // Runs on a replay too (lib/plan-one-time-steps.ts): each share is keyed by `payment_ref`.
+    shares: async () => {
+      if (promoterSku) return true
+      const input = { shopId, paymentRef: session.id, paidAt }
+      if (plan === 'negocio') return recordNegocioPaymentShares({ ...input, grossCents: session.amount_total ?? 0 })
+      return (await accrueTiendaPaymentShare({ ...input, amountCents: session.amount_total ?? 0 })) !== 'failed'
+    },
+    attribution: async () => {
+      const promoterId = session.metadata?.promoter_id
+      if (plan !== 'negocio' || !promoterId || !isPromoterSku(promoterSku)) return true
+      const r = await markAttributionPaid({ promoterId, sellerId: shopId, sku: promoterSku, grossAmountCents: session.amount_total ?? 0, cadence: 'one_time' })
+      if (r !== 'recorded') tg.alert(`🚨 ${name} (pago único): la atribución del promotor NO se registró — Stripe lo reintentará.\nShop: ${shopId}\nSession: ${session.id}`)
+      return r === 'recorded'
+    },
+    firstTime: async (grant) => {
+      tg.alert(
+        grant === 'comp'
+          ? `ℹ️ Negocio pagado en una tienda que ya lo tenía sin costo — revisar si hay que reembolsar.\nShop: ${shopId}\nSession: ${session.id}`
+          : `✅ ${name} activado (${months} meses)\nShop: ${shopId}`,
+      )
+      if (grant !== 'written') return
+      if (plan === 'negocio') await cancelTiendaUnderNegocio(shopId, session.metadata?.seller_clerk_id)
+      await afterPlanPaid({ plan, shopId, paymentRef: session.id })
+    },
+  })
+  return outcome
 }
 
 function syncDeps(retrieved?: RetrievedPlanSubscription): PlanStatusSyncDeps {
@@ -277,15 +278,19 @@ export async function handlePlanInvoicePaid(invoice: Stripe.Invoice, subscriptio
   const out = await syncPlanSubscriptionStatus(subscription.id, syncDeps(subscription))
   // The $0 invoice that opens a free period is not a payment: no renewal share for a promoter.
   if ((invoice.amount_paid ?? 0) <= 0) return syncWebhookOutcome(out)
-  // A monthly Negocio payment in year 2 of a promoter's package earns that promoter 10% (D13), once per invoice.
-  // Plan Tienda's renewal share is sprint 4's (plan-tienda D14).
+  // Every paid invoice may earn a promoter a share, only once the status landed: for Negocio the year-2 renewal (D13)
+  // or the first move up from a Plan Tienda package (plan-tienda D14); for Plan Tienda the year-2 Tienda renewal.
+  // Keyed by `payment_ref` (unique), so the retried delivery that finally lands records each once; a share that did
+  // not land answers `retry`, and the redelivery records only what is missing.
   const shopId = subscription.metadata?.shop_id
-  if (out.outcome === 'patched' && out.plan === 'negocio' && shopId && invoice.id) {
-    const paidAt = invoice.status_transitions?.paid_at ? new Date(invoice.status_transitions.paid_at * 1000) : new Date()
-    // Keyed by the invoice id (`payment_ref` is unique), so the retried delivery that finally lands records it once.
-    await recordNegocioPaymentShares({ shopId, paymentRef: invoice.id, grossCents: invoice.amount_paid ?? 0, paidAt })
-  }
-  return syncWebhookOutcome(out)
+  const result = syncWebhookOutcome(out)
+  if (out.outcome !== 'patched' || !shopId || !invoice.id) return result
+  const paidAt = invoice.status_transitions?.paid_at ? new Date(invoice.status_transitions.paid_at * 1000) : new Date()
+  const shared =
+    out.plan === 'negocio'
+      ? await recordNegocioPaymentShares({ shopId, paymentRef: invoice.id, grossCents: invoice.amount_paid ?? 0, paidAt })
+      : (await accrueTiendaPaymentShare({ shopId, paymentRef: invoice.id, amountCents: invoice.amount_paid ?? 0, paidAt })) !== 'failed'
+  return shared ? result : 'retry'
 }
 
 /** A failed renewal: send the current status (past_due is a grace state the Backend keeps live; unpaid is not). */
