@@ -4,7 +4,7 @@
  * `resolvePlan` is the ONE way a gate learns a shop's plan: it reads the Medusa Commerce subscription only when the
  * shop's own grants do not already answer, then hands every fact to the pure `derivePlanFromMetadata`.
  *
- * `ensureNegocioTrial` stamps the 30-day trial the first time an owned shop's owner opens their panel. The write is
+ * `ensureNegocioTrial` stamps the Negocio trial (`NEGOCIO_TRIAL_DAYS`) the first time an owned shop's owner opens their panel. The write is
  * `merge_shop_metadata` guarded on the key being ABSENT: one atomic statement that merges only the trial key (a
  * concurrent change to any other key survives) and does nothing if a trial already exists — so two tabs opening the
  * panel at once can never stamp two trials, and the trial is never moved.
