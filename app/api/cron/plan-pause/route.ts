@@ -2,9 +2,11 @@
  * GET /api/cron/plan-pause — pause the shops whose free months ended without a plan (epic 08 ·
  * plan-tienda-three-free-months S3.3, README D9).
  *
- *   GET /api/cron/plan-pause?dry_run=1   → reads and decides, writes NOTHING (no claim, no Backend call), and
- *                                          returns the list of shops it WOULD pause. Run this first, and read it.
- *   GET /api/cron/plan-pause             → pauses them.
+ *   GET /api/cron/plan-pause             → a DRY RUN: reads and decides, writes NOTHING (no claim, no Backend write),
+ *                                          and returns the list of shops it WOULD pause. Run this first, and read it.
+ *   GET /api/cron/plan-pause?dry_run=0   → the ONLY live form: pauses them. This is what the timer must call.
+ *
+ * A dry run is the default (verifier S1b): a bare curl by a person reading the docs must never pause a shop.
  *
  * Authorised like the other VM-timer crons (`business-checkin`): the `x-cron-secret` header against `CRON_SECRET`,
  * constant-time; a `?secret=` query is NOT accepted (it would land in access logs), and a missing secret refuses
@@ -27,9 +29,8 @@ export async function GET(req: NextRequest) {
   if (!cronSecretMatches(req.headers.get('x-cron-secret'), process.env.CRON_SECRET)) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
-  // Any `dry_run` other than an explicit 0 is a dry run: a typo (`dry_run=true`, `dry_run=yes`) must never pause.
-  const dryParam = req.nextUrl.searchParams.get('dry_run')
-  const dryRun = dryParam !== null && dryParam !== '0'
+  // Live ONLY on an explicit `dry_run=0`. No parameter, or any other value (`dry_run=false`, a typo), is a dry run.
+  const dryRun = req.nextUrl.searchParams.get('dry_run') !== '0'
   const result = await runPlanPause(planPauseDeps(), { dryRun })
   console.info('[plan-pause] run', JSON.stringify(result))
   // 409 when the legacy marking has not run (the run refused on purpose); 503 when the shops could not be read.

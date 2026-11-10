@@ -406,8 +406,9 @@ test.describe('the cron route', () => {
     expect(src).toMatch(/cronSecretMatches\(req\.headers\.get\('x-cron-secret'\), process\.env\.CRON_SECRET\)/)
     expect(src.indexOf('cronSecretMatches(')).toBeLessThan(src.indexOf('runPlanPause('))
   })
-  test('any dry_run value but an explicit 0 is a dry run', () => {
-    expect(src).toMatch(/dryParam !== null && dryParam !== '0'/)
+  test('a bare GET is a dry run; only an explicit dry_run=0 is live (verifier S1b)', () => {
+    expect(src).toContain("const dryRun = req.nextUrl.searchParams.get('dry_run') !== '0'")
+    expect(src).toContain('GET /api/cron/plan-pause?dry_run=0   → the ONLY live form')
   })
 })
 
