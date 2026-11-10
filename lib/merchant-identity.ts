@@ -115,7 +115,7 @@ export function isFuzzyNameMatch(a: string, b: string): boolean {
 
 // ── Dedupe precedence (Story 1.2 build contract) ────────────────────────────
 
-export type DedupeMatchReason = 'shop_id' | 'phone_e164' | 'email_normalized'
+export type DedupeMatchReason = 'shop_id' | 'phone_e164' | 'whatsapp_e164' | 'email_normalized'
 
 export interface DedupeCandidateRows {
   /** Result of `WHERE shop_id = :shopId` (only run when a shopId was given). */
@@ -124,6 +124,8 @@ export interface DedupeCandidateRows {
   byPhone: { id: string } | null
   /** Result of `WHERE email_normalized = :normalizedEmail`. */
   byEmail: { id: string } | null
+  /** Result of `WHERE whatsapp_e164 = :normalizedWhatsapp` — the promoter panel's one required contact (promoter-panel S2). */
+  byWhatsapp?: { id: string } | null
 }
 
 export type DedupeDecision =
@@ -138,9 +140,31 @@ export type DedupeDecision =
  * lookups) and this spec can never disagree about which one wins when more
  * than one candidate matched.
  */
+export type DedupeConflictBody =
+  | { ok: false; error: string; relationshipId: string; matchReason: DedupeMatchReason }
+  | { ok: false; error: string; elsewhere: true }
+
+/**
+ * What a create's 409 may tell the promoter. Their OWN record: its id and why it matched, so the panel can offer
+ * «Sí, seguir con ese». Another promoter's: only that it exists — never its id or which field matched, because the
+ * dedupe reads every promoter's leads and an id lets a promoter confirm a number sits in someone else's private CRM
+ * (Codex security lens, #481). Unknown owner (`undefined`) is treated as someone else's: fail closed.
+ */
+export function dedupeConflictBody(
+  decision: Extract<DedupeDecision, { matched: true }>,
+  ownerPromoterId: string | null | undefined,
+  actorPromoterId: string,
+): DedupeConflictBody {
+  if (ownerPromoterId && ownerPromoterId === actorPromoterId) {
+    return { ok: false, error: 'Ya existe un registro con estos datos.', relationshipId: decision.relationshipId, matchReason: decision.matchReason }
+  }
+  return { ok: false, error: 'Otro promotor ya registró un negocio con estos datos.', elsewhere: true }
+}
+
 export function decideDedupeMatch(rows: DedupeCandidateRows): DedupeDecision {
   if (rows.byShopId) return { matched: true, relationshipId: rows.byShopId.id, matchReason: 'shop_id' }
   if (rows.byPhone) return { matched: true, relationshipId: rows.byPhone.id, matchReason: 'phone_e164' }
+  if (rows.byWhatsapp) return { matched: true, relationshipId: rows.byWhatsapp.id, matchReason: 'whatsapp_e164' }
   if (rows.byEmail) return { matched: true, relationshipId: rows.byEmail.id, matchReason: 'email_normalized' }
   return { matched: false }
 }

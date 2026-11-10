@@ -7,6 +7,7 @@
  * Also serves as the well-known discovery document (link from robots.txt / .well-known).
  */
 
+import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN, NEGOCIO_TRIAL_DAYS } from '@/lib/negocio-pricing'
 import { NextRequest, NextResponse } from 'next/server'
 import { UCP_CAPABILITIES, MCP_TOOL_NAMES } from '@/lib/ucp/capabilities'
 import { aboutManifestBlock } from '@/lib/about-agent'
@@ -189,10 +190,19 @@ export async function GET(req: NextRequest) {
           mcp_tools: ['list_orders'],
         },
 
+        seller_plan: {
+          method: 'POST',
+          url: `${base}/api/ucp/mcp`,
+          description: `Miyagi Sánchez has two plans: Gratis (free forever, with the shop, its URL and subdomain, 0% commission and every payment method) and Negocio ($${NEGOCIO_PRICE_MONTHLY_MXN} MXN a month, or $${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN a year payable in card installments), which adds the custom domain, Mercado Libre sync, far more shop-chat answers and photos, the monthly check-in and no badge. Every new shop gets a ${NEGOCIO_TRIAL_DAYS}-day Negocio trial. A seller's own agent reads the plan with get_plan and starts Negocio with start_negocio (owner token only); entitlement turns on once the payment lands.`,
+          auth: 'authorization_bearer_shop_token',
+          note: "Per-shop token (Authorization: Bearer ms_agent_…) generated in the shop's “Agentes e integraciones” settings; scoped to one shop.",
+          mcp_tools: ['get_plan', 'start_negocio'],
+        },
+
         seller_domain_subscription: {
           method: 'POST',
           url: `${base}/api/ucp/mcp`,
-          description: "A seller's own agent can check its custom-domain entitlement and start checkout for the domain SKU (the platform's paid SKU, $499 MXN/yr) via the MCP tools get_domain_entitlement and start_domain_subscription. The SKU has two cadences: `recurring` (annual subscription, default) or `one_time` (pay one year up front with no recurring mandate — a dated 12-month grant that lapses gracefully with no auto-charge). On the recurring cadence pass an optional coupon (e.g. miyagisan) to comp the first year, capped at 100 redemptions. Returns a Stripe checkout URL; entitlement flips on once checkout completes. The free shop URL (/s/slug) stays free; the white-label subdomain is a separate, cheaper SKU (see seller_subdomain_subscription).",
+          description: "The custom domain is part of Negocio (see seller_plan): get_domain_entitlement reports whether YOUR OWN shop may connect one; start_domain_subscription is retired and points to start_negocio. Shops that bought the domain on its own before keep it. The free shop URL (/s/slug) and the subdomain are always free.",
           auth: 'authorization_bearer_shop_token',
           note: "Per-shop token (Authorization: Bearer ms_agent_…) generated in the shop's “Agentes e integraciones” settings; scoped to one shop.",
           mcp_tools: ['get_domain_entitlement', 'start_domain_subscription'],
@@ -201,7 +211,7 @@ export async function GET(req: NextRequest) {
         seller_subdomain_subscription: {
           method: 'POST',
           url: `${base}/api/ucp/mcp`,
-          description: "A seller's own agent can check its subdomain entitlement and start checkout for the subdomain SKU (the platform's cheaper paid SKU, $199 MXN/yr ~ $17/mo, or $25 MXN/mo) via the MCP tools get_subdomain_entitlement and start_subdomain_subscription. This SKU serves the shop white-label at <slug>.miyagisanchez.com as a standalone site (no platform chrome). Two cadences: `recurring` (a subscription, default) or `one_time` (pay one year up front with no recurring mandate — a dated 12-month grant that lapses gracefully with no auto-charge). On the recurring cadence pick the billing interval: `year` ($199/yr, the discount) or `month` ($25/mo); switch between them anytime with switch_subdomain_cadence (Stripe proration, no double charge, no gap). No campaign coupon (that's the custom-domain SKU). Returns a Stripe checkout URL; entitlement flips on once checkout completes. The free shop URL (/s/slug) always stays free.",
+          description: "The white-label subdomain (<slug>.miyagisanchez.com) is FREE on every plan. get_subdomain_entitlement confirms it; start_subdomain_subscription and switch_subdomain_cadence are retired and only say so.",
           auth: 'authorization_bearer_shop_token',
           note: "Per-shop token (Authorization: Bearer ms_agent_…) generated in the shop's “Agentes e integraciones” settings; scoped to one shop.",
           mcp_tools: ['get_subdomain_entitlement', 'start_subdomain_subscription', 'switch_subdomain_cadence'],

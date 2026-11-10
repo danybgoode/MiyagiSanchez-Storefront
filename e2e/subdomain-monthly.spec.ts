@@ -57,13 +57,13 @@ test.describe('subdomain-monthly · pricing single-source', () => {
     expect(SUBDOMAIN_PRICE_LABEL.es).toContain('$199')
   })
 
-  test('/acerca names BOTH the monthly and yearly subdomain price in both locales', () => {
+  test('/acerca names no subdomain price in either locale: the subdomain is free (plans-gratis-negocio D11)', () => {
     const pricing = getAboutSection('pricing')
     expect(pricing.stub).toBe(false)
     for (const locale of LOCALES) {
       const text = aboutCopy(pricing, locale).body.join(' ')
-      expect(text, `${locale} names the monthly price`).toContain('$25')
-      expect(text, `${locale} still names the yearly price`).toContain('$199')
+      expect(text, `${locale} names no monthly subdomain price`).not.toContain('$25 ')
+      expect(text, `${locale} names no yearly subdomain price`).not.toContain('$199')
     }
   })
 })
@@ -151,29 +151,29 @@ test.describe('subdomain-monthly · entitlement is interval-agnostic', () => {
 
 // ── 5. Route guards + UCP manifest ────────────────────────────────────────────
 
-test.describe('subdomain-monthly · buy + switch routes require auth', () => {
-  test('POST /api/sell/shop/subdomain/subscribe (monthly) → 401 anonymously', async ({ request }) => {
+// The subdomain is free on every plan: buying it and switching its cadence are both retired (410 for everyone).
+test.describe('subdomain-monthly · buy + switch routes are retired', () => {
+  test('POST /api/sell/shop/subdomain/subscribe (monthly) → 410', async ({ request }) => {
     const res = await request.post('/api/sell/shop/subdomain/subscribe', {
       data: { cadence: 'recurring', interval: 'month' },
     })
-    expect(res.status()).toBe(401)
+    expect(res.status()).toBe(410)
   })
 
-  test('POST /api/sell/shop/subdomain/switch → 401 anonymously (auth before secret)', async ({ request }) => {
+  test('POST /api/sell/shop/subdomain/switch → 410', async ({ request }) => {
     const res = await request.post('/api/sell/shop/subdomain/switch', {
       data: { interval: 'year' },
     })
-    expect(res.status()).toBe(401)
+    expect(res.status()).toBe(410)
   })
 })
 
-test.describe('subdomain-monthly · UCP manifest advertises monthly + switch', () => {
-  test('GET /api/ucp/manifest lists the monthly price + the switch tool', async ({ request }) => {
+test.describe('subdomain-monthly · the UCP manifest no longer prices the subdomain', () => {
+  test('GET /api/ucp/manifest calls the switch tool retired and states no subdomain price', async ({ request }) => {
     const res = await request.get('/api/ucp/manifest')
     expect(res.ok()).toBeTruthy()
-    const body = await res.text()
-    expect(body).toContain('seller_subdomain_subscription')
-    expect(body).toContain('switch_subdomain_cadence')
-    expect(body).toContain('$25')
+    const sub = JSON.stringify((await res.json()).endpoints?.seller_subdomain_subscription ?? null)
+    expect(sub).toContain('switch_subdomain_cadence are retired')
+    expect(sub).not.toContain('$25')
   })
 })

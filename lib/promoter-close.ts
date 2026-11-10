@@ -105,3 +105,42 @@ export function canAnchorPreview(
   if (shop.clerkUserId !== null) return false // claimed → never a preview subject
   return isPromoterShopOwner(shop, promoterCode)
 }
+
+/**
+ * Was this shop opened by the promoter with this code? `promoterSourceUrl` stamps every shop the workspace opens with
+ * `promoter://<code>/…`; the package close route accepts only such shops (or a relationship the promoter owns) —
+ * plans-gratis-negocio S4.2, Codex security #474.
+ */
+export function promoterOpenedShop(sourceUrl: string | null | undefined, promoterCode: string): boolean {
+  const code = normalizePromoterCode(promoterCode)
+  return !!code && typeof sourceUrl === 'string' && sourceUrl.startsWith(`promoter://${code}/`)
+}
+
+/** Does the promoter own this shop? Then they may not close a package on it (self-close). Unknown owners are not self. */
+export function isSelfOwned(shopOwnerClerkId: string | null | undefined, promoterClerkId: string | null | undefined): boolean {
+  return !!shopOwnerClerkId && !!promoterClerkId && shopOwnerClerkId === promoterClerkId
+}
+
+/**
+ * May a promoter WRITE to this shop (add products, fill one from a photo, import a catalog)? (promoter-panel D1.)
+ *
+ * Only a shop nobody has claimed yet, and only one this promoter opened or holds a relationship row for. A claimed shop
+ * is the merchant's: they add products from their own panel. `claimed` is checked first, so a promoter can't write to
+ * a merchant's live shop even if they opened it once (Daniel, 2026-11-05).
+ */
+export type ShopEditDecision = 'ok' | 'claimed' | 'not_yours'
+
+export function decideShopEdit(input: { claimed: boolean; openedByPromoter: boolean; linkedToPromoter: boolean }): ShopEditDecision {
+  if (input.claimed) return 'claimed'
+  return input.openedByPromoter || input.linkedToPromoter ? 'ok' : 'not_yours'
+}
+
+/** The refusal a promoter reads for each decision (null = allowed). One place, so every write route says the same. */
+export function shopEditRefusal(decision: ShopEditDecision | 'unavailable'): { status: number; error: string } | null {
+  switch (decision) {
+    case 'ok': return null
+    case 'claimed': return { status: 403, error: 'Esta tienda ya es de su dueño. Pídele que agregue productos desde su panel.' }
+    case 'not_yours': return { status: 403, error: 'Solo puedes agregar productos a las tiendas que tú abriste.' }
+    case 'unavailable': return { status: 503, error: 'No pudimos confirmar la tienda. Intenta de nuevo en un momento.' }
+  }
+}

@@ -112,6 +112,7 @@ export const MCP_BUYER_TOOLS = [
   'create_checkout',
   'make_offer',
   'get_shop',
+  'ask_shop',        // business-infrastructure S4 — the shop's own answer from its published info (no auth)
   'check_availability',
   'book_appointment',
   'get_buyer_trust',
@@ -135,6 +136,7 @@ export const MCP_SELLER_TOOLS = [
   'create_listing',
   'list_my_listings',
   'get_share_kit',             // share-kit S3.3 — catalog link, PDF link, Meta feed URL (token-scoped)
+  'get_business_plan',         // business-infrastructure S3 — «Tu plan», read-only (token-scoped)
   'create_payment_link',       // in-person-sales S4.4 — payment links (token-scoped)
   'list_payment_links',        // in-person-sales S4.4 (token-scoped)
   'cancel_payment_link',       // in-person-sales S4.4 (token-scoped)
@@ -178,6 +180,8 @@ export const MCP_SELLER_TOOLS = [
   'get_subdomain_entitlement',     // subdomain-pricing S2 (token-scoped)
   'start_subdomain_subscription',  // subdomain-pricing S2 (token-scoped)
   'switch_subdomain_cadence',      // subdomain-pricing S3 — monthly↔yearly switch (token-scoped)
+  'get_plan',                      // plans-gratis-negocio S3.3 — Gratis / trial / Negocio and what it includes (token-scoped)
+  'start_negocio',                 // plans-gratis-negocio S3.3 — Negocio checkout, monthly or yearly (owner token only)
   'send_feedback',                 // miyagi-partners-mcp S3 — structured product feedback; callable by
                                     // seller AND partner credentials, incl. a viewer-role partner (token-scoped)
 ] as const

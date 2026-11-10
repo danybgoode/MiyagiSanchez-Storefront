@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { invoiceSubscriptionId } from '@/lib/negocio-checkout-rules'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
 import { db } from '@/lib/supabase'
@@ -53,6 +54,15 @@ import { oneTimeGrantNote } from '@/lib/promoter-close'
 import { listingUrlFor } from '@/lib/market-url'
 import { notifyMerchantCloseReceipt } from '@/lib/promoter-close-notify'
 import { MIGRATION_CHECKOUT_KIND } from '@/lib/migration-checkout'
+import { PROMOTER_PACKAGE_CHECKOUT_KIND, handlePromoterPackageComplete } from '@/lib/promoter-package-server'
+import { NEGOCIO_CHECKOUT_KIND } from '@/lib/negocio-subscription'
+import {
+  handleNegocioInvoiceFailed,
+  handleNegocioInvoicePaid,
+  handleNegocioOneTimeComplete,
+  handleNegocioSubscriptionChanged,
+  handleNegocioSubscriptionComplete,
+} from '@/lib/negocio-webhook'
 
 /** Metadata key for the `migration` SKU's inert paid/audit marker (no ongoing
  *  feature to entitle — see lib/promoter-transfer.ts). */
@@ -160,6 +170,12 @@ export async function POST(req: NextRequest) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
+      // Negocio and promoter packages are paid to the PLATFORM. An event from a connected account carrying those kinds
+      // could only be a merchant forging metadata on their own account: ignore it (pr-reviewer, #474).
+      if ((event as { account?: string | null }).account && (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND || session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND)) {
+        console.error('[stripe webhook] platform-payee kind from a connected account, ignored:', session.id)
+        break
+      }
       if (session.mode === 'subscription') {
         if (session.metadata?.kind === CUSTOM_DOMAIN_CHECKOUT_KIND) {
           await handleCustomDomainSubscriptionComplete(session)
@@ -167,6 +183,9 @@ export async function POST(req: NextRequest) {
           await handleSubdomainSubscriptionComplete(session)
         } else if (session.metadata?.kind === ML_SYNC_CHECKOUT_KIND) {
           await handleMlSyncSubscriptionComplete(session)
+        } else if (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
+          // Negocio monthly (plans-gratis-negocio D6): the Medusa Commerce subscription, per shop.
+          await handleNegocioSubscriptionComplete(session)
         } else {
           await handleSubscriptionCheckoutComplete(session)
         }
@@ -182,6 +201,12 @@ export async function POST(req: NextRequest) {
         // One-time ML-sync cadence (epic 03 · mercadolibre-sync S6): pay a year up
         // front, writing the dated ml_sync_grant.
         await handleMlSyncOneTimeComplete(session)
+      } else if (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
+        // Negocio yearly or a promoter package (plans-gratis-negocio D6): paid months added to the shop's grant.
+        await handleNegocioOneTimeComplete(session, event.created)
+      } else if (session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND) {
+        // A promoter pays the platform its share of a package by card (plans-gratis-negocio S4.2, D12).
+        await handlePromoterPackageComplete(session)
       } else if (session.metadata?.kind === MIGRATION_CHECKOUT_KIND) {
         // migration SKU (epic 03 · platform-migrations S2): a one-time consulting
         // service, no subscription — writes an inert migration_grant marker.
@@ -1361,6 +1386,11 @@ async function handleSubscriptionCheckoutComplete(session: Stripe.Checkout.Sessi
 // ── customer.subscription.updated ─────────────────────────────────────────────
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  if (subscription.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
+    await handleNegocioSubscriptionChanged(subscription, false)
+    return
+  }
+
   // Custom-domain paywall (S2.2): sync the Medusa status (the entitlement source
   // of truth). The domain is only released by customer.subscription.deleted.
   if (subscription.metadata?.kind === CUSTOM_DOMAIN_CHECKOUT_KIND) {
@@ -1411,6 +1441,12 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 // ── customer.subscription.deleted ─────────────────────────────────────────────
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  // Negocio monthly: a definitive cancel returns the shop to its trial or Gratis on the next read.
+  if (subscription.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
+    await handleNegocioSubscriptionChanged(subscription, true)
+    return
+  }
+
   // Custom-domain paywall (S2.2): a definitive cancel flips entitlement off and
   // releases the domain → the shop reverts to its free subdomain + slug.
   if (subscription.metadata?.kind === CUSTOM_DOMAIN_CHECKOUT_KIND) {
@@ -1448,11 +1484,17 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 // ── invoice.payment_succeeded ─────────────────────────────────────────────────
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-  const stripeSubscriptionId = (invoice as unknown as Record<string, unknown>).subscription as string | undefined
+  const stripeSubscriptionId = invoiceSubscriptionId(invoice)
   if (!stripeSubscriptionId) return
 
   // Update billing period on the subscription
   const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
+
+  // Negocio monthly (plans-gratis-negocio D6): the platform is the payee — never the seller transfer below.
+  if (stripeSub.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
+    await handleNegocioInvoicePaid(invoice, stripeSubscriptionId, stripeSub.metadata?.shop_id ?? null)
+    return
+  }
 
   // Custom-domain paywall (S2.2): a successful renewal (or recovery from past_due)
   // keeps the Medusa sub active. No seller transfer — the platform is the payee.
@@ -1529,7 +1571,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 // ── invoice.payment_failed ────────────────────────────────────────────────────
 
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  const stripeSubscriptionId = (invoice as unknown as Record<string, unknown>).subscription as string | undefined
+  const stripeSubscriptionId = invoiceSubscriptionId(invoice)
   if (!stripeSubscriptionId) return
 
   // Custom-domain paywall (S2.2): a failed renewal marks the Medusa sub past_due,
@@ -1537,6 +1579,10 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   // while Stripe retries. Only customer.subscription.deleted disconnects.
   try {
     const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
+    if (sub.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
+      await handleNegocioInvoiceFailed(stripeSubscriptionId)
+      return
+    }
     if (sub.metadata?.kind === CUSTOM_DOMAIN_CHECKOUT_KIND) {
       await setCustomDomainSubscriptionStatus(stripeSubscriptionId, 'past_due')
       tg.alert(`⚠️ Pago fallido en dominio propio (en gracia)\nSubscription: ${stripeSubscriptionId}`)

@@ -14,6 +14,10 @@ import { isRenderableArtworkUrl, isImageLikeArtworkUrl } from '@/lib/personaliza
 import { formatRentalBookingLines, type RentalBookingLike } from '@/lib/rental-booking'
 import { NUDGE_COPY, NUDGE_STEP_COPY } from '@/lib/prompt-to-shop/copy'
 import type { NudgeDay, NudgeStep } from '@/lib/prompt-to-shop/nudges'
+import { CHECKIN_COPY } from '@/lib/business-plan/copy'
+import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN } from '@/lib/negocio-pricing'
+import { PLAN_ALLOWANCES } from '@/lib/plan-allowances'
+import type { CheckinMessage } from '@/lib/business-plan/checkin'
 import {
   resolveFoundingOperatorInvitationOutcome,
   type FoundingOperatorInvitationOutcome,
@@ -431,6 +435,27 @@ export async function sendShopClaimLink(ctx: { to: string; shopName: string; cla
   ].join(''))
 }
 
+/**
+ * «El recibo del negocio» by email (promoter-panel S4.1, D10), sent the moment the promoter taps «Sí, ya me pagó» when
+ * the owner left an email. Every word arrives from the `promotorPanel.recibo` locale block, filled by the caller; this
+ * only lays it out and escapes it. One per shop and option (the idempotency key), so a second tap never emails twice.
+ */
+export async function sendPromoterReceipt(ctx: {
+  to: string
+  subject: string
+  heading: string
+  lines: string[]
+  ctaLabel: string
+  receiptUrl: string
+  idempotencyKey: string
+}): Promise<EmailSendResult> {
+  return sendWithResult(ctx.to, plainLine(ctx.subject), [
+    h1(plainLine(ctx.heading)),
+    ...ctx.lines.map((line) => p(esc(line))),
+    cta(ctx.ctaLabel, ctx.receiptUrl),
+  ].join(''), undefined, undefined, 'es', ctx.idempotencyKey)
+}
+
 /** Notify the account that now owns the shop, once Medusa confirms a new transfer. */
 export async function sendShopClaimedWelcome(ctx: { to: string; shopName: string; shopSlug: string; market: 'mx' | 'us'; sellerId: string }): Promise<void> {
   const shopUrl = `${SITE}/${ctx.market}/s/${encodeURIComponent(ctx.shopSlug)}`
@@ -509,6 +534,88 @@ export async function sendP2sNudge(ctx: { to: string; shopName: string; step: Nu
     cta(NUDGE_COPY.cta, `${SITE}/sell/armar`),
     p(esc(NUDGE_COPY.footer)),
   ].join(''), undefined, undefined, 'es', `p2s-nudge/${ctx.draftId}/${ctx.day}`)
+}
+
+/**
+ * The monthly business check-in (business-infrastructure S3.4): last month's sales against the merchant's plan, and
+ * the plan's first move. Every figure arrives from the engine (`decideCheckin`); this only lays it out. Idempotency key
+ * = row + period, so a retried run cannot email twice for the same month.
+ */
+export async function sendBusinessCheckin(ctx: { to: string; shopName: string; rowId: string; message: CheckinMessage; nextText: string | null }): Promise<EmailSendResult> {
+  const shopName = plainLine(ctx.shopName) || 'Tu tienda'
+  const m = ctx.message
+  return sendWithResult(ctx.to, CHECKIN_COPY.subject(shopName, m.month), [
+    h1(CHECKIN_COPY.heading(m.month)),
+    p(esc(CHECKIN_COPY.sold(m.month, m.sold))),
+    p(esc(m.needed != null ? CHECKIN_COPY.versus(m.needed, m.sold) : CHECKIN_COPY.noGoal)),
+    ...(ctx.nextText ? [p(`<strong>${esc(CHECKIN_COPY.next)}</strong> ${esc(ctx.nextText)}`)] : []),
+    cta(CHECKIN_COPY.cta, `${SITE}/shop/manage/plan`),
+    p(esc(CHECKIN_COPY.footer)),
+  ].join(''), undefined, undefined, 'es', `business-checkin/${ctx.rowId}/${m.period}`)
+}
+
+/**
+ * The Negocio trial's two notices (plans-gratis-negocio S2.3, D10): five days left, and «ya estás en Gratis». Prices
+ * and allowances come from their one modules, never typed here.
+ */
+export async function sendNegocioTrialNotice(ctx: {
+  to: string
+  shopName: string
+  shopId: string
+  notice: 'five_days' | 'ended'
+  endsAt: string
+}): Promise<EmailSendResult> {
+  const shopName = plainLine(ctx.shopName) || 'Tu tienda'
+  const pesos = (n: number) => `$${n.toLocaleString('en-US')}`
+  const prices = `El Plan Negocio cuesta ${pesos(NEGOCIO_PRICE_MONTHLY_MXN)} al mes, o ${pesos(NEGOCIO_PRICE_YEARLY_MXN)} al año, que puedes pagar a meses sin intereses.`
+  const endDate = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' }).format(new Date(ctx.endsAt))
+  const href = `${SITE}/shop/manage/negocio`
+  if (ctx.notice === 'five_days') {
+    return sendWithResult(ctx.to, `${shopName}: te quedan 5 días del Plan Negocio`, [
+      h1('Tu prueba del Plan Negocio termina pronto'),
+      p(esc('Este mes tu tienda ha tenido el Plan Negocio: Mercado Libre sincronizado, muchas más respuestas del chat y tu revisión del mes. Al contratarlo también puedes conectar tu propio dominio.')),
+      p(esc(`El ${endDate} tu tienda pasa sola al Plan Gratis. Sigue abierta, con todos tus productos y tu subdominio; no tienes que hacer nada.`)),
+      p(esc(prices)),
+      cta('Quedarme con el Plan Negocio', href),
+    ].join(''), undefined, undefined, 'es', `negocio-trial/${ctx.shopId}/five_days`)
+  }
+  return sendWithResult(ctx.to, `${shopName} sigue abierta, ahora en el Plan Gratis`, [
+    h1('Terminó tu prueba del Plan Negocio'),
+    p(esc('Tu tienda sigue abierta en el Plan Gratis: tus productos y tu subdominio siguen igual, y puedes seguir vendiendo sin pagar nada.')),
+    p(esc(`Lo que cambia: el chat de tu tienda responde hasta ${PLAN_ALLOWANCES.gratis.chatAnswersPerMonth} preguntas al mes, la sincronización con Mercado Libre y la revisión del mes quedan en pausa, y aparece un pequeño enlace «Tienda impulsada por Miyagi Sánchez» al pie de tu tienda. Todo vuelve al contratar el Plan Negocio.`)),
+    p(esc(prices)),
+    cta('Volver al Plan Negocio', href),
+  ].join(''), undefined, undefined, 'es', `negocio-trial/${ctx.shopId}/ended`)
+}
+
+/**
+ * A buyer left a question the shop's chat could not answer (business-infrastructure S5). To the shop OWNER only, with
+ * a link to answer in «Preguntas». The buyer's email is not in this message: the reply goes through the platform.
+ */
+export async function sendShopQuestionToOwner(ctx: { to: string; shopName: string; threadId: string; question: string; transcript?: Array<{ role: string; text: string }> }): Promise<EmailSendResult> {
+  const shopName = plainLine(ctx.shopName) || 'Tu tienda'
+  return sendWithResult(ctx.to, `${shopName}: alguien te dejó una pregunta`, [
+    h1('Te dejaron una pregunta'),
+    p('El chat de tu tienda no tenía la respuesta, así que te la pasamos:'),
+    p(`<strong>${esc(ctx.question)}</strong>`),
+    ...(ctx.transcript && ctx.transcript.length > 1
+      ? [p(`<em>La conversación:</em><br>${ctx.transcript.slice(-6).map((t) => `${t.role === 'user' ? 'Comprador' : 'Chat'}: ${esc(t.text)}`).join('<br>')}`)]
+      : []),
+    cta('Responder', `${SITE}/shop/manage/preguntas`),
+    p('Le llega tu respuesta a su correo. Si la guardas como pregunta frecuente, el chat la responde solo la próxima vez.'),
+  ].join(''), undefined, undefined, 'es', `shop-question/${ctx.threadId}`)
+}
+
+/** The shop's answer, to the buyer who left the question (S5). Idempotency key = thread: one answer, one email. */
+export async function sendShopAnswerToBuyer(ctx: { to: string; shopName: string; shopSlug: string; threadId: string; question: string; reply: string }): Promise<EmailSendResult> {
+  const shopName = plainLine(ctx.shopName) || 'La tienda'
+  return sendWithResult(ctx.to, `${shopName} respondió tu pregunta`, [
+    h1(`${esc(shopName)} te respondió`),
+    p(`Tu pregunta: <em>${esc(ctx.question)}</em>`),
+    p(esc(ctx.reply)),
+    cta('Ver la tienda', `${SITE}/s/${encodeURIComponent(ctx.shopSlug)}`),
+    p('Si tú no hiciste esta pregunta, ignora este correo.'),
+  ].join(''), undefined, undefined, 'es', `shop-answer/${ctx.threadId}`)
 }
 
 /** General account welcome. Shop-specific language belongs to the claim receipt. */
@@ -2131,7 +2238,7 @@ export async function sendPromoterApplicationApproved(ctx: {
     h1(`¡Felicidades, ${esc(ctx.name)}!`),
     p('Tu solicitud para ser promotor de Miyagi Sánchez fue aprobada. Este es tu código personal:'),
     amount(ctx.code, 'Tu código de promotor', true),
-    p('Para empezar a cerrar ventas:'),
+    p('Para empezar:'),
     table([
       ['1', 'Crea tu cuenta en miyagisanchez.com (o inicia sesión si ya tienes una)'],
       ['2', 'Entra a tu panel de promotor y captura tu código'],
@@ -2243,7 +2350,7 @@ export async function sendPromoterTransferRejected(ctx: {
     h1('Transferencia rechazada'),
     p(`No pudimos confirmar tu transferencia para ${esc(ctx.skuLabel)}.`),
     ctx.reason ? quote(ctx.reason) : '',
-    p('Puedes intentar de nuevo desde el flujo de cierre.'),
+    p('Puedes intentarlo de nuevo desde tu panel de promotor.'),
   ].join('')
   await send(ctx.to, subject, body)
 }

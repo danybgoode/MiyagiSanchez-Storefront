@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   // Paywall: provisioning DNS for a custom domain is a premium SKU (flag on).
   const ent = await resolveDomainEntitlement(
     (shop as unknown as { metadata: unknown }).metadata,
-    { sellerClerkId: user.id },
+    { sellerClerkId: user.id, shopId: (shop as unknown as { id: string }).id },
   )
   if (!ent.entitled) {
     return NextResponse.json(

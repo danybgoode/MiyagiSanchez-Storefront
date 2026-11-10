@@ -36,7 +36,7 @@ export default async function ProfitPage() {
 
   const { data: shop } = await db
     .from('marketplace_shops')
-    .select('slug, metadata')
+    .select('id, slug, metadata')
     .eq('clerk_user_id', user.id)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -65,7 +65,7 @@ export default async function ProfitPage() {
     loadFailed = true
   }
 
-  const entitlement = await resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: user.id })
+  const entitlement = await resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: user.id, shopId: shop.id })
   const showMlFees = entitlement?.entitled ?? false
 
   const orderRows = computeOrderMargins(events, orders)

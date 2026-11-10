@@ -196,24 +196,23 @@ test.describe('promoter-cadence · promoterCouponKey', () => {
 
 // ── 4. Route guards + the agent-facing manifest advertises both cadences ───────
 
-test.describe('promoter-cadence · domain buy route requires auth', () => {
-  test('POST /api/sell/shop/domain/subscribe → 401 anonymously', async ({ request }) => {
+// The standalone domain purchase is retired (the purchase is retired (plans-gratis-negocio S2/S3): 410 for everyone, before any auth).
+test.describe('promoter-cadence · the domain buy route is retired', () => {
+  test('POST /api/sell/shop/domain/subscribe → 410', async ({ request }) => {
     const res = await request.post('/api/sell/shop/domain/subscribe', {
       data: { cadence: 'one_time', promoterCode: 'PRM-ABC123' },
     })
-    expect(res.status()).toBe(401)
+    expect(res.status()).toBe(410)
   })
 })
 
-test.describe('promoter-cadence · UCP manifest advertises both cadences (US-6)', () => {
-  // Runs against the branch PREVIEW in CI (the authoritative gate); the public
-  // manifest carries the updated cadence wording there.
-  test('GET /api/ucp/manifest lists recurring + one_time on the domain SKU', async ({ request }) => {
+test.describe('promoter-cadence · the UCP manifest says the domain is part of Negocio', () => {
+  // The domain is no longer sold on its own, so the manifest offers no cadences for it: it points agents to the plan.
+  test('GET /api/ucp/manifest sends the domain to start_negocio and sells no domain cadence', async ({ request }) => {
     const res = await request.get('/api/ucp/manifest')
     expect(res.ok()).toBeTruthy()
-    const body = await res.text()
-    expect(body).toContain('seller_domain_subscription')
-    expect(body).toContain('one_time')
-    expect(body).toContain('recurring')
+    const domain = JSON.stringify((await res.json()).endpoints?.seller_domain_subscription ?? null)
+    expect(domain).toContain('start_domain_subscription is retired and points to start_negocio')
+    expect(domain).not.toContain('one_time')
   })
 })

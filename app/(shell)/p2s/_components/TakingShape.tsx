@@ -1,5 +1,6 @@
 'use client'
 
+import BodyPortal from '@/components/ui/BodyPortal'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
@@ -27,6 +28,7 @@ export default function TakingShape({
   turnstileToken,
   draftId,
   tone,
+  shape,
   onBack,
   onDone,
 }: {
@@ -35,6 +37,8 @@ export default function TakingShape({
   /** Set for a re-run on an owned draft («Otra versión»); absent for a first generation. */
   draftId?: string
   tone?: string
+  /** The business shape the merchant picked for a re-run (business-infrastructure D3); absent = the model decides. */
+  shape?: string
   onBack: () => void
   /** Overrides the default navigation to the owner canvas (used when «Otra versión» runs in place). */
   onDone?: (result: { draftId: string; versionsLeft: number }) => void
@@ -48,7 +52,7 @@ export default function TakingShape({
     if (started.current) return
     started.current = true
     void runDraftRequest(
-      { turnstile_token: turnstileToken, ...(description ? { description } : {}), ...(draftId ? { draft_id: draftId } : {}), ...(tone ? { tone } : {}) },
+      { turnstile_token: turnstileToken, ...(description ? { description } : {}), ...(draftId ? { draft_id: draftId } : {}), ...(tone ? { tone } : {}), ...(shape ? { shape } : {}) },
       (event) =>
         setBlocks((prev) => ({
           ...prev,
@@ -70,7 +74,8 @@ export default function TakingShape({
   const view = draftView(draftId ?? 'nuevo', blocks)
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto" style={{ background: 'var(--bg)' }} data-testid="p2s-taking-shape">
+    <BodyPortal>
+    <div className="fixed inset-0 overflow-y-auto" style={{ zIndex: 'var(--z-overlay)', background: 'var(--bg)' }} data-testid="p2s-taking-shape">
       <div className="max-w-2xl mx-auto px-4 pt-6 pb-4">
         <h2 className="t-h3" style={{ letterSpacing: 0, marginBottom: 'var(--s-3)' }}>{SHAPING_COPY.title}</h2>
         <ul role="status" aria-live="polite" className="grid gap-1.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -96,5 +101,6 @@ export default function TakingShape({
       </div>
       <ShopCanvas view={view} mode="shaping" />
     </div>
+    </BodyPortal>
   )
 }

@@ -40,10 +40,12 @@ test.describe('the root leads with the shop, not the marketplace', () => {
     // token would print "{subdomainYearly}" to a merchant.
     const proof = anchor.proofPoints.map((p) => p.body).join('\n')
     expect(proof).not.toMatch(/\{\w+\}/)
-    expect(proof).toMatch(/\$[\d,]+ MXN al año/)
+    // plans-gratis-negocio (D11): no retired subdomain/domain price is quoted on the proof points.
+    expect(proof).not.toMatch(/MXN al año/)
     expect(anchor.pricingCallout?.body).not.toMatch(/\{\w+\}/)
     expect(anchor.pricingCallout?.body).toMatch(/0% de comisión/)
-    expect(anchor.pricingCallout?.body).toMatch(/\$[\d,]+ MXN al año/)
+    // The callout names Negocio's monthly price, filled from lib/negocio-pricing.ts (plans-gratis-negocio D16).
+    expect(anchor.pricingCallout?.body).toMatch(/\$[\d,]+ MXN al mes/)
     expect(anchor.pricingCallout?.cta.href).toBe('/mx/precios')
   })
 

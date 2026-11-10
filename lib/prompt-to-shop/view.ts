@@ -10,6 +10,7 @@
  * never to made-up content: the taking-shape screen is this same view with fewer blocks filled in.
  */
 
+import type { NumbersBlock } from './numbers'
 import { readableTextOn } from '../platform-theme'
 import { resolveTheme } from '../shop-presentation/theme'
 import type { ResolvedTheme } from '../shop-presentation/types'
@@ -24,6 +25,11 @@ export interface DraftBlocks {
   identity: IdentityBlock | null
   words: WordsBlock | null
   catalog: ExampleRow[] | null
+  /**
+   * «Tus números» (business-infrastructure D5). Optional: drafts written before the block existed have no column value,
+   * and a draft is "landed" on identity + words + catalog — the numbers never hold back the keep.
+   */
+  numbers?: NumbersBlock | null
   block_status: Partial<Record<BlockKey, BlockStatus>>
 }
 
@@ -124,11 +130,12 @@ export function draftView(draftId: string, draft: DraftBlocks): CanvasView {
     about: words?.about ?? null,
     announcement: words?.announcement ?? null,
     cards: catalog ? exampleCards(catalog) : null,
-    pending: { identity: !identity, words: !words, catalog: !catalog },
+    pending: { identity: !identity, words: !words, catalog: !catalog, numbers: !draft.numbers },
     fallback: {
       identity: !!identity && status.identity === 'fallback',
       words: !!words && status.words === 'fallback',
       catalog: !!catalog && status.catalog === 'fallback',
+      numbers: !!draft.numbers && status.numbers === 'fallback',
     },
   }
 }

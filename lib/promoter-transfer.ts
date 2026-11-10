@@ -28,7 +28,11 @@
 
 import { computeCommissionCents } from '@/lib/promoter-commission'
 
-export const TRANSFER_SKUS = ['custom_domain', 'subdomain', 'ml_sync', 'migration'] as const
+export const TRANSFER_SKUS = [
+  'custom_domain', 'subdomain', 'ml_sync', 'migration',
+  // plans-gratis-negocio S4 (D12): the three packages, settled at source by transfer (M1 widened the DB CHECK).
+  'negocio_anual', 'negocio_arranque', 'setup_gratis',
+] as const
 export type TransferSku = (typeof TRANSFER_SKUS)[number]
 
 /** Narrow an untrusted value to a known TransferSku. */
@@ -102,6 +106,10 @@ export const SKU_GRANT_KEYS: Record<TransferSku, string> = {
   subdomain: 'subdomain_grant',
   ml_sync: 'ml_sync_grant',
   migration: 'migration_grant',
+  // The packages grant Negocio through `applyNegocioPayment` (lib/negocio-webhook.ts), not a per-SKU key.
+  negocio_anual: 'negocio_grant',
+  negocio_arranque: 'negocio_grant',
+  setup_gratis: '',
 }
 
 /** es-MX display label per SKU — for transfer-approval/rejection email subjects. */
@@ -110,6 +118,9 @@ export const TRANSFER_SKU_LABEL: Record<TransferSku, string> = {
   subdomain: 'Subdominio propio',
   ml_sync: 'Sincronización Mercado Libre',
   migration: 'Migración de tienda',
+  negocio_anual: 'Plan Negocio · 1 año (tienda lista + 12 meses)',
+  negocio_arranque: 'Plan Negocio · 3 meses (tienda lista + 3 meses)',
+  setup_gratis: 'Plan Gratis · tienda lista',
 }
 
 // ── Transfer-details completeness (the "never a dead-end destination" guard) ──

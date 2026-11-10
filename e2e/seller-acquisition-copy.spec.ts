@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { sellerTrustPrompt } from '../lib/seller-acquisition'
-import { fillFixedPricingTokens } from '../lib/pricing-catalog'
-import { SUBDOMAIN_PRICE_YEARLY_MXN } from '../lib/subdomain-pricing'
 import { buildPromoterPageConfig } from '../app/(shell)/mx/vende/_components/page-config'
 
 // Locked es-MX copy from COPY-BRIEF.md (Sprint 1, approved 2026-06-25). These guards keep the
@@ -138,20 +136,33 @@ test.describe('promoter landing · CTA + wording sweep (promoter-funnel-v2 S1 ·
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fullCopy = sa as any
 
-  test('no stale "subdomain is free for everyone" claim remains in the glossary', () => {
-    const subdomainEntry = promoterCopy.glossary.find((g: { title: string }) => g.title === 'Subdominio')
-    expect(subdomainEntry.body).not.toContain('gratis para todos')
-    // The price is a `{token}` since pricing-page D8 — assert on what the page renders, filled
-    // from the price module, so the check still proves a real price reaches the merchant.
-    expect(fillFixedPricingTokens(subdomainEntry.body, 'es')).toContain(`$${SUBDOMAIN_PRICE_YEARLY_MXN} MXN`)
-    expect(subdomainEntry.body).not.toMatch(/\$\d/)
-    expect(subdomainEntry.body).toContain('GRATIS el primer año')
+  test('the promoter page sells only the three options, each with its money in plain words (Daniel, 2026-11-05)', () => {
+    const rates = { custom_domain: 0, print_ad: 0, subdomain: 0, ml_sync: 0, migration: 0, negocio_anual: 55, negocio_arranque: 50, setup_gratis: 80, negocio_renewal: 10 }
+    const config = buildPromoterPageConfig(fullCopy, { customDomainPriceMxn: 499, enabled: true, commissionRates: rates })
+    expect(config.proofPoints.map((p) => p.title)).toEqual(['Plan Negocio · 1 año', 'Plan Negocio · 3 meses', 'Plan Gratis · tienda lista'])
+    expect(config.proofPoints[0].body).toContain('Cobras $2,000. Le pasas $900 a Miyagi Sánchez. Te quedas $1,100.')
+    // The retired single products and the printed ad are gone, and so is the old "your code is a discount" claim.
+    const words = JSON.stringify(promoterCopy)
+    for (const gone of ['Anuncio impreso', 'Subdominio', 'descuento', 'Muy pronto']) expect(words).not.toContain(gone)
+    // The renewal share is a stat read from the live rate, never typed.
+    expect(config.socialStats.map((s) => s.value)).toContain('10%')
+  })
+
+  test('no "cerrar / cierre" vocabulary on the promoter page, the guide or the migration guide (Daniel, 2026-11-05)', () => {
+    // The workspace URL /promotor/cerrar is the only allowed occurrence: it is an address, not a word a promoter reads.
+    const words = JSON.stringify([promoterCopy, fullCopy.promotorMigracion]).replaceAll('/promotor/cerrar', '/promotor/[panel]')
+    expect(words).not.toMatch(/cerrar|cierre|cierra/i)
+  })
+
+  test('the 1-year option never promises to BUY a domain: a domain the merchant has is connected', () => {
+    expect(promoterCopy.guide.say.negocio_anual).toContain('Si tienes un dominio')
+    expect(promoterCopy.guide.say.negocio_anual).not.toMatch(/[Ii]ncluye tu propio dominio/)
   })
 
   test('a not-yet-bound visitor gets the apply CTA, never the dead-ended workspace CTA', () => {
     const config = buildPromoterPageConfig(fullCopy, { customDomainPriceMxn: 499, enabled: true, isBoundPromoter: false })
-    expect(config.primaryCta?.label).toBe('Aplica para ser promotor')
-    expect(config.primaryCta?.label).not.toBe('Abrir mi panel para cerrar')
+    expect(config.primaryCta?.label).toBe('Quiero ser promotor')
+    expect(config.primaryCta?.label).not.toBe('Abrir mi panel')
     // Never a dead link: the apply CTA anchors to the on-page teaser, not a route.
     expect(config.primaryCta?.href).toBe('#promotor-aplica')
     expect(config.applyTeaser?.id).toBe('promotor-aplica')
@@ -159,7 +170,7 @@ test.describe('promoter landing · CTA + wording sweep (promoter-funnel-v2 S1 ·
 
   test('a bound promoter keeps the real close-workspace CTA', () => {
     const config = buildPromoterPageConfig(fullCopy, { customDomainPriceMxn: 499, enabled: true, isBoundPromoter: true })
-    expect(config.primaryCta?.label).toBe('Abrir mi panel para cerrar')
+    expect(config.primaryCta?.label).toBe('Abrir mi panel')
     expect(config.primaryCta?.href).toBe('/promotor/cerrar')
     expect(config.applyTeaser).toBeUndefined()
   })

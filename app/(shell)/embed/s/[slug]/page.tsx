@@ -21,11 +21,15 @@ import { notFound } from 'next/navigation'
 import { getShop, getShopListings, formatPrice } from '@/lib/listings'
 import { assertShopNotPreviewPrivate, isShopPreviewPrivateBySlug } from '@/lib/preview-access'
 import ChannelLayout from '@/app/(shell)/s/[slug]/ChannelLayout'
+import { shopShowsBadge } from '@/lib/plan-badge-server'
+import { badgeHref } from '@/lib/plan'
 import TrustSignals from '@/app/components/TrustSignals'
 import { deriveShopTrustInputs } from '@/lib/trust-inputs'
 import { listingUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 import type { Metadata } from 'next'
+import ShopChat from '@/components/shop-chat/ShopChat'
+import { isShopClaimed } from '@/lib/claim'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
@@ -75,6 +79,9 @@ export default async function EmbedShopPage({
       accentColor={accent}
       logoUrl={shop.logo_url ?? null}
       domain=""
+      // The Gratis badge (plans-gratis-negocio D7) — the embed is a white-label surface too.
+      showBadge={await shopShowsBadge(shop.slug)}
+      badgeHref={badgeHref(shop.slug)}
       trust={
         // Epic D / D.2 — the embed shell carries the same platform-assurance strip.
         // paymentProtected suppressed (the shell's lead line carries that assurance).
@@ -138,6 +145,8 @@ export default async function EmbedShopPage({
           )}
         </div>
       </div>
+      {/* The shop's chat inside the embed too (business-infrastructure D15); claimed shops only. */}
+      {isShopClaimed(shop) ? <ShopChat slug={shop.slug} shopName={shop.name} siteKey={process.env.TURNSTILE_SITE_KEY || null} bottomOffset={16} /> : null}
     </ChannelLayout>
   )
 }

@@ -48,7 +48,8 @@ export type NotifyEvent = {
   // reads `title`/`body`/`url`/`tag` generically), so this widening is a
   // zero-blast-radius change to every existing caller.
   // 'onboarding_nudge' (prompt-to-shop S5.4): the day 1/3/7 reminder to finish a shop. Additive, like the one above.
-  kind: 'new_message' | 'offer' | 'order' | 'portfolio_reminder' | 'onboarding_nudge'
+  // 'business_checkin' (business-infrastructure S3.4): the monthly «Tu plan» check-in. Additive, like the two above.
+  kind: 'new_message' | 'offer' | 'order' | 'portfolio_reminder' | 'onboarding_nudge' | 'business_checkin'
   title: string
   body: string
   url: string

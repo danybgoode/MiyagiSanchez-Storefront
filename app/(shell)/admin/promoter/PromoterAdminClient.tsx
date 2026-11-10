@@ -33,6 +33,10 @@ const SKU_LABEL: Record<PromoterSku, string> = {
   subdomain: 'Subdominio propio',
   ml_sync: 'Sincronización Mercado Libre',
   migration: 'Migración de tienda',
+  negocio_anual: 'Plan Negocio · 1 año (tienda lista + 12 meses)',
+  negocio_arranque: 'Plan Negocio · 3 meses (tienda lista + 3 meses)',
+  setup_gratis: 'Plan Gratis · tienda lista',
+  negocio_renewal: 'Renovación del Plan Negocio (año 2)',
 }
 
 /**
@@ -468,7 +472,7 @@ export default function PromoterAdminClient({
           <button
             onClick={createPromoter}
             disabled={creating}
-            className="bg-[var(--color-accent)] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            className="btn btn-primary"
           >
             {creating ? 'Creando…' : 'Crear promotor'}
           </button>
@@ -518,7 +522,7 @@ export default function PromoterAdminClient({
                     <button
                       onClick={() => decide(a.id, 'approve')}
                       disabled={decidingId === a.id}
-                      className="rounded-lg bg-[var(--color-accent)] text-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
+                      className="btn btn-primary btn-sm"
                     >
                       {decidingId === a.id ? 'Procesando…' : 'Aprobar'}
                     </button>
@@ -530,7 +534,7 @@ export default function PromoterAdminClient({
                     <button
                       onClick={() => decide(a.id, 'reject')}
                       disabled={decidingId === a.id}
-                      className="rounded-lg border border-[var(--color-border)] px-3 py-1 text-sm font-semibold hover:bg-[var(--color-surface)] disabled:opacity-50"
+                      className="btn btn-secondary btn-sm"
                     >
                       Rechazar
                     </button>
@@ -540,7 +544,7 @@ export default function PromoterAdminClient({
                   <button
                     onClick={() => resendInvitation(a.id)}
                     disabled={resendingId === a.id}
-                    className="rounded-lg border border-[var(--color-border)] px-3 py-1 text-sm font-semibold hover:bg-[var(--color-surface)] disabled:opacity-50"
+                    className="btn btn-secondary btn-sm"
                   >
                     {resendingId === a.id ? 'Rotando…' : 'Rotar y reenviar invitación'}
                   </button>
@@ -568,13 +572,13 @@ export default function PromoterAdminClient({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => toggleAttributions(p.id)}
-                      className="text-sm rounded-lg border border-[var(--color-border)] px-3 py-1 hover:bg-[var(--color-surface)]"
+                      className="btn btn-secondary btn-sm"
                     >
                       {openId === p.id ? 'Ocultar' : 'Atribuciones'}
                     </button>
                     <button
                       onClick={() => copy(p.code)}
-                      className="text-sm rounded-lg border border-[var(--color-border)] px-3 py-1 hover:bg-[var(--color-surface)]"
+                      className="btn btn-secondary btn-sm"
                     >
                       {copied === p.code ? 'Copiado' : 'Copiar liga'}
                     </button>
@@ -647,7 +651,7 @@ export default function PromoterAdminClient({
           <button
             onClick={saveSettings}
             disabled={savingSettings}
-            className="bg-[var(--color-accent)] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            className="btn btn-primary"
           >
             {savingSettings ? 'Guardando…' : 'Guardar descuento'}
           </button>
@@ -684,7 +688,7 @@ export default function PromoterAdminClient({
         <button
           onClick={saveSettings}
           disabled={savingSettings}
-          className="rounded-lg bg-[var(--color-accent)] text-white px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className="btn btn-primary"
         >
           {savingSettings ? 'Guardando…' : 'Guardar datos de transferencia'}
         </button>
@@ -727,7 +731,7 @@ export default function PromoterAdminClient({
                 <button
                   onClick={() => savePrice(sku)}
                   disabled={savingPrice === sku || priceDisabled}
-                  className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold hover:bg-[var(--color-surface)] disabled:opacity-50"
+                  className="btn btn-secondary"
                 >
                   {savingPrice === sku ? 'Guardando…' : 'Guardar'}
                 </button>
@@ -772,7 +776,7 @@ export default function PromoterAdminClient({
           <button
             onClick={saveSettings}
             disabled={savingSettings}
-            className="rounded-lg bg-[var(--color-accent)] text-white px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            className="btn btn-primary"
           >
             {savingSettings ? 'Guardando…' : 'Guardar paquete'}
           </button>
@@ -826,7 +830,7 @@ export default function PromoterAdminClient({
               <button
                 onClick={() => saveRate(sku)}
                 disabled={savingRate === sku}
-                className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold hover:bg-[var(--color-surface)] disabled:opacity-50"
+                className="btn btn-secondary"
               >
                 {savingRate === sku ? 'Guardando…' : 'Guardar'}
               </button>
@@ -865,7 +869,7 @@ export default function PromoterAdminClient({
                   <button
                     onClick={() => settle(c.id)}
                     disabled={settling === c.id}
-                    className="rounded-lg border border-[var(--color-border)] px-3 py-1 text-sm font-semibold hover:bg-[var(--color-surface)] disabled:opacity-50"
+                    className="btn btn-secondary btn-sm"
                   >
                     {settling === c.id ? 'Marcando…' : 'Marcar pagada'}
                   </button>
@@ -906,7 +910,7 @@ export default function PromoterAdminClient({
                   <button
                     onClick={() => decideTransfer(t.id, 'approve')}
                     disabled={decidingTransferId === t.id}
-                    className="rounded-lg bg-[var(--color-accent)] text-white px-3 py-1 text-sm font-semibold disabled:opacity-50"
+                    className="btn btn-primary btn-sm"
                   >
                     {decidingTransferId === t.id ? 'Procesando…' : 'Aprobar'}
                   </button>
@@ -920,7 +924,7 @@ export default function PromoterAdminClient({
                   <button
                     onClick={() => decideTransfer(t.id, 'reject')}
                     disabled={decidingTransferId === t.id}
-                    className="rounded-lg border border-[var(--color-border)] px-3 py-1 text-sm font-semibold hover:bg-[var(--color-surface)] disabled:opacity-50"
+                    className="btn btn-secondary btn-sm"
                   >
                     Rechazar
                   </button>

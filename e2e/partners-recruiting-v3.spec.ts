@@ -18,18 +18,18 @@ const PROMOTER_IDENTITY_BY_CLERK_ID_CONSUMERS = [
   'app/(shell)/promotor/cerrar/page.tsx',
   'app/(shell)/mx/vende/promotor/page.tsx',
   'app/api/promoter/claim/link/route.ts',
-  'app/api/promoter/close/domain/route.ts',
   'app/api/promoter/close/listing/route.ts',
   'app/api/promoter/close/migration/route.ts',
-  'app/api/promoter/close/ml-sync/route.ts',
-  'app/api/promoter/close/print/route.ts',
-  'app/api/promoter/close/subdomain/route.ts',
+  'app/api/promoter/close/package/[sku]/route.ts',
+  'app/api/promoter/close/photo/route.ts',
+  'app/api/promoter/close/receipt/route.ts', // promoter-panel S4: the merchant's receipt
+  // close/print and rate-card are retired (410, no printed ads since 2026-11-05): they read no identity at all.
   'app/api/promoter/close/transfer/[id]/report/route.ts',
   'app/api/promoter/close/transfer/route.ts',
   'app/api/promoter/preview/activate/route.ts',
   'app/api/promoter/preview/route.ts',
-  'app/api/promoter/rate-card/route.ts',
   'app/api/promoter/shop/setup/route.ts',
+  'lib/promoter-import-server.ts', // promoter-panel S1: the import routes' shared preamble
 ] as const
 const PARTNER_IDENTITY_BY_ID_CONSUMERS = [
   'lib/portfolio/partner-portfolio-auth.ts',
@@ -39,6 +39,10 @@ const PROMOTER_IDENTITY_BY_ID_CONSUMERS = [
   'app/api/admin/promoter/transfers/[id]/reject/route.ts',
   'lib/promoter-close-notify.ts',
 ] as const
+// Not a resolver consumer, on purpose: lib/promoter-receipt-read.ts reads only `name, code` of the promoter id inside a
+// SIGNED receipt token (minted for a promoter-track identity by /api/promoter/close/receipt), with no track filter, so
+// a promoter later moved to another track does not turn every receipt they issued into a 404 (pr-reviewer, #483).
+// It grants nothing and computes no economics.
 
 function sourceFilesBelow(relativeDirectory: string): string[] {
   const found: string[] = []

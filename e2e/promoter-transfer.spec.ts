@@ -28,8 +28,8 @@ import {
  */
 
 test.describe('promoter-transfer · SKU + method narrowing', () => {
-  test('TRANSFER_SKUS is exactly the 4 close-workspace SKUs (print_ad excluded — Sprint 5 scope)', () => {
-    expect(TRANSFER_SKUS).toEqual(['custom_domain', 'subdomain', 'ml_sync', 'migration'])
+  test('TRANSFER_SKUS is exactly the close-workspace SKUs plus the three packages (print_ad excluded)', () => {
+    expect(TRANSFER_SKUS).toEqual(['custom_domain', 'subdomain', 'ml_sync', 'migration', 'negocio_anual', 'negocio_arranque', 'setup_gratis'])
   })
 
   test('isTransferSku narrows correctly', () => {
@@ -103,12 +103,16 @@ test.describe('promoter-transfer · remittance state machine (canTransitionTrans
 })
 
 test.describe('promoter-transfer · per-SKU activation mapping (SKU_GRANT_KEYS)', () => {
-  test('covers exactly the 4 in-scope SKUs, matching the existing entitlement-reader keys', () => {
+  test('covers every transfer SKU, matching the existing entitlement-reader keys', () => {
     expect(SKU_GRANT_KEYS).toEqual({
       custom_domain: 'custom_domain_grant',
       subdomain: 'subdomain_grant',
       ml_sync: 'ml_sync_grant',
       migration: 'migration_grant',
+      // The packages grant Negocio through applyNegocioPayment; the free setup grants nothing.
+      negocio_anual: 'negocio_grant',
+      negocio_arranque: 'negocio_grant',
+      setup_gratis: '',
     })
   })
 
@@ -139,19 +143,20 @@ test.describe('promoter-transfer · transfer-details completeness (hasRequiredTr
 })
 
 test.describe('promoter-transfer · route guards (flag-agnostic — asserted in both states)', () => {
-  test('POST /api/promoter/close/domain with paymentMethod:transfer → 404 (hidden) or 401 (auth required)', async ({ request }) => {
+  // The single-product closes are retired (the packages replaced them): hidden (404) or retired (410), never a transfer.
+  test('POST /api/promoter/close/domain with paymentMethod:transfer → 410 (retired)', async ({ request }) => {
     const res = await request.post('/api/promoter/close/domain', { data: { paymentMethod: 'transfer', transferMethod: 'spei' } })
-    expect([401, 404]).toContain(res.status())
+    expect(res.status()).toBe(410)
   })
 
-  test('POST /api/promoter/close/subdomain with paymentMethod:transfer → 404 (hidden) or 401 (auth required)', async ({ request }) => {
+  test('POST /api/promoter/close/subdomain with paymentMethod:transfer → 410 (retired)', async ({ request }) => {
     const res = await request.post('/api/promoter/close/subdomain', { data: { paymentMethod: 'transfer', transferMethod: 'dimo' } })
-    expect([401, 404]).toContain(res.status())
+    expect(res.status()).toBe(410)
   })
 
-  test('POST /api/promoter/close/ml-sync with paymentMethod:transfer → 404 (hidden) or 401 (auth required)', async ({ request }) => {
+  test('POST /api/promoter/close/ml-sync with paymentMethod:transfer → 410 (retired)', async ({ request }) => {
     const res = await request.post('/api/promoter/close/ml-sync', { data: { paymentMethod: 'transfer', transferMethod: 'codi' } })
-    expect([401, 404]).toContain(res.status())
+    expect(res.status()).toBe(410)
   })
 
   test('GET /api/promoter/close/transfer → 404 (hidden) or 401 (auth required)', async ({ request }) => {

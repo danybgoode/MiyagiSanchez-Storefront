@@ -32,24 +32,15 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
-import { revalidateTag } from 'next/cache'
 import { checkRateLimit, getClientIp } from '@/lib/ratelimit'
 import { isEnabled } from '@/lib/flags'
 import { getPromoterByClerkId } from '@/lib/promoter'
 import { resolveTargetShop } from '@/lib/promoter-server'
-import { createSellerProductViaInternal } from '@/lib/seller-products'
-import { syncSupabaseListingMirror } from '@/lib/provisioning'
+import { promoterShopEditAccess } from '@/lib/promoter-shop-access'
+import { shopEditRefusal } from '@/lib/promoter-close'
 import { CATALOG_CATEGORY_KEYS } from '@/lib/catalog-import'
-import {
-  ensureShopPreviewReportingCreation,
-  getPreviewByShop,
-  canAnchorPreview,
-  shopMustStayPrivate,
-  shopHasPublicListings,
-} from '@/lib/preview-access'
-import { invalidateIfMaterialChange } from '@/lib/preview-consent'
-import { emitPreviewEvent } from '@/lib/preview-lifecycle'
 import { normalizePromoterListingContract, optionalTrimmedText } from '@/lib/promoter-listing-contract'
+import { afterPromoterProductsAdded, createPromoterProduct, resolvePromoterListingStatus } from '@/lib/promoter-listing-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -108,146 +99,33 @@ export async function POST(req: NextRequest) {
 
   const shop = await resolveTargetShop({ shopId: body.shopId, slug: body.slug })
   if (!shop) return NextResponse.json({ ok: false, error: 'Tienda no encontrada.' }, { status: 404 })
+  // Only a shop this promoter opened (or holds a relationship for) that nobody has claimed (promoter-panel D1). Before
+  // this, any promoter account could add a product to any merchant's live shop (pr-reviewer, #475).
+  const refusal = shopEditRefusal(await promoterShopEditAccess({ promoter, shop }))
+  if (refusal) return NextResponse.json({ ok: false, error: refusal.error }, { status: refusal.status })
 
-  // Consent-safe preview: when ON *and this promoter may anchor this shop*, create
-  // the listing PRIVATE (Medusa draft + mirror 'draft'). Otherwise publish as
-  // before — EXCEPT for a shop that already carries a non-activated anchor, which
-  // stays private regardless of the flag or the caller (see below). So flag-OFF is
-  // today's behavior for every shop that was never anchored, not for all shops.
-  //
-  // `canAnchorPreview` is load-bearing here, not just on the preview route: an
-  // anchor hides the storefront, so anchoring a shop this promoter didn't create —
-  // or a CLAIMED shop that's already trading — would take a live merchant down.
-  // A promoter adding a listing to someone else's live shop therefore keeps the
-  // old publish behavior rather than silently going private.
-  //
-  // The ANCHOR is authoritative, ahead of the flag and ahead of who is calling: a
-  // shop already awaiting its merchant's consent must never receive a published
-  // product — not during a flag-store outage (the enablement flag falls open to
-  // `false`, which would force-publish), and not because a DIFFERENT promoter is
-  // the one adding the listing (`canAnchorPreview` is false for them, which must
-  // mean "you may not anchor", never "publish freely into it").
-  const alreadyPrivate = await shopMustStayPrivate(shop.id)
-
-  let privatePreview =
-    alreadyPrivate ||
-    ((await isEnabled('promoter.private_preview_enabled')) && canAnchorPreview(shop, promoter.code))
-
-  // Only the shop's own promoter may CREATE the anchor; an existing one is
-  // honored no matter who is calling. Creating one also requires that the shop
-  // isn't ALREADY publicly trading — anchoring a shop with live listings would
-  // hide a working storefront (locked decision #4: existing public/unclaimed
-  // shops are audited, not mutated). The whole pre-epic promoter-close install
-  // base has that shape.
-  if (privatePreview && !alreadyPrivate && (await shopHasPublicListings(shop.id))) {
-    privatePreview = false
-  } else if (privatePreview && !alreadyPrivate) {
-    // Anchor BEFORE creating the product, so a failed anchor costs nothing. (The
-    // shop-setup path already anchored at shop creation, so this is normally a
-    // no-op read.) Anchoring first is safe precisely because this shop is
-    // promoter-created and unclaimed: an anchor on a product-less shop of that
-    // kind is the correct state, not a stranded one — whereas creating the
-    // product first would leave an untracked draft that a retry duplicates.
-    const anchored = await ensureShopPreviewReportingCreation(shop.id, user.id)
-    if (!anchored.preview) {
-      return NextResponse.json(
-        { ok: false, error: 'No se pudo preparar la vista previa privada. Inténtalo de nuevo.' },
-        { status: 500 },
-      )
-    }
-    // Lifecycle telemetry (S3.1) — only for a genuinely new anchor, after the
-    // canonical write. Never fails the listing.
-    if (anchored.created) {
-      await emitPreviewEvent('preview_created', {
-        shopId: shop.id,
-        previewId: anchored.preview.id,
-        version: anchored.preview.currentVersion,
-      })
-    }
-    // An ALREADY-ACTIVATED shop is public and out of the consent flow — creating a
-    // hidden draft against it would strand a product nobody can see and mint a
-    // preview link that always 404s. Fall back to the ordinary publish path.
-    if (anchored.preview.status === 'activated') privatePreview = false
-  }
-
-  const listingStatus: 'published' | 'draft' = privatePreview ? 'draft' : 'published'
-  const mirrorStatus = privatePreview ? 'draft' : 'active'
+  // Private (a preview draft the merchant approves) or published — the same rule for typed and imported products
+  // (lib/promoter-listing-server.ts, moved here unchanged from this route).
+  const status = await resolvePromoterListingStatus({ shop, promoterCode: promoter.code, clerkUserId: user.id })
+  if (!status.ok) return NextResponse.json({ ok: false, error: status.error }, { status: status.status })
+  const { privatePreview } = status
 
   const { currency, priceCents, quantity } = normalizePromoterListingContract(body)
-  const description = optionalTrimmedText(body.description)
-  const sourceUrl = optionalTrimmedText(body.source_url)
-  const sourcePlatform = optionalTrimmedText(body.source_platform)
-  const images = Array.isArray(body.images) ? body.images.slice(0, 6) : []
-  const locationDetail = (shop.metadata.location_detail ?? null) as
-    | { estado?: string | null; municipio?: string | null }
-    | null
-
-  const result = await createSellerProductViaInternal(shop.slug, {
+  const created = await createPromoterProduct(shop, privatePreview, {
     title,
-    description,
+    description: optionalTrimmedText(body.description),
     category,
-    price_cents: priceCents,
+    priceCents,
     currency,
-    condition: body.condition?.trim() || null,
-    listing_type: 'product',
-    state: locationDetail?.estado ?? null,
-    municipio: locationDetail?.municipio ?? null,
     quantity,
-    metadata: {
-      ...(sourceUrl ? { source_url: sourceUrl } : {}),
-      ...(sourcePlatform ? { source_platform: sourcePlatform } : {}),
-      acquisition: { motion: 'claim_shop_preview' },
-    },
-    // Force-published (flag OFF) or private draft (flag ON) — see file header.
-    // Never gated by listingActivationBlock either way.
-    status: listingStatus,
-    images,
-  })
-  if (!result.ok || !result.product_id) {
-    return NextResponse.json({ ok: false, error: result.error ?? 'No se pudo crear el anuncio.' }, { status: 502 })
-  }
-
-  await syncSupabaseListingMirror(shop.id, {
-    id: result.product_id,
-    title,
-    description,
-    category,
-    price_cents: priceCents,
-    currency,
     condition: body.condition?.trim() || null,
-    listing_type: 'product',
-    state: locationDetail?.estado ?? null,
-    municipio: locationDetail?.municipio ?? null,
-    images,
-    status: mirrorStatus,
-    ...(sourceUrl ? { source_url: sourceUrl } : {}),
-    ...(sourcePlatform ? { source_platform: sourcePlatform } : {}),
+    images: Array.isArray(body.images) ? body.images.slice(0, 6) : [],
+    // Provenance stays accepted from API callers; the panel no longer sends it (promoter-panel D7).
+    sourceUrl: optionalTrimmedText(body.source_url),
+    sourcePlatform: optionalTrimmedText(body.source_platform),
   })
+  if (!created.ok) return NextResponse.json({ ok: false, error: created.error }, { status: 502 })
 
-  // Consent-safe previews (S2.2) — adding a product is a MATERIAL change: the set
-  // the merchant reviewed is no longer what would be published. If this shop had a
-  // current approval, it is now stale, so invalidate it and return the preview to
-  // review. Idempotent + safe: only touches an anchor whose approved snapshot no
-  // longer matches (a shop with no approval, or one that didn't materially change,
-  // is left completely alone). Best-effort — a telemetry-grade step that must never
-  // fail the listing write that already succeeded.
-  if (privatePreview) {
-    const pv = await getPreviewByShop(shop.id)
-    if (pv) {
-      const outcome = await invalidateIfMaterialChange(pv).catch(() => ({ invalidated: false, reasons: [] }))
-      // Lifecycle telemetry (S3.1) — only when consent actually went stale.
-      if (outcome.invalidated) {
-        await emitPreviewEvent('preview_invalidated', {
-          shopId: shop.id,
-          previewId: pv.id,
-          version: pv.currentVersion,
-        })
-      }
-    }
-  }
-
-  revalidateTag('listings', 'default')
-  revalidateTag('shops', 'default')
-
-  return NextResponse.json({ ok: true, productId: result.product_id, private: privatePreview })
+  await afterPromoterProductsAdded(shop.id, privatePreview)
+  return NextResponse.json({ ok: true, productId: created.productId, private: privatePreview })
 }

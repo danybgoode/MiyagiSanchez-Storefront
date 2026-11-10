@@ -39,21 +39,21 @@ import type { SellerLocale } from './seller-locale'
  */
 const NAV_LABELS = {
   es: {
-    operar: 'Operar', resumen: 'Resumen', pedidos: 'Pedidos', ofertas: 'Ofertas', venderEnPersona: 'Vender en persona', cobrarConLink: 'Cobrar con un link',
+    operar: 'Operar', resumen: 'Resumen', pedidos: 'Pedidos', ofertas: 'Ofertas', preguntas: 'Preguntas', venderEnPersona: 'Vender en persona', cobrarConLink: 'Cobrar con un link',
     catalogo: 'Catálogo', anuncios: 'Anuncios', colecciones: 'Colecciones',
     canales: 'Canales', mercadoLibre: 'Mercado Libre', importar: 'Importar catálogo',
     crecer: 'Crecer', cupones: 'Cupones', suscripciones: 'Suscripciones',
     contenido: 'Contenido', eventos: 'Eventos', sorteos: 'Sorteos',
-    analiticas: 'Analíticas', ganancias: 'Ganancias', configuracion: 'Configuración',
+    analiticas: 'Analíticas', ganancias: 'Ganancias', tuPlan: 'Tu plan', tuSuscripcion: 'Tu suscripción', configuracion: 'Configuración',
     miTienda: 'Mi tienda',
   },
   en: {
-    operar: 'Operate', resumen: 'Overview', pedidos: 'Orders', ofertas: 'Offers', venderEnPersona: 'Sell in person', cobrarConLink: 'Charge with a link',
+    operar: 'Operate', resumen: 'Overview', pedidos: 'Orders', ofertas: 'Offers', preguntas: 'Questions', venderEnPersona: 'Sell in person', cobrarConLink: 'Charge with a link',
     catalogo: 'Catalog', anuncios: 'Listings', colecciones: 'Collections',
     canales: 'Channels', mercadoLibre: 'Mercado Libre', importar: 'Import catalog',
     crecer: 'Grow', cupones: 'Coupons', suscripciones: 'Subscriptions',
     contenido: 'Content', eventos: 'Events', sorteos: 'Giveaways',
-    analiticas: 'Analytics', ganancias: 'Earnings', configuracion: 'Settings',
+    analiticas: 'Analytics', ganancias: 'Earnings', tuPlan: 'Your plan', tuSuscripcion: 'Your subscription', configuracion: 'Settings',
     miTienda: 'My shop',
   },
 } as const
@@ -140,6 +140,8 @@ export const SELLER_NAV: SellerNavGroup[] = [
       { key: 'resumen', label: 'Resumen', href: '/shop/manage', icon: 'iconoir-dashboard-dots' },
       { key: 'pedidos', label: 'Pedidos', href: '/shop/manage/orders', icon: 'iconoir-package' },
       { key: 'ofertas', label: 'Ofertas', href: '/shop/manage/offers', icon: 'iconoir-hand-cash' },
+      // business-infrastructure S5: questions buyers left when the shop's chat did not know.
+      { key: 'preguntas', label: 'Preguntas', href: '/shop/manage/preguntas', icon: 'iconoir-chat-bubble' },
       // In-person sales S1.3: the counter. Appended LAST so the indices the mobile bar and
       // the "Más" sheet slice by (Resumen 0, Pedidos 1, Ofertas 2) do not move.
       { key: 'vender', label: 'Vender en persona', href: '/shop/manage/en-persona', icon: 'iconoir-smartphone-device' },
@@ -177,6 +179,12 @@ export const SELLER_NAV: SellerNavGroup[] = [
       // nav-side (catalog-management S5 · Story 5.1 — R13) so a seller never taps
       // into that 404 in the first place.
       { key: 'ganancias', label: 'Ganancias', href: '/shop/manage/profit', icon: 'iconoir-coins', flag: 'ops.profit_enabled' },
+      // business-infrastructure S2/S3: the shop's numbers and the plan built on them. Not flagged (WAYS-OF-WORKING:
+      // no new flags); it reads the profit ledger but works without it, naming what it could not read.
+      { key: 'plan', label: 'Tu plan', href: '/shop/manage/plan', icon: 'iconoir-stats-report' },
+      // plans-gratis-negocio S3.2 (D15): the billing page. «Tu plan» above is the business plan; this one is the
+      // shop's Gratis / Negocio subscription. Not flagged.
+      { key: 'suscripcion', label: 'Tu suscripción', href: '/shop/manage/negocio', icon: 'iconoir-credit-card' },
     ],
   },
   {
@@ -213,7 +221,7 @@ export const SELLER_NAV_MOBILE_PRIMARY: SellerNavEntry[] = [
  * guard, which asserts this against `SELLER_NAV` itself).
  */
 export const SELLER_NAV_MOBILE_OVERFLOW_GROUPS: SellerNavMobileOverflowGroup[] = [
-  { key: 'operar', label: 'Operar', entries: SELLER_NAV[0].entries.slice(2) }, // Ofertas, Vender en persona
+  { key: 'operar', label: 'Operar', entries: SELLER_NAV[0].entries.slice(2) }, // Ofertas, Preguntas, Vender en persona, Cobrar con un link
   { key: 'catalogo', label: 'Catálogo', entries: SELLER_NAV[1].entries.slice(1) }, // Colecciones, Canales, Mercado Libre, Importar catálogo
   { key: 'crecer', label: 'Crecer', entries: SELLER_NAV[2].entries, layout: 'grid' },
   { key: 'configuracion', label: 'Configuración', entries: SELLER_NAV[3].entries },

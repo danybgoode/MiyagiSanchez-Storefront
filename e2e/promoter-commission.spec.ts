@@ -44,7 +44,11 @@ test.describe('promoter-commission · rate validation (US-7)', () => {
   })
 
   test('defaults are 0% for every known SKU', () => {
-    expect(DEFAULT_COMMISSION_RATES).toEqual({ custom_domain: 0, print_ad: 0, subdomain: 0, ml_sync: 0, migration: 0 })
+    expect(DEFAULT_COMMISSION_RATES).toEqual({
+      custom_domain: 0, print_ad: 0, subdomain: 0, ml_sync: 0, migration: 0,
+      // plans-gratis-negocio S4: the packages and the renewal share (real rates are rows seeded by M1).
+      negocio_anual: 0, negocio_arranque: 0, setup_gratis: 0, negocio_renewal: 0,
+    })
   })
 })
 

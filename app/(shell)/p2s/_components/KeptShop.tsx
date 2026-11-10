@@ -1,5 +1,6 @@
 'use client'
 
+import type { BusinessShape } from '@/lib/business-shape'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -50,6 +51,7 @@ export default function KeptShop({
   market,
   chooser,
   correosAvailable,
+  shape,
 }: {
   view: CanvasView
   shopSlug: string | null
@@ -65,6 +67,8 @@ export default function KeptShop({
   /** The cobros / entregas switches as the shop row holds them. */
   chooser: ChooserState
   correosAvailable: boolean
+  /** What kind of business this is (business-infrastructure D1), from the kept draft's identity. */
+  shape: BusinessShape
 }) {
   const router = useRouter()
   const [sheet, setSheet] = useState<SheetState>(null)
@@ -93,7 +97,7 @@ export default function KeptShop({
     }
     setPublishing({ kind: 'idle' })
     // Funnel step 7 (S5.3): counted on the publish that succeeded, not on a later visit that finds the shop live.
-    trackFunnel('p2s_published', draftId, { published: result.published, live: result.live })
+    trackFunnel('p2s_published', draftId, { published: result.published, live: result.live, shape })
     setJustPublished(true)
     router.refresh()
   }
@@ -216,6 +220,7 @@ export default function KeptShop({
               market={market}
               initial={chooser}
               correosAvailable={correosAvailable}
+              shape={shape}
               draftId={draftId}
               onSaved={() => router.refresh()}
             />

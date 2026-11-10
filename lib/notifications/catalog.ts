@@ -110,6 +110,16 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     sender: 'sendP2sNudge', origin: 'lib/prompt-to-shop/nudges-server.ts', group: 'onboarding',
   },
   {
+    key: 'shop.business_checkin', trigger: 'El día 1 de cada mes (o en la primera semana si no se pudo leer): las ventas del mes pasado contra «Tu plan» y lo que más conviene hacer.',
+    from: 'platform', to: 'seller', channels: ['email', 'push', 'telegram'], domain: 'cuentas',
+    sender: 'sendBusinessCheckin', origin: 'lib/business-plan/checkin-server.ts', group: 'onboarding',
+  },
+  {
+    key: 'shop.negocio_trial_notice', trigger: 'Cinco días antes de que termine la prueba de Negocio de una tienda, y al terminar si no se pagó (una vez cada una).',
+    from: 'platform', to: 'seller', channels: ['email'], domain: 'cuentas',
+    sender: 'sendNegocioTrialNotice', origin: 'lib/negocio-trial-notices-server.ts', group: 'onboarding',
+  },
+  {
     key: 'shop.claimed_welcome', trigger: 'La tienda se vincula a una cuenta por primera vez.',
     from: 'platform', to: 'seller', channels: ['email'], domain: 'cuentas',
     sender: 'sendShopClaimedWelcome', origin: 'app/api/claim/complete/route.ts',
@@ -261,6 +271,16 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     trigger: 'Un admin redacta y envía un aviso operativo desde /admin/comunicaciones → Difusión.',
     from: 'admin', to: 'seller', channels: ['email'], domain: 'difusion',
     sender: 'sendPlatformBroadcast', origin: 'app/api/admin/comunicaciones/broadcast/route.ts',
+  },
+  {
+    key: 'mensajes.shop_question', trigger: 'Un comprador deja en el chat de la tienda una pregunta que el chat no pudo responder.',
+    from: 'buyer', to: 'seller', channels: ['email', 'push', 'telegram'], domain: 'mensajes',
+    sender: 'sendShopQuestionToOwner', origin: 'lib/shop-chat/handoff-server.ts', group: 'mensajes',
+  },
+  {
+    key: 'mensajes.shop_answer', trigger: 'La tienda responde, desde «Preguntas», una pregunta que un comprador dejó en su chat.',
+    from: 'seller', to: 'buyer', channels: ['email'], domain: 'mensajes',
+    sender: 'sendShopAnswerToBuyer', origin: 'lib/shop-chat/handoff-server.ts',
   },
   {
     key: 'mensajes.conversation_message',
@@ -504,6 +524,12 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     trigger: 'Un promotor cierra el alta de un comercio nuevo.',
     from: 'promoter', to: 'seller', channels: ['email'], domain: 'promoter',
     sender: 'sendMerchantCloseReceipt', origin: 'lib/promoter-close-notify.ts',
+  },
+  {
+    key: 'promoter.merchant_payment_receipt',
+    trigger: 'El promotor marca «Sí, ya me pagó»: el dueño recibe su recibo (también por WhatsApp, desde el teléfono del promotor).',
+    from: 'promoter', to: 'seller', channels: ['email'], domain: 'promoter',
+    sender: 'sendPromoterReceipt', origin: 'app/api/promoter/close/receipt/route.ts',
   },
   {
     key: 'promoter.preview_approval_code',

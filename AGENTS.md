@@ -8,9 +8,9 @@
 
 **Monorepo**:
 ```
-medusa-bonsai/
+miyagisanchez-product/
 ├── apps/backend/          ← Medusa v2 (the commerce engine — products, orders, payments, fulfillment)
-└── apps/miyagisanchez/    ← Next.js 16 (UI layer + UCP/MCP endpoints + non-commerce APIs)
+└── apps/storefront/    ← Next.js 16 (UI layer + UCP/MCP endpoints + non-commerce APIs)
 ```
 
 **Workflow (gitflow)**: work on a **feature branch** (`feat/<epic-slug>`), commit per story, open a **PR** with `gh`, and **merge to `main`** when verified + approved. **Production runs on the Oracle VM `panfleto-prod`** behind Cloudflare (epic `miyagi-to-oracle-vm`, cut over 2026-10-16; the GCP Cloud Run/Cloud Build rail is **deleted**). Merging to `main` builds the arm64 image (`.github/workflows/image-arm64.yml` → `ghcr.io/danybgoode/miyagisanchez-storefront:main`) but **deploys nothing by itself**: the deploy is `ssh -i ~/.ssh/panfleto_oci ubuntu@159.54.158.4 /opt/miyagi/infra/oci/update.sh` once the image build is green (root repo `infra/oci/`; it resolves `:main` to a digest, and a `*_PIN` line in `.env` rolls back). The backend works the same way. `cloudbuild.yaml` stays only as the build-args source of truth that `e2e/image-arm64-build-args.spec.ts` checks. Vercel is only the per-PR preview and CI target. Each frontend branch/PR still gets a **Vercel preview**, but CI runs the Playwright suites against it **only when the PR is labelled `e2e-preview`**: Vercel is the free Hobby plan, its Active CPU is shared by every project on the account, and CI on every push paused them all on 2026-10-30 (`.github/workflows/ci.yml` header). Never commit feature work straight to `main`. Roll back a bad merge with `git revert` on `main`.
@@ -121,7 +121,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 ```bash
 # Dev — run both services
 cd apps/backend && npx medusa dev           # Medusa backend on :9000
-cd apps/miyagisanchez && npm run dev        # Next.js frontend on :3001 (Turbopack)
+cd apps/storefront && npm run dev        # Next.js frontend on :3001 (Turbopack)
 
 # Type-check (frontend)
 npx tsc --noEmit
@@ -135,7 +135,7 @@ npm run build
 
 **Key env vars**:
 
-Frontend (`apps/miyagisanchez/.env.local`):
+Frontend (`apps/storefront/.env.local`):
 - `MEDUSA_STORE_URL` — Medusa backend URL (`http://localhost:9000` in dev)
 - `MEDUSA_PUBLISHABLE_KEY` — Medusa publishable API key (required for all Store API calls)
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`

@@ -10,7 +10,7 @@
  *
  *   - `app/api/promoter/relationship/route.ts`        — `PREFERRED_CHANNELS` (validator)
  *   - `lib/fundadoras-application.ts`                — `PREFERRED_CHANNELS` (validator)
- *   - `app/(shell)/promotor/cerrar/RelationshipStep.tsx` — labels, `email: 'Correo'`
+ *   - `app/(shell)/promotor/cerrar/NegocioStep.tsx` (promoter-panel, from `promotorPanel.negocio.channels`) — labels, `email: 'Correo'`
  *   - `lib/portfolio/resolver.ts`                    — labels, `email: 'Correo electrónico'`
  *
  * Two identical value arrays and two label maps that disagreed on one string.

@@ -67,14 +67,14 @@ test('a block that has not landed is a skeleton placeholder, not a spinner', () 
   expect(canvas).not.toMatch(/spinner|Spinner|loading-dots|pending-dot/)
   const empty = draftView('d', { identity: null, words: null, catalog: null, block_status: {} })
   expect(empty.cards).toBeNull()
-  expect(empty.pending).toEqual({ identity: true, words: true, catalog: true })
+  expect(empty.pending).toEqual({ identity: true, words: true, catalog: true, numbers: true })
 })
 
 test('a fallback note is shown to the owner and withheld from a read-only viewer', () => {
   expect(canvas).toContain("mode === 'viewer' ? [] :")
   expect(canvas).toContain('FALLBACK_NOTE[key]')
   const fb = draftView('d', { ...full, identity: fallbackIdentity('Vendo velas'), catalog: fallbackCatalog(), block_status: { identity: 'fallback', words: 'ok', catalog: 'fallback' } })
-  expect(fb.fallback).toEqual({ identity: true, words: false, catalog: true })
+  expect(fb.fallback).toEqual({ identity: true, words: false, catalog: true, numbers: false })
   expect(FALLBACK_NOTE.identity).toBe('Usamos un nombre provisional; puedes cambiarlo')
 })
 

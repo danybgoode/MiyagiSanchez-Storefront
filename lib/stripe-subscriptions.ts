@@ -68,6 +68,8 @@ export async function createSubscriptionCheckout({
   buyerEmail,
   promotionCodeId,
   paymentMethodCollection,
+  idempotencyKey,
+  trialEnd,
 }: {
   priceId: string
   successUrl: string
@@ -76,18 +78,22 @@ export async function createSubscriptionCheckout({
   buyerEmail?: string
   promotionCodeId?: string
   paymentMethodCollection?: 'always' | 'if_required'
+  /** Stripe idempotency key: concurrent requests with the same key get the SAME session, never two. */
+  idempotencyKey?: string
+  /** First charge at this unix time (a free period until then); omitted = charge today. At least 48 h ahead. */
+  trialEnd?: number | null
 }): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     line_items: [{ price: priceId, quantity: 1 }],
-    subscription_data: { metadata },
+    subscription_data: { metadata, ...(trialEnd ? { trial_end: trialEnd } : {}) },
     customer_email: buyerEmail,
     success_url: successUrl,
     cancel_url: cancelUrl,
     metadata,
     ...(promotionCodeId ? { discounts: [{ promotion_code: promotionCodeId }] } : {}),
     ...(paymentMethodCollection ? { payment_method_collection: paymentMethodCollection } : {}),
-  })
+  }, idempotencyKey ? { idempotencyKey } : undefined)
   return session.url!
 }
 
@@ -113,6 +119,9 @@ export async function createOneTimeCheckout({
   metadata,
   buyerEmail,
   promotionCodeId,
+  installments,
+  paymentMethodTypes,
+  idempotencyKey,
 }: {
   amountCents: number
   currency: string
@@ -122,6 +131,13 @@ export async function createOneTimeCheckout({
   metadata: Record<string, string>
   buyerEmail?: string
   promotionCodeId?: string
+  /** Offer card installments (meses sin intereses, Mexico). Stripe allows them on one-time payments only. */
+  installments?: boolean
+  /** Restrict the payment methods (e.g. `['card']`): a delayed method (OXXO, a bank voucher) completes the session
+   *  UNPAID, so a grant written on `checkout.session.completed` would be given away. Omitted = the dashboard's set. */
+  paymentMethodTypes?: Array<'card'>
+  /** Stripe idempotency key: concurrent requests with the same key get the SAME session, never two. */
+  idempotencyKey?: string
 }): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
@@ -134,12 +150,14 @@ export async function createOneTimeCheckout({
       },
     }],
     payment_intent_data: { metadata },
+    ...(installments ? { payment_method_options: { card: { installments: { enabled: true } } } } : {}),
+    ...(paymentMethodTypes ? { payment_method_types: paymentMethodTypes } : {}),
     customer_email: buyerEmail,
     success_url: successUrl,
     cancel_url: cancelUrl,
     metadata,
     ...(promotionCodeId ? { discounts: [{ promotion_code: promotionCodeId }] } : {}),
-  })
+  }, idempotencyKey ? { idempotencyKey } : undefined)
   return session.url!
 }
 

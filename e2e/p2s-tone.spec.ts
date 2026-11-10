@@ -13,6 +13,7 @@ const goodText = {
   identity: JSON.stringify({ name: 'Tamales La Abuela', tagline: 'Tamales de masa madre', description: 'Hechos a mano.', accent_color: '#8a3b12', accent_alternates: ['#1f6f5c', '#2f4b8a', '#6b2f6b'], theme_preset: 'terracota' }),
   words: JSON.stringify({ announcement: 'Pedidos con un día de anticipación.', headline: 'Como los de casa', about: 'Somos una familia poblana.' }),
   catalog: JSON.stringify({ products: [1, 2, 3, 4].map((n) => ({ title: `Tamal número ${n}`, price: 30 + n, category: 'otros' })) }),
+  numbers: JSON.stringify({ offers: [0, 1, 2, 3].map((index) => ({ index, unit_cost: 12, minutes_per_unit: 15 })), capacity: { resource: 'la olla', hours_per_month: 120 }, fixed_costs: [{ label: 'Gas', monthly: 900 }] }),
 }
 
 test('tone is an optional closed enum on the body; anything else is a 400-shaped null', () => {
@@ -47,7 +48,7 @@ test('the tone reaches the words call only — not identity, not catalog', async
   expect(prompts.words).toContain(TONE_HINT.divertido)
   expect(prompts.identity).not.toContain(TONE_HINT.divertido)
   expect(prompts.catalog).not.toContain(TONE_HINT.divertido)
-  expect(events.map((e) => e.key)).toEqual(['identity', 'words', 'catalog'])
+  expect(events.map((e) => e.key)).toEqual(['identity', 'words', 'catalog', 'numbers'])
 })
 
 test('the handler hands the parsed tone to the model, and a tone changes neither the order nor the spend', async () => {

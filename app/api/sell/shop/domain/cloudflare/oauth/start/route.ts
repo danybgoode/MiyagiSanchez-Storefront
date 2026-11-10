@@ -34,14 +34,14 @@ export async function GET(req: NextRequest) {
   // 402 at the callback). The callback gate is the real guarantee; this is UX.
   const { data: shop } = await db
     .from('marketplace_shops')
-    .select('metadata')
+    .select('id, metadata')
     .eq('clerk_user_id', user.id)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
   const ent = await resolveDomainEntitlement(
     (shop as unknown as { metadata?: unknown } | null)?.metadata,
-    { sellerClerkId: user.id },
+    { sellerClerkId: user.id, shopId: (shop as unknown as { id?: string } | null)?.id },
   )
   if (!ent.entitled) {
     return NextResponse.json(

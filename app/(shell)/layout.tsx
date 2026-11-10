@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import { headers } from 'next/headers'
 import MarketDocument, { ROOT_METADATA, ROOT_VIEWPORT } from '@/app/components/MarketDocument'
 import ChannelLayout from '@/app/(shell)/s/[slug]/ChannelLayout'
+import { shopShowsBadge } from '@/lib/plan-badge-server'
+import { badgeHref } from '@/lib/plan'
 import TrustSignals from '@/app/components/TrustSignals'
 import PlatformShell from '@/app/components/PlatformShell'
 import PlatformThemeScript from '@/app/components/PlatformThemeScript'
@@ -60,6 +62,8 @@ export default async function ShellLayout({ children }: { children: React.ReactN
   const channelSettings = ((channelShop?.metadata as Record<string, unknown> | null)?.settings ?? {}) as Record<string, unknown>
   const channelTheme = (channelSettings.theme ?? {}) as { accent_color?: string | null }
   const channelAccent = channelTheme.accent_color ?? '#1d6f42'
+  // The Gratis badge (plans-gratis-negocio D7): hidden for Negocio and trial shops.
+  const channelShowsBadge = channelShop ? await shopShowsBadge(channelShop.slug) : true
 
   // White-label = no platform chrome (embed iframe OR a live custom domain).
   const whiteLabel = isEmbed || isChannel
@@ -115,6 +119,8 @@ export default async function ShellLayout({ children }: { children: React.ReactN
           accentColor={channelAccent}
           logoUrl={channelShop.logo_url ?? null}
           domain={channelDomain}
+          showBadge={channelShowsBadge}
+          badgeHref={channelShop ? badgeHref(channelShop.slug) : undefined}
           trust={
             // Epic D / D.2 — slim trust chips beside the assurance lead line the shell
             // renders. paymentProtected is suppressed here (the lead line "Pago seguro ·

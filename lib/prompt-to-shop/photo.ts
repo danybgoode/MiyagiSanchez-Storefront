@@ -37,6 +37,7 @@
  * Pure: every effect is injected, so `e2e/p2s-photo.spec.ts` drives the order with a trace and no network.
  */
 
+import { DEFAULT_SHAPE, SHAPE_DEFAULTS, type BusinessShape } from '../business-shape'
 import { CATALOG_CATEGORY_KEYS, validateRows, type CatalogImportRow } from '../catalog-import'
 import type { CategoryKey } from '../types'
 import { P2S_LIMITS, decidePhotoSpend, photosLeft, photosLeftCopy } from './allowance'
@@ -197,7 +198,28 @@ export const PHOTO_MAX_ATTEMPTS = 2
 
 // ── Analyse ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export type OwnerLookup = { kind: 'ok'; draftId: string; sellerId: string; shopName: string | null } | { kind: 'none' } | { kind: 'unavailable' }
+export type OwnerLookup =
+  | {
+      kind: 'ok'
+      draftId: string
+      sellerId: string
+      shopName: string | null
+      /** The kept shop's business shape (business-infrastructure D1); absent on older callers = products. */
+      shape?: BusinessShape
+    }
+  | { kind: 'none' }
+  | { kind: 'unavailable' }
+
+/**
+ * The row a confirm creates, fitted to the shop (business-infrastructure D4, amended): its listing type is the SHOP's
+ * (a services shop's photo becomes a service, not a product — review finding on PR #466). The example's estimated
+ * cost is NOT written into Medusa as COGS: an AI guess stored as the product's cost would read back as measured. The
+ * product carries the example it replaced in its metadata instead (`createProduct`'s `exampleTitle`), and the business
+ * model keeps that estimate labelled «estimado» until the merchant types their own.
+ */
+export function fitRowToShop(row: CatalogImportRow, shape: BusinessShape | undefined): CatalogImportRow {
+  return { ...row, listing_type: SHAPE_DEFAULTS[shape ?? DEFAULT_SHAPE].listingType }
+}
 
 export interface AnalyzeDeps {
   /** The user's kept draft AND a Medusa seller that is the shop it became. */
@@ -206,6 +228,9 @@ export interface AnalyzeDeps {
   burstAllowed: () => Promise<boolean>
   /** This month's photos already used — a READ, never a spend. `null` = could not read. */
   photosUsed: () => Promise<number | null>
+  /** The owner plan's monthly photos (plans-gratis-negocio D8) — the SAME cap the confirm spends against, so "left"
+   *  is never counted against a different number (pr-reviewer, #472). Omitted → `P2S_LIMITS.photosPerMonth`. */
+  photoCap?: () => Promise<number>
   /** `spend_ai_allowance('photo_analysis:user:<id>', 'daily_budget', YYYY-MM-DD MX, photoAnalysesPerDay)` raw answer.
    *  The fail-CLOSED bound on vision calls: the burst limiter fails open, and a merchant who never confirms never
    *  spends a monthly photo. */
@@ -243,7 +268,8 @@ export async function analyzePhoto(input: AnalyzeInput, deps: AnalyzeDeps): Prom
 
   // A read, not a spend: at the cap, refuse BEFORE paying for a vision call the merchant could not confirm anyway.
   // A failed read does not refuse — the confirm's spend is the hard cap and it fails closed.
-  const left = photosLeft(await deps.photosUsed())
+  const cap = deps.photoCap ? await deps.photoCap() : P2S_LIMITS.photosPerMonth
+  const left = photosLeft(await deps.photosUsed(), cap)
   if (left === 0) return refuse(429, 'allowance', photosLeftCopy(0))
 
   const empty = (message: string) => ({ status: 200 as const, body: { ok: true as const, suggestion: null, message, photos_left: left } })
@@ -432,11 +458,15 @@ export interface ConfirmDeps {
   /** Runs one ledger mutation as a conditional write on the kept draft (id + claimed_by + updated_at, `.select()`
    *  back). `unavailable` when it could not be applied (read failed, or lost every race). */
   mutate: <T>(draftId: string, fn: (row: LedgerRow) => Mutation<T>) => Promise<{ ok: true; result: T } | { ok: false }>
-  /** `spend_ai_allowance` raw answer — `decidePhotoSpend` reads it. */
-  spend: () => Promise<{ data: unknown; error: unknown }>
+  /** `spend_ai_allowance` raw answer against `cap` — `decidePhotoSpend` reads it. */
+  spend: (cap: number) => Promise<{ data: unknown; error: unknown }>
+  /** The owner's monthly photos for their plan (`lib/plan-allowances.ts`, plans-gratis-negocio D8). Omitted (a test,
+   *  an older caller) → `P2S_LIMITS.photosPerMonth`. Spend and "photos left" read the SAME cap. */
+  photoCap?: () => Promise<number>
   /** A product this nonce already created (a `paid` retry after a create that did land). `unavailable` = could not tell. */
   findCreated: (nonce: string) => Promise<string | null | 'unavailable'>
-  createProduct: (row: CatalogImportRow, imageUrl: string, nonce: string) => Promise<{ ok: true; productId: string } | { ok: false; message: string | null }>
+  /** `exampleTitle` = the draft example this product replaces, kept on the product so the plan can carry its estimate. */
+  createProduct: (row: CatalogImportRow, imageUrl: string, nonce: string, exampleTitle: string | null) => Promise<{ ok: true; productId: string } | { ok: false; message: string | null }>
   log?: (line: Record<string, unknown>) => void
   now: () => Date
 }
@@ -514,14 +544,15 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
   }
 
   // spend — fails CLOSED. Then mark it paid BEFORE the create.
+  const photoCap = deps.photoCap ? await deps.photoCap() : P2S_LIMITS.photosPerMonth
   if (mustSpend) {
     let rpc: { data: unknown; error: unknown }
     try {
-      rpc = await deps.spend()
+      rpc = await deps.spend(photoCap)
     } catch (e) {
       rpc = { data: null, error: e instanceof Error ? e.message : 'spend threw' }
     }
-    const decision = decidePhotoSpend(rpc, P2S_LIMITS.photosPerMonth)
+    const decision = decidePhotoSpend(rpc, photoCap)
     if (!decision.ok) {
       await deps.mutate(draftId, (r) => releaseMutation(r, nonce))
       deps.log?.({ step: 'photo_spend', ok: false, reason: decision.reason })
@@ -543,7 +574,7 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
   // create — one Medusa draft product (bounded by CREATE_TIMEOUT_MS in photo-server.ts).
   let created: { ok: true; productId: string } | { ok: false; message: string | null }
   try {
-    created = await deps.createProduct(row, imageUrl, nonce)
+    created = await deps.createProduct(fitRowToShop(row, owner.shape), imageUrl, nonce, replace?.title ?? null)
   } catch {
     created = { ok: false, message: null }
   }

@@ -8,7 +8,11 @@
 /** The paid SKUs a promoter can enroll a shop on (S1: custom domain; S2: print ad;
  *  subdomain-pricing S2: subdomain; mercadolibre-sync S5: ml_sync; platform-migrations
  *  S2: migration — a white-glove consultant migration, flat-or-quoted). */
-export const PROMOTER_SKUS = ['custom_domain', 'print_ad', 'subdomain', 'ml_sync', 'migration'] as const
+export const PROMOTER_SKUS = [
+  'custom_domain', 'print_ad', 'subdomain', 'ml_sync', 'migration',
+  // plans-gratis-negocio S4 (D12, D13): the three promoter packages and the year-2 renewal share.
+  'negocio_anual', 'negocio_arranque', 'setup_gratis', 'negocio_renewal',
+] as const
 export type PromoterSku = (typeof PROMOTER_SKUS)[number]
 
 export function isPromoterSku(raw: string | null | undefined): raw is PromoterSku {

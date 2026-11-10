@@ -39,7 +39,7 @@ import { getEnviaGrant, setEnviaGrant } from '@/lib/envia-grant'
 
 export const dynamic = 'force-dynamic'
 
-type ShopRow = { metadata: Record<string, unknown> | null; clerk_user_id: string | null }
+type ShopRow = { id?: string; metadata: Record<string, unknown> | null; clerk_user_id: string | null }
 
 const GRANT_SKUS = ['custom_domain', 'subdomain', 'ml_sync', 'envia'] as const
 type GrantSku = (typeof GRANT_SKUS)[number]
@@ -67,8 +67,9 @@ function asSku(raw: unknown): GrantSku {
 }
 
 /** Resolve the SKU's true entitlement (incl. the per-seller subscription). */
-async function resolveForSku(sku: SupabaseGrantSku, metadata: unknown, sellerClerkId?: string): Promise<DomainEntitlement> {
-  const opts = { sellerClerkId: sellerClerkId ?? undefined }
+async function resolveForSku(sku: SupabaseGrantSku, metadata: unknown, sellerClerkId?: string, shopId?: string): Promise<DomainEntitlement> {
+  // shopId: Negocio is per shop, and an admin may be looking at any of an owner's shops (plans-gratis-negocio D1).
+  const opts = { sellerClerkId: sellerClerkId ?? undefined, shopId }
   if (sku === 'subdomain') return resolveSubdomainEntitlement(metadata, opts)
   if (sku === 'ml_sync') return resolveMlSyncEntitlement(metadata, opts)
   return resolveDomainEntitlement(metadata, opts)
@@ -78,7 +79,7 @@ async function resolveForSku(sku: SupabaseGrantSku, metadata: unknown, sellerCle
 async function loadShop(id: string): Promise<ShopRow | null> {
   const { data, error } = await db
     .from('marketplace_shops')
-    .select('metadata, clerk_user_id')
+    .select('id, metadata, clerk_user_id')
     .eq('id', id)
     .maybeSingle()
   if (error) {
@@ -102,7 +103,7 @@ async function resolvedEntitlement(sku: GrantSku, shop: ShopRow) {
     const medusaSellerId = (shop.metadata as Record<string, unknown> | null)?.medusa_seller_id as string | undefined
     return resolvedEnviaEntitlement(await getEnviaGrant(medusaSellerId))
   }
-  const ent = await resolveForSku(sku, shop.metadata, shop.clerk_user_id ?? undefined)
+  const ent = await resolveForSku(sku, shop.metadata, shop.clerk_user_id ?? undefined, shop.id)
   return {
     sku,
     entitlementReason: ent.reason,

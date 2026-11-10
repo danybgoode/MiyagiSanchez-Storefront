@@ -34,7 +34,7 @@ export default async function MercadoLibrePage({
 
   const { data: shop } = await db
     .from('marketplace_shops')
-    .select('slug, metadata')
+    .select('id, slug, metadata')
     .eq('clerk_user_id', user.id)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -49,7 +49,7 @@ export default async function MercadoLibrePage({
   // level; skip the extra round-trips when the kill-switch is off (dark-ship).
   const events = syncEnabledFlag ? toMlEventViews(await getMlSyncEvents(shop.slug, 25)) : []
   const [entitlement, sellerSyncEnabled] = syncEnabledFlag
-    ? await Promise.all([resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: user.id }), getSellerSyncEnabled(shop.slug)])
+    ? await Promise.all([resolveMlSyncEntitlement(shop.metadata, { sellerClerkId: user.id, shopId: shop.id }), getSellerSyncEnabled(shop.slug)])
     : [null, false]
 
   return (

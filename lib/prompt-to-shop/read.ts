@@ -9,7 +9,8 @@ import 'server-only'
 import { db } from '@/lib/supabase'
 import type { ReadDeps } from './access'
 
-const OWNED_COLUMNS = 'id, identity, words, catalog, block_status, versions_used, updated_at, view_token'
+// `numbers` is owner-only (business-infrastructure D5): a merchant's costs are not part of the shared preview.
+const OWNED_COLUMNS = 'id, identity, words, catalog, numbers, block_status, versions_used, updated_at, view_token'
 // Content only. No id, no device_id, no description, no claim fields: a viewer is shown the shop and nothing about
 // who made it or how to change it.
 const SHARED_COLUMNS = 'identity, words, catalog, block_status'

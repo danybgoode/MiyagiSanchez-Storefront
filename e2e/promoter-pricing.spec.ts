@@ -4,7 +4,6 @@ import {
   buildSkuPriceRow,
   buildSkuPriceTable,
   computeBundleRow,
-  type PromoterSkuPrices,
   type BundleConfig,
 } from '../lib/promoter-pricing'
 import type { PromoterSettings } from '../lib/promoter'
@@ -89,7 +88,7 @@ test.describe('buildSkuPriceRow / buildSkuPriceTable', () => {
       { subdomain: 0 },
       settingsFixed(),
     )
-    expect(table.map((r) => r.sku)).toEqual(['custom_domain', 'print_ad', 'subdomain', 'ml_sync', 'migration'])
+    expect(table.map((r) => r.sku)).toEqual(['custom_domain', 'print_ad', 'subdomain', 'ml_sync', 'migration', 'negocio_anual', 'negocio_arranque', 'setup_gratis', 'negocio_renewal'])
     expect(table.find((r) => r.sku === 'print_ad')?.variablePrice).toBe(true)
     expect(table.find((r) => r.sku === 'subdomain')?.isFree).toBe(true)
     // migration has no `PROMOTER_SKU_BASE_PRICE_MXN` entry (variable — flat ≤150 or
