@@ -168,8 +168,7 @@ export function negocioPageView(plan: PlanState, now: Date = new Date()): Negoci
         buttons: [monthlyButton(plan, now), yearlyButton(plan, now)],
         pauses: { title: 'Lo que vuelve al contratar el Plan Negocio:', items: negocioGains() },
       }
-    case 'none':
-    default:
+    case 'legacy':
       return {
         ...base,
         headline: 'Tu tienda está abierta en el Plan Gratis.',
@@ -177,5 +176,33 @@ export function negocioPageView(plan: PlanState, now: Date = new Date()): Negoci
         buttons: [monthlyButton(plan, now), yearlyButton(plan, now)],
         pauses: { title: 'Lo que sumas con el Plan Negocio:', items: negocioGains() },
       }
+    // Plan Tienda and "no plan" (plan-tienda sprint 1): one true sentence each, so the page never falls through to
+    // «Plan Gratis» for a shop that is not on it. Sprint 2 writes the real page (the Tienda prices, its buttons, its
+    // manage link). Until then a Tienda shop is offered nothing to buy here: the rules for paying Negocio on top of
+    // Tienda (D6) are sprint 2's, and a button whose consequences the page cannot explain yet is not offered.
+    case 'tienda_one_time':
+      return {
+        ...base,
+        headline: plan.endsAt ? `Tienes el Plan Tienda pagado hasta el ${formatPlanDate(plan.endsAt)}.` : 'Tienes el Plan Tienda.',
+        tone: 'ok',
+        buttons: [],
+      }
+    case 'tienda_subscription':
+      return { ...base, headline: 'Tienes el Plan Tienda mensual: se cobra solo cada mes a tu tarjeta.', tone: 'ok', buttons: [] }
+    case 'unpaid':
+      return {
+        ...base,
+        headline: 'Tu tienda no tiene un plan activo.',
+        tone: 'ok',
+        buttons: [monthlyButton(plan, now), yearlyButton(plan, now)],
+        pauses: { title: 'Lo que incluye el Plan Negocio:', items: negocioGains() },
+      }
+    default: {
+      // Exhaustive: a new PlanReason is a type error on the next line until it has its own sentence. At run time a
+      // reason this page does not know is shown as "could not confirm" — never a guessed plan, and never a crash.
+      const unhandled: never = plan.reason
+      void unhandled
+      return { ...base, headline: 'No pudimos confirmar tu suscripción. Intenta de nuevo en unos minutos.', tone: 'unknown', buttons: [] }
+    }
   }
 }

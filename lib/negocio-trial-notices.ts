@@ -20,6 +20,9 @@ export const TRIAL_ENDED_NOTICE_WINDOW_DAYS = 7
 export function decideTrialNotice(trial: NegocioTrial | null, plan: PlanState, now: Date): TrialNotice | null {
   if (!trial) return null
   if (plan.plan === 'negocio') return null
+  // A shop on Plan Tienda paid, and an unpaid shop is NOT on Plan Gratis: «ya estás en Gratis» would be false for
+  // both. They get nothing from this job until plan-tienda sprint 3 (D8) adds the notice written for them.
+  if (plan.plan === 'tienda' || plan.plan === 'unpaid') return null
   const end = Date.parse(trial.expires_at)
   if (plan.plan === 'trial') {
     const left = daysLeft(plan, now)

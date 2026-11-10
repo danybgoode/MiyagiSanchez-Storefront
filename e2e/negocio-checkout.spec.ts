@@ -15,7 +15,7 @@ const st = (plan: PlanState['plan'], reason: PlanState['reason']): PlanState => 
 
 test.describe('decideNegocioCheckout — never a double charge', () => {
   test('Gratis and the trial may buy either cadence', () => {
-    for (const s of [st('gratis', 'none'), st('gratis', 'trial_ended'), st('trial', 'trial')]) {
+    for (const s of [st('gratis', 'legacy'), st('gratis', 'trial_ended'), st('trial', 'trial')]) {
       expect(decideNegocioCheckout({ cadence: 'month', plan: s }).ok).toBe(true)
       expect(decideNegocioCheckout({ cadence: 'year', plan: s }).ok).toBe(true)
     }

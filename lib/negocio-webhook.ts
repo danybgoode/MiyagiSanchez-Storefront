@@ -7,8 +7,8 @@
  *   - Subscription complete (monthly) → record the Medusa Commerce subscription against the Negocio plan, keyed by the
  *     shop (Negocio is per shop). `/store/subscriptions` dedupes on the Stripe subscription id, so a replay is safe.
  *   - One-time complete (yearly, or a promoter package by card) → add the paid months to the shop's `negocio_grant`
- *     with a compare-and-swap through `merge_shop_metadata` (`equals` guard). The grant remembers the payment ids it
- *     counted, so a replayed webhook adds nothing (`decideNegocioPayment`).
+ *     with a compare-and-swap through `merge_shop_metadata_guards` (every key the decision read is guarded). The
+ *     grant remembers the payment ids it counted, so a replayed webhook adds nothing (`decideNegocioPayment`).
  *   - Status changes and cancellations → flip the Medusa subscription; a lapse returns the shop to its trial or Gratis
  *     on the next read.
  *
@@ -23,7 +23,7 @@ import { stripe } from '@/lib/stripe'
 import { db } from '@/lib/supabase'
 import { tg } from '@/lib/telegram'
 import { getNegocioSubscription, setNegocioSubscriptionStatus } from '@/lib/negocio-subscription'
-import { NEGOCIO_GRANT_KEY, decideNegocioPayment } from '@/lib/plan'
+import { GRANT_WRITE_RPC, NEGOCIO_GRANT_KEY, decideNegocioPayment, grantWriteRpcArgs } from '@/lib/plan'
 import { mapNegocioStatus, sessionMonths, subscriptionPeriod } from '@/lib/negocio-checkout-rules'
 import { markAttributionPaid, isPromoterSku } from '@/lib/promoter'
 import { releaseCustomDomainForShop } from '@/lib/domain-lapse-server'
@@ -86,7 +86,9 @@ export async function handleNegocioSubscriptionComplete(session: Stripe.Checkout
   tg.alert(`✅ Negocio mensual activado\nShop: ${shopId}`)
 }
 
-/** Write the paid months onto the shop's grant: compare-and-swap, re-read and retried on a concurrent change. */
+/** Write the paid months onto the shop's grant: compare-and-swap, re-read and retried on a concurrent change.
+ *  Every dated Negocio grant goes through here (the yearly payment, a promoter package by card or by transfer), so
+ *  this is the one place the Tienda shift is written. */
 export async function applyNegocioPayment(input: {
   shopId: string
   paymentId: string
@@ -100,16 +102,13 @@ export async function applyNegocioPayment(input: {
     if (!shop) throw new Error(`no shop row for id ${input.shopId}`)
     const decision = decideNegocioPayment((shop as { metadata: unknown }).metadata, input)
     if (decision.action !== 'write') return decision.action
-    const { data: merged, error } = await db.rpc('merge_shop_metadata', {
-      p_shop_id: input.shopId,
-      p_patch: { [NEGOCIO_GRANT_KEY]: decision.grant },
-      p_guard_key: NEGOCIO_GRANT_KEY,
-      p_guard_mode: decision.guard.mode,
-      p_expected: decision.guard.mode === 'equals' ? decision.guard.expected : null,
-    })
+    // ONE statement: the Negocio grant and, when the shop holds a live Tienda grant, that grant moved forward by the
+    // same months (plan-tienda D4) land together or not at all — and only if the Negocio grant, the Tienda grant and
+    // the trial are all still exactly as read (`merge_shop_metadata_guards`; see PLAN_PAYMENT_READS in lib/plan.ts).
+    const { data: merged, error } = await db.rpc(GRANT_WRITE_RPC, grantWriteRpcArgs(input.shopId, NEGOCIO_GRANT_KEY, decision))
     if (error) throw new Error(`grant write failed: ${error.message}`)
     if (Array.isArray(merged) && merged.length > 0) return 'written'
-    // The guard fired: the grant changed between the read and the write. Re-read and decide again.
+    // A guard fired: one of the three keys changed between the read and the write. Re-read and decide again.
   }
   throw new Error('grant write lost three compare-and-swap races')
 }

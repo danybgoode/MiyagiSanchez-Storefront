@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { negocioPageView, gratisPauses, MONTHLY_BUTTON_LABEL, YEARLY_BUTTON_LABEL, RENEW_BUTTON_LABEL } from '../lib/negocio-page'
 import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN } from '../lib/negocio-pricing'
 import { PLAN_ALLOWANCES } from '../lib/plan-allowances'
@@ -49,7 +50,7 @@ test.describe('«Tu suscripción» view', () => {
   })
 
   test('on Gratis: open on the Plan Gratis, both buttons, and payment starts today', () => {
-    for (const reason of ['none', 'trial_ended'] as const) {
+    for (const reason of ['legacy', 'trial_ended'] as const) {
       const v = negocioPageView(st('gratis', reason), NOW)
       expect(v.headline).toContain('abierta en el Plan Gratis')
       expect(v.afterTrial).toBeNull()
@@ -83,4 +84,47 @@ test.describe('«Tu suscripción» view', () => {
     expect(v.buttons).toEqual([])
     expect(v.manage).toBe(false)
   })
+})
+
+test.describe('Plan Tienda and "no plan" on «Tu suscripción» (plan-tienda S1.1)', () => {
+  test('a Tienda shop is told it is on Plan Tienda — never «Plan Gratis» — and is offered nothing to buy yet', () => {
+    const dated = negocioPageView(st('tienda', 'tienda_one_time', '2027-11-04T12:00:00.000Z'), NOW)
+    expect(dated.headline).toBe('Tienes el Plan Tienda pagado hasta el 4 de noviembre de 2027.')
+    const monthly = negocioPageView(st('tienda', 'tienda_subscription'), NOW)
+    expect(monthly.headline).toContain('Plan Tienda mensual')
+    for (const v of [dated, monthly]) {
+      expect(v.headline).not.toContain('Gratis')
+      expect(v.tone).toBe('ok')
+      expect(v.buttons).toEqual([])
+      expect(v.manage).toBe(false)
+    }
+  })
+
+  test('an unpaid shop is told it has no plan — never «Plan Gratis» — and may pay Negocio today', () => {
+    const v = negocioPageView(st('unpaid', 'unpaid'), NOW)
+    expect(v.headline).toBe('Tu tienda no tiene un plan activo.')
+    expect(v.headline).not.toContain('Gratis')
+    expect(v.buttons.map((b) => b.cadence)).toEqual(['month', 'year'])
+    expect(v.buttons[0].lines).toContain('El primer cobro es hoy.')
+  })
+
+  test('no reason prints «undefined» or leaves the headline empty', () => {
+    const reasons = ['comp', 'one_time', 'subscription', 'trial', 'tienda_one_time', 'tienda_subscription', 'trial_ended', 'legacy', 'unpaid', 'unavailable'] as const
+    for (const reason of reasons) {
+      const v = negocioPageView(st('gratis', reason, '2027-01-01T00:00:00.000Z'), NOW)
+      expect(v.headline.length).toBeGreaterThan(10)
+      expect(JSON.stringify(v)).not.toContain('undefined')
+    }
+  })
+})
+
+test('«Tu suscripción» never prints a plan for one that could not be read (PR #484 review)', () => {
+  const v = negocioPageView(st('gratis', 'unavailable'), NOW)
+  expect(v.headline).toBe('No pudimos confirmar tu suscripción. Intenta de nuevo en unos minutos.')
+  expect(v.headline).not.toMatch(/Plan (Gratis|Tienda|Negocio)/)
+  expect(v).toMatchObject({ tone: 'unknown', buttons: [], manage: false, afterTrial: null, pauses: null })
+  // The page file renders that tone as a warning, and builds the same state when the read itself throws.
+  const page = readFileSync('app/(shell)/shop/manage/negocio/page.tsx', 'utf8')
+  expect(page).toContain("view.tone === 'unknown' ? (\n          <Banner variant=\"warning\">{view.headline}</Banner>")
+  expect(page).toContain("negocioPageView(mine === 'unavailable' ? { plan: 'gratis', reason: 'unavailable', endsAt: null } : mine.plan)")
 })
