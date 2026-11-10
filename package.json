@@ -23,6 +23,7 @@
     "lint:changed": "node scripts/lint-changed.mjs",
     "paywall:backfill": "tsx --env-file=.env.local scripts/backfill-paywall-grants.ts",
     "negocio:trial-backfill": "tsx --env-file=.env.local scripts/backfill-negocio-trial.ts",
+    "plan:mark-legacy": "tsx --env-file=.env.local scripts/mark-plan-legacy.ts",
     "subdomain:cancel-paid": "tsx scripts/cancel-subdomain-subscriptions.ts"
   },
   "dependencies": {
