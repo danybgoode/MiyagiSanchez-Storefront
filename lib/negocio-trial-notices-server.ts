@@ -10,12 +10,23 @@ import { db } from '@/lib/supabase'
 import { dispatchToSeller } from '@/lib/notifications/dispatch'
 import { sendNegocioTrialNotice } from '@/lib/email'
 import { NEGOCIO_TRIAL_KEY, readNegocioTrial, readPlanLegacyState } from '@/lib/plan'
-import { hasPlanPause, rawPlanPause } from '@/lib/plan-pause'
+import { claimMarket, hasPlanPause, rawPlanPause, type PlanPauseMarket } from '@/lib/plan-pause'
+import { readShopMarket } from '@/lib/plan-pause-server'
 import { noticeVariantFor } from '@/lib/negocio-trial-notices'
 import { resolvePlan } from '@/lib/plan-server'
 import type { TrialNoticeDeps, TrialShop } from '@/lib/negocio-trial-notices'
 
 const BATCH = 1000
+
+/**
+ * The market, read only for a NEW shop (a legacy shop's wording does not depend on it, so it costs no read). A paused
+ * shop's comes from its claim: the public seller read hides a paused seller.
+ */
+async function marketFor(slug: string, metadata: unknown): Promise<PlanPauseMarket> {
+  if (readPlanLegacyState(metadata) !== 'absent') return 'unknown'
+  if (hasPlanPause(metadata)) return claimMarket(metadata)
+  return readShopMarket(slug, metadata)
+}
 
 /** The claim's `paused_at`, when it is a string; anything else is null (the decision then counts from the end). */
 function pausedAtOf(metadata: unknown): string | null {
@@ -34,10 +45,11 @@ export function trialNoticeDeps(): TrialNoticeDeps {
         .order('created_at', { ascending: true })
         .limit(BATCH)
       if (error || !Array.isArray(data)) return null
-      return (data as Array<{ id: string; slug: string; name: string | null; clerk_user_id: string; metadata: Record<string, unknown> | null }>)
+      const rows = (data as Array<{ id: string; slug: string; name: string | null; clerk_user_id: string; metadata: Record<string, unknown> | null }>)
         .map((r) => ({ row: r, trial: readNegocioTrial(r.metadata) }))
         .filter((x) => x.trial !== null)
-        .map(({ row, trial }) => ({
+      const shops: TrialShop[] = []
+      for (const { row, trial } of rows) shops.push({
           id: row.id,
           slug: row.slug,
           name: row.name,
@@ -48,8 +60,10 @@ export function trialNoticeDeps(): TrialNoticeDeps {
             legacy: readPlanLegacyState(row.metadata),
             planPaused: hasPlanPause(row.metadata),
             pausedAt: pausedAtOf(row.metadata),
+            market: await marketFor(row.slug, row.metadata),
           },
-        }))
+        })
+      return shops
     },
     readPlan: async (shop: TrialShop) => {
       const { data } = await db.from('marketplace_shops').select('metadata').eq('id', shop.id).maybeSingle()

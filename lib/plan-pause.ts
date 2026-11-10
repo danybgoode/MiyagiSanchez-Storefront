@@ -9,7 +9,9 @@
  * while that record is there, so an admin pause (which never writes it) is never lifted by a payment (D10).
  *
  * Validate, then claim, then apply — three positions, never two:
- *   validate — `decidePlanPause`, pure: owned, legacy marker ABSENT, plan read uncached as `unpaid`, a free or paid
+ *   validate — `decidePlanPause`, pure: owned, legacy marker ABSENT, KNOWN to be in Mexico (S3.3 review: no United
+ *              States plans, so another market is `not_mx` and an unreadable one `unavailable`), plan read uncached as
+ *              `unpaid`, a free or paid
  *              term that has ended, not already claimed. Anything it could not read is `unavailable`, never `pause`.
  *   claim    — `plan_pause` written with a guard matching what was read (absent, or JSON null after a release), read
  *              back from the row the write returned.
@@ -39,7 +41,33 @@ export const PLAN_PAUSE_REASON = 'plan_unpaid'
 /** The reason sent when a payment brings the shop back. */
 export const PLAN_RESTORE_REASON = 'plan_paid'
 
-export type PlanPause = { paused_at: string }
+/**
+ * The claim. `market: 'mx'` records that the job KNEW the shop was in Mexico when it paused it: a paused seller is
+ * hidden from the public seller read (`/store/sellers/:slug` answers 404 for it), so the market can no longer be read
+ * afterwards, and the end notice relies on this field instead (lib/negocio-trial-notices.ts).
+ */
+export type PlanPause = { paused_at: string; market: 'mx' }
+
+/**
+ * The shop's market as far as the plan job can tell (plan-tienda S3.3 review). Only `mx` can ever be paused: Plan
+ * Tienda and Plan Negocio are Mexico plans and "No United States plans" is a no-go, so a shop in any other market has
+ * nothing it could pay. `unknown` — the read failed, the seller is hidden or its id does not match the mirror's, or
+ * the projection contradicts the market registry — is never treated as Mexico.
+ */
+export type PlanPauseMarket = 'mx' | 'other' | 'unknown'
+
+/** The market from a validated public seller projection's code (`readPublicSellerMarket`), or `unknown`. */
+export function planPauseMarketOf(marketCode: string | null | undefined): PlanPauseMarket {
+  if (marketCode === 'mx') return 'mx'
+  if (typeof marketCode === 'string' && marketCode !== '') return 'other'
+  return 'unknown'
+}
+
+/** The market the claim recorded: `mx` only when the claim says so (an older or malformed claim is `unknown`). */
+export function claimMarket(metadata: unknown): PlanPauseMarket {
+  const raw = rawPlanPause(metadata) as { market?: unknown } | null
+  return raw && typeof raw === 'object' && raw.market === 'mx' ? 'mx' : 'unknown'
+}
 
 /**
  * Is there a plan-pause claim on this shop? ANY non-null value under the key counts: only service-role code writes
@@ -59,7 +87,7 @@ export function rawPlanPause(metadata: unknown): unknown {
 
 /** The claim the job writes. */
 export function buildPlanPause(now: Date): PlanPause {
-  return { paused_at: now.toISOString() }
+  return { paused_at: now.toISOString(), market: 'mx' }
 }
 
 /**
@@ -86,14 +114,35 @@ export type PlanPauseWhy =
   | 'legacy' // the marker is there: Plan Gratis for good
   | 'legacy_unreadable' // something is under the marker key that we cannot read: never paused (lib/plan.ts)
   | 'already_claimed'
+  | 'not_mx' // a shop in another market: there is no plan it could pay (no United States plans)
   | 'has_plan' // a live plan, or legacy Gratis
   | 'never_started' // no trial or grant ever ended
   | 'plan_unreadable' // the plan could not be read (a failed lookup, or `unavailable`)
+  | 'market_unknown' // the shop's market could not be read: never paused on a guess
 
 export type PlanPauseDecision =
   | { action: 'pause'; why: 'unpaid' }
-  | { action: 'leave'; why: Exclude<PlanPauseWhy, 'unpaid' | 'plan_unreadable'> }
-  | { action: 'unavailable'; why: 'plan_unreadable' }
+  | { action: 'leave'; why: Exclude<PlanPauseWhy, 'unpaid' | 'plan_unreadable' | 'market_unknown'> }
+  | { action: 'unavailable'; why: 'plan_unreadable' | 'market_unknown' }
+
+/**
+ * The facts read from the shop row alone (owner, marker, claim). They settle most shops without a single network
+ * read, so the runner asks them first; `decidePlanPause` starts with the same function, so the two never disagree.
+ */
+export function decidePlanPauseFromRow(shop: PausableShop, legacy: PlanLegacyState): PlanPauseDecision | null {
+  if (!shop.clerk_user_id) return { action: 'leave', why: 'unowned' }
+  if (legacy === 'marked') return { action: 'leave', why: 'legacy' }
+  if (legacy === 'unreadable') return { action: 'leave', why: 'legacy_unreadable' }
+  if (hasPlanPause(shop.metadata)) return { action: 'leave', why: 'already_claimed' }
+  return null
+}
+
+/** The market step: a shop not KNOWN to be in Mexico is never paused. */
+export function decidePlanPauseMarket(market: PlanPauseMarket): PlanPauseDecision | null {
+  if (market === 'other') return { action: 'leave', why: 'not_mx' }
+  if (market === 'unknown') return { action: 'unavailable', why: 'market_unknown' }
+  return null
+}
 
 /**
  * Pause, leave, or "could not tell". `plan` is the plan resolved UNCACHED (`resolvePlan`), or null when the read
@@ -102,11 +151,11 @@ export type PlanPauseDecision =
  * Order matters only for the label: the facts that make a shop unpausable whatever its plan (unowned, legacy,
  * already claimed) are checked before the plan read's outcome, so a dry run names the real reason a shop is safe.
  */
-export function decidePlanPause(shop: PausableShop, plan: PlanState | null, legacy: PlanLegacyState, now: Date): PlanPauseDecision {
-  if (!shop.clerk_user_id) return { action: 'leave', why: 'unowned' }
-  if (legacy === 'marked') return { action: 'leave', why: 'legacy' }
-  if (legacy === 'unreadable') return { action: 'leave', why: 'legacy_unreadable' }
-  if (hasPlanPause(shop.metadata)) return { action: 'leave', why: 'already_claimed' }
+export function decidePlanPause(shop: PausableShop, plan: PlanState | null, legacy: PlanLegacyState, now: Date, market: PlanPauseMarket): PlanPauseDecision {
+  const fromRow = decidePlanPauseFromRow(shop, legacy)
+  if (fromRow) return fromRow
+  const fromMarket = decidePlanPauseMarket(market)
+  if (fromMarket) return fromMarket
   if (!plan || plan.reason === 'unavailable') return { action: 'unavailable', why: 'plan_unreadable' }
   if (plan.plan !== 'unpaid' || plan.reason !== 'unpaid') return { action: 'leave', why: 'has_plan' }
   if (!hadPlanThatEnded(shop.metadata, now)) return { action: 'leave', why: 'never_started' }
@@ -192,6 +241,8 @@ export interface PlanPauseDeps {
   readPlan: (shop: PauseCandidate) => Promise<PlanState | null>
   /** The legacy state, from the metadata read with the shop. Injected so the shell and the spec use one reader. */
   readLegacy: (metadata: unknown) => PlanLegacyState
+  /** The shop's market, read fresh from its Medusa seller; `unknown` when it cannot be told (never a default). */
+  readMarket: (shop: PauseCandidate) => Promise<PlanPauseMarket>
   /** The Medusa seller's current status. */
   readSellerStatus: (shop: PauseCandidate) => Promise<SellerStatusFact>
   /** Write `plan_pause = claim`, guarded on what was read; true only when the returned row carries exactly it. */
@@ -234,6 +285,8 @@ export type PlanPauseRun =
       paused: number
       left: Record<string, number>
       unavailable: number
+      /** The `unavailable` shops by reason (`plan_unreadable`, `market_unknown`); after the claim, by their entry. */
+      unavailableBy: Record<string, number>
       failed: number
     }
   | { ok: false; error: 'unavailable'; read: number }
@@ -261,6 +314,7 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
   const now = deps.now()
   const candidates: PlanPauseEntry[] = []
   const left: Record<string, number> = {}
+  const unavailableBy: Record<string, number> = {}
   let unavailable = 0
   let paused = 0
   let failed = 0
@@ -274,12 +328,19 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
 
   for (const shop of shops) {
     const legacy = deps.readLegacy(shop.metadata)
-    // The plan is read only when the cheap facts do not already settle it (an unowned or legacy shop costs no
-    // Backend round trip); `decidePlanPause` checks those first, so passing null for them changes nothing.
-    const settled = decidePlanPause(shop, null, legacy, now)
-    const plan = settled.action === 'leave' ? null : await deps.readPlan(shop).catch(() => null)
-    const decision = settled.action === 'leave' ? settled : decidePlanPause(shop, plan, legacy, now)
-    if (decision.action === 'unavailable') { unavailable += 1; continue }
+    // In the order of `decidePlanPause`, cheapest first: the row (no read), then the market (one public read), then
+    // the plan (the Backend's subscription reads). Each later read happens only when the earlier facts did not settle
+    // the shop, and the final call re-decides from ALL the facts, so the shortcut can never decide differently.
+    const decision = await (async (): Promise<PlanPauseDecision> => {
+      const fromRow = decidePlanPauseFromRow(shop, legacy)
+      if (fromRow) return fromRow
+      const market = await deps.readMarket(shop).catch((): PlanPauseMarket => 'unknown')
+      const fromMarket = decidePlanPauseMarket(market)
+      if (fromMarket) return fromMarket
+      const plan = await deps.readPlan(shop).catch(() => null)
+      return decidePlanPause(shop, plan, legacy, now, market)
+    })()
+    if (decision.action === 'unavailable') { unavailable += 1; unavailableBy[decision.why] = (unavailableBy[decision.why] ?? 0) + 1; continue }
     if (decision.action === 'leave') { left[decision.why] = (left[decision.why] ?? 0) + 1; continue }
 
     // VALIDATE: the seller must be active now. Already paused (by an admin) or deleted: not ours to touch.
@@ -339,5 +400,5 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
     deps.alert(`⚠️ Pausa por falta de plan FALLÓ${released ? ' (se reintenta mañana)' : ' y NO se pudo liberar la marca — quitar plan_pause a mano'}.\nShop: ${shop.slug ?? shop.id}\n${result.detail}`)
   }
 
-  return { ok: true, dryRun: opts.dryRun, read: shops.length, candidates, paused, left, unavailable, failed }
+  return { ok: true, dryRun: opts.dryRun, read: shops.length, candidates, paused, left, unavailable, unavailableBy, failed }
 }

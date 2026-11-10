@@ -5,6 +5,12 @@
  *   readPage         — owned shops (`clerk_user_id` set), ordered by `created_at` then `id` so paging is stable.
  *   readPlan         — `resolvePlan` on a FRESH read of the shop's metadata: uncached (it reads Medusa Commerce
  *                      directly, never the slug cache), and a failure is null, never "unpaid".
+ *   readMarket       — the shop's Medusa seller, read FRESH from `/store/sellers/:slug` (`readShopFresh`, no cache),
+ *                      trusted only when its id equals the mirror's `medusa_seller_id`, and validated against the
+ *                      market registry (`readPublicSellerMarket`) — the same projection and identity check the admin
+ *                      directory uses (lib/admin/tenant-directory-server.ts). `marketplace_shops` has no market
+ *                      column; the market is Medusa's (`seller.market_code`, from its operating market). Anything
+ *                      unreadable is `unknown`, which never pauses.
  *   readSellerStatus — the Backend's `GET /internal/sellers/:id/status`, through the admin's own client.
  *   claim            — `merge_shop_metadata_guards` (`planPauseClaimArgs`), counted only when the returned row
  *                      carries exactly the claim written.
@@ -20,6 +26,8 @@ import { tg } from '@/lib/telegram'
 import { readPlanLegacyState } from '@/lib/plan'
 import { resolvePlan } from '@/lib/plan-server'
 import { DEFAULT_PAGE_SIZE } from '@/lib/paged-read'
+import { readShopFresh } from '@/lib/listings'
+import { readPublicSellerMarket } from '@/lib/owned-market'
 import { medusaSellerIdOf } from '@/lib/admin/tenant-directory'
 import { changeSellerStatus, readSellerStatus } from '@/lib/admin/tenant-status'
 import {
@@ -27,8 +35,10 @@ import {
   claimLanded,
   planPauseClaimArgs,
   planPauseClearArgs,
+  planPauseMarketOf,
   pauseOutcomeOf,
   type PauseCandidate,
+  type PlanPauseMarket,
   type PlanPauseDeps,
   type SellerStatusFact,
 } from '@/lib/plan-pause'
@@ -38,6 +48,17 @@ async function freshMetadata(shopId: string): Promise<{ metadata: unknown } | nu
   const { data, error } = await db.from('marketplace_shops').select('metadata').eq('id', shopId).maybeSingle()
   if (error || !data) return null
   return { metadata: (data as { metadata: unknown }).metadata }
+}
+
+/** A shop's market from its Medusa seller (see the header). Shared with the notices' shell. Never throws. */
+export async function readShopMarket(slug: string | null, metadata: unknown): Promise<PlanPauseMarket> {
+  const expectedId = medusaSellerIdOf(metadata)
+  if (!slug || !expectedId) return 'unknown'
+  const read = await readShopFresh(slug).catch(() => null)
+  if (!read || read.state !== 'resolved') return 'unknown'
+  // A seller with another id is not this shop's: its market says nothing about it.
+  if (read.shop.id !== expectedId) return 'unknown'
+  return planPauseMarketOf(readPublicSellerMarket(read.shop)?.market_code)
 }
 
 export function planPauseDeps(): PlanPauseDeps {
@@ -61,6 +82,7 @@ export function planPauseDeps(): PlanPauseDeps {
       return plan.reason === 'unavailable' ? null : plan
     },
     readLegacy: readPlanLegacyState,
+    readMarket: (shop) => readShopMarket(shop.slug, shop.metadata),
     readSellerStatus: async (shop): Promise<SellerStatusFact> => {
       const read = await readSellerStatus(medusaSellerIdOf(shop.metadata))
       if (read.state === 'resolved') return read.status

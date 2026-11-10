@@ -12,11 +12,18 @@
  *
  * The END notice of a new shop says «tu tienda está en pausa», so it is sent only once the pause job has CLAIMED the
  * pause (`plan_pause`, lib/plan-pause.ts) — before that, or while the job's timer is still off, the sentence would be
- * false. Its seven-day window runs from the pause, not from the trial's end, for the same reason. A legacy end notice
+ * false. Its seven-day window runs from the pause, not from the trial's end, for the same reason.
+ *
+ * A new shop that is not KNOWN to be in Mexico gets NOTHING (plan-tienda S3.3 review): the pause job never pauses it
+ * ("No United States plans"), so «elige un plan o se pausa» and «tu tienda está en pausa» would both be false, and
+ * the legacy wording («pasa al Plan Gratis») would promise a plan it does not have — «Tu suscripción» reads it as
+ * having none. Silence is the only sentence that is not false; when there is a plan for it, it gets its own notice.
+ * An unknown market sends nothing this run and is looked at again the next day (nothing is claimed). A legacy end notice
  * that would arrive more than a week after the end (a run that could not look) is not sent: a late notice about a
  * change long past reads as a mistake.
  */
 import { daysLeft, type NegocioTrial, type PlanLegacyState, type PlanState } from './plan'
+import type { PlanPauseMarket } from './plan-pause'
 
 export type TrialNotice = 'fifteen_days' | 'five_days' | 'ended'
 export type TrialNoticeVariant = 'legacy' | 'pause'
@@ -39,12 +46,19 @@ export type TrialNoticeFacts = {
   planPaused: boolean
   /** Its `paused_at`, when readable. */
   pausedAt: string | null
+  /**
+   * The shop's market, needed only for a new shop (a legacy shop's wording does not depend on it). For a paused shop
+   * it is the market the claim recorded (`claimMarket`): a paused seller is hidden from the public read.
+   */
+  market: PlanPauseMarket
 }
 
 export function decideTrialNotice(trial: NegocioTrial | null, plan: PlanState, now: Date, facts: TrialNoticeFacts): TrialNotice | null {
   if (!trial) return null
   // A paid shop gets nothing; a plan that could not be read is never guessed at.
   if (plan.plan === 'negocio' || plan.plan === 'tienda' || plan.reason === 'unavailable') return null
+  // A new shop outside Mexico, or whose market could not be read, gets none (see the header).
+  if (noticeVariantFor(facts.legacy) === 'pause' && facts.market !== 'mx') return null
   if (plan.plan === 'trial') {
     const left = daysLeft(plan, now)
     if (left === null) return null

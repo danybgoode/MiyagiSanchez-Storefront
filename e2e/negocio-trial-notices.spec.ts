@@ -26,9 +26,9 @@ const negocio: PlanState = { plan: 'negocio', reason: 'subscription', endsAt: nu
 const tienda: PlanState = { plan: 'tienda', reason: 'tienda_one_time', endsAt: '2027-11-04T12:00:00.000Z' }
 const unavailable: PlanState = { plan: 'gratis', reason: 'unavailable', endsAt: null }
 
-const LEGACY: TrialNoticeFacts = { legacy: 'marked', planPaused: false, pausedAt: null }
-const NEW: TrialNoticeFacts = { legacy: 'absent', planPaused: false, pausedAt: null }
-const NEW_PAUSED = (pausedAt: string | null = new Date(NOW.getTime() - DAY).toISOString()): TrialNoticeFacts => ({ legacy: 'absent', planPaused: true, pausedAt })
+const LEGACY: TrialNoticeFacts = { legacy: 'marked', planPaused: false, pausedAt: null, market: 'unknown' }
+const NEW: TrialNoticeFacts = { legacy: 'absent', planPaused: false, pausedAt: null, market: 'mx' }
+const NEW_PAUSED = (pausedAt: string | null = new Date(NOW.getTime() - DAY).toISOString()): TrialNoticeFacts => ({ legacy: 'absent', planPaused: true, pausedAt, market: 'mx' })
 
 test.describe('the reminders at 15 and at 5 days (D8)', () => {
   for (const facts of [LEGACY, NEW]) {
@@ -91,6 +91,28 @@ test.describe('the end notice: two variants by the legacy marker', () => {
     const ended = trialEnding(-1)
     expect(decideTrialNotice(ended, unpaid, NOW, LEGACY)).toBeNull()
     expect(decideTrialNotice(ended, gratisEnded, NOW, NEW_PAUSED())).toBeNull()
+  })
+})
+
+test.describe('a new shop not KNOWN to be in Mexico gets no notice (S3.3 review)', () => {
+  for (const market of ['other', 'unknown'] as const) {
+    test(`market ${market}: no reminder and no end notice, paused or not`, () => {
+      const t15 = trialEnding(15)
+      const t5 = trialEnding(5)
+      expect(decideTrialNotice(t15, trialPlan(t15), NOW, { ...NEW, market })).toBeNull()
+      expect(decideTrialNotice(t5, trialPlan(t5), NOW, { ...NEW, market })).toBeNull()
+      expect(decideTrialNotice(trialEnding(-1), unpaid, NOW, { ...NEW_PAUSED(), market })).toBeNull()
+    })
+  }
+  test('a legacy shop keeps its Plan Gratis notices whatever its market (its wording does not depend on it)', () => {
+    const t5 = trialEnding(5)
+    expect(decideTrialNotice(t5, trialPlan(t5), NOW, { ...LEGACY, market: 'other' })).toBe('five_days')
+    expect(decideTrialNotice(trialEnding(-1), gratisEnded, NOW, { ...LEGACY, market: 'other' })).toBe('ended')
+  })
+  test('the shell reads the market only for a new shop, and a paused one from its claim', () => {
+    const shell = readFileSync('lib/negocio-trial-notices-server.ts', 'utf8')
+    expect(shell).toMatch(/if \(readPlanLegacyState\(metadata\) !== 'absent'\) return 'unknown'\s+if \(hasPlanPause\(metadata\)\) return claimMarket\(metadata\)\s+return readShopMarket\(slug, metadata\)/)
+    expect(shell).toContain('market: await marketFor(row.slug, row.metadata)')
   })
 })
 
