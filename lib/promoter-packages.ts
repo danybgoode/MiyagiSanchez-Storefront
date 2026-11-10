@@ -222,6 +222,23 @@ export function startsRenewalWindow(sku: string | null, renewalSku: RenewalSku =
   return !!sku && (RENEWAL_ANCHOR_SKUS[renewalSku] as readonly string[]).includes(sku)
 }
 
+export type RenewalDecision = { action: 'record' } | { action: 'skip'; reason: 'not_attributed' | 'outside_window' }
+
+/**
+ * A renewal share (D14): given the EARLIEST paid package for this shop among those that open `renewalSku`'s window
+ * (`RENEWAL_ANCHOR_SKUS`), does a payment at `paidAt` earn that package's promoter the share? Only in months
+ * [12, 24) after it. Pure; the caller reads the anchor. Once per payment is the caller's `payment_ref` (unique).
+ */
+export function decideRenewalShare(input: {
+  renewalSku: RenewalSku
+  anchor: { sku: string | null; paidAt: Date } | null
+  paidAt: Date
+}): RenewalDecision {
+  if (!input.anchor || !startsRenewalWindow(input.anchor.sku, input.renewalSku)) return { action: 'skip', reason: 'not_attributed' }
+  if (!isRenewalPayment(input.anchor.paidAt, input.paidAt)) return { action: 'skip', reason: 'outside_window' }
+  return { action: 'record' }
+}
+
 /** The Negocio packages: a sale of one after a `tienda_anual` supersedes the upgrade share. */
 export const NEGOCIO_PACKAGE_SKUS: readonly PackageSku[] = PACKAGE_SKUS.filter(
   (sku) => packageMonths(sku, 'negocio') > 0 && packageMonths(sku, 'tienda') === 0,
