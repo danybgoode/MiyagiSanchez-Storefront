@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { PLAN_PAUSE_KEY, PLAN_RESTORE_REASON } from '../lib/plan-pause'
+import { PACKAGES, applyPackageGrants, type PackageSku } from '../lib/promoter-packages'
 import { restoreAfterPlanPaid, restoreOutcomeOf, type PlanRestoreDeps, type RestoreCallResult } from '../lib/plan-restore'
 import { PLAN_PAUSED_HEADLINE, PLAN_PAUSED_NOTICE, PLAN_PAUSED_PAID_NOTICE, negocioPageView } from '../lib/negocio-page'
 import type { PlanState } from '../lib/plan'
@@ -171,4 +172,35 @@ test.describe('a paused owner can still reach «Tu suscripción» and both check
       expect(src).not.toMatch(/getMySeller/)
     })
   }
+})
+
+test.describe('the promoter package and transfer paths reach the restore (sprint 4 rebase)', () => {
+  test('both the card package and the approved transfer apply every grant through the two restoring wrappers', () => {
+    const server = readFileSync('lib/promoter-package-server.ts', 'utf8')
+    expect(server).toContain("apply: (plan, input) => (plan === 'negocio' ? applyNegocioPayment(input) : applyTiendaPayment(input)),")
+    expect(server).toMatch(/applyPackageGrants\([\s\S]{0,200}PACKAGE_GRANT_DEPS\)/)
+    expect(readFileSync('lib/promoter-grant-server.ts', 'utf8')).toMatch(/applyPackageGrants\([\s\S]{0,200}PACKAGE_GRANT_DEPS,/)
+  })
+
+  test('a redelivery that completes a half-written package still reaches the wrapper (and so the restore) for every grant', async () => {
+    const sku = (Object.keys(PACKAGES) as PackageSku[]).find((k) => PACKAGES[k].grants.length >= 2)
+    if (!sku) throw new Error('no two-grant package to test')
+    const written = new Set<string>()
+    const restoredOn: string[] = []
+    // The wrappers' rule, restated as the dep: apply the grant, then restore on written OR replay.
+    const deps = {
+      apply: async (plan: 'negocio' | 'tienda', input: { paymentId: string }) => {
+        const key = `${plan}:${input.paymentId}`
+        const outcome = written.has(key) ? ('replay' as const) : ('written' as const)
+        written.add(key)
+        restoredOn.push(`${plan}:${outcome}`)
+        return outcome
+      },
+    }
+    // First delivery dies after the first grant: only that half is written.
+    written.add(`${PACKAGES[sku].grants[0].plan}:cs_1`)
+    const out = await applyPackageGrants({ sku, shopId: 'shop_1', paymentId: 'cs_1' }, deps)
+    expect(out).toBe('written')
+    expect(restoredOn).toEqual(PACKAGES[sku].grants.map((g, i) => `${g.plan}:${i === 0 ? 'replay' : 'written'}`))
+  })
 })
