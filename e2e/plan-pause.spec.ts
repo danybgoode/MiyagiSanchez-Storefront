@@ -17,6 +17,7 @@ import {
   hadPlanThatEnded,
   hasPlanPause,
   pauseOutcomeOf,
+  unpauseOutcomeOf,
   planPauseClaimArgs,
   planPauseClearArgs,
   planPauseMarketOf,
@@ -178,6 +179,10 @@ test.describe('the Backend answer', () => {
     expect(pauseOutcomeOf({ ok: true, to: 'paused', complete: false })).toEqual({ outcome: 'paused', complete: false })
     expect(pauseOutcomeOf({ ok: false, status: 409, message: 'ya' })).toEqual({ outcome: 'already_paused' })
     expect(pauseOutcomeOf({ ok: false, status: 400, message: 'no' }).outcome).toBe('failed')
+    // Any 5xx, Medusa-authored 500 included, is unknown: it may have unlinked before failing (verifier S3).
+    for (const status of [500, 502, 503, 504]) expect(pauseOutcomeOf({ ok: false, status, message: 'x' }).outcome).toBe('unknown')
+    for (const status of [500, 503]) expect(unpauseOutcomeOf({ ok: false, status, message: 'x' }).outcome).toBe('unknown')
+    expect(unpauseOutcomeOf({ ok: false, status: 400, message: 'x' }).outcome).toBe('failed')
     expect(pauseOutcomeOf({ ok: 'unknown', message: 'timeout' }).outcome).toBe('unknown')
     expect(pauseOutcomeOf({ ok: true, to: 'active', complete: false }).outcome).toBe('failed')
   })
@@ -270,6 +275,14 @@ test.describe('runPlanPause — validate, claim, re-check, apply, release', () =
     const run = await runPlanPause(deps, { dryRun: false })
     expect(run).toMatchObject({ ok: true, paused: 1, failed: 0 })
     expect(log.filter((l) => !l.startsWith('page'))).toEqual(['market:a', 'plan:a', 'status:a', `claim:a:${NOW.toISOString()}`, 'plan:a', 'pause:a', 'readClaim:a', 'plan:a'])
+  })
+
+  test('a Medusa 500 on the pause keeps the claim (it may have unlinked first) and alerts', async () => {
+    const { deps, log, alerts } = harness({ shops: [shop('a')], pause: pauseOutcomeOf({ ok: false, status: 500, message: 'boom' }) })
+    const run = await runPlanPause(deps, { dryRun: false })
+    expect(run.ok && run.candidates[0].result).toBe('unknown')
+    expect(log.some((l) => l.startsWith('release'))).toBe(false)
+    expect(alerts).toHaveLength(1)
   })
 
   test('a Backend failure releases exactly the claim written, so the next run retries, and alerts', async () => {

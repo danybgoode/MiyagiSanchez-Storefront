@@ -95,6 +95,7 @@ test.describe('restoreAfterPlanPaid (D10)', () => {
     expect(restoreOutcomeOf({ ok: true, to: 'active', complete: true })).toEqual({ outcome: 'active', complete: true })
     expect(restoreOutcomeOf({ ok: false, status: 409, message: 'ya' })).toEqual({ outcome: 'already_active' })
     expect(restoreOutcomeOf({ ok: false, status: 400, message: 'x' }).outcome).toBe('failed')
+    expect(restoreOutcomeOf({ ok: false, status: 500, message: 'x' }).outcome).toBe('unknown')
     expect(restoreOutcomeOf({ ok: 'unknown', message: 't' }).outcome).toBe('unknown')
     expect(restoreOutcomeOf({ ok: true, to: 'paused', complete: false }).outcome).toBe('failed')
   })

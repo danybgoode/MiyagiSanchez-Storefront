@@ -223,6 +223,10 @@ export function pauseOutcomeOf(result: StatusChangeAnswer): PauseCallResult {
   if (result.ok === false) {
     // The Backend answers 409 only for `no_change` (`planSellerStatusChange`): the seller was already paused.
     if (result.status === 409) return { outcome: 'already_paused' }
+    // ANY 5xx is "we do not know", not "it did not happen" (verifier S3): a 500 Medusa authors after the unlinks ran
+    // leaves a dark shop reading `active`. `changeSellerStatus` calls only 502/503/504 ambiguous; this caller is
+    // stricter on purpose, because releasing the claim here is the one mistake a payment cannot repair.
+    if (result.status >= 500) return { outcome: 'unknown', detail: `HTTP ${result.status}: ${result.message}` }
     return { outcome: 'failed', detail: `HTTP ${result.status}: ${result.message}` }
   }
   // `to` is the status the seller ACTUALLY holds: a pause whose every unlink failed leaves it active.
@@ -245,6 +249,7 @@ export function unpauseOutcomeOf(result: StatusChangeAnswer): UnpauseCallResult 
   if (result.ok === 'unknown') return { outcome: 'unknown', detail: result.message }
   if (result.ok === false) {
     if (result.status === 409) return { outcome: 'already_active' }
+    if (result.status >= 500) return { outcome: 'unknown', detail: `HTTP ${result.status}: ${result.message}` }
     return { outcome: 'failed', detail: `HTTP ${result.status}: ${result.message}` }
   }
   if (result.to === 'active') return { outcome: 'active', complete: result.complete }

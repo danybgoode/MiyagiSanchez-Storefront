@@ -70,6 +70,8 @@ export function restoreOutcomeOf(result: RestoreStatusAnswer): RestoreCallResult
     // 409 is only `no_change` (`planSellerStatusChange`): the seller is active already — an earlier restore whose
     // clear failed, or an admin who reactivated it by hand.
     if (result.status === 409) return { outcome: 'already_active' }
+    // Any 5xx is "we do not know" (verifier S3). Both keep the claim and alert today; the label says which it was.
+    if (result.status >= 500) return { outcome: 'unknown', detail: `HTTP ${result.status}: ${result.message}` }
     return { outcome: 'failed', detail: `HTTP ${result.status}: ${result.message}` }
   }
   if (result.to === 'active') return { outcome: 'active', complete: result.complete }
