@@ -10,7 +10,7 @@
  *
  * Refusals, all before anything is written:
  *   - `--shop` missing, or `--trial-end` not an instant with an explicit zone (`Z` or `+hh:mm`);
- *   - a shop whose name AND slug both lack «prueba» or «test» (any case) — so a real merchant's trial is never moved
+ *   - a shop whose name AND slug both lack the whole word «prueba» or «test» (any case) — so a real merchant's trial is never moved
  *     by a typo in an id — unless `--force` is passed;
  *   - a shop with no readable trial (its owner has not opened the panel yet, so there is nothing to move);
  *   - an unknown argument.
@@ -56,9 +56,13 @@ export function parseArgs(argv: readonly string[]): SetTrialEndArgs {
   return { ok: true, shopId, trialEnd: new Date(ms).toISOString(), apply, force }
 }
 
-/** «prueba» or «test» in the name or the slug, any case. */
+/**
+ * «prueba» or «test» as a WHOLE WORD in the name or the slug, any case: «Tienda de prueba», `qa-test-1`. Not a
+ * substring, so «contestar» or «protesta» never pass for a test shop (verifier nit). A word here is bounded by
+ * anything that is not a letter or digit, accented letters included, so «pruebá» is not «prueba».
+ */
 export function looksLikeTestShop(shop: { name: string | null; slug: string | null }): boolean {
-  return /prueba|test/i.test(`${shop.name ?? ''} ${shop.slug ?? ''}`)
+  return /(^|[^\p{L}\p{N}])(prueba|test)($|[^\p{L}\p{N}])/iu.test(`${shop.name ?? ''} ${shop.slug ?? ''}`)
 }
 
 export type TrialEndShop = { id: string; slug: string | null; name: string | null; metadata: unknown }
