@@ -9,7 +9,6 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
-  PLAN_LEGACY_CUTOFF,
   PLAN_LEGACY_KEY,
   NEGOCIO_TRIAL_KEY,
   buildPlanLegacy,
@@ -72,11 +71,25 @@ test.describe('planLegacyMarking — who gets the marker', () => {
     for (const d of decisions) expect(d).toEqual({ shopId: d.shopId, slug: d.slug, action: 'skip', why: 'unreadable' })
   })
 
-  test('the default cutoff is the constant in lib/plan.ts, and a cutoff that is not a date refuses to plan', () => {
-    expect(Number.isFinite(Date.parse(PLAN_LEGACY_CUTOFF))).toBe(true)
-    const justBefore = new Date(Date.parse(PLAN_LEGACY_CUTOFF) - 1).toISOString()
-    expect(planLegacyMarking([shop('a', justBefore), shop('b', PLAN_LEGACY_CUTOFF)]).map((d) => d.action)).toEqual(['mark', 'skip'])
+  test('the cutoff is the caller\'s and nothing else: no constant in the code, no default, and a non-date refuses to plan', () => {
+    const plan = readFileSync('lib/plan.ts', 'utf8')
+    expect(plan).not.toContain('PLAN_LEGACY_CUTOFF')
+    expect(plan).toContain('export function planLegacyMarking(shops: readonly ShopForLegacyMarking[], cutoff: string): LegacyMarkingDecision[] {')
+    // The same shop, two cutoffs: only the argument decides.
+    const s = [shop('a', '2026-11-11T15:00:00Z')]
+    expect(planLegacyMarking(s, '2026-11-10T00:00:00.000Z')[0].why).toBe('created_after_cutoff')
+    expect(planLegacyMarking(s, '2026-11-12T00:00:00.000Z')[0].why).toBe('unmarked_before_cutoff')
     expect(() => planLegacyMarking([shop('a', BEFORE)], 'soon')).toThrow()
+    expect(() => planLegacyMarking([shop('a', BEFORE)], undefined as unknown as string)).toThrow()
+  })
+
+  test('derivePlan depends on the marker only, never on a date: the same shop, marked or not, at any creation date', () => {
+    const src = readFileSync('lib/plan.ts', 'utf8')
+    const derive = src.slice(src.indexOf('export function derivePlan('), src.indexOf('/** The two subscription answers'))
+    expect(derive).not.toMatch(/created_at|cutoff/i)
+    const facts = { hasActiveSubscription: false, hasActiveTiendaSubscription: false }
+    expect(derivePlanFromMetadata({ created_at: '2020-01-01T00:00:00Z' }, facts, new Date('2027-01-01T00:00:00Z')).plan).toBe('unpaid')
+    expect(derivePlanFromMetadata({ [PLAN_LEGACY_KEY]: marker }, facts, new Date('2040-01-01T00:00:00Z')).plan).toBe('gratis')
   })
 
   test('what the plan promises: once marked, an ended trial is Plan Gratis; unmarked, it is unpaid', () => {
@@ -158,15 +171,53 @@ test.describe('reading the table — paged, and never a partial list', () => {
 test.describe('the script shell', () => {
   const src = readFileSync('scripts/mark-plan-legacy.ts', 'utf8')
 
-  test('defaults to a dry run and refuses unknown flags', () => {
-    expect(parseArgs([])).toEqual({ ok: true, apply: false })
-    expect(parseArgs(['--dry-run'])).toEqual({ ok: true, apply: false })
-    expect(parseArgs(['--apply'])).toEqual({ ok: true, apply: true })
-    expect(parseArgs(['--aply']).ok).toBe(false)
+  const NOW = new Date('2026-11-12T20:00:00.000Z')
+  const C = '2026-11-12T18:30:00Z'
+
+  test('--cutoff is required; with it the run defaults to a dry run; unknown flags are refused', () => {
+    expect(parseArgs(['--cutoff', C], NOW)).toEqual({ ok: true, apply: false, cutoff: '2026-11-12T18:30:00.000Z' })
+    expect(parseArgs(['--cutoff', C, '--dry-run'], NOW)).toEqual({ ok: true, apply: false, cutoff: '2026-11-12T18:30:00.000Z' })
+    expect(parseArgs(['--apply', `--cutoff=${C}`], NOW)).toEqual({ ok: true, apply: true, cutoff: '2026-11-12T18:30:00.000Z' })
+    expect(parseArgs(['--cutoff', C, '--aply'], NOW).ok).toBe(false)
+    for (const missing of [[], ['--apply'], ['--dry-run']]) {
+      const r = parseArgs(missing, NOW)
+      expect(r).toMatchObject({ ok: false })
+      if (!r.ok) expect(r.error).toContain('missing --cutoff')
+    }
+  })
+
+  test('the cutoff must be an instant with an explicit zone — a bare date or a local time is a different moment on each machine', () => {
+    // A zone offset is honoured and printed in UTC.
+    expect(parseArgs(['--cutoff', '2026-11-12T12:30:00-06:00'], NOW)).toMatchObject({ ok: true, cutoff: '2026-11-12T18:30:00.000Z' })
+    expect(parseArgs(['--cutoff', '2026-11-12T18:30Z'], NOW)).toMatchObject({ ok: true, cutoff: '2026-11-12T18:30:00.000Z' })
+    for (const bad of ['', 'soon', '2026-11-12', '2026-11-12T18:30:00', '2026-11-12 18:30:00Z', '12/11/2026', '1762972200000', '2026-13-40T00:00:00Z', '--apply']) {
+      const r = parseArgs(['--cutoff', bad], NOW)
+      expect({ bad, ok: r.ok }).toEqual({ bad, ok: false })
+      if (!r.ok) expect(r.error).toContain('--cutoff must be an ISO instant')
+    }
+    expect(parseArgs(['--cutoff'], NOW).ok).toBe(false)
+  })
+
+  test('a cutoff in the future is refused: nothing created after the run can ever be covered by it', () => {
+    const future = parseArgs(['--cutoff', '2026-11-12T20:00:00.001Z'], NOW)
+    expect(future.ok).toBe(false)
+    if (!future.ok) expect(future.error).toContain('is in the future')
+    expect(parseArgs(['--cutoff', '2026-11-13T00:00:00Z', '--apply'], NOW).ok).toBe(false)
+    // Exactly now, and one millisecond ago, are fine.
+    expect(parseArgs(['--cutoff', '2026-11-12T20:00:00.000Z'], NOW).ok).toBe(true)
+    expect(parseArgs(['--cutoff', '2026-11-12T19:59:59.999Z'], NOW).ok).toBe(true)
+  })
+
+  test('the boundary, end to end: the parsed cutoff marks a shop created one millisecond before it and not one created at it', () => {
+    const parsed = parseArgs(['--cutoff', '2026-11-12T12:30:00-06:00'], NOW)
+    if (!parsed.ok) throw new Error('expected a cutoff')
+    const decisions = planLegacyMarking([shop('before', '2026-11-12T18:29:59.999Z'), shop('at', '2026-11-12T18:30:00.000Z'), shop('later-that-day', '2026-11-12T19:00:00Z')], parsed.cutoff)
+    expect(decisions.map((d) => [d.slug, d.action])).toEqual([['before', 'mark'], ['at', 'skip'], ['later-that-day', 'skip']])
+    expect(formatLegacyMarkingReport('DRY RUN', parsed.cutoff, decisions)[0]).toBe('[plan:mark-legacy] DRY RUN — cutoff 2026-11-12T18:30:00.000Z')
   })
 
   test('the dry run returns before the first write', () => {
-    const dryReturn = src.indexOf("console.log('[plan:mark-legacy] dry run — nothing written. Re-run with --apply.')\n    return")
+    const dryReturn = src.indexOf('console.log(`[plan:mark-legacy] dry run — nothing written. Re-run with --cutoff ${parsed.cutoff} --apply.`)\n    return')
     expect(dryReturn).toBeGreaterThan(0)
     expect(src.indexOf("db.rpc('merge_shop_metadata'")).toBeGreaterThan(dryReturn)
     // The only write in the file is that one guarded merge: no update, upsert, insert or delete.
@@ -178,7 +229,10 @@ test.describe('the script shell', () => {
     expect(src).toContain('p_guard_key: PLAN_LEGACY_KEY')
     expect(src).toContain('p_guard_mode: d.guard.mode')
     expect(src).toContain("process.argv[1]?.endsWith('mark-plan-legacy.ts')")
-    expect(src).toContain('planLegacyMarking(await readShops(db), PLAN_LEGACY_CUTOFF)')
+    // The plan, the report and the recount all use the cutoff that was passed — there is no other.
+    expect(src.match(/planLegacyMarking\(await readShops\(db\), parsed\.cutoff\)/g)).toHaveLength(2)
+    expect(src).toContain("formatLegacyMarkingReport(parsed.apply ? 'APPLY' : 'DRY RUN', parsed.cutoff, decisions)")
+    expect(src).not.toContain('PLAN_LEGACY_CUTOFF')
     // The table is read through the paged reader, never one unpaged select.
     expect(src).toContain("}, LEGACY_PAGE_SIZE, 'marketplace_shops')")
     expect(src).toContain('.range(from, to)')

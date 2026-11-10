@@ -3,8 +3,8 @@
  * widened by epic 08 · plan-tienda-three-free-months, README D1–D4).
  *
  * Miyagi Sánchez has two paid plans, **Tienda** and **Negocio**, a dated Negocio trial that every shop gets once, and
- * **Gratis**, which since plan-tienda means LEGACY Plan Gratis only: the shops that existed before
- * `PLAN_LEGACY_CUTOFF` keep it for good. A shop with none of those is **unpaid**. This module answers
+ * **Gratis**, which since plan-tienda means LEGACY Plan Gratis only: the shops that carry the legacy marker (those
+ * that existed when `scripts/mark-plan-legacy.ts` was run) keep it for good. A shop with none of those is **unpaid**. This module answers
  * "gratis, trial, tienda, negocio or unpaid?" from these facts and nothing else:
  *
  *   1. `metadata.negocio_grant` — a `comp` (hand-granted, permanent) or a dated `one_time` grant (a yearly payment, or
@@ -51,14 +51,11 @@ export const PLAN_LEGACY_KEY = 'plan_legacy'
 /** The two metadata keys that hold a dated plan grant. The grant readers and builders below take one of them. */
 export type PlanGrantKey = typeof NEGOCIO_GRANT_KEY | typeof TIENDA_GRANT_KEY
 
-/**
- * A shop created BEFORE this instant is a legacy shop: it is marked and keeps Plan Gratis for good (README D2).
- *
- * ⚠️ PLACEHOLDER — the orchestrator sets this to the day sprint 1 deploys, BEFORE `scripts/mark-plan-legacy.ts` is
- * run in production. It is a constant, not "now", on purpose: it is what stops a RERUN of the script, weeks later,
- * from marking a shop that was opened after the change and was never promised Plan Gratis.
- */
-export const PLAN_LEGACY_CUTOFF = '2026-11-10T00:00:00.000Z'
+// There is deliberately NO cutoff date in this module (PR #484 review). Whether a shop is legacy is decided by the
+// MARKER and nothing else: `derivePlan` never compares a date. The instant that separates "existed before" from
+// "opened after" is an argument of the one run that writes the markers (`scripts/mark-plan-legacy.ts --cutoff`),
+// chosen by a person on the day it runs. A constant here would have to be guessed before that day, and a wrong
+// guess leaves the shops opened in between unmarked — and unmarked is what gets a shop paused.
 
 /** `gratis` is LEGACY Plan Gratis only. `unpaid` is a shop with no live plan and no legacy marker (README D1). */
 export type PlanName = 'gratis' | 'trial' | 'tienda' | 'negocio' | 'unpaid'
@@ -660,12 +657,13 @@ export type LegacyMarkingDecision = {
  * Which shops get the legacy marker: every row created BEFORE `cutoff` that has none, owned or not (an imported shop
  * claimed later was promised the same page). A row is never marked twice, and a row created at or after the cutoff
  * is never marked — that is what makes a rerun safe.
+ * `cutoff` is REQUIRED and has no default: the caller states the instant, this function never assumes one.
  *
  * `unreadable` is its own outcome, never folded into "skip, fine": a marker we cannot parse, or a `created_at` we
  * cannot parse, is a row we could not decide. It is reported and left for a person; overwriting a value we do not
  * understand, or guessing which side of the cutoff a shop is on, are both how a promise gets broken quietly.
  */
-export function planLegacyMarking(shops: readonly ShopForLegacyMarking[], cutoff: string = PLAN_LEGACY_CUTOFF): LegacyMarkingDecision[] {
+export function planLegacyMarking(shops: readonly ShopForLegacyMarking[], cutoff: string): LegacyMarkingDecision[] {
   const cutoffMs = Date.parse(cutoff)
   if (!Number.isFinite(cutoffMs)) throw new Error(`planLegacyMarking: the cutoff is not a date (got ${cutoff})`)
   return shops.map((s) => {

@@ -2,13 +2,24 @@
  * scripts/mark-plan-legacy.ts
  *
  * Marks every shop that ALREADY EXISTS as legacy, so it keeps Plan Gratis for good (epic 08 ·
- * plan-tienda-three-free-months S1.2, README D2). Every row of `marketplace_shops` created before
- * `PLAN_LEGACY_CUTOFF` gets `metadata.plan_legacy = { marked_at }`, owned or not: an imported shop claimed later was
+ * plan-tienda-three-free-months S1.2, README D2). Every row of `marketplace_shops` created before the
+ * `--cutoff` instant gets `metadata.plan_legacy = { marked_at }`, owned or not: an imported shop claimed later was
  * promised the same page. Without the marker `lib/plan.ts` resolves a shop with no live plan to `unpaid`, which is
  * what the pause job (sprint 3) acts on — so this runs, and is verified, BEFORE that job is deployed.
  *
- *   npm run plan:mark-legacy                 # DRY RUN — reads, plans, writes nothing
- *   npm run plan:mark-legacy -- --apply      # writes
+ *   npm run plan:mark-legacy -- --cutoff 2026-11-12T18:30:00Z             # DRY RUN — reads, plans, writes nothing
+ *   npm run plan:mark-legacy -- --cutoff 2026-11-12T18:30:00Z --apply     # writes
+ *
+ * `--cutoff <ISO instant>` is REQUIRED (PR #484 review). It is the moment the promise «gratis para siempre» stopped
+ * being made to new shops — in practice, the moment the new pricing went live. It is an argument and not a constant
+ * in the code because it is only known on the day: a date typed into the code beforehand leaves every shop opened
+ * between that date and the real one unmarked. Three refusals:
+ *   - missing, or not an instant with an explicit zone (`Z` or `+hh:mm`): a bare date or a local time would mean a
+ *     different moment on the VM (UTC) than on a laptop in Mexico City;
+ *   - in the FUTURE: a shop that does not exist yet must never be covered by a run that already happened. With a
+ *     future cutoff a rerun tomorrow would mark shops opened after the change;
+ *   - anything this script does not recognise.
+ * The cutoff used is printed on the first line of every report.
  *
  * `--dry-run` is the default and stays FULLY read-only. The decision lives in `lib/plan.ts` (`planLegacyMarking`,
  * unit-tested); this file only reads shops, asks the planner and writes what it says. Each write is
@@ -16,7 +27,8 @@
  * planner picks the guard that matches what was read), and only a row that the write RETURNED is counted. A marker
  * that appeared between the read and the write is left exactly as it is.
  *
- * The cutoff is what makes a rerun safe: a shop opened after the change is never marked, however late this runs.
+ * The cutoff is what makes a rerun safe: a shop opened after it is never marked, however late this runs. A rerun
+ * must pass the SAME cutoff as the first run.
  *
  * A read failure, an empty table, any failed write, a row that could not be decided, or a recount that still finds
  * shops to mark exits non-zero: a marking run that "succeeds" at nothing reads as a passing gate.
@@ -27,7 +39,6 @@
 import process from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import {
-  PLAN_LEGACY_CUTOFF,
   PLAN_LEGACY_KEY,
   buildPlanLegacy,
   planLegacyMarking,
@@ -37,15 +48,35 @@ import {
 } from '../lib/plan'
 import { DEFAULT_PAGE_SIZE, readAllPages } from '../lib/paged-read'
 
-/** Parse argv; an unknown flag is fatal rather than silently ignored. */
-export function parseArgs(argv: readonly string[]): { ok: true; apply: boolean } | { ok: false; error: string } {
+/** An instant with seconds optional and an EXPLICIT zone. A bare date, or a time with no zone, is refused: it
+ *  would be read in the machine's own timezone and mean a different moment on each machine. */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/
+
+export type MarkLegacyArgs = { ok: true; apply: boolean; cutoff: string } | { ok: false; error: string }
+
+/**
+ * Parse argv. `--cutoff <ISO instant>` (or `--cutoff=<…>`) is required and must not be in the future; `--apply`
+ * writes; `--dry-run` is the default; an unknown flag is fatal rather than silently ignored. The cutoff comes back
+ * normalised to UTC (`toISOString`), which is the form the report prints.
+ */
+export function parseArgs(argv: readonly string[], now: Date = new Date()): MarkLegacyArgs {
   let apply = false
-  for (const arg of argv) {
+  let raw: string | null = null
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i]
     if (arg === '--apply') { apply = true; continue }
     if (arg === '--dry-run') { apply = false; continue }
+    if (arg === '--cutoff') { raw = argv[i + 1] ?? ''; i += 1; continue }
+    if (arg.startsWith('--cutoff=')) { raw = arg.slice('--cutoff='.length); continue }
     return { ok: false, error: `unknown argument: ${arg}` }
   }
-  return { ok: true, apply }
+  if (raw === null) return { ok: false, error: 'missing --cutoff <ISO instant> (for example --cutoff 2026-11-12T18:30:00Z): the moment new shops stopped being promised Plan Gratis' }
+  const ms = ISO_INSTANT.test(raw) ? Date.parse(raw) : NaN
+  if (!Number.isFinite(ms)) return { ok: false, error: `--cutoff must be an ISO instant with a zone, like 2026-11-12T18:30:00Z or 2026-11-12T12:30:00-06:00 (got "${raw}")` }
+  if (ms > now.getTime()) {
+    return { ok: false, error: `--cutoff ${new Date(ms).toISOString()} is in the future (now is ${now.toISOString()}): a shop that does not exist yet must never be covered by this run` }
+  }
+  return { ok: true, apply, cutoff: new Date(ms).toISOString() }
 }
 
 /** The page the table is read in (`lib/paged-read.ts` explains why it is paged, and why below 1,000). */
@@ -107,11 +138,11 @@ async function main(): Promise<void> {
   if (!parsed.ok) throw new Error(parsed.error)
   const db = client()
 
-  const decisions = planLegacyMarking(await readShops(db), PLAN_LEGACY_CUTOFF)
-  for (const line of formatLegacyMarkingReport(parsed.apply ? 'APPLY' : 'DRY RUN', PLAN_LEGACY_CUTOFF, decisions)) console.log(line)
+  const decisions = planLegacyMarking(await readShops(db), parsed.cutoff)
+  for (const line of formatLegacyMarkingReport(parsed.apply ? 'APPLY' : 'DRY RUN', parsed.cutoff, decisions)) console.log(line)
 
   if (!parsed.apply) {
-    console.log('[plan:mark-legacy] dry run — nothing written. Re-run with --apply.')
+    console.log(`[plan:mark-legacy] dry run — nothing written. Re-run with --cutoff ${parsed.cutoff} --apply.`)
     return
   }
 
@@ -148,8 +179,8 @@ async function main(): Promise<void> {
 
   // Take the count AGAIN from the table (the acceptance: "the count is taken again at apply time"). What matters is
   // the state of the shops now, not what this run believes it wrote.
-  const after = summarizeLegacyMarking(planLegacyMarking(await readShops(db), PLAN_LEGACY_CUTOFF))
-  console.log(`[plan:mark-legacy] recount — rows ${after.total}   marked ${after.alreadyMarked}   still to mark ${after.toMark}   created after the cutoff ${after.afterCutoff}   unreadable ${after.unreadable}`)
+  const after = summarizeLegacyMarking(planLegacyMarking(await readShops(db), parsed.cutoff))
+  console.log(`[plan:mark-legacy] recount (cutoff ${parsed.cutoff}) — rows ${after.total}   marked ${after.alreadyMarked}   still to mark ${after.toMark}   created after the cutoff ${after.afterCutoff}   unreadable ${after.unreadable}`)
 
   if (failures.length) throw new Error(`${failures.length} write(s) failed — re-run to retry (the marking is idempotent)`)
   if (after.toMark > 0) throw new Error(`${after.toMark} shop(s) created before the cutoff are still unmarked — re-run`)
