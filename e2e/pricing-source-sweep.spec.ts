@@ -22,6 +22,10 @@ const ENFORCED_SOURCE = [
   'lib/about-content.ts',
   'app/(shell)/mx/vende/_components/page-config.ts',
   'app/(shell)/mx/precios',
+  // plan-tienda S2.3: «Tu suscripción» and the agents' plan answer state both plans' prices — only through the modules.
+  'lib/negocio-page.ts',
+  'lib/plan-agent.ts',
+  'app/(shell)/shop/manage/negocio',
 ]
 
 /** JSON paths whose prices are NOT ours — each with its reason. */

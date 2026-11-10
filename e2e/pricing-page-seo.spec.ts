@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN } from '../lib/negocio-pricing'
+import { TIENDA_PRICE_MONTHLY_MXN, TIENDA_PRICE_YEARLY_MXN } from '../lib/tienda-pricing'
+import { yearlyAsMonthly } from '../lib/pricing-catalog'
 import { PLATFORM_SITEMAP_ENTRIES } from '../lib/market-sitemap'
 
 /**
@@ -27,9 +29,15 @@ test.describe('/mx/precios · server HTML', () => {
     for (const title of [ui.plans.title, ui.extras.title, ui.processors.title, ui.compare.title]) {
       expect(html, title).toContain(title)
     }
-    // Two plans side by side (plans-gratis-negocio D16), Negocio priced from lib/negocio-pricing.ts.
-    expect(html).toContain('data-testid="precios-plan-gratis"')
+    // The two PAID plans side by side (plan-tienda S2.3), priced from their modules, IVA included; no Plan Gratis.
+    expect(html).toContain('data-testid="precios-plan-tienda"')
     expect(html).toContain('data-testid="precios-plan-negocio"')
+    expect(html).not.toContain('data-testid="precios-plan-gratis"')
+    expect(html).toContain(`Desde $${yearlyAsMonthly(TIENDA_PRICE_YEARLY_MXN)} al mes`)
+    expect(html).toContain(`$${TIENDA_PRICE_YEARLY_MXN} MXN al año`)
+    expect(html).toContain(`$${TIENDA_PRICE_MONTHLY_MXN} MXN al mes`)
+    expect(html.match(/data-testid="precios-plan-(tienda|negocio)-iva"[^>]*>IVA incluido</g)).toHaveLength(2)
+    expect(html).not.toContain('gratis para siempre')
     expect(html).toContain(`$${NEGOCIO_PRICE_MONTHLY_MXN} MXN/mes`)
     expect(html).toContain(`$${YEARLY} MXN/año`)
     // The retired extras are not sold on the page any more.
@@ -52,14 +60,14 @@ test.describe('/mx/precios · server HTML', () => {
     expect(html).toMatch(/href="\/"[^>]*data-testid="precios-primary-cta"|data-testid="precios-primary-cta"[^>]*href="\/"/)
     expect(html).not.toContain('href="/mx/vende"')
     // No unfilled token reached the page.
-    expect(html).not.toMatch(/\{(subdomain|customDomain|mlSync|printAd|migration|negocio|trialDays)\w*\}/)
+    expect(html).not.toMatch(/\{(subdomain|customDomain|mlSync|printAd|migration|negocio|tienda|trial)\w*\}/)
     // The full plan names, never a bare «Negocio es opcional» (Daniel, 2026-11-05).
-    expect(html).toContain('Plan Gratis')
+    expect(html).toContain('Plan Tienda')
     expect(html).toContain('Plan Negocio')
     expect(html).not.toContain('Negocio es opcional')
   })
 
-  test('exposes metadata, OG, canonical and JSON-LD offers for the Negocio prices only', async ({ request }) => {
+  test('exposes metadata, OG, canonical and JSON-LD offers for the two plans\' fixed prices only', async ({ request }) => {
     const html = decode(await (await request.get('/mx/precios')).text())
     expect(html).toContain(ui.metadata.title)
     expect(html).toContain(`<link rel="canonical" href="${BASE_URL}/mx/precios"`)
@@ -70,7 +78,7 @@ test.describe('/mx/precios · server HTML', () => {
     expect(ld).toBeTruthy()
     const offers = ld.mainEntity.itemListElement as Array<{ name: string; price: string; priceCurrency: string }>
     expect(offers.map((o) => o.price).sort()).toEqual(
-      [NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN].map(String).sort(),
+      [TIENDA_PRICE_MONTHLY_MXN, TIENDA_PRICE_YEARLY_MXN, NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN].map(String).sort(),
     )
     expect(offers.every((o) => o.priceCurrency === 'MXN')).toBe(true)
     expect(offers.some((o) => /impreso|Migraci/.test(o.name))).toBe(false)

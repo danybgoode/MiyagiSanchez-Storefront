@@ -55,13 +55,14 @@ import { listingUrlFor } from '@/lib/market-url'
 import { notifyMerchantCloseReceipt } from '@/lib/promoter-close-notify'
 import { MIGRATION_CHECKOUT_KIND } from '@/lib/migration-checkout'
 import { PROMOTER_PACKAGE_CHECKOUT_KIND, handlePromoterPackageComplete } from '@/lib/promoter-package-server'
-import { NEGOCIO_CHECKOUT_KIND } from '@/lib/negocio-subscription'
+import { paidPlanOfKind } from '@/lib/plan-kind'
+import { webhookAnswerStatus, type PlanWebhookOutcome } from '@/lib/plan-subscription-sync'
 import {
-  handleNegocioInvoiceFailed,
-  handleNegocioInvoicePaid,
-  handleNegocioOneTimeComplete,
-  handleNegocioSubscriptionChanged,
-  handleNegocioSubscriptionComplete,
+  handlePlanInvoiceFailed,
+  handlePlanInvoicePaid,
+  handlePlanOneTimeComplete,
+  handlePlanSubscriptionComplete,
+  handlePlanSubscriptionEvent,
 } from '@/lib/negocio-webhook'
 
 /** Metadata key for the `migration` SKU's inert paid/audit marker (no ongoing
@@ -167,12 +168,18 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Handle events ─────────────────────────────────────────────────────────
+  // Set ONLY by a Plan Negocio / Plan Tienda step. A plan step that failed in a way a later delivery can fix makes the
+  // answer a 500, so Stripe retries the event (PR 485 review); every other event type and handler leaves it unset and
+  // keeps its 200. See `webhookAnswerStatus` and the header of lib/negocio-webhook.ts for why a retry is safe.
+  let planOutcome: PlanWebhookOutcome | undefined
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
-      // Negocio and promoter packages are paid to the PLATFORM. An event from a connected account carrying those kinds
-      // could only be a merchant forging metadata on their own account: ignore it (pr-reviewer, #474).
-      if ((event as { account?: string | null }).account && (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND || session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND)) {
+      // The paid plans (Negocio, Tienda) and promoter packages are paid to the PLATFORM. An event from a connected
+      // account carrying those kinds could only be a merchant forging metadata on their own account: ignore it
+      // (pr-reviewer, #474).
+      const sessionPlan = paidPlanOfKind(session.metadata?.kind)
+      if ((event as { account?: string | null }).account && (sessionPlan || session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND)) {
         console.error('[stripe webhook] platform-payee kind from a connected account, ignored:', session.id)
         break
       }
@@ -183,9 +190,10 @@ export async function POST(req: NextRequest) {
           await handleSubdomainSubscriptionComplete(session)
         } else if (session.metadata?.kind === ML_SYNC_CHECKOUT_KIND) {
           await handleMlSyncSubscriptionComplete(session)
-        } else if (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
-          // Negocio monthly (plans-gratis-negocio D6): the Medusa Commerce subscription, per shop.
-          await handleNegocioSubscriptionComplete(session)
+        } else if (sessionPlan) {
+          // Plan Negocio or Plan Tienda, monthly (plans-gratis-negocio D6, plan-tienda D6): the Medusa Commerce
+          // subscription on that plan, per shop.
+          planOutcome = await handlePlanSubscriptionComplete(session, sessionPlan)
         } else {
           await handleSubscriptionCheckoutComplete(session)
         }
@@ -201,9 +209,10 @@ export async function POST(req: NextRequest) {
         // One-time ML-sync cadence (epic 03 · mercadolibre-sync S6): pay a year up
         // front, writing the dated ml_sync_grant.
         await handleMlSyncOneTimeComplete(session)
-      } else if (session.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
-        // Negocio yearly or a promoter package (plans-gratis-negocio D6): paid months added to the shop's grant.
-        await handleNegocioOneTimeComplete(session, event.created)
+      } else if (sessionPlan) {
+        // A yearly Plan Negocio or Plan Tienda, or a promoter package (plans-gratis-negocio D6, plan-tienda D6): paid
+        // months added to that plan's grant on the shop.
+        planOutcome = await handlePlanOneTimeComplete(session, sessionPlan, event.created)
       } else if (session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND) {
         // A promoter pays the platform its share of a package by card (plans-gratis-negocio S4.2, D12).
         await handlePromoterPackageComplete(session)
@@ -218,19 +227,26 @@ export async function POST(req: NextRequest) {
     }
 
     case 'customer.subscription.updated':
-      await handleSubscriptionUpdated(event.data.object as Stripe.Subscription)
+    case 'customer.subscription.deleted': {
+      const subscription = event.data.object as Stripe.Subscription
+      // A plan subscription lives on the PLATFORM account; one on a connected account carrying a plan kind is forged
+      // metadata (the same guard as the checkout above). The plan handler would not find it on the platform anyway.
+      if ((event as { account?: string | null }).account && paidPlanOfKind(subscription.metadata?.kind)) {
+        console.error('[stripe webhook] platform-payee kind from a connected account, ignored:', subscription.id)
+        break
+      }
+      planOutcome = event.type === 'customer.subscription.updated'
+        ? await handleSubscriptionUpdated(subscription)
+        : await handleSubscriptionDeleted(subscription)
       break
-
-    case 'customer.subscription.deleted':
-      await handleSubscriptionDeleted(event.data.object as Stripe.Subscription)
-      break
+    }
 
     case 'invoice.payment_succeeded':
-      await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice)
+      planOutcome = await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice)
       break
 
     case 'invoice.payment_failed':
-      await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice)
+      planOutcome = await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice)
       break
 
     case 'account.updated':
@@ -242,7 +258,7 @@ export async function POST(req: NextRequest) {
       break
   }
 
-  return NextResponse.json({ received: true })
+  return NextResponse.json({ received: true }, { status: webhookAnswerStatus(planOutcome) })
 }
 
 // ── checkout.session.completed ────────────────────────────────────────────────
@@ -1385,10 +1401,11 @@ async function handleSubscriptionCheckoutComplete(session: Stripe.Checkout.Sessi
 
 // ── customer.subscription.updated ─────────────────────────────────────────────
 
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  if (subscription.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
-    await handleNegocioSubscriptionChanged(subscription, false)
-    return
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Promise<PlanWebhookOutcome | undefined> {
+  // Plan Negocio / Plan Tienda (plan-tienda S2.2): the handler RETRIEVES the subscription and sends its current
+  // status to that plan's route — never this event's status, which may be stale (lib/plan-subscription-sync.ts).
+  if (paidPlanOfKind(subscription.metadata?.kind)) {
+    return handlePlanSubscriptionEvent(subscription.id, { deleted: false })
   }
 
   // Custom-domain paywall (S2.2): sync the Medusa status (the entitlement source
@@ -1440,11 +1457,11 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
 // ── customer.subscription.deleted ─────────────────────────────────────────────
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  // Negocio monthly: a definitive cancel returns the shop to its trial or Gratis on the next read.
-  if (subscription.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
-    await handleNegocioSubscriptionChanged(subscription, true)
-    return
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<PlanWebhookOutcome | undefined> {
+  // Plan Negocio / Plan Tienda monthly: the current status (`canceled`) goes to that plan's route, and the shop
+  // falls back to whatever else it holds on the next read. A Negocio cancel also releases a domain held through it.
+  if (paidPlanOfKind(subscription.metadata?.kind)) {
+    return handlePlanSubscriptionEvent(subscription.id, { deleted: true })
   }
 
   // Custom-domain paywall (S2.2): a definitive cancel flips entitlement off and
@@ -1483,17 +1500,17 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
 // ── invoice.payment_succeeded ─────────────────────────────────────────────────
 
-async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
+async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice): Promise<PlanWebhookOutcome | undefined> {
   const stripeSubscriptionId = invoiceSubscriptionId(invoice)
   if (!stripeSubscriptionId) return
 
   // Update billing period on the subscription
   const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
 
-  // Negocio monthly (plans-gratis-negocio D6): the platform is the payee — never the seller transfer below.
-  if (stripeSub.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
-    await handleNegocioInvoicePaid(invoice, stripeSubscriptionId, stripeSub.metadata?.shop_id ?? null)
-    return
+  // Plan Negocio / Plan Tienda monthly (plans-gratis-negocio D6, plan-tienda S2.2): the platform is the payee — never
+  // the seller transfer below. The status sent is the one on `stripeSub`, retrieved just above for this event.
+  if (paidPlanOfKind(stripeSub.metadata?.kind)) {
+    return handlePlanInvoicePaid(invoice, stripeSub)
   }
 
   // Custom-domain paywall (S2.2): a successful renewal (or recovery from past_due)
@@ -1570,7 +1587,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
 // ── invoice.payment_failed ────────────────────────────────────────────────────
 
-async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<PlanWebhookOutcome | undefined> {
   const stripeSubscriptionId = invoiceSubscriptionId(invoice)
   if (!stripeSubscriptionId) return
 
@@ -1579,9 +1596,9 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   // while Stripe retries. Only customer.subscription.deleted disconnects.
   try {
     const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
-    if (sub.metadata?.kind === NEGOCIO_CHECKOUT_KIND) {
-      await handleNegocioInvoiceFailed(stripeSubscriptionId)
-      return
+    if (paidPlanOfKind(sub.metadata?.kind)) {
+      // Plan Negocio / Plan Tienda: the CURRENT status of the subscription just retrieved, to that plan's route.
+      return await handlePlanInvoiceFailed(sub)
     }
     if (sub.metadata?.kind === CUSTOM_DOMAIN_CHECKOUT_KIND) {
       await setCustomDomainSubscriptionStatus(stripeSubscriptionId, 'past_due')

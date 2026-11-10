@@ -3274,11 +3274,11 @@
       },
       "pricing": {
         "heading": "Pricing",
-        "lead": "Your shop is free forever (0% commission). There are two plans, the Free plan and the Negocio plan, and every price is public at miyagisanchez.com/mx/precios.",
+        "lead": "Opening your shop costs nothing: you start with {trialLength} of the Negocio plan free, with no card and 0% commission. After that there are two plans, the Tienda plan and the Negocio plan, and every price, IVA (VAT) included, is public at miyagisanchez.com/mx/precios.",
         "body": [
-          "Free plan, forever: your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.",
-          "Negocio plan: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop tries it for {trialDays} days without paying (the custom domain turns on when you sign up).",
-          "If your trial ends or you cancel, your shop stays open on the Free plan, at your URL miyagisanchez.com/mx/s/your-shop.",
+          "Tienda plan: {tiendaFrom} ({tiendaYearly} in one payment, or {tiendaMonthly}). Your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.",
+          "Negocio plan: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop starts with {trialLength} free (the custom domain turns on when you sign up).",
+          "When your {trialLength} free end you choose a plan; if you don't, your shop is paused with nothing deleted and comes back as soon as you pay. Shops that existed before the paid plans stay on the Free plan.",
           "A separate service: assisted migration, {migrationPrice}.",
           "Your payment processor (Stripe or Mercado Pago) charges its own fee, not us, and the money goes straight to your account. Every price, with its sources: miyagisanchez.com/mx/precios."
         ]
@@ -3326,21 +3326,20 @@
   },
   "precios": {
     "metadata": {
-      "title": "Pricing: Free plan and Negocio plan | Miyagi Sánchez",
-      "description": "With the Free plan your online shop is free forever, with no commission. The Negocio plan lets you connect your own domain, sync Mercado Libre and get more AI help. Every new shop tries it without paying.",
-      "ogAlt": "Miyagi Sánchez pricing: the Free plan forever and the Negocio plan"
+      "title": "Pricing: Tienda plan and Negocio plan | Miyagi Sánchez",
+      "description": "Open your online shop with Miyagi Sánchez and start with {trialLength} of the Negocio plan free, with no card. After that you continue on the Tienda plan or the Negocio plan, with no commission on sales and IVA (VAT) included.",
+      "ogAlt": "Miyagi Sánchez pricing: the Tienda plan and the Negocio plan, IVA (VAT) included"
     },
     "eyebrow": "Pricing",
-    "heroTitle": "Your online shop, free forever.",
-    "heroLead": "With the Free plan you sell with no monthly fee and no commission. When you want more, the Negocio plan lets you connect your own domain, sync Mercado Libre and get more AI help. Every new shop uses it for {trialDays} days without paying.",
-    "primaryCta": "Open your shop for free",
+    "heroTitle": "Your own online shop, with no commission on sales.",
+    "heroLead": "You start with {trialLength} of the Negocio plan free, with no card. Then you choose: the Tienda plan, {tiendaFrom}, or the Negocio plan, with your own domain, Mercado Libre and more AI help. Every price includes IVA (VAT).",
+    "primaryCta": "Open your shop",
     "plans": {
       "title": "Choose your plan",
-      "lead": "You start with {trialDays} days of the Negocio plan without paying. If you don't sign up afterwards, your shop stays open on the Free plan, with all your products.",
-      "monthlySuffix": "or",
-      "recommended": "{trialDays} days free",
-      "cta": "Open your shop for free",
-      "ctaNegocio": "Try it {trialDays} days free",
+      "lead": "{trialLength} of the Negocio plan free to start, with no card. When they end, you continue on the plan that suits you. Prices include IVA (VAT): it is what you pay.",
+      "recommended": "{trialLength} free to start",
+      "cta": "Open your shop",
+      "ctaNegocio": "Start with {trialLength} free",
       "includesLabel": "Includes"
     },
     "extras": {
@@ -3365,24 +3364,28 @@
       "title": "Frequently asked questions",
       "items": [
         {
-          "q": "What happens when my {trialDays} days end?",
-          "a": "Your shop stays open on the Free plan, with your products, your address and your sales. It never closes and you don't have to do anything. Only the Negocio plan's extras pause: the Mercado Libre connection, the monthly check-in and the extra AI help, and a small «Shop powered by Miyagi Sánchez» link appears. Everything comes back as soon as you sign up for the Negocio plan."
+          "q": "What happens when my {trialLength} free end?",
+          "a": "You choose which plan to continue on: the Tienda plan, {tiendaFrom}, or the Negocio plan. If you choose neither, your shop is paused: nothing is deleted, your products, your address and your sales stay saved, and it comes back as soon as you pay for a plan. If your shop existed before the paid plans, it stays on the Free plan as always."
         },
         {
-          "q": "Does the monthly Negocio plan charge itself?",
-          "a": "Yes. It is a subscription: it charges your card every month, and you can cancel it whenever you like from «Tu suscripción». The yearly plan is a single payment for 12 months (interest-free installments available) and does not renew on its own."
+          "q": "Does the monthly payment charge itself?",
+          "a": "Yes. The monthly Tienda or Negocio plan is a subscription: it charges your card every month, and you can cancel it whenever you like from «Tu suscripción». The yearly plan is a single payment for 12 months and does not renew on its own; the Negocio one also comes with interest-free installments."
         },
         {
-          "q": "If I sign up during my {trialDays} free days, do I lose the days I have left?",
-          "a": "No. The monthly plan first charges you when your free days end. The yearly plan is paid the day you buy it, but its 12 months start when your free days end."
+          "q": "If I sign up during my {trialLength} free, do I lose the time I have left?",
+          "a": "No. The monthly plan first charges you when your free time ends. The yearly plan is paid the day you buy it, but its 12 months start when your free time ends."
         },
         {
           "q": "Do I need a card to start?",
-          "a": "No. You open your shop and use the Negocio plan for {trialDays} days without giving any card."
+          "a": "No. You open your shop and use the Negocio plan for {trialLength} without giving any card."
+        },
+        {
+          "q": "Do the prices include IVA (VAT)?",
+          "a": "Yes. The Tienda plan ({tiendaYearly}, or {tiendaMonthly}) and the Negocio plan ({negocioYearly}, or {negocioMonthly}) already include IVA: it is what you pay, with nothing added."
         },
         {
           "q": "Why don't you charge commission?",
-          "a": "Because we earn from the Negocio plan, not from your sales. Every peso you sell is yours; only your payment method charges its fee."
+          "a": "Because we earn from the plans, not from your sales. Every peso you sell is yours; only your payment method charges its fee."
         }
       ]
     }

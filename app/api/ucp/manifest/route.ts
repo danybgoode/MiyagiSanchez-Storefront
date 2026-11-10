@@ -8,6 +8,8 @@
  */
 
 import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN, NEGOCIO_TRIAL_DAYS } from '@/lib/negocio-pricing'
+import { TIENDA_PRICE_MONTHLY_MXN, TIENDA_PRICE_YEARLY_MXN } from '@/lib/tienda-pricing'
+import { trialLengthLabel, yearlyAsMonthly } from '@/lib/pricing-catalog'
 import { NextRequest, NextResponse } from 'next/server'
 import { UCP_CAPABILITIES, MCP_TOOL_NAMES } from '@/lib/ucp/capabilities'
 import { aboutManifestBlock } from '@/lib/about-agent'
@@ -193,10 +195,11 @@ export async function GET(req: NextRequest) {
         seller_plan: {
           method: 'POST',
           url: `${base}/api/ucp/mcp`,
-          description: `Miyagi Sánchez has two plans: Gratis (free forever, with the shop, its URL and subdomain, 0% commission and every payment method) and Negocio ($${NEGOCIO_PRICE_MONTHLY_MXN} MXN a month, or $${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN a year payable in card installments), which adds the custom domain, Mercado Libre sync, far more shop-chat answers and photos, the monthly check-in and no badge. Every new shop gets a ${NEGOCIO_TRIAL_DAYS}-day Negocio trial. A seller's own agent reads the plan with get_plan and starts Negocio with start_negocio (owner token only); entitlement turns on once the payment lands.`,
+          // Every number from its pricing module (plan-tienda S2.3): the two paid plans, IVA included, and the trial length.
+          description: `Miyagi Sánchez has two paid plans, prices in MXN with IVA (VAT) included. Plan Tienda: $${TIENDA_PRICE_YEARLY_MXN} MXN a year in one card payment (from $${yearlyAsMonthly(TIENDA_PRICE_YEARLY_MXN)} MXN a month), or $${TIENDA_PRICE_MONTHLY_MXN} MXN a month; the shop, its URL and subdomain, 0% commission and every payment method. Plan Negocio: $${NEGOCIO_PRICE_MONTHLY_MXN} MXN a month, or $${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN a year payable in card installments; it adds the custom domain, Mercado Libre sync, far more shop-chat answers and photos, the monthly check-in and no badge. Every new shop starts with ${trialLengthLabel(NEGOCIO_TRIAL_DAYS, 'en')} of Plan Negocio free, with no card; then it needs one of the two plans. Shops that existed before the paid plans keep Plan Gratis. A seller's own agent reads the plan with get_plan and starts a plan with start_tienda or start_negocio (owner token only); the plan turns on once the payment lands.`,
           auth: 'authorization_bearer_shop_token',
           note: "Per-shop token (Authorization: Bearer ms_agent_…) generated in the shop's “Agentes e integraciones” settings; scoped to one shop.",
-          mcp_tools: ['get_plan', 'start_negocio'],
+          mcp_tools: ['get_plan', 'start_tienda', 'start_negocio'],
         },
 
         seller_domain_subscription: {

@@ -1,11 +1,12 @@
 /**
  * POST /api/sell/negocio/manage
  *
- * The signed-in owner opens Stripe's page for their MONTHLY Plan Negocio, where they change the card, see their
- * invoices and cancel (Daniel, 2026-11-05). Returns `{ ok: true, url }` or `{ ok: false, error }`.
+ * The signed-in owner opens Stripe's page for their MONTHLY plan — Plan Negocio or, since plan-tienda S2.2, Plan
+ * Tienda — where they change the card, see their invoices and cancel (Daniel, 2026-11-05). Returns `{ ok: true, url }`
+ * or `{ ok: false, error }`. The path keeps its first name: «Tu suscripción» is one page for both plans.
  *
  * Auth first: anonymous is always 401. The shop is the caller's own (`readOwnedShop`), and the subscription must carry
- * this shop AND this user in its metadata (`pickNegocioSubscription`), so the body names nothing.
+ * this shop AND this user in its metadata (`pickPlanSubscription`), so the body names nothing.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'

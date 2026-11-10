@@ -182,6 +182,7 @@ export const MCP_SELLER_TOOLS = [
   'switch_subdomain_cadence',      // subdomain-pricing S3 — monthly↔yearly switch (token-scoped)
   'get_plan',                      // plans-gratis-negocio S3.3 — the shop's plan (negocio / trial / tienda / gratis / unpaid) and what it includes (token-scoped)
   'start_negocio',                 // plans-gratis-negocio S3.3 — Negocio checkout, monthly or yearly (owner token only)
+  'start_tienda',                  // plan-tienda-three-free-months S2.3 — Plan Tienda checkout, monthly or yearly (owner token only)
   'send_feedback',                 // miyagi-partners-mcp S3 — structured product feedback; callable by
                                     // seller AND partner credentials, incl. a viewer-role partner (token-scoped)
 ] as const

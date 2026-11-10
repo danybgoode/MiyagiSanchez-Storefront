@@ -1,15 +1,19 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import {
   buildPricingCatalog,
   fillPricingTokens,
   fillFixedPricingTokens,
   fixedPricingTokens,
   getExtra,
+  tiendaIncludes,
+  trialLengthLabel,
   yearlyAsMonthly,
   type PricingCatalogInput,
 } from '../lib/pricing-catalog'
 import { PROMOTER_SKUS } from '../lib/promoter-skus'
 import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN, NEGOCIO_TRIAL_DAYS } from '../lib/negocio-pricing'
+import { TIENDA_PRICE_MONTHLY_MXN, TIENDA_PRICE_YEARLY_MXN } from '../lib/tienda-pricing'
 import { PLAN_ALLOWANCES } from '../lib/plan-allowances'
 import { SUBDOMAIN_PRICE_YEARLY_MXN, SUBDOMAIN_PRICE_MONTHLY_MXN } from '../lib/subdomain-pricing'
 import { CUSTOM_DOMAIN_PRICE_MXN, CUSTOM_DOMAIN_PRICE_MONTHLY_MXN } from '../lib/domain-pricing'
@@ -38,29 +42,47 @@ test.describe('pricing catalog', () => {
     expect(catalog.extras.map((r) => r.sku)).not.toContain('print_ad')
   })
 
-  test('two plans: Gratis and Negocio, with Negocio priced from lib/negocio-pricing.ts (plans D16)', () => {
+  test('two PAID plans, Plan Tienda and Plan Negocio — Plan Gratis is no longer offered (plan-tienda S2.3)', () => {
     const c = buildPricingCatalog(UNSET)
-    expect(c.plans.map((p) => p.id)).toEqual(['gratis', 'negocio'])
+    expect(c.plans.map((p) => p.id)).toEqual(['tienda', 'negocio'])
     // Always the full plan names, so «Negocio» never reads as "doing business" (Daniel, 2026-11-05).
-    expect(c.plans.map((p) => p.name.es)).toEqual(['Plan Gratis', 'Plan Negocio'])
-    expect(c.plans.map((p) => p.name.en)).toEqual(['Free plan', 'Negocio plan'])
-    const [gratis, negocio] = c.plans
-    expect([gratis.monthlyMxn, gratis.yearlyMxn, gratis.yearlyLabel]).toEqual([null, null, null])
-    expect(gratis.priceLabel.es).toMatch(/^Gratis/)
+    expect(c.plans.map((p) => p.name.es)).toEqual(['Plan Tienda', 'Plan Negocio'])
+    expect(c.plans.map((p) => p.name.en)).toEqual(['Tienda plan', 'Negocio plan'])
+    expect(JSON.stringify(c.plans)).not.toMatch(/Plan Gratis|Free plan|para siempre|forever/)
+    const [tienda, negocio] = c.plans
+    // Plan Tienda: «desde $19 al mes» is the yearly price over twelve months, never typed (D5).
+    expect([tienda.monthlyMxn, tienda.yearlyMxn]).toEqual([TIENDA_PRICE_MONTHLY_MXN, TIENDA_PRICE_YEARLY_MXN])
+    expect(tienda.priceLabel.es).toBe(`Desde $${yearlyAsMonthly(TIENDA_PRICE_YEARLY_MXN)} al mes`)
+    expect(tienda.priceLabel.es).toBe('Desde $19 al mes')
+    expect(tienda.priceDetail.es).toBe(`$${TIENDA_PRICE_YEARLY_MXN} MXN al año, en un solo pago, o $${TIENDA_PRICE_MONTHLY_MXN} MXN al mes`)
     expect([negocio.monthlyMxn, negocio.yearlyMxn]).toEqual([NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN])
     expect(negocio.priceLabel.es).toBe(`$${NEGOCIO_PRICE_MONTHLY_MXN} MXN/mes`)
-    expect(negocio.yearlyLabel?.es).toBe(`$${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN/año (también a meses sin intereses)`)
-    const incl = (p: typeof gratis, loc: 'es' | 'en') => p.includes.map((i) => i[loc]).join(' | ')
+    expect(negocio.priceDetail.es).toBe(`o $${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN/año (también a meses sin intereses)`)
+    // Prices include IVA, and both plans say so (D5).
+    for (const p of c.plans) expect([p.ivaLabel.es, p.ivaLabel.en]).toEqual(['IVA incluido', 'IVA (VAT) included'])
+    const incl = (p: typeof tienda, loc: 'es' | 'en') => p.includes.map((i) => i[loc]).join(' | ')
     for (const loc of ['es', 'en'] as const) {
-      expect(incl(gratis, loc)).toContain(PLAN_ALLOWANCES.gratis.chatAnswersPerMonth.toLocaleString("en-US"))
-      expect(incl(negocio, loc)).toContain(PLAN_ALLOWANCES.negocio.chatAnswersPerMonth.toLocaleString("en-US"))
+      expect(incl(tienda, loc)).toContain(PLAN_ALLOWANCES.tienda.chatAnswersPerMonth.toLocaleString('en-US'))
+      expect(incl(negocio, loc)).toContain(PLAN_ALLOWANCES.negocio.chatAnswersPerMonth.toLocaleString('en-US'))
       expect(incl(negocio, loc)).toContain(String(PLAN_ALLOWANCES.negocio.photosPerMonth))
-      expect(incl(negocio, loc)).toContain(String(NEGOCIO_TRIAL_DAYS))
+      expect(incl(negocio, loc)).toContain(trialLengthLabel(NEGOCIO_TRIAL_DAYS, loc))
     }
     expect(incl(negocio, 'es')).toMatch(/propio dominio/)
     expect(incl(negocio, 'es')).toMatch(/Mercado Libre/)
-    expect(incl(gratis, 'es')).toMatch(/subdominio/)
-    expect(incl(gratis, 'es')).toMatch(/Tienda impulsada por Miyagi Sánchez/)
+    expect(incl(negocio, 'es')).toContain('Todo lo del Plan Tienda')
+    expect(incl(negocio, 'es')).toContain('sin tarjeta')
+    // Plan Tienda includes today's Plan Gratis list.
+    expect(tienda.includes).toEqual(tiendaIncludes())
+    expect(incl(tienda, 'es')).toMatch(/subdominio/)
+    expect(incl(tienda, 'es')).toMatch(/Tienda impulsada por Miyagi Sánchez/)
+  })
+
+  test('the trial length reads «3 meses» only once it is 90 days, and its true length before that (D20)', () => {
+    expect(trialLengthLabel(90, 'es')).toBe('3 meses')
+    expect(trialLengthLabel(90, 'en')).toBe('3 months')
+    expect(trialLengthLabel(30, 'es')).toBe('30 días')
+    expect(trialLengthLabel(45, 'es')).toBe('45 días')
+    expect(fixedPricingTokens('es').trialLength).toBe(trialLengthLabel(NEGOCIO_TRIAL_DAYS, 'es'))
   })
 
   test('the legacy SKU tokens still read their single-source constants', () => {
@@ -138,6 +160,14 @@ test.describe('pricing tokens (D7)', () => {
     expect(fillFixedPricingTokens('{negocioMonthly}', 'en')).toBe(`$${NEGOCIO_PRICE_MONTHLY_MXN} MXN a month`)
   })
 
+  test('the Plan Tienda tokens fill from lib/tienda-pricing.ts, es and en', () => {
+    expect(fillFixedPricingTokens('{tiendaFrom} · {tiendaYearly} · {tiendaMonthly}', 'es')).toBe(
+      `desde $${yearlyAsMonthly(TIENDA_PRICE_YEARLY_MXN)} al mes · $${TIENDA_PRICE_YEARLY_MXN} MXN al año · $${TIENDA_PRICE_MONTHLY_MXN} MXN al mes`,
+    )
+    expect(fillFixedPricingTokens('{tiendaFrom}', 'es')).toBe('desde $19 al mes')
+    expect(fillFixedPricingTokens('{tiendaFrom} · {tiendaMonthly}', 'en')).toBe(`from $19 a month · $${TIENDA_PRICE_MONTHLY_MXN} MXN a month`)
+  })
+
   test('the fixed-only filler leaves admin tokens as written', () => {
     expect(fillFixedPricingTokens('{customDomainYearly} · {printAdPrice}', 'es')).toBe(
       `$${CUSTOM_DOMAIN_PRICE_MXN} MXN al año · {printAdPrice}`,
@@ -155,5 +185,48 @@ test.describe('pricing tokens (D7)', () => {
     expect(es).toContain(`$${NEGOCIO_PRICE_MONTHLY_MXN} MXN al mes`)
     expect(es).toContain(`$${NEGOCIO_PRICE_YEARLY_MXN.toLocaleString('en-US')} MXN al año`)
     expect(es).toContain('/mx/precios')
+    // Both paid plans, IVA included, and no Plan Gratis offered to a new shop (plan-tienda S2.3).
+    expect(es).toContain(`$${TIENDA_PRICE_YEARLY_MXN} MXN al año`)
+    expect(es).toContain('desde $19 al mes')
+    const lead = aboutCopy(getAboutSection('pricing'), 'es').lead ?? ''
+    expect(lead).toContain('IVA incluido')
+    expect(lead).not.toContain('gratis para siempre')
+  })
+
+  test('/acerca renders the LOCALES: their pricing section says exactly what lib/about-content.ts says', () => {
+    // pricing-page memory: the live /acerca reads locales/*.json → acerca.sections.pricing, while llms.txt and the
+    // agent surfaces read lib/about-content.ts. Two copies of one text: they must be the same text.
+    for (const locale of ['es', 'en'] as const) {
+      const json = JSON.parse(readFileSync(`locales/${locale}.json`, 'utf8')).acerca.sections.pricing
+      // The about defaults are filled from a catalog with no admin prices (lib/about-content.ts); fill the locale the same way.
+      const fill = (t: string) => fillPricingTokens(t, buildPricingCatalog(UNSET), locale)
+      const section = getAboutSection('pricing')[locale]
+      expect({ heading: json.heading, lead: fill(json.lead), body: json.body.map(fill) }).toEqual({ heading: section.heading, lead: section.lead, body: section.body })
+    }
+  })
+})
+
+test.describe('/mx/precios copy (plan-tienda S2.3)', () => {
+  test('the headline stops leading with free-forever; the page offers two paid plans, IVA included, and 3 free months of Negocio without a card', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const ui = JSON.parse(readFileSync(`locales/${locale}.json`, 'utf8')).precios
+      const all = JSON.stringify(ui)
+      expect(all).not.toMatch(/gratis para siempre|free forever/i)
+      // Plan Gratis is not OFFERED: it is named only in the FAQ answer that tells an existing shop it keeps it.
+      const offer = JSON.stringify({ metadata: ui.metadata, hero: [ui.heroTitle, ui.heroLead, ui.primaryCta], plans: ui.plans })
+      expect(offer).not.toMatch(/Plan Gratis|Free plan/)
+      expect(ui.faq.items.filter((i: { a: string }) => /Plan Gratis|Free plan/.test(i.a))).toHaveLength(1)
+      expect(all).not.toContain('{trialDays}')
+      const fill = (t: string) => fillFixedPricingTokens(t, locale)
+      // Every token in the copy is a known one.
+      expect(fill(all)).not.toMatch(/\{\w+\}/)
+      expect(fill(ui.plans.lead)).toContain(trialLengthLabel(NEGOCIO_TRIAL_DAYS, locale))
+      expect(fill(ui.heroLead)).toContain(locale === 'es' ? 'desde $19 al mes' : 'from $19 a month')
+      expect(fill(ui.heroLead)).toMatch(locale === 'es' ? /incluyen IVA/ : /includes IVA/)
+      expect(ui.plans.lead).toMatch(locale === 'es' ? /sin tarjeta/ : /no card/)
+    }
+    const es = JSON.parse(readFileSync('locales/es.json', 'utf8')).precios
+    expect(es.heroTitle).toBe('Tu propia tienda en línea, sin comisión por venta.')
+    expect(fillFixedPricingTokens(es.plans.lead, 'es')).toMatch(/^(3 meses|\d+ días) gratis del Plan Negocio para empezar, sin tarjeta\./)
   })
 })

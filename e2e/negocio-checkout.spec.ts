@@ -7,7 +7,8 @@
  */
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { coerceNegocioCadence, decideNegocioCheckout, mapNegocioStatus, sessionMonths, subscriptionPeriod } from '../lib/negocio-checkout-rules'
+import { coerceNegocioCadence, decideNegocioCheckout, sessionMonths, subscriptionPeriod } from '../lib/negocio-checkout-rules'
+import { decidePlanStatusSync } from '../lib/plan-subscription-sync'
 import { NEGOCIO_GRANT_KEY, decideNegocioPayment, guardFor, type PlanState } from '../lib/plan'
 
 const NOW = new Date('2026-11-10T12:00:00Z')
@@ -55,11 +56,15 @@ test.describe('webhook inputs', () => {
     expect(sessionMonths('doce')).toBeNull()
   })
 
-  test('statuses: unpaid is the past_due grace window; unknown statuses are left alone', () => {
-    expect(mapNegocioStatus('active')).toBe('active')
-    expect(mapNegocioStatus('unpaid')).toBe('past_due')
-    expect(mapNegocioStatus('canceled')).toBe('canceled')
-    expect(mapNegocioStatus('incomplete')).toBeNull()
+  // plan-tienda S2.2 (sprint-2 build contract): Stripe's status is sent AS IS and the Backend decides what is live —
+  // `unpaid` is no longer folded into the `past_due` grace window, and `incomplete` is no longer dropped.
+  test('statuses: sent as Stripe reports them; an unknown one is not guessed', () => {
+    const negocio = (status: string) => decidePlanStatusSync('sub_1', { id: 'sub_1', status, metadata: { kind: 'negocio' } })
+    expect(negocio('active')).toMatchObject({ action: 'patch', plan: 'negocio', status: 'active' })
+    expect(negocio('unpaid')).toMatchObject({ action: 'patch', status: 'unpaid' })
+    expect(negocio('canceled')).toMatchObject({ action: 'patch', status: 'canceled' })
+    expect(negocio('incomplete')).toMatchObject({ action: 'patch', status: 'incomplete' })
+    expect(negocio('sleeping')).toMatchObject({ action: 'alert', reason: 'unknown_status' })
   })
 })
 
@@ -125,6 +130,7 @@ test.describe('#471 review fixes', () => {
 
 test('both Negocio checkouts carry a per-shop idempotency key, so concurrent requests share one session (Codex security, #473)', () => {
   const src = readFileSync('lib/negocio-checkout.ts', 'utf8')
-  expect(src).toContain('const idempotencyKey = `negocio:${shopId}:${cadence}:')
+  // Plan-neutral since plan-tienda S2.1: `${plan}` is `negocio` for these, so the key is the same string as before.
+  expect(src).toContain('const idempotencyKey = `${plan}:${shopId}:${cadence}:')
   expect(src.match(/idempotencyKey,/g)?.length).toBe(2)
 })

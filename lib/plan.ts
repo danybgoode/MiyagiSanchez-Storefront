@@ -528,6 +528,22 @@ export type PlanSubscriptionFacts = {
   tiendaSubscriptionUnavailable?: boolean
 }
 
+/**
+ * Must the monthly Plan Tienda subscription be looked up to decide this shop's plan? Only when nothing that outranks
+ * it in `derivePlan` already decides: a Negocio comp or live dated grant, a live Negocio subscription (`true`), a live
+ * trial, or a live dated Tienda grant (which outranks the Tienda subscription). Every other case — including a Negocio
+ * subscription that could NOT be read (`undefined`) — needs it: a live Tienda read then wins over "could not look",
+ * and an unreadable one must be reported as such. Saves the backend round trip on most reads (plan-tienda S2.2).
+ */
+export function tiendaLookupNeeded(metadata: unknown, hasActiveSubscription: boolean | undefined, now: Date = new Date()): boolean {
+  const grant = readNegocioGrant(metadata)
+  if (grant?.type === 'comp' || isLiveDatedGrant(grant, now)) return false
+  if (hasActiveSubscription === true) return false
+  if (liveTrialEnd(metadata, now)) return false
+  if (isLiveDatedGrant(readTiendaGrant(metadata), now)) return false
+  return true
+}
+
 /** Derive straight from a shop's metadata plus the subscription answers. */
 export function derivePlanFromMetadata(metadata: unknown, sub: PlanSubscriptionFacts, now?: Date): PlanState {
   return derivePlan({
