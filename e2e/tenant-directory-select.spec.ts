@@ -30,7 +30,7 @@ function row(overrides: Partial<TenantRow> = {}): TenantRow {
     marketplacePublicationLabel: 'Publicada',
     createdAt: '2026-01-01T00:00:00.000Z',
     status: 'active',
-    registrationEmail: 'a@example.com',
+    registrationEmail: 'a@example.com', planLegacy: 'absent', pausedForPlan: false,
     ...overrides,
   }
 }

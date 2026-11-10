@@ -24,7 +24,7 @@ function tenant(index: number, overrides: Partial<TenantRow> = {}): TenantRow {
     marketplacePublicationLabel: 'Publicada',
     createdAt: '2026-01-01T00:00:00.000Z',
     status: 'active',
-    registrationEmail: `shop-${index}@example.com`,
+    registrationEmail: `shop-${index}@example.com`, planLegacy: 'absent', pausedForPlan: false,
     ...overrides,
   }
 }

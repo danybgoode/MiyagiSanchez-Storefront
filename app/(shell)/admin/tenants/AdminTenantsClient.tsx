@@ -220,6 +220,10 @@ export default function AdminTenantsClient({ tenants }: { tenants: TenantRow[] }
                     {t.subscriptionUnchecked ? 'Sin plan (suscripción sin verificar)' : entitlementReasonLabel(t.entitlementReason)}
                   </Badge>
                   <Badge tone={t.operatingMarketCode ? 'ok' : 'warn'}>{t.marketplacePublicationLabel}</Badge>
+                  {t.planLegacy !== 'absent' ? (
+                    <Badge tone={t.planLegacy === 'marked' ? 'muted' : 'warn'}>{t.planLegacy === 'marked' ? 'Plan Gratis (de antes)' : 'Marca de Plan Gratis ilegible'}</Badge>
+                  ) : null}
+                  {t.pausedForPlan ? <Badge tone="warn">En pausa por falta de plan</Badge> : null}
                   <span className="text-[var(--color-muted)]">{t.listingCount} anuncios</span>
                 </span>
               </button>

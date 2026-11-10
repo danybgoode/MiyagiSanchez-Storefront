@@ -44,7 +44,7 @@ function row(overrides: Partial<TenantRow> = {}): TenantRow {
     customDomain: null, domainStatus: 'none', entitlementReason: 'flag_off', entitled: true,
     subscriptionUnchecked: false, listingCount: 0, operatingMarketCode: 'mx',
     operatingMarketLabel: 'México', marketplacePublicationLabel: 'Publicada',
-    createdAt: null, status: 'active', registrationEmail: null,
+    createdAt: null, status: 'active', registrationEmail: null, planLegacy: 'absent', pausedForPlan: false,
     ...overrides,
   }
 }
