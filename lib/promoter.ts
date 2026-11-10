@@ -23,7 +23,7 @@
  */
 
 import { db } from '@/lib/supabase'
-import { DEFAULT_COMMISSION_RATES, decideAccrual } from '@/lib/promoter-commission'
+import { DEFAULT_COMMISSION_RATES, accrualOutcomeOf, decideAccrual, type AccrualOutcome } from '@/lib/promoter-commission'
 import { PROMOTER_SKUS, isPromoterSku, type PromoterSku } from '@/lib/promoter-skus'
 import { resolveSkuPromoterPriceCents, type PromoterSkuPrices } from '@/lib/promoter-pricing'
 
@@ -692,31 +692,53 @@ export async function updatePromoterSkuPrice(sku: PromoterSku, promoterPriceMxn:
  * subscription renewal of the same attribution accrues nothing).
  */
 export async function accrueCommissionForAttribution(attributionId: string): Promise<void> {
-  if (!attributionId) return
+  await accrueCommissionOutcome(attributionId)
+}
+
+/**
+ * The same accrual, saying what it amounted to (`AccrualOutcome`): `accrued`, `will_not_accrue` with the rule's
+ * reason, or `failed` (a read or the insert errored). Never throws. The share paths use this so that a share the
+ * rules correctly do not pay (a 0% rate set in /admin/promoter, a self-referral, a promoter off the track) is DONE,
+ * and only a real failure is retried (verifier, PR 486).
+ */
+export async function accrueCommissionOutcome(attributionId: string): Promise<AccrualOutcome> {
+  if (!attributionId) return { kind: 'failed', error: 'no attribution id' }
 
   const { data: attr, error: attrErr } = await db
     .from('marketplace_promoter_attributions')
     .select('id, promoter_id, seller_id, sku, gross_amount_cents, status')
     .eq('id', attributionId)
     .maybeSingle()
-  if (attrErr || !attr) return
+  if (attrErr || !attr) return { kind: 'failed', error: attrErr?.message ?? 'attribution not found' }
 
-  const { data: existing } = await db
+  const { data: existing, error: existingErr } = await db
     .from('marketplace_promoter_commissions')
     .select('id')
     .eq('attribution_id', attributionId)
     .maybeSingle()
+  if (existingErr) return { kind: 'failed', error: existingErr.message }
 
-  const rates = await getCommissionRates()
-  const ratePct = isPromoterSku(attr.sku) ? rates[attr.sku] : null
+  // The rate is read with its error kept: `getCommissionRates` falls back to 0% on a failed read, which here would
+  // turn "could not look" into "the rule says nothing is owed".
+  let ratePct: number | null = null
+  if (isPromoterSku(attr.sku)) {
+    const { data: rateRow, error: rateErr } = await db
+      .from('marketplace_promoter_commission_rates')
+      .select('rate_pct')
+      .eq('sku', attr.sku)
+      .maybeSingle()
+    if (rateErr) return { kind: 'failed', error: rateErr.message }
+    ratePct = (rateRow as { rate_pct: number | null } | null)?.rate_pct ?? DEFAULT_COMMISSION_RATES[attr.sku]
+  }
 
-  const { data: promoter } = await db
+  const { data: promoter, error: promoterErr } = await db
     .from('marketplace_promoters')
     .select('clerk_user_id, program_track')
     .eq('id', attr.promoter_id)
     .eq('program_track', 'promoter')
     .maybeSingle()
-  if (!isPromoterEconomicIdentity(promoter)) return
+  if (promoterErr) return { kind: 'failed', error: promoterErr.message }
+  if (!isPromoterEconomicIdentity(promoter)) return { kind: 'will_not_accrue', reason: 'not_promoter_track' }
 
   let shopOwnerClerkUserId: string | null = null
   if (attr.seller_id) {
@@ -735,7 +757,7 @@ export async function accrueCommissionForAttribution(attributionId: string): Pro
     promoterClerkUserId: promoter?.clerk_user_id ?? null,
     shopOwnerClerkUserId,
   })
-  if (!decision.ok) return
+  if (!decision.ok) return accrualOutcomeOf(decision)
 
   const { error } = await db.from('marketplace_promoter_commissions').insert({
     attribution_id: attributionId,
@@ -748,9 +770,11 @@ export async function accrueCommissionForAttribution(attributionId: string): Pro
     status: 'accrued',
   })
   // 23505 = a concurrent accrual already inserted (UNIQUE attribution_id) — fine.
-  if (error && error.code !== '23505' && !/does not exist|relation/i.test(error.message ?? '')) {
-    console.error('[promoter] commission accrual insert failed:', error.message)
+  if (error && error.code !== '23505') {
+    if (!/does not exist|relation/i.test(error.message ?? '')) console.error('[promoter] commission accrual insert failed:', error.message)
+    return { kind: 'failed', error: error.message }
   }
+  return { kind: 'accrued' }
 }
 
 /** Missing or non-Promotor identities can never enter commission economics. */

@@ -115,7 +115,9 @@ test('money guards (pr-reviewer, #474): an unread rate refuses, a comp shop refu
   const webhook = readFileSync('app/api/webhooks/stripe/route.ts', 'utf8')
   expect(webhook).toContain('platform-payee kind from a connected account, ignored')
   const renewal = readFileSync('lib/promoter-renewal-server.ts', 'utf8')
-  expect(renewal).toContain("throw new Error('renewal commission did not accrue')")
+  // A share whose commission could not be recorded is a failure (retried); one the rules do not pay is done
+  // (plan-tienda S4 review, verifier S1 — e2e/promoter-share-accrual.spec.ts).
+  expect(renewal).toContain('if (!accrualSettles(accrual)) throw new Error(')
 })
 
 test('no self-close: a promoter never closes a package on a shop they own (Codex security, #474)', () => {

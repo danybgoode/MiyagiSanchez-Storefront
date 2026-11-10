@@ -17,7 +17,8 @@
 import 'server-only'
 import { db } from '@/lib/supabase'
 import { tg } from '@/lib/telegram'
-import { accrueCommissionForAttribution } from '@/lib/promoter'
+import { accrueCommissionOutcome } from '@/lib/promoter'
+import { accrualSettles } from '@/lib/promoter-commission'
 import {
   NEGOCIO_PACKAGE_SKUS,
   RENEWAL_ANCHOR_SKUS,
@@ -41,7 +42,8 @@ const SHARE_NAME: Record<ShareSku, string> = {
 /**
  * Record ONE share attribution under `paymentRef` and accrue it. A 23505 on `payment_ref` means this exact share was
  * already recorded: the (idempotent) accrual is re-run in case it was the step that failed, and `replay` is returned.
- * The commission row is then verified, because `accrueCommissionForAttribution` never throws (pr-reviewer, #474).
+ * The accrual says what it amounted to (`accrueCommissionOutcome`): a real failure throws (pr-reviewer, #474), a share
+ * the rules do not pay is done.
  * Shared by the renewals and the upgrade share; throws on any failure (the caller alerts).
  */
 export async function recordShareAttribution(input: {
@@ -77,14 +79,11 @@ export async function recordShareAttribution(input: {
     if (!inserted) throw new Error(`${input.sku} attribution insert returned no row`)
     attributionId = (inserted as { id: string }).id
   }
-  await accrueCommissionForAttribution(attributionId)
-  const { data: commission, error: commissionError } = await db
-    .from('marketplace_promoter_commissions')
-    .select('id')
-    .eq('attribution_id', attributionId)
-    .maybeSingle()
-  // Throw text kept from plans-gratis-negocio (e2e/promoter-packages.spec.ts pins it).
-  if (commissionError || !commission) throw new Error('renewal commission did not accrue')
+  // Settled = a commission row now exists, OR the rules say none is owed (a 0% rate, a self-referral, a promoter off
+  // the track): both are done. Only a real read or write failure throws, so the webhook retries it (verifier, PR 486).
+  const accrual = await accrueCommissionOutcome(attributionId)
+  if (!accrualSettles(accrual)) throw new Error(`${input.sku} commission could not be recorded: ${accrual.kind === 'failed' ? accrual.error : ''}`)
+  if (accrual.kind === 'will_not_accrue') console.info(`[promoter ${input.sku}] recorded, no commission owed: ${accrual.reason}`)
   return outcome
 }
 

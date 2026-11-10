@@ -124,6 +124,41 @@ export function decideAccrual(input: AccrualInput): AccrualDecision {
   return { ok: true, commissionCents, ratePct, grossAmountCents }
 }
 
+// ── What an accrual attempt amounted to (plan-tienda S4 review, verifier S1) ──────
+
+/**
+ * Three states, never two: a commission row now exists (`accrued`, inserted now or already there); the rules say NO
+ * commission is owed (`will_not_accrue` — a 0% rate, a self-referral, no gross, a sku that earns nothing, or a promoter
+ * no longer on the `promoter` track); or we could not tell / could not write (`failed`). Only `failed` is worth a
+ * retry: a correctly unpaid share retried would alert and redeliver for days and still pay nothing.
+ */
+export type AccrualOutcome =
+  | { kind: 'accrued' }
+  | { kind: 'will_not_accrue'; reason: 'no_rate' | 'self_referral' | 'no_gross' | 'sku_not_eligible' | 'not_promoter_track' }
+  | { kind: 'failed'; error: string }
+
+/** The outcome of an accrual that reached the decision. `not_paid` is never expected for a share (it is written
+ *  paid), so it is a failure to look at, not a rule. */
+export function accrualOutcomeOf(decision: AccrualDecision): AccrualOutcome {
+  if (decision.ok) return { kind: 'accrued' }
+  switch (decision.reason) {
+    case 'already_accrued':
+      return { kind: 'accrued' }
+    case 'no_rate':
+    case 'self_referral':
+    case 'no_gross':
+    case 'sku_not_eligible':
+      return { kind: 'will_not_accrue', reason: decision.reason }
+    case 'not_paid':
+      return { kind: 'failed', error: 'attribution is not paid' }
+  }
+}
+
+/** Is this accrual settled (nothing a retry could change)? */
+export function accrualSettles(outcome: AccrualOutcome): boolean {
+  return outcome.kind !== 'failed'
+}
+
 // ── Settlement state machine (US-9) ───────────────────────────────────────────
 
 export type CommissionState = 'accrued' | 'paid'
