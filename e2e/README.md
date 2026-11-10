@@ -112,7 +112,7 @@ the production nightly. A missing fixture is a visible skip, not a failure.
 | `MS_TEST_GALLERY_SINGLE_LISTING_ID` | `pdp-gallery.browser.spec.ts` | **Optional pin, VALIDATED.** Discovered when unset or stale — a public listing with exactly one photo. Safe to delete from Actions secrets. |
 | ~~`MS_TEST_GALLERY_ZERO_LISTING_ID`~~ | *(no spec)* | **Unused as of 2026-08-17** — the zero-photo browser spec was retired (see below). Safe to delete from Actions secrets. |
 | `MS_TEST_SHIPPABLE_LISTING_ID` | `checkout-cp-first.browser.spec.ts`, `ucp-checkout-session-shipping-boundary.spec.ts` | Public, priced physical listing with Envía shipping. |
-| `MS_TEST_CLAIMED_SLUG` | `seller-unclaimed-s3.browser.spec.ts`, `collection-isolation.spec.ts` | A real claimed shop slug. |
+| `MS_TEST_CLAIMED_SLUG` | `seller-unclaimed-s3.browser.spec.ts`, `collection-isolation.spec.ts` | **Optional pin, VALIDATED.** A claimed shop is discovered from the live catalog when unset or when the pin's claim page no longer shows the manage CTA (`_helpers/claimed-shop-fixture.ts`). The old pin `miyagiprints` was deleted and kept the nightly red 2026-10-15 → 11-03. Safe to delete from Actions secrets. |
 | `MS_TEST_UNCLAIMED_LISTING_ID` | `unclaimed-pdp.browser.spec.ts`, `unclaimed-guardrails.spec.ts` | Public listing on a “Sin reclamar” shop. |
 | `MS_TEST_GTM_ID` | `site-analytics-loader.browser.spec.ts` | Set to `1` only when the target build has `NEXT_PUBLIC_GTM_ID`; this is a repo variable, not a secret. |
 | `MS_TEST_ARRANGED_LISTING_ID` | `ucp-checkout-session-arranged-delivery.spec.ts` | Public, priced listing using coordinated delivery. |

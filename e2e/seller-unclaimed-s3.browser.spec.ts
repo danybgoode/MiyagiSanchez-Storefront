@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { authEnabled, requireEnv, sellerEmail, signIn } from './_helpers/auth'
+import { resolveClaimedShop } from './_helpers/claimed-shop-fixture'
 
 /**
  * Seller & unclaimed-shop bug sweep — Sprint 3 UI polish (browser smoke).
@@ -11,14 +12,14 @@ import { authEnabled, requireEnv, sellerEmail, signIn } from './_helpers/auth'
  * in CI; these specs confirm it renders.
  *
  *  - 3.1 runs ANONYMOUSLY on the public claim page (`/s/<slug>/claim`), the one
- *    surface among the five reachable without auth. Fixture: MS_TEST_CLAIMED_SLUG
- *    (any claimed shop) — skips cleanly when unset.
+ *    surface among the five reachable without auth. Fixture: a claimed shop
+ *    DISCOVERED from the live catalog (`_helpers/claimed-shop-fixture.ts`);
+ *    MS_TEST_CLAIMED_SLUG is only a checked, optional pin. A dead pin
+ *    (`miyagiprints`) kept the nightly red 2026-10-15 → 2026-11-03.
  *  - 3.2 is auth-gated (`/shop/manage` is behind `auth.protect()`), so it needs a
  *    seller session and skips unless `MS_TEST_BROWSER_AUTH=1` + `MS_TEST_SELLER_EMAIL`.
  *    Until that fixture exists the 375px sub-nav check is owed to Daniel.
  */
-
-const CLAIMED_SLUG = process.env.MS_TEST_CLAIMED_SLUG
 
 function parseRgb(value: string): [number, number, number] | null {
   const match = value.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
@@ -26,12 +27,10 @@ function parseRgb(value: string): [number, number, number] | null {
 }
 
 test.describe('seller bug sweep S3.1 · legible accent button (browser)', () => {
-  test.beforeEach(() => {
-    requireEnv(CLAIMED_SLUG, 'MS_TEST_CLAIMED_SLUG')
-  })
-
-  test('the claim-page primary CTA shows a white label on green (not green-on-green)', async ({ page }) => {
-    await page.goto(`/s/${CLAIMED_SLUG}/claim`)
+  test('the claim-page primary CTA shows a white label on green (not green-on-green)', async ({ page, request }) => {
+    const fixture = await resolveClaimedShop(request, process.env.MS_TEST_CLAIMED_SLUG)
+    test.skip(fixture.slug === null, `FIXTURE UNAVAILABLE — ${fixture.reason ?? 'no reason given'}`)
+    await page.goto(`/s/${fixture.slug}/claim`)
 
     const cta = page.getByRole('link', { name: /ir a mi panel de ventas/i }).first()
     await expect(cta).toBeVisible()
