@@ -8,6 +8,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+import type { KeyedMetadataGuard, NegocioPaymentDecision, TiendaPaymentDecision } from '../lib/plan'
 import {
   NEGOCIO_GRANT_KEY,
   NEGOCIO_TRIAL_KEY,
@@ -18,7 +19,9 @@ import {
   decideNegocioPayment,
   decideTiendaPayment,
   extendPlanGrant,
+  GRANT_WRITE_RPC,
   grantWriteRpcArgs,
+  keyedGuardFor,
   guardFor,
   isLiveDatedGrant,
   readPlanGrant,
@@ -514,6 +517,11 @@ test.describe('paying for Negocio or Tienda once — replays, where the months s
       action: 'write',
       grant: { type: 'one_time', granted_at: NOW.toISOString(), expires_at: addMonthsClamped(NOW, 12).toISOString(), note: 'yearly 12m', payments: ['cs_1'] },
       guard: { mode: 'absent' },
+      guards: [
+        { key: NEGOCIO_GRANT_KEY, mode: 'absent' },
+        { key: TIENDA_GRANT_KEY, mode: 'absent' },
+        { key: NEGOCIO_TRIAL_KEY, mode: 'absent' },
+      ],
     })
   })
 
@@ -572,28 +580,39 @@ test.describe('paying for Negocio or Tienda once — replays, where the months s
     expect(decideNegocioPayment(done, { ...pay, paymentId: 'cs_2', months: 3 })).toEqual({ action: 'replay' })
   })
 
-  test('the write is ONE merge of both keys under the one guard on the paid plan\'s key', () => {
+  test('the write is ONE merge of both keys, and it lands only if every key the decision read is still as read', () => {
     const meta = { [NEGOCIO_GRANT_KEY]: liveOneTime, [TIENDA_GRANT_KEY]: liveTienda }
     const d = decideNegocioPayment(meta, pay)
     if (d.action !== 'write') throw new Error('expected a write')
+    expect(GRANT_WRITE_RPC).toBe('merge_shop_metadata_guards')
     expect(grantWriteRpcArgs('shop_1', NEGOCIO_GRANT_KEY, d)).toEqual({
       p_shop_id: 'shop_1',
       p_patch: { [NEGOCIO_GRANT_KEY]: d.grant, [TIENDA_GRANT_KEY]: d.also!.value },
-      p_guard_key: NEGOCIO_GRANT_KEY,
-      p_guard_mode: 'equals',
-      p_expected: liveOneTime,
+      p_guards: [
+        { key: NEGOCIO_GRANT_KEY, mode: 'equals', expected: liveOneTime },
+        // The Tienda key equals the EXACT value the moved grant was computed from: a Tienda payment landing in
+        // between changes it, the write matches no row, and nothing paid for is erased.
+        { key: TIENDA_GRANT_KEY, mode: 'equals', expected: liveTienda },
+        { key: NEGOCIO_TRIAL_KEY, mode: 'absent' },
+      ],
     })
     const alone = decideNegocioPayment({}, pay)
     if (alone.action !== 'write') throw new Error('expected a write')
-    expect(grantWriteRpcArgs('shop_1', NEGOCIO_GRANT_KEY, alone)).toEqual({
-      p_shop_id: 'shop_1', p_patch: { [NEGOCIO_GRANT_KEY]: alone.grant }, p_guard_key: NEGOCIO_GRANT_KEY, p_guard_mode: 'absent', p_expected: null,
+    const args = grantWriteRpcArgs('shop_1', NEGOCIO_GRANT_KEY, alone)
+    expect(args).toEqual({
+      p_shop_id: 'shop_1',
+      p_patch: { [NEGOCIO_GRANT_KEY]: alone.grant },
+      p_guards: [{ key: NEGOCIO_GRANT_KEY, mode: 'absent' }, { key: TIENDA_GRANT_KEY, mode: 'absent' }, { key: NEGOCIO_TRIAL_KEY, mode: 'absent' }],
     })
+    // `expected` travels only with `equals` (the SQL refuses an `equals` without it).
+    for (const g of args.p_guards) expect('expected' in g).toBe(false)
   })
 
-  test('the webhook writes through that one function: no second, unguarded write of the Tienda key', () => {
+  test('the webhook writes through that one function: no second write of the Tienda key, and never the single-guard merge', () => {
     const src = readFileSync('lib/negocio-webhook.ts', 'utf8')
-    expect(src).toContain("db.rpc('merge_shop_metadata', grantWriteRpcArgs(input.shopId, NEGOCIO_GRANT_KEY, decision))")
-    expect(src.match(/merge_shop_metadata'/g)).toHaveLength(1)
+    expect(src).toContain('db.rpc(GRANT_WRITE_RPC, grantWriteRpcArgs(input.shopId, NEGOCIO_GRANT_KEY, decision))')
+    expect(src.match(/db\.rpc\(/g)).toHaveLength(1)
+    expect(src).not.toContain("'merge_shop_metadata'")
     expect(src).not.toContain('TIENDA_GRANT_KEY')
   })
 
@@ -602,11 +621,20 @@ test.describe('paying for Negocio or Tienda once — replays, where the months s
       action: 'write',
       grant: { type: 'one_time', granted_at: NOW.toISOString(), expires_at: addMonthsClamped(NOW, 12).toISOString(), note: 'yearly 12m', payments: ['cs_1'] },
       guard: { mode: 'absent' },
+      guards: [
+        { key: TIENDA_GRANT_KEY, mode: 'absent' },
+        { key: NEGOCIO_GRANT_KEY, mode: 'absent' },
+        { key: NEGOCIO_TRIAL_KEY, mode: 'absent' },
+      ],
     })
     expect(decideTiendaPayment({ [TIENDA_GRANT_KEY]: null }, pay)).toMatchObject({ guard: { mode: 'json_null' } })
     const d = decideTiendaPayment({}, pay)
     if (d.action !== 'write') throw new Error('expected a write')
-    expect(grantWriteRpcArgs('shop_1', TIENDA_GRANT_KEY, d)).toMatchObject({ p_patch: { [TIENDA_GRANT_KEY]: d.grant }, p_guard_key: TIENDA_GRANT_KEY, p_guard_mode: 'absent' })
+    expect(grantWriteRpcArgs('shop_1', TIENDA_GRANT_KEY, d)).toEqual({
+      p_shop_id: 'shop_1',
+      p_patch: { [TIENDA_GRANT_KEY]: d.grant },
+      p_guards: [{ key: TIENDA_GRANT_KEY, mode: 'absent' }, { key: NEGOCIO_GRANT_KEY, mode: 'absent' }, { key: NEGOCIO_TRIAL_KEY, mode: 'absent' }],
+    })
   })
 
   test('Tienda: a replay writes nothing — and a Negocio payment with the same id is not a Tienda replay', () => {
@@ -649,5 +677,150 @@ test.describe('paying for Negocio or Tienda once — replays, where the months s
     expect(guardFor({}, TIENDA_GRANT_KEY)).toEqual({ mode: 'absent' })
     expect(guardFor({ [TIENDA_GRANT_KEY]: null }, TIENDA_GRANT_KEY)).toEqual({ mode: 'json_null' })
     expect(guardFor({ [TIENDA_GRANT_KEY]: liveTienda }, TIENDA_GRANT_KEY)).toEqual({ mode: 'equals', expected: liveTienda })
+  })
+})
+
+// ── PR #484 review: every key a payment READS is guarded in the one write ──────
+
+test.describe('a plan payment guards every key it decided from (PR #484 review)', () => {
+  const pay = { paymentId: 'cs_g', months: 12, now: NOW }
+  const VALUES: Record<string, unknown[]> = {
+    [NEGOCIO_GRANT_KEY]: [undefined, null, liveOneTime, lapsedOneTime, 'junk'],
+    [TIENDA_GRANT_KEY]: [undefined, null, liveTienda, lapsedTienda, { type: 'comp', granted_at: iso(0) }],
+    [NEGOCIO_TRIAL_KEY]: [undefined, null, liveTrial, endedTrial, { broken: true }],
+  }
+  const metas: Record<string, unknown>[] = []
+  for (const n of VALUES[NEGOCIO_GRANT_KEY]) for (const t of VALUES[TIENDA_GRANT_KEY]) for (const tr of VALUES[NEGOCIO_TRIAL_KEY]) {
+    const m: Record<string, unknown> = { settings: { theme: 'x' } }
+    if (n !== undefined) m[NEGOCIO_GRANT_KEY] = n
+    if (t !== undefined) m[TIENDA_GRANT_KEY] = t
+    if (tr !== undefined) m[NEGOCIO_TRIAL_KEY] = tr
+    metas.push(m)
+  }
+  /** What each key must be guarded as: absent when missing, json_null when JSON null, else the exact value read. */
+  const want = (m: Record<string, unknown>, key: string): KeyedMetadataGuard =>
+    !(key in m) ? { key, mode: 'absent' } : m[key] === null ? { key, mode: 'json_null' } : { key, mode: 'equals', expected: m[key] }
+
+  test('125 shops (5 values of each key): a Negocio write guards negocio_grant, tienda_grant and the trial, each as read', () => {
+    expect(metas).toHaveLength(125)
+    for (const m of metas) {
+      const d: NegocioPaymentDecision = decideNegocioPayment(m, pay)
+      if (d.action !== 'write') throw new Error('expected a write')
+      expect({ m, guards: d.guards }).toEqual({ m, guards: [want(m, NEGOCIO_GRANT_KEY), want(m, TIENDA_GRANT_KEY), want(m, NEGOCIO_TRIAL_KEY)] })
+      expect(d.guard).toEqual(guardFor(m, NEGOCIO_GRANT_KEY))
+      // The Tienda grant is moved exactly when it is live — and then the guard is the value it was moved FROM.
+      expect({ m, moved: !!d.also }).toEqual({ m, moved: m[TIENDA_GRANT_KEY] === liveTienda })
+      if (d.also) expect(d.guards[1]).toEqual({ key: TIENDA_GRANT_KEY, mode: 'equals', expected: liveTienda })
+    }
+  })
+
+  test('the same 125 shops: a Tienda write guards tienda_grant, negocio_grant and the trial, each as read', () => {
+    for (const m of metas) {
+      const d: TiendaPaymentDecision = decideTiendaPayment(m, pay)
+      if (d.action !== 'write') throw new Error('expected a write')
+      expect({ m, guards: d.guards }).toEqual({ m, guards: [want(m, TIENDA_GRANT_KEY), want(m, NEGOCIO_GRANT_KEY), want(m, NEGOCIO_TRIAL_KEY)] })
+      expect(d.guard).toEqual(guardFor(m, TIENDA_GRANT_KEY))
+      expect('also' in d).toBe(false)
+    }
+  })
+
+  test('a Negocio write with NO Tienda grant still guards the Tienda key absent: one landing in between is not left unmoved', () => {
+    const d = decideNegocioPayment({}, pay)
+    if (d.action !== 'write') throw new Error('expected a write')
+    expect(d.guards).toContainEqual({ key: TIENDA_GRANT_KEY, mode: 'absent' })
+  })
+
+  test('the race, replayed: a Tienda payment lands between a Negocio read and its write — the guards no longer hold, and the re-read keeps both', () => {
+    /** The SQL's rule, in miniature: every guard must hold against the metadata as it is NOW. */
+    const holds = (now: Record<string, unknown>, g: KeyedMetadataGuard) =>
+      g.mode === 'absent' ? !(g.key in now) : g.mode === 'json_null' ? now[g.key] === null : JSON.stringify(now[g.key]) === JSON.stringify(g.expected)
+    const read = { [TIENDA_GRANT_KEY]: { ...liveTienda, payments: ['cs_t1'] } }
+    const negocio = decideNegocioPayment(read, pay)
+    if (negocio.action !== 'write') throw new Error('expected a write')
+    // Meanwhile a second Tienda payment lands.
+    const tienda2 = decideTiendaPayment(read, { paymentId: 'cs_t2', months: 12, now: NOW })
+    if (tienda2.action !== 'write') throw new Error('expected a write')
+    const afterTienda = { ...read, [TIENDA_GRANT_KEY]: tienda2.grant }
+    expect(negocio.guards.every((g) => holds(afterTienda, g))).toBe(false)
+    expect(holds(afterTienda, negocio.guards[0])).toBe(true) // the Negocio key alone would have let it through
+    // Decided again from the truth, the Tienda grant keeps BOTH payments and is moved from its new end.
+    const again = decideNegocioPayment(afterTienda, pay)
+    if (again.action !== 'write' || !again.also) throw new Error('expected a write that moves Tienda')
+    expect(again.also.value.payments).toEqual(['cs_t1', 'cs_t2'])
+    expect(again.also.value.expires_at).toBe(addMonthsClamped(new Date(tienda2.grant.expires_at!), 12).toISOString())
+    expect(again.guards.every((g) => holds(afterTienda, g))).toBe(true)
+  })
+
+  test('the race, the other way: a Negocio grant lands between a Tienda read and its write — the Tienda write is refused and restarts after it', () => {
+    const tienda = decideTiendaPayment({}, pay)
+    const negocio = decideNegocioPayment({}, { paymentId: 'cs_n', months: 3, now: NOW })
+    if (tienda.action !== 'write' || negocio.action !== 'write') throw new Error('expected writes')
+    const afterNegocio = { [NEGOCIO_GRANT_KEY]: negocio.grant }
+    expect(tienda.guards).toContainEqual({ key: NEGOCIO_GRANT_KEY, mode: 'absent' }) // no longer true
+    const again = decideTiendaPayment(afterNegocio, pay)
+    expect(again).toMatchObject({ grant: { expires_at: addMonthsClamped(addMonthsClamped(NOW, 3), 12).toISOString() } })
+  })
+
+  test('keyedGuardFor names the key; grantWriteRpcArgs refuses a write that does not guard what it replaces', () => {
+    expect(keyedGuardFor({ a: 1 }, 'a')).toEqual({ key: 'a', mode: 'equals', expected: 1 })
+    expect(keyedGuardFor({}, 'a')).toEqual({ key: 'a', mode: 'absent' })
+    const d = decideNegocioPayment({ [TIENDA_GRANT_KEY]: liveTienda }, pay)
+    if (d.action !== 'write') throw new Error('expected a write')
+    expect(() => grantWriteRpcArgs('s', TIENDA_GRANT_KEY, d)).toThrow('does not guard')
+    expect(() => grantWriteRpcArgs('s', NEGOCIO_GRANT_KEY, { ...d, guards: [] })).toThrow('does not guard')
+    expect(() => grantWriteRpcArgs('s', NEGOCIO_GRANT_KEY, { ...d, guards: [d.guards[0]] })).toThrow('written but not guarded')
+  })
+})
+
+test.describe('the migration merge_shop_metadata_guards — static check of the SQL (PR #484 review)', () => {
+  const sql = readFileSync('supabase/migrations/20261110000000_merge_shop_metadata_guards.sql', 'utf8')
+  const code = sql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n')
+  const original = readFileSync('supabase/migrations/20260814225843_merge_shop_metadata_explicit_guard_mode.sql', 'utf8')
+
+  test('it is additive: a new function, and the single-guard one is neither replaced nor dropped', () => {
+    expect(code).toContain('create or replace function public.merge_shop_metadata_guards(')
+    expect(code).not.toMatch(/drop\s+function/i)
+    expect(code).not.toMatch(/function public\.merge_shop_metadata\(/)
+    expect(code.match(/create or replace function/g)).toHaveLength(1)
+  })
+
+  test('same settings and return shape as the original', () => {
+    for (const line of ['returns table (id uuid, metadata jsonb)', 'language sql', 'security definer', 'set search_path = public', 'returning s.id, s.metadata;', "set metadata = coalesce(s.metadata, '{}'::jsonb) || p_patch"]) {
+      expect(original).toContain(line)
+      expect(code).toContain(line)
+    }
+  })
+
+  test('service role only: public, anon and authenticated are revoked BY NAME', () => {
+    expect(code).toContain('revoke all on function public.merge_shop_metadata_guards(uuid, jsonb, jsonb) from public, anon, authenticated;')
+    expect(code).toContain('grant execute on function public.merge_shop_metadata_guards(uuid, jsonb, jsonb) to service_role;')
+    expect(code.match(/grant /g)).toHaveLength(1)
+  })
+
+  test('every guard must hold: the write needs NO guard that fails, and an empty or malformed list refuses', () => {
+    expect(code).toContain('else not exists (')
+    expect(code).toContain('from jsonb_array_elements(p_guards) as g(guard)')
+    expect(code).toContain('where not coalesce(')
+    expect(code).toContain('when p_guards is null then false')
+    expect(code).toContain("when jsonb_typeof(p_guards) <> 'array' then false")
+    expect(code).toContain('when jsonb_array_length(p_guards) = 0 then false')
+    // An unknown mode refuses, and there is no unconditional mode at all.
+    expect(code).toMatch(/else false\s+end,\s+false\s+\)/)
+    expect(code).not.toContain("'none'")
+  })
+
+  test('the three modes compare exactly as the original does (absent ≠ JSON null), and equals needs its expected', () => {
+    expect(code).toContain("then not (coalesce(s.metadata, '{}'::jsonb) ? (g.guard ->> 'key'))")
+    expect(code).toContain("then (coalesce(s.metadata, '{}'::jsonb) -> (g.guard ->> 'key')) = 'null'::jsonb")
+    expect(code).toContain("then (g.guard ? 'expected')")
+    expect(code).toContain("and (coalesce(s.metadata, '{}'::jsonb) -> (g.guard ->> 'key')) is not distinct from (g.guard -> 'expected')")
+    expect(original).toContain("not (coalesce(s.metadata, '{}'::jsonb) ? p_guard_key)")
+    expect(original).toContain("(coalesce(s.metadata, '{}'::jsonb) -> p_guard_key) = 'null'::jsonb")
+    expect(original).toContain("(coalesce(s.metadata, '{}'::jsonb) -> p_guard_key) is not distinct from p_expected")
+  })
+
+  test('the TypeScript sends exactly the modes the SQL knows', () => {
+    for (const mode of ['absent', 'json_null', 'equals']) expect(code).toContain(`g.guard ->> 'mode' = '${mode}'`)
+    expect(readFileSync('lib/plan.ts', 'utf8')).toContain("export const GRANT_WRITE_RPC = 'merge_shop_metadata_guards'")
   })
 })

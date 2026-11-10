@@ -312,15 +312,47 @@ export const extendPlanGrant = extendNegocioGrant
 /** A second key written in the SAME statement as the grant (README D4: Tienda time under Negocio). */
 export type MetadataCompanionWrite = { key: PlanGrantKey; value: PlanGrant }
 
+/** A guard that names its key: one element of `merge_shop_metadata_guards`' `p_guards`. */
+export type KeyedMetadataGuard = { key: string } & MetadataGuard
+
+/** The guard for `key`, matching what was READ there (`guardFor`), carrying the key's name. */
+export function keyedGuardFor(metadata: unknown, key: string): KeyedMetadataGuard {
+  return { key, ...guardFor(metadata, key) }
+}
+
+/**
+ * The three keys a plan payment reads to decide: both grants, and the trial. EVERY grant write guards all three, as
+ * read (PR #484 review). Guarding only the key being paid for is not enough, because the decision depends on the
+ * other two:
+ *   - A Negocio payment moves a live Tienda grant forward and writes that moved value. If a Tienda payment landed
+ *     between the read and the write, the stale value would overwrite it and erase months somebody paid for. And if
+ *     the shop had NO Tienda grant at the read, a Tienda payment landing in between would simply not be moved, and
+ *     would run out underneath the new Negocio months.
+ *   - A Tienda payment starts after a live trial and a live Negocio grant. If either appeared, or grew, between the
+ *     read and the write, the Tienda months would start too early and be spent underneath it.
+ * With all three guarded in the one UPDATE, the later writer matches no row, re-reads and decides from the truth.
+ * The cost is a retry when something unrelated to the dates touches a key in that instant (a trial notice stamping
+ * `notified_*_at`): harmless, the caller already loops.
+ */
+const PLAN_PAYMENT_READS = [NEGOCIO_GRANT_KEY, TIENDA_GRANT_KEY, NEGOCIO_TRIAL_KEY] as const
+
+/** The guards for a grant write: the paid plan's key FIRST (so `guards[0]` is `guard`), then the other keys read. */
+function planPaymentGuards(metadata: unknown, paidKey: PlanGrantKey): KeyedMetadataGuard[] {
+  return [paidKey, ...PLAN_PAYMENT_READS.filter((k) => k !== paidKey)].map((k) => keyedGuardFor(metadata, k))
+}
+
 export type PlanGrantWrite = {
   action: 'write'
   grant: PlanGrant
-  /** Compare-and-swap: write `grant` iff the PAID plan's key is still as read. */
+  /** The guard on the PAID plan's key, as read. Kept for readers of the decision; what is WRITTEN is `guards`. */
   guard: MetadataGuard
+  /** Every guard the write must satisfy, all in one statement: the paid key (first), the other plan's grant and the
+   *  trial, each exactly as read — see `PLAN_PAYMENT_READS`. */
+  guards: KeyedMetadataGuard[]
   /**
    * Present only when a dated Negocio grant is written for a shop holding a live Tienda grant: the Tienda grant moved
-   * forward, to be merged in the SAME `merge_shop_metadata` call as `grant` — both keys land or neither does. The
-   * guard stays the one on the paid plan's key (`merge_shop_metadata` takes a single guard key).
+   * forward, merged in the SAME call as `grant` — both keys land or neither does. The Tienda key is among `guards`,
+   * so the moved value can only replace the exact value it was computed from.
    */
   also?: MetadataCompanionWrite
 }
@@ -342,8 +374,8 @@ function liveTrialEnd(metadata: unknown, now: Date): Date | null {
 
 /**
  * The plan-neutral core of a paid one-time payment: the replay rule, "add after the current end" and "start after
- * `startAfter`", with the guard that matches exactly what was read at `key` (`guardFor`). Both plans decide through
- * this; neither restates it.
+ * `startAfter`", with guards that match exactly what was read (`planPaymentGuards`). Both plans decide through this;
+ * neither restates it.
  */
 function decideGrantPayment(
   metadata: unknown,
@@ -351,13 +383,14 @@ function decideGrantPayment(
   current: PlanGrant | null,
   payment: PlanPayment,
   startAfter: Date | null,
-): { action: 'replay' } | { action: 'write'; grant: PlanGrant; guard: MetadataGuard } {
+): { action: 'replay' } | { action: 'write'; grant: PlanGrant; guard: MetadataGuard; guards: KeyedMetadataGuard[] } {
   if (current?.payments?.includes(payment.paymentId)) return { action: 'replay' }
   const now = payment.now ?? new Date()
   return {
     action: 'write',
     grant: extendNegocioGrant(current, payment.months, { now, note: payment.note, paymentId: payment.paymentId, startAfter }),
     guard: guardFor(metadata, key),
+    guards: planPaymentGuards(metadata, key),
   }
 }
 
@@ -369,7 +402,9 @@ function decideGrantPayment(
  *
  * Tienda time under Negocio (plan-tienda README D4): a shop that holds a LIVE dated Tienda grant does not lose it by
  * moving up. Negocio outranks Tienda, so for the months just granted the Tienda grant would otherwise run out
- * unused; its end is therefore moved forward by exactly those months (`also`), in the same write. A lapsed Tienda
+ * unused; its end is therefore moved forward by exactly those months (`also`), in the same write. The write guards the
+ * Tienda key as read whether or not there is anything to move (`PLAN_PAYMENT_READS`), so a Tienda payment landing
+ * in between is never overwritten and never left unmoved. A lapsed Tienda
  * grant is not revived, and a replay moves nothing (the replay is decided on the Negocio grant, which the same
  * statement wrote). Under a MONTHLY Negocio subscription nothing here runs, so the Tienda clock keeps going: the
  * months are not known in advance (the documented deviation in D4).
@@ -398,6 +433,10 @@ export function decideNegocioPayment(metadata: unknown, payment: PlanPayment): N
  * live trial, or a live dated Negocio grant — so they are never spent underneath it. (This is the mirror of the
  * shift in `decideNegocioPayment`: whichever of the two grants is written second, the Tienda months end up after
  * Negocio's.) A permanent Negocio has no end to wait for, so it moves nothing.
+ *
+ * The start is chosen from the trial and the Negocio grant, so the write guards BOTH as read, beside the Tienda key
+ * (`PLAN_PAYMENT_READS`). A stale start is not harmless: a Negocio grant landing between this read and this write
+ * would leave the Tienda months starting today, underneath it, and the merchant would lose them.
  */
 export function decideTiendaPayment(metadata: unknown, payment: PlanPayment): TiendaPaymentDecision {
   const now = payment.now ?? new Date()
@@ -407,24 +446,36 @@ export function decideTiendaPayment(metadata: unknown, payment: PlanPayment): Ti
   return decideGrantPayment(metadata, TIENDA_GRANT_KEY, readTiendaGrant(metadata), payment, startAfter > 0 ? new Date(startAfter) : null)
 }
 
+/** The Postgres function every plan-grant write goes through (migration 20261110000000). */
+export const GRANT_WRITE_RPC = 'merge_shop_metadata_guards'
+
+export type GrantWriteRpcGuard = { key: string; mode: 'absent' | 'json_null' } | { key: string; mode: 'equals'; expected: unknown }
+
+export type GrantWriteRpcArgs = { p_shop_id: string; p_patch: Record<string, PlanGrant>; p_guards: GrantWriteRpcGuard[] }
+
 /**
- * The exact `merge_shop_metadata` arguments for a decided grant write — ONE statement that merges the paid plan's
- * grant and, when present, the companion key, under the single guard on the paid plan's key. Pure, so "both keys in
- * one patch, guarded on the grant that was read" is asserted without a database.
+ * The exact `merge_shop_metadata_guards` arguments for a decided grant write — ONE statement that merges the paid
+ * plan's grant and, when present, the companion key, and lands only if EVERY guard still holds. Pure, so "both keys
+ * in one patch, every key that was read guarded" is asserted without a database.
+ *
+ * Every grant write uses this function, also the ones that write a single key. Not "the old function when there is
+ * nothing to move": whether there is a Tienda grant to move is exactly the thing that can change between the read and
+ * the write, so the single-key write needs the Tienda guard as much as the two-key one. One path also means one thing
+ * to test. The price is that the migration must be applied BEFORE this code deploys (the epic's deploy order);
+ * without it every paid grant fails loudly (the webhook alerts) rather than landing unguarded.
+ *
+ * `expected` is sent ONLY with `equals`: the SQL refuses an `equals` without it, and for the other modes it would be
+ * noise that a reader could mistake for a comparison.
  */
-export function grantWriteRpcArgs(shopId: string, key: PlanGrantKey, write: PlanGrantWrite): {
-  p_shop_id: string
-  p_patch: Record<string, PlanGrant>
-  p_guard_key: PlanGrantKey
-  p_guard_mode: MetadataGuard['mode']
-  p_expected: unknown
-} {
+export function grantWriteRpcArgs(shopId: string, key: PlanGrantKey, write: PlanGrantWrite): GrantWriteRpcArgs {
+  // A decision whose first guard is not the paid key's was not built by `decideGrantPayment`. Refuse to write it:
+  // the patch would replace a grant nothing is guarding.
+  if (write.guards[0]?.key !== key) throw new Error(`grantWriteRpcArgs: the write for ${key} does not guard ${key} first`)
+  if (write.also && !write.guards.some((g) => g.key === write.also!.key)) throw new Error(`grantWriteRpcArgs: ${write.also.key} is written but not guarded`)
   return {
     p_shop_id: shopId,
     p_patch: { [key]: write.grant, ...(write.also ? { [write.also.key]: write.also.value } : {}) },
-    p_guard_key: key,
-    p_guard_mode: write.guard.mode,
-    p_expected: write.guard.mode === 'equals' ? write.guard.expected : null,
+    p_guards: write.guards.map((g): GrantWriteRpcGuard => (g.mode === 'equals' ? { key: g.key, mode: 'equals', expected: g.expected } : { key: g.key, mode: g.mode })),
   }
 }
 
