@@ -70,3 +70,13 @@ test('a send that fails releases its claim, so the next run retries (Codex, #472
   expect(await runTrialNotices(deps)).toMatchObject({ ok: true, sent: 0, failed: 1 })
   expect(released).toEqual(['a:5d'])
 })
+
+test('«ya estás en Gratis» is never sent to a shop that is not on Gratis: Tienda paid, and unpaid has no plan (plan-tienda S1.1)', () => {
+  const ended = trialEnding(-1)
+  const tienda: PlanState = { plan: 'tienda', reason: 'tienda_one_time', endsAt: '2027-11-04T12:00:00.000Z' }
+  const unpaid: PlanState = { plan: 'unpaid', reason: 'unpaid', endsAt: null }
+  expect(decideTrialNotice(ended, tienda, NOW)).toBeNull()
+  expect(decideTrialNotice(ended, unpaid, NOW)).toBeNull()
+  // The legacy shop still gets it.
+  expect(decideTrialNotice(ended, gratisEnded, NOW)).toBe('ended')
+})

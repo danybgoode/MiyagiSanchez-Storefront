@@ -68,7 +68,7 @@ test.describe('a monthly subscription during the trial first charges when the tr
   })
 
   test('no trial, no wait: Gratis and an ended trial charge today', () => {
-    for (const plan of [{ plan: 'gratis', reason: 'none', endsAt: null }, { plan: 'gratis', reason: 'trial_ended', endsAt: null }] as PlanState[]) {
+    for (const plan of [{ plan: 'gratis', reason: 'legacy', endsAt: null }, { plan: 'gratis', reason: 'trial_ended', endsAt: null }] as PlanState[]) {
       expect(monthlyFirstChargeAt(plan, NOW)).toBeNull()
     }
   })

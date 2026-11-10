@@ -37,6 +37,10 @@ export function planAgentView(plan: PlanState, now: Date = new Date()): PlanAgen
     : plan.plan === 'trial' ? `La tienda está en su prueba del Plan Negocio: le quedan ${left} día(s). Después sigue abierta en el Plan Gratis, sin perder sus productos.`
     : plan.plan === 'negocio' && plan.reason === 'one_time' ? `La tienda tiene el Plan Negocio pagado hasta ${plan.endsAt?.slice(0, 10)}.`
     : plan.plan === 'negocio' ? 'La tienda tiene el Plan Negocio activo.'
+    // Plan Tienda and "no plan" get a plain, true sentence here; the pages that sell Plan Tienda are plan-tienda sprint 2.
+    : plan.plan === 'tienda' && plan.reason === 'tienda_one_time' ? `La tienda tiene el Plan Tienda pagado hasta ${plan.endsAt?.slice(0, 10)}.`
+    : plan.plan === 'tienda' ? 'La tienda tiene el Plan Tienda activo.'
+    : plan.plan === 'unpaid' ? 'La tienda no tiene un plan activo. El Plan Negocio agrega dominio propio, Mercado Libre, mucho más chat y la revisión del mes.'
     : 'La tienda está en el Plan Gratis. El Plan Negocio agrega dominio propio, Mercado Libre, mucho más chat y la revisión del mes.'
   return {
     summary,

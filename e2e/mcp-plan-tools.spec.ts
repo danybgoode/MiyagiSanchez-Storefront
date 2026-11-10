@@ -21,7 +21,7 @@ test('both tools are seller tools; a partner may READ the plan (viewer list), an
 })
 
 test('the plan view states what the plan includes, from the one allowance and price modules', () => {
-  const g = planAgentView(st('gratis', 'none'), NOW).json
+  const g = planAgentView(st('gratis', 'legacy'), NOW).json
   expect(g.includes).toMatchObject({ custom_domain: false, mercadolibre_sync: false, badge_shown: true, chat_answers_per_month: PLAN_ALLOWANCES.gratis.chatAnswersPerMonth })
   expect(g.negocio_price).toMatchObject({ monthly: NEGOCIO_PRICE_MONTHLY_MXN, yearly: NEGOCIO_PRICE_YEARLY_MXN })
   const t = planAgentView(st('trial', 'trial', '2026-11-20T12:00:00Z'), NOW).json
@@ -29,7 +29,7 @@ test('the plan view states what the plan includes, from the one allowance and pr
 })
 
 test('which checkout can start mirrors the checkout rules (never a double charge)', () => {
-  expect(planAgentView(st('gratis', 'none'), NOW).json.can_start).toEqual({ month: true, year: true })
+  expect(planAgentView(st('gratis', 'legacy'), NOW).json.can_start).toEqual({ month: true, year: true })
   expect(planAgentView(st('negocio', 'subscription'), NOW).json.can_start).toEqual({ month: false, year: false })
   expect(planAgentView(st('negocio', 'one_time', '2027-01-01T00:00:00Z'), NOW).json.can_start).toEqual({ month: false, year: true })
   expect(planAgentView(st('negocio', 'comp'), NOW).json.can_start).toEqual({ month: false, year: false })
@@ -47,4 +47,19 @@ test('the tools are scoped to the token\'s exact shop, and an unclaimed shop can
   // manager partner through (pr-reviewer, #473).
   expect(start.indexOf('if (agentAuth.partner)')).toBeGreaterThan(-1)
   expect(start.indexOf('if (agentAuth.partner)')).toBeLessThan(start.indexOf('startNegocioCheckout('))
+})
+
+test('Plan Tienda and "no plan" are named truthfully to an agent (plan-tienda S1.1)', () => {
+  const tienda = planAgentView(st('tienda', 'tienda_one_time', '2027-11-04T12:00:00Z'), NOW)
+  expect(tienda.summary).toBe('La tienda tiene el Plan Tienda pagado hasta 2027-11-04.')
+  expect(tienda.json).toMatchObject({
+    plan: 'tienda', reason: 'tienda_one_time',
+    includes: { custom_domain: false, mercadolibre_sync: false, badge_shown: false, monthly_checkin: false, chat_answers_per_month: PLAN_ALLOWANCES.tienda.chatAnswersPerMonth, photos_per_month: PLAN_ALLOWANCES.tienda.photosPerMonth },
+  })
+  expect(planAgentView(st('tienda', 'tienda_subscription'), NOW).summary).toBe('La tienda tiene el Plan Tienda activo.')
+  const unpaid = planAgentView(st('unpaid', 'unpaid'), NOW)
+  expect(unpaid.summary).toContain('no tiene un plan activo')
+  expect(unpaid.summary).not.toContain('Plan Gratis')
+  expect(unpaid.json).toMatchObject({ plan: 'unpaid', reason: 'unpaid', includes: { custom_domain: false, mercadolibre_sync: false, badge_shown: true, monthly_checkin: false } })
+  for (const v of [tienda, unpaid]) expect(JSON.stringify(v)).not.toContain('undefined')
 })

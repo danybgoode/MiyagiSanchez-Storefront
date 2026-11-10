@@ -22,6 +22,8 @@ export type PlanAllowance = {
 
 export const PLAN_ALLOWANCES: Readonly<Record<PlanName, PlanAllowance>> = Object.freeze({
   gratis: Object.freeze({ chatAnswersPerMonth: 50, photosPerMonth: 20 }),
+  tienda: Object.freeze({ chatAnswersPerMonth: 50, photosPerMonth: 20 }),
+  unpaid: Object.freeze({ chatAnswersPerMonth: 50, photosPerMonth: 20 }),
   trial: Object.freeze({ chatAnswersPerMonth: 1000, photosPerMonth: 60 }),
   negocio: Object.freeze({ chatAnswersPerMonth: 1000, photosPerMonth: 60 }),
 })
