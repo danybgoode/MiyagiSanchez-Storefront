@@ -55,6 +55,10 @@ test('/admin/promoter names every sku, marks the retired ones, and states each p
   expect(admin).toContain('`${PACKAGES.setup_gratis.label} (ya no se vende)`')
   expect(admin).toContain('{isSellablePackageSku(sku) && rates[sku] ? (')
   expect(admin).toContain('{packageSentence(sku, rates[sku])}')
+  // The rate note matches the shares beside it: a renewal earns on every payment in its year (verifier N1, PR 486).
+  const note = admin.slice(admin.indexOf('Porcentaje que gana el promotor'), admin.indexOf('</p>', admin.indexOf('Porcentaje que gana el promotor'))).replace(/\s+/g, ' ')
+  expect(note).toContain('En una renovación gana en cada pago del negocio dentro de su año')
+  expect(note).not.toMatch(/sobre cada venta pagada y atribuida\. Se acumula solo en el primer pago/)
 })
 
 test("the promoter's commission page names every sku they can earn on", () => {

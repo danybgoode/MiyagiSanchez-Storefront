@@ -814,8 +814,9 @@ export default function PromoterAdminClient({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Comisión por SKU</h2>
         <p className="text-sm text-[var(--color-muted)]">
-          Porcentaje que gana el promotor sobre cada venta pagada y atribuida. Se acumula solo en el primer pago. En un
-          paquete es lo que el promotor se queda del precio; en una renovación o un cambio de plan, la parte del pago del negocio.
+          Porcentaje que gana el promotor. En un paquete es lo que se queda del precio al cobrar, así que no genera
+          comisión aparte. En una renovación gana en cada pago del negocio dentro de su año; en el cambio de Plan Tienda a
+          Plan Negocio, solo en el primer pago. En los demás productos, solo en el primer pago.
         </p>
         <ul className="space-y-2">
           {PROMOTER_SKUS.map((sku) => (
