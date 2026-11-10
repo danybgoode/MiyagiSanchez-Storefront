@@ -86,3 +86,17 @@ test('the get_plan description names the five plans and every reason the tool ca
   expect(description).not.toMatch(/\$\s?\d|\d+\s?MXN/)
   expect(description).not.toMatch(/start_tienda|buy Plan Tienda|contrata(r)? (el )?Plan Tienda/i)
 })
+
+test('a plan that could not be read is never called Plan Gratis to an agent (PR #484 review)', () => {
+  // `unavailable` travels under the plan name `gratis` (so every gate fails closed) — the SUMMARY must not repeat
+  // that name as if it were known.
+  const v = planAgentView(st('gratis', 'unavailable'), NOW)
+  expect(v.summary).toBe('No se pudo confirmar la suscripción de la tienda en este momento; inténtalo de nuevo en unos minutos.')
+  expect(v.summary).not.toMatch(/Plan (Gratis|Tienda|Negocio)/)
+  expect(v.summary).not.toContain('no tiene un plan')
+  // The machine-readable half says why, and offers no checkout on a guess.
+  expect(v.json).toMatchObject({ reason: 'unavailable', ends_at: null, days_left: null, can_start: { month: false, year: false } })
+  // Only `unavailable` gets that sentence: a legacy shop is still told it is on Plan Gratis.
+  expect(planAgentView(st('gratis', 'legacy'), NOW).summary).toContain('Plan Gratis')
+  expect(planAgentView(st('gratis', 'trial_ended'), NOW).summary).toContain('Plan Gratis')
+})

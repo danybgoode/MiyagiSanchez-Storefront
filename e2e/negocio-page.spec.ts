@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { negocioPageView, gratisPauses, MONTHLY_BUTTON_LABEL, YEARLY_BUTTON_LABEL, RENEW_BUTTON_LABEL } from '../lib/negocio-page'
 import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN } from '../lib/negocio-pricing'
 import { PLAN_ALLOWANCES } from '../lib/plan-allowances'
@@ -115,4 +116,15 @@ test.describe('Plan Tienda and "no plan" on «Tu suscripción» (plan-tienda S1.
       expect(JSON.stringify(v)).not.toContain('undefined')
     }
   })
+})
+
+test('«Tu suscripción» never prints a plan for one that could not be read (PR #484 review)', () => {
+  const v = negocioPageView(st('gratis', 'unavailable'), NOW)
+  expect(v.headline).toBe('No pudimos confirmar tu suscripción. Intenta de nuevo en unos minutos.')
+  expect(v.headline).not.toMatch(/Plan (Gratis|Tienda|Negocio)/)
+  expect(v).toMatchObject({ tone: 'unknown', buttons: [], manage: false, afterTrial: null, pauses: null })
+  // The page file renders that tone as a warning, and builds the same state when the read itself throws.
+  const page = readFileSync('app/(shell)/shop/manage/negocio/page.tsx', 'utf8')
+  expect(page).toContain("view.tone === 'unknown' ? (\n          <Banner variant=\"warning\">{view.headline}</Banner>")
+  expect(page).toContain("negocioPageView(mine === 'unavailable' ? { plan: 'gratis', reason: 'unavailable', endsAt: null } : mine.plan)")
 })
