@@ -13,7 +13,7 @@ import type { OperatorDetailsV1, OperatorDetailsV2, PromoterApplication } from '
 import { PROMOTER_SKU_BASE_PRICE_MXN } from '@/lib/promoter-earnings'
 import { buildSkuPriceTable, computeBundleRow, type PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { TRANSFER_SKU_LABEL, type TransferSku } from '@/lib/promoter-transfer'
-import { PACKAGES } from '@/lib/promoter-packages'
+import { PACKAGES, PACKAGE_FREE_MONTHS, isSellablePackageSku, packageSentence } from '@/lib/promoter-packages'
 import type { PromoterTransfer } from '@/lib/promoter-transfers'
 import { SELLER_LANDING_PATHS } from '@/lib/seller-acquisition'
 
@@ -814,7 +814,8 @@ export default function PromoterAdminClient({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Comisión por SKU</h2>
         <p className="text-sm text-[var(--color-muted)]">
-          Porcentaje que gana el promotor sobre cada venta pagada y atribuida. Se acumula solo en el primer pago.
+          Porcentaje que gana el promotor sobre cada venta pagada y atribuida. Se acumula solo en el primer pago. En un
+          paquete es lo que el promotor se queda del precio; en una renovación o un cambio de plan, la parte del pago del negocio.
         </p>
         <ul className="space-y-2">
           {PROMOTER_SKUS.map((sku) => (
@@ -832,6 +833,12 @@ export default function PromoterAdminClient({
                   />
                   <span className="text-sm text-[var(--color-muted)]">%</span>
                 </div>
+                {/* plan-tienda S4.4: a package on sale reads as the promoter says it, from the rate being edited. */}
+                {isSellablePackageSku(sku) && rates[sku] ? (
+                  <span className="block mt-1 text-xs text-[var(--color-muted)]" data-testid={`admin-package-sentence-${sku}`}>
+                    {packageSentence(sku, rates[sku])}. {PACKAGES[sku].summary}: los {PACKAGE_FREE_MONTHS} meses gratis van además del tiempo pagado.
+                  </span>
+                ) : null}
               </label>
               <button
                 onClick={() => saveRate(sku)}

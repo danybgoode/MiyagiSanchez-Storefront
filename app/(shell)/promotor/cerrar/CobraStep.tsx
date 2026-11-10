@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { PACKAGES, SELLABLE_PACKAGE_SKUS, packageSplit, type PackageSku, type SellablePackageSku } from '@/lib/promoter-packages'
+import { PACKAGES, PACKAGE_FREE_MONTHS, SELLABLE_PACKAGE_SKUS, packageSplit, type PackageSku, type SellablePackageSku } from '@/lib/promoter-packages'
 import type { Dictionary } from '@/lib/dictionary'
 
 /**
@@ -186,17 +186,29 @@ export default function CobraStep({ copy, shop, transferEnabled, packageRates }:
   )
 }
 
-/** The money for the chosen option, large: what the promoter charges, passes on and keeps (from the live rate). */
+/** The money for the chosen option, large: what the promoter charges, passes on and keeps (from the live rate), then
+ *  what the merchant gets, with the three free months on top of the paid time (plan-tienda S4.4). */
 function SplitLine({ copy, sku, rate }: { copy: Copy; sku: PackageSku; rate: number | undefined }) {
   const t = copy.cobra
-  if (!rate) return <p className="text-sm" style={{ margin: 0 }}>{fill(t.ratePending, { monto: pesos(PACKAGES[sku].priceMxn * 100) })}</p>
+  const onTop = <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }} data-testid="close-on-top">{fill(t.onTop, { resumen: PACKAGES[sku].summary, meses: String(PACKAGE_FREE_MONTHS) })}</p>
+  if (!rate) {
+    return (
+      <>
+        <p className="text-sm" style={{ margin: 0 }}>{fill(t.ratePending, { monto: pesos(PACKAGES[sku].priceMxn * 100) })}</p>
+        {onTop}
+      </>
+    )
+  }
   const s = packageSplit(sku, rate)
   return (
-    <div className="grid grid-cols-3 gap-2 rounded-lg bg-[var(--color-surface)] p-3 text-center" data-testid="close-split">
-      <div><div className="text-xs" style={{ color: 'var(--fg-muted)' }}>{t.colCharge}</div><div className="text-lg font-bold">{pesos(s.chargeCents)}</div></div>
-      <div><div className="text-xs" style={{ color: 'var(--fg-muted)' }}>{t.colPay}</div><div className="text-lg font-bold">{pesos(s.payPlatformCents)}</div></div>
-      <div><div className="text-xs" style={{ color: 'var(--fg-muted)' }}>{t.colKeep}</div><div className="text-2xl font-extrabold" style={{ color: 'var(--success)' }}>{pesos(s.keepCents)}</div></div>
-    </div>
+    <>
+      <div className="grid grid-cols-3 gap-2 rounded-lg bg-[var(--color-surface)] p-3 text-center" data-testid="close-split">
+        <div><div className="text-xs" style={{ color: 'var(--fg-muted)' }}>{t.colCharge}</div><div className="text-lg font-bold">{pesos(s.chargeCents)}</div></div>
+        <div><div className="text-xs" style={{ color: 'var(--fg-muted)' }}>{t.colPay}</div><div className="text-lg font-bold">{pesos(s.payPlatformCents)}</div></div>
+        <div><div className="text-xs" style={{ color: 'var(--fg-muted)' }}>{t.colKeep}</div><div className="text-2xl font-extrabold" style={{ color: 'var(--success)' }}>{pesos(s.keepCents)}</div></div>
+      </div>
+      {onTop}
+    </>
   )
 }
 
