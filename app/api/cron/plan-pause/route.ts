@@ -32,5 +32,6 @@ export async function GET(req: NextRequest) {
   const dryRun = dryParam !== null && dryParam !== '0'
   const result = await runPlanPause(planPauseDeps(), { dryRun })
   console.info('[plan-pause] run', JSON.stringify(result))
-  return NextResponse.json(result, { status: result.ok ? 200 : 503 })
+  // 409 when the legacy marking has not run (the run refused on purpose); 503 when the shops could not be read.
+  return NextResponse.json(result, { status: result.ok ? 200 : result.error === 'legacy_marker_missing' ? 409 : 503 })
 }

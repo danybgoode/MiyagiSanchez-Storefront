@@ -202,8 +202,13 @@ function shop(id: string, extra: Record<string, unknown> = {}): PauseCandidate {
   return { id, slug: id, name: id, clerk_user_id: 'user_' + id, metadata: { [NEGOCIO_TRIAL_KEY]: endedTrial, medusa_seller_id: 'sel_' + id, ...extra } }
 }
 
+/** A shop carrying the legacy marker: without one in the population the run refuses (verifier S1). */
+const MARKED = (): PauseCandidate => shop('zz-legacy', { [PLAN_LEGACY_KEY]: { marked_at: '2026-11-12T00:00:00Z' } })
+
 function harness(opts: {
   shops: PauseCandidate[]
+  /** Leave the population exactly as given (no marked shop appended). */
+  bare?: boolean
   plan?: (s: PauseCandidate, call: number) => PlanState | null
   status?: (s: PauseCandidate, call: number) => SellerStatusFact
   market?: (s: PauseCandidate) => PlanPauseMarket
@@ -223,12 +228,14 @@ function harness(opts: {
   const alerts: string[] = []
   let stored: unknown = null
   const pageSize = opts.pageSize ?? 500
+  const marked = opts.shops.some((x) => readPlanLegacyState(x.metadata) === 'marked')
+  const population = opts.bare || marked ? opts.shops : [...opts.shops, MARKED()]
   const deps: PlanPauseDeps = {
     pageSize,
     readPage: async (from, to) => {
       log.push(`page:${from}-${to}`)
       if (opts.failPage !== undefined && from === opts.failPage * pageSize) return null
-      return opts.shops.slice(from, to + 1)
+      return population.slice(from, to + 1)
     },
     readPlan: async (s) => {
       const n = (planCalls.get(s.id) ?? 0) + 1
@@ -383,7 +390,7 @@ test.describe('runPlanPause — validate, claim, re-check, apply, release', () =
   })
 
   test('every page is read, and a page that fails fails the run — never a confident short list', async () => {
-    const shops = ['a', 'b', 'c', 'd', 'e'].map((id) => shop(id))
+    const shops = [...['a', 'b', 'c', 'd'].map((id) => shop(id)), MARKED()]
     const all = harness({ shops, pageSize: 2 })
     const run = await runPlanPause(all.deps, { dryRun: true })
     expect(run).toMatchObject({ ok: true, read: 5 })
@@ -506,5 +513,24 @@ test.describe('a partial pause (Codex, PR 487)', () => {
     expect(run.ok && run.candidates[0].result).toBe('paused_partly')
     expect(alerts).toHaveLength(1)
     expect(log.some((l) => l.startsWith('release'))).toBe(false)
+  })
+})
+
+test.describe('the legacy marker guard (verifier S1)', () => {
+  test('when NO owned shop carries the marker, the whole run is refused before any read of the Backend, dry run too', async () => {
+    for (const dryRun of [true, false]) {
+      const { deps, log, alerts } = harness({ shops: [shop('a'), shop('b')], bare: true })
+      expect(await runPlanPause(deps, { dryRun })).toEqual({ ok: false, error: 'legacy_marker_missing', read: 2 })
+      expect(log.filter((l) => !l.startsWith('page'))).toEqual([])
+      expect(alerts).toHaveLength(1)
+    }
+  })
+  test('one marked shop is enough for the run to go ahead', async () => {
+    const { deps } = harness({ shops: [shop('a'), MARKED()], bare: true })
+    expect((await runPlanPause(deps, { dryRun: true })).ok).toBe(true)
+  })
+  test('the route answers 409 for the refusal and 503 for a failed read', () => {
+    const src = readFileSync('app/api/cron/plan-pause/route.ts', 'utf8')
+    expect(src).toContain("result.ok ? 200 : result.error === 'legacy_marker_missing' ? 409 : 503")
   })
 })

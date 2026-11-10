@@ -115,14 +115,27 @@ export interface TrialNoticeDeps {
   now: () => Date
 }
 
-export type TrialNoticeRun = { ok: true; sent: number; skipped: number; unavailable: number; failed: number } | { ok: false; error: 'unavailable' }
+/** `pauseHeld`: new-shop (pause-variant) notices not sent because NO shop read carries the legacy marker yet. */
+export type TrialNoticeRun = { ok: true; sent: number; skipped: number; unavailable: number; failed: number; pauseHeld: number } | { ok: false; error: 'unavailable' }
+
+/**
+ * Has the legacy marking run (D2)? A code guard, not only the deploy order (verifier S1): until at least one shop
+ * read carries the marker, EVERY shop reads as new, and the 18 owned shops whose trials end on 2026-12-05 would be
+ * told «elige un plan o tu tienda se pausa» from 2026-11-20 by the daily check-in timer. So while nothing is marked,
+ * no pause-variant notice goes out; the legacy wording is unaffected.
+ */
+export function legacyMarkingHasRun(legacyStates: readonly PlanLegacyState[]): boolean {
+  return legacyStates.some((state) => state === 'marked')
+}
 
 export async function runTrialNotices(deps: TrialNoticeDeps): Promise<TrialNoticeRun> {
   const shops = await deps.readShops()
   if (!shops) return { ok: false, error: 'unavailable' }
   const now = deps.now()
-  let sent = 0, skipped = 0, unavailable = 0, failed = 0
+  let sent = 0, skipped = 0, unavailable = 0, failed = 0, pauseHeld = 0
+  const marked = legacyMarkingHasRun(shops.map((shop) => shop.facts.legacy))
   for (const shop of shops) {
+    if (!marked && noticeVariantFor(shop.facts.legacy) === 'pause') { pauseHeld += 1; continue }
     const plan = await deps.readPlan(shop)
     if (!plan) { unavailable += 1; continue }
     const notice = decideTrialNotice(shop.trial, plan, now, shop.facts)
@@ -139,5 +152,5 @@ export async function runTrialNotices(deps: TrialNoticeDeps): Promise<TrialNotic
       await deps.release?.(shop, claimed).catch(() => {})
     }
   }
-  return { ok: true, sent, skipped, unavailable, failed }
+  return { ok: true, sent, skipped, unavailable, failed, pauseHeld }
 }

@@ -329,6 +329,8 @@ export type PlanPauseRun =
       failed: number
     }
   | { ok: false; error: 'unavailable'; read: number }
+  /** No owned shop carries the legacy marker: the marking (D2) has not run, so nothing may be paused (verifier S1). */
+  | { ok: false; error: 'legacy_marker_missing'; read: number }
 
 /** Upper bound on pages: a paging bug must end the run loudly, never loop forever. */
 const MAX_PAGES = 200
@@ -348,6 +350,14 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
     if (!rows) return { ok: false, error: 'unavailable', read: shops.length }
     shops.push(...rows)
     if (rows.length < deps.pageSize) break
+  }
+
+  // A CODE guard for the epic's first rule, "legacy first, pause second" (verifier S1): if not one owned shop carries
+  // the marker, the marking has not run, and every old shop would read as unpaid. Refuse the WHOLE run — dry runs
+  // too, which would otherwise call the Backend for every shop — before any claim or Backend call.
+  if (!shops.some((shop) => deps.readLegacy(shop.metadata) === 'marked')) {
+    deps.alert(`🚨 Pausa por falta de plan: NINGUNA tienda tiene la marca de Plan Gratis de antes (plan_legacy). No se pausó nada — correr scripts/mark-plan-legacy.ts primero.`)
+    return { ok: false, error: 'legacy_marker_missing', read: shops.length }
   }
 
   const now = deps.now()

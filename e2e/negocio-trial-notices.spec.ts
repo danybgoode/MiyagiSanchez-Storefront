@@ -129,15 +129,16 @@ const shopOf = (id: string, facts: TrialNoticeFacts = NEW): TrialShop => ({ id, 
 
 test('the runner claims before it sends; a lost claim sends nothing; an unreadable plan waits', async () => {
   const sent: string[] = []
-  const shops = [shopOf('a'), shopOf('b'), shopOf('c')]
+  const shops = [shopOf('a'), shopOf('b'), shopOf('c'), shopOf('m', LEGACY)]
   const deps: TrialNoticeDeps = {
     readShops: async () => shops,
     readPlan: async (s) => (s.id === 'c' ? null : trialPlan(s.trial)),
     claim: async (s) => s.id === 'a',
+    // (`m` is the marked shop that lets pause-variant notices go: its claim is lost, so it sends nothing.)
     send: async (s, n) => { sent.push(`${s.id}:${n}`) },
     now: () => NOW,
   }
-  expect(await runTrialNotices(deps)).toEqual({ ok: true, sent: 1, skipped: 1, unavailable: 1, failed: 0 })
+  expect(await runTrialNotices(deps)).toEqual({ ok: true, sent: 1, skipped: 2, unavailable: 1, failed: 0, pauseHeld: 0 })
   expect(sent).toEqual(['a:five_days'])
 })
 
@@ -149,7 +150,7 @@ test('a run that cannot read the shops reports unavailable, never "nobody"', asy
 test('a send that fails releases its claim, so the next run retries (Codex, #472)', async () => {
   const released: string[] = []
   const deps: TrialNoticeDeps = {
-    readShops: async () => [shopOf('a')],
+    readShops: async () => [shopOf('a', LEGACY)],
     readPlan: async (s) => trialPlan(s.trial),
     claim: async () => true,
     send: async () => { throw new Error('smtp down') },
@@ -165,7 +166,7 @@ test('the runner decides with the facts read with each shop', async () => {
   const paused = { ...shopOf('p', NEW_PAUSED()), trial: trialEnding(-1) }
   const notYet = { ...shopOf('q', NEW), trial: trialEnding(-1) }
   const deps: TrialNoticeDeps = {
-    readShops: async () => [paused, notYet],
+    readShops: async () => [paused, notYet, { ...shopOf('m', LEGACY), trial: trialEnding(-30) }],
     readPlan: async () => unpaid,
     claim: async () => true,
     send: async (s, n) => { sent.push(`${s.id}:${n}`) },
@@ -210,5 +211,31 @@ test.describe('the email copy', () => {
     expect(shell).toContain('variant: noticeVariantFor(shop.facts.legacy)')
     expect(shell).toContain('legacy: readPlanLegacyState(row.metadata)')
     expect(shell).toContain('planPaused: hasPlanPause(row.metadata)')
+  })
+})
+
+test.describe('the legacy marker guard for the notices (verifier S1)', () => {
+  test('while NO shop is marked, no pause-variant notice goes out; the legacy wording is unaffected', async () => {
+    const sent: string[] = []
+    const deps: TrialNoticeDeps = {
+      readShops: async () => [shopOf('n1'), shopOf('n2'), shopOf('u', { ...LEGACY, legacy: 'unreadable' })],
+      readPlan: async (s) => trialPlan(s.trial),
+      claim: async () => true,
+      send: async (s, n) => { sent.push(`${s.id}:${n}`) },
+      now: () => NOW,
+    }
+    expect(await runTrialNotices(deps)).toMatchObject({ ok: true, sent: 1, pauseHeld: 2 })
+    expect(sent).toEqual(['u:five_days'])
+  })
+  test('one marked shop releases them', async () => {
+    const sent: string[] = []
+    const deps: TrialNoticeDeps = {
+      readShops: async () => [shopOf('n1'), shopOf('m', LEGACY)],
+      readPlan: async (s) => trialPlan(s.trial),
+      claim: async () => true,
+      send: async (s, n) => { sent.push(`${s.id}:${n}`) },
+      now: () => NOW,
+    }
+    expect(await runTrialNotices(deps)).toMatchObject({ ok: true, sent: 2, pauseHeld: 0 })
   })
 })
