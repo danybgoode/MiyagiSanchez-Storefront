@@ -203,7 +203,7 @@ export type PauseCandidate = {
 
 /** What the Backend said when asked to pause. */
 export type PauseCallResult =
-  | { outcome: 'paused' } // the seller is paused now
+  | { outcome: 'paused'; complete: boolean } // the seller is paused now (complete: every market link was removed)
   | { outcome: 'already_paused' } // 409 no_change: paused before, by someone else
   | { outcome: 'failed'; detail: string } // definitely did not apply
   | { outcome: 'unknown'; detail: string } // we cannot tell (a timeout, a gateway error, an answer we cannot read)
@@ -226,8 +226,31 @@ export function pauseOutcomeOf(result: StatusChangeAnswer): PauseCallResult {
     return { outcome: 'failed', detail: `HTTP ${result.status}: ${result.message}` }
   }
   // `to` is the status the seller ACTUALLY holds: a pause whose every unlink failed leaves it active.
-  if (result.to === 'paused') return { outcome: 'paused' }
+  if (result.to === 'paused') return { outcome: 'paused', complete: true }
   return { outcome: 'failed', detail: `the Backend left the seller ${result.to} (no product could be unlinked)` }
+}
+
+/** What the Backend said when the settle step asked to undo a pause. */
+export type UnpauseCallResult =
+  | { outcome: 'active'; complete: boolean }
+  | { outcome: 'already_active' }
+  | { outcome: 'failed'; detail: string }
+  | { outcome: 'unknown'; detail: string }
+
+/** The Backend's answer to the settle step's unpause (same mapping as the payment path's restore). */
+export function unpauseOutcomeOf(result: StatusChangeAnswer): UnpauseCallResult {
+  if (result.ok === 'unknown') return { outcome: 'unknown', detail: result.message }
+  if (result.ok === false) {
+    if (result.status === 409) return { outcome: 'already_active' }
+    return { outcome: 'failed', detail: `HTTP ${result.status}: ${result.message}` }
+  }
+  if (result.to === 'active') return { outcome: 'active', complete: result.complete }
+  return { outcome: 'failed', detail: `the Backend left the seller ${result.to}` }
+}
+
+/** Is the claim read now exactly the one this run wrote? */
+export function claimIsOurs(current: unknown, claim: PlanPause): boolean {
+  return !!current && typeof current === 'object' && (current as { paused_at?: unknown }).paused_at === claim.paused_at
 }
 
 /** The seller's status before the claim: the validate step's last read. */
@@ -251,6 +274,12 @@ export interface PlanPauseDeps {
   pause: (shop: PauseCandidate) => Promise<PauseCallResult>
   /** Clear the claim (guard `equals` on `claim`); true when it was cleared. */
   release: (shop: PauseCandidate, claim: PlanPause) => Promise<boolean>
+  /** The `plan_pause` value now, read fresh; `'unavailable'` when the read failed. */
+  readClaim: (shop: PauseCandidate) => Promise<unknown | 'unavailable'>
+  /** Ask the Backend to set the seller active with `PLAN_RESTORE_REASON` (the settle step's undo). */
+  unpause: (shop: PauseCandidate) => Promise<UnpauseCallResult>
+  /** Put the claim back when it is gone (guard: `plan_pause` absent or JSON null); true when written. */
+  restoreClaim: (shop: PauseCandidate, claim: PlanPause) => Promise<boolean>
   alert: (message: string) => void
   now: () => Date
 }
@@ -269,6 +298,7 @@ export type PlanPauseEntry = {
     | 'no_seller'
     | 'claim_lost'
     | 'paid_meanwhile'
+    | 'unpaused_after_payment'
     | 'plan_unavailable'
     | 'failed'
     | 'unknown'
@@ -326,6 +356,72 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
     ...(detail ? { detail } : {}),
   })
 
+
+  /**
+   * SETTLE — after the Backend paused the seller, decide whether the pause may stand (Codex, PR 487).
+   *
+   * The race it closes: a payment can land at ANY point of this run, and its restore hook
+   * (`restoreAfterPlanPaid`, lib/plan-restore.ts) reads the claim → asks the Backend for `active` → clears the claim.
+   * If that hook runs entirely before our pause call, it finds the seller still active (409, `already_active`),
+   * clears the claim, and our pause then lands on a PAID shop with no claim — and no later payment would restore it.
+   *
+   * So, after the pause call, the job reads the claim and the plan again (uncached) and lets the pause stand ONLY when
+   * both say nothing happened: the claim is still exactly ours, and the plan is still `unpaid`. Otherwise it undoes
+   * its own pause (`active`, reason `plan_paid`) and clears the claim. A read that fails counts as "something
+   * happened": the cost of being wrong that way is one unpaid shop open until tomorrow's run; the cost of the other
+   * way is a paying merchant left dark.
+   *
+   * Why this is enough: a payment is RECORDED (grant written, or subscription created) before its hook runs, and the
+   * hook clears the claim only after its own Backend call. Every interleaving, by where the payment lands:
+   *
+   *   payment recorded …                          | what the job sees                 | outcome
+   *   ------------------------------------------- | --------------------------------- | -----------------------------------
+   *   before the job's claim (a grant)            | claim lost (grant key guarded)    | never claimed, never paused
+   *   before the claim (a subscription), hook     | re-check: plan paid               | released, never paused
+   *     found no claim                            |                                   |
+   *   between claim and re-check                  | re-check: plan paid               | released, never paused; the hook,
+   *                                               |                                   |   if it saw the claim, gets 409 and
+   *                                               |                                   |   clears it
+   *   between re-check and pause call; hook ran   | settle: claim gone                | job unpauses → active
+   *     fully before the pause call (the bug)     |                                   |
+   *   between re-check and pause call; hook       | settle: plan paid (it was         | job unpauses; the hook's clear (or
+   *     mid-flight at the settle reads            |   recorded before the hook)       |   ours) removes the claim
+   *   during the pause call; hook after it        | settle: plan paid, or claim gone  | job unpauses, or the hook already
+   *                                               |                                   |   restored (job's unpause gets 409)
+   *   after the settle reads                      | claim ours, plan unpaid           | pause stands; the hook then sees
+   *                                               |                                   |   the claim and restores
+   *
+   * In no row does a recorded payment leave the shop paused without the claim that lets the hook restore it.
+   */
+  async function settle(shop: PauseCandidate, claim: PlanPause, complete: boolean, detail?: string): Promise<void> {
+    const current = await deps.readClaim(shop).catch(() => 'unavailable' as const)
+    const plan = await deps.readPlan(shop).catch(() => null)
+    const ours = current !== 'unavailable' && claimIsOurs(current, claim)
+    const stillUnpaid = !!plan && plan.plan === 'unpaid' && plan.reason === 'unpaid'
+    if (ours && stillUnpaid) {
+      paused += 1
+      void complete
+      candidates.push(entry(shop, 'paused', detail))
+      return
+    }
+    // Something happened while we paused: undo our own pause.
+    const undo = await deps.unpause(shop).catch((e): UnpauseCallResult => ({ outcome: 'unknown', detail: e instanceof Error ? e.message : String(e) }))
+    if (undo.outcome === 'active' || undo.outcome === 'already_active') {
+      if (ours || current === 'unavailable') await deps.release(shop, claim).catch(() => false)
+      candidates.push(entry(shop, 'unpaused_after_payment'))
+      if (undo.outcome === 'active' && !undo.complete) {
+        deps.alert(`⚠️ La tienda se reactivó tras un pago que llegó durante la pausa, pero no todos sus productos volvieron — revisar en /admin/tenants.\nShop: ${shop.slug ?? shop.id}`)
+      }
+      return
+    }
+    // The undo did not land: the shop may be paid AND paused. Keep (or put back) the claim so the next payment, or a
+    // person, can still bring it back as the plan's pause, and say so loudly.
+    if (!ours) await deps.restoreClaim(shop, claim).catch(() => false)
+    failed += 1
+    candidates.push(entry(shop, 'failed', `paid while pausing; unpause ${undo.outcome}: ${undo.detail}`))
+    deps.alert(`🚨 Llegó un pago mientras la tienda se pausaba y NO se pudo reactivar — reactivarla a mano en /admin/tenants.\nShop: ${shop.slug ?? shop.id}\n${undo.detail}`)
+  }
+
   for (const shop of shops) {
     const legacy = deps.readLegacy(shop.metadata)
     // In the order of `decidePlanPause`, cheapest first: the row (no read), then the market (one public read), then
@@ -369,13 +465,13 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
 
     // APPLY.
     const result = await deps.pause(shop).catch((e): PauseCallResult => ({ outcome: 'unknown', detail: e instanceof Error ? e.message : String(e) }))
-    if (result.outcome === 'paused') { candidates.push(entry(shop, 'paused')); paused += 1; continue }
+    if (result.outcome === 'paused') { await settle(shop, claim, result.complete); continue }
 
     if (result.outcome === 'unknown') {
       // We do not know whether the Backend paused it. Read the status back before deciding the claim's fate:
       // releasing over a pause that DID land would leave a paused shop that a payment cannot bring back.
       const after = await deps.readSellerStatus(shop).catch((): SellerStatusFact => 'unavailable')
-      if (after === 'paused') { candidates.push(entry(shop, 'paused', 'confirmed by re-read')); paused += 1; continue }
+      if (after === 'paused') { await settle(shop, claim, true, 'confirmed by re-read'); continue }
       if (after === 'active') {
         await deps.release(shop, claim).catch(() => false)
         candidates.push(entry(shop, 'failed', result.detail)); failed += 1

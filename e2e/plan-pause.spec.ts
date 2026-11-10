@@ -5,11 +5,13 @@
  */
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+import { restoreAfterPlanPaid, type PlanRestoreDeps } from '../lib/plan-restore'
 import {
   PLAN_PAUSE_KEY,
   PLAN_PAUSE_REASON,
   buildPlanPause,
   claimLanded,
+  claimIsOurs,
   claimMarket,
   decidePlanPause,
   hadPlanThatEnded,
@@ -23,6 +25,7 @@ import {
   type PauseCandidate,
   type PlanPauseDeps,
   type PlanPauseMarket,
+  type UnpauseCallResult,
   type SellerStatusFact,
 } from '../lib/plan-pause'
 import {
@@ -170,7 +173,7 @@ test.describe('the market fact', () => {
 
 test.describe('the Backend answer', () => {
   test('paused, already paused (409), failed, unknown — and a 200 that left the seller active is a failure', () => {
-    expect(pauseOutcomeOf({ ok: true, to: 'paused', complete: true })).toEqual({ outcome: 'paused' })
+    expect(pauseOutcomeOf({ ok: true, to: 'paused', complete: true })).toEqual({ outcome: 'paused', complete: true })
     expect(pauseOutcomeOf({ ok: false, status: 409, message: 'ya' })).toEqual({ outcome: 'already_paused' })
     expect(pauseOutcomeOf({ ok: false, status: 400, message: 'no' }).outcome).toBe('failed')
     expect(pauseOutcomeOf({ ok: 'unknown', message: 'timeout' }).outcome).toBe('unknown')
@@ -199,7 +202,11 @@ function harness(opts: {
   market?: (s: PauseCandidate) => PlanPauseMarket
   claim?: boolean
   pause?: PauseCallResult
+  /** Runs inside the pause call, before it answers: a payment and its hook landing there. */
+  duringPause?: (world: { clearClaim: () => void }) => void
   release?: boolean
+  readClaim?: () => unknown | 'unavailable'
+  unpause?: UnpauseCallResult
   pageSize?: number
   failPage?: number
 }) {
@@ -207,6 +214,7 @@ function harness(opts: {
   const planCalls = new Map<string, number>()
   const statusCalls = new Map<string, number>()
   const alerts: string[] = []
+  let stored: unknown = null
   const pageSize = opts.pageSize ?? 500
   const deps: PlanPauseDeps = {
     pageSize,
@@ -229,9 +237,16 @@ function harness(opts: {
       log.push(`status:${s.id}`)
       return opts.status ? opts.status(s, n) : 'active'
     },
-    claim: async (s, c) => { log.push(`claim:${s.id}:${c.paused_at}`); return opts.claim ?? true },
-    pause: async (s) => { log.push(`pause:${s.id}`); return opts.pause ?? { outcome: 'paused' } },
-    release: async (s, c) => { log.push(`release:${s.id}:${c.paused_at}`); return opts.release ?? true },
+    claim: async (s, c) => { log.push(`claim:${s.id}:${c.paused_at}`); if (opts.claim ?? true) stored = c; return opts.claim ?? true },
+    pause: async (s) => {
+      log.push(`pause:${s.id}`)
+      opts.duringPause?.({ clearClaim: () => { stored = null } })
+      return opts.pause ?? { outcome: 'paused', complete: true }
+    },
+    release: async (s, c) => { log.push(`release:${s.id}:${c.paused_at}`); if (stored && claimIsOurs(stored, c)) stored = null; return opts.release ?? true },
+    readClaim: async (s) => { log.push(`readClaim:${s.id}`); return opts.readClaim ? opts.readClaim() : stored },
+    unpause: async (s) => { log.push(`unpause:${s.id}`); return opts.unpause ?? { outcome: 'active', complete: true } },
+    restoreClaim: async (s, c) => { log.push(`restoreClaim:${s.id}`); stored = c; return true },
     alert: (m) => { alerts.push(m) },
     now: () => NOW,
   }
@@ -252,7 +267,7 @@ test.describe('runPlanPause — validate, claim, re-check, apply, release', () =
     const { deps, log } = harness({ shops: [shop('a')] })
     const run = await runPlanPause(deps, { dryRun: false })
     expect(run).toMatchObject({ ok: true, paused: 1, failed: 0 })
-    expect(log.filter((l) => !l.startsWith('page'))).toEqual(['market:a', 'plan:a', 'status:a', `claim:a:${NOW.toISOString()}`, 'plan:a', 'pause:a'])
+    expect(log.filter((l) => !l.startsWith('page'))).toEqual(['market:a', 'plan:a', 'status:a', `claim:a:${NOW.toISOString()}`, 'plan:a', 'pause:a', 'readClaim:a', 'plan:a'])
   })
 
   test('a Backend failure releases exactly the claim written, so the next run retries, and alerts', async () => {
@@ -371,3 +386,99 @@ test.describe('the cron route', () => {
     expect(src).toMatch(/dryParam !== null && dryParam !== '0'/)
   })
 })
+
+// ── The race with the payment's restore hook (Codex, PR 487) ────────────────────
+
+test.describe('settle: a payment landing while the job pauses never leaves a paid shop dark', () => {
+  const paidAfter = (n: number) => (_s: PauseCandidate, call: number) => (call > n ? PLANS.tienda_subscription : PLANS.unpaid)
+
+  test('the hook ran fully before the pause call and cleared the claim (the reported bug): the job undoes its pause', async () => {
+    const { deps, log } = harness({ shops: [shop('a')], plan: paidAfter(2), duringPause: (w) => w.clearClaim() })
+    const run = await runPlanPause(deps, { dryRun: false })
+    expect(run).toMatchObject({ ok: true, paused: 0 })
+    expect(run.ok && run.candidates[0].result).toBe('unpaused_after_payment')
+    expect(log.slice(-4)).toEqual(['pause:a', 'readClaim:a', 'plan:a', 'unpause:a'])
+  })
+
+  test('the claim is still ours but the plan is now paid (the hook is mid-flight): the job undoes its pause and clears the claim', async () => {
+    const { deps, log } = harness({ shops: [shop('a')], plan: paidAfter(2) })
+    const run = await runPlanPause(deps, { dryRun: false })
+    expect(run.ok && run.candidates[0].result).toBe('unpaused_after_payment')
+    expect(log.slice(-2)).toEqual(['unpause:a', `release:a:${NOW.toISOString()}`])
+  })
+
+  test('the claim was cleared although the plan still reads unpaid: the job undoes its pause (someone restored it)', async () => {
+    const { deps, log } = harness({ shops: [shop('a')], duringPause: (w) => w.clearClaim() })
+    const run = await runPlanPause(deps, { dryRun: false })
+    expect(run.ok && run.candidates[0].result).toBe('unpaused_after_payment')
+    expect(log).toContain('unpause:a')
+  })
+
+  test('nothing happened (claim ours, plan unpaid): the pause stands, no undo', async () => {
+    const { deps, log } = harness({ shops: [shop('a')] })
+    const run = await runPlanPause(deps, { dryRun: false })
+    expect(run).toMatchObject({ ok: true, paused: 1 })
+    expect(log).not.toContain('unpause:a')
+  })
+
+  test('a settle read that fails counts as "something happened": undo, never a guess that leaves a payer dark', async () => {
+    const claimUnreadable = harness({ shops: [shop('a')], readClaim: () => 'unavailable' })
+    expect((await runPlanPause(claimUnreadable.deps, { dryRun: false })).ok && claimUnreadable.log).toContain('unpause:a')
+    const planUnreadable = harness({ shops: [shop('a')], plan: (_s, n) => (n > 2 ? null : PLANS.unpaid) })
+    expect((await runPlanPause(planUnreadable.deps, { dryRun: false })).ok && planUnreadable.log).toContain('unpause:a')
+  })
+
+  test('an undo answered 409 (the hook already restored it) is settled the same way', async () => {
+    const { deps } = harness({ shops: [shop('a')], plan: paidAfter(2), unpause: { outcome: 'already_active' } })
+    const run = await runPlanPause(deps, { dryRun: false })
+    expect(run.ok && run.candidates[0].result).toBe('unpaused_after_payment')
+  })
+
+  test('an undo that fails puts the claim back where it was cleared and alerts, so the shop can still be restored', async () => {
+    const { deps, log, alerts } = harness({ shops: [shop('a')], plan: paidAfter(2), duringPause: (w) => w.clearClaim(), unpause: { outcome: 'failed', detail: 'HTTP 500' } })
+    const run = await runPlanPause(deps, { dryRun: false })
+    expect(run).toMatchObject({ ok: true, failed: 1 })
+    expect(log.at(-1)).toBe('restoreClaim:a')
+    expect(alerts).toHaveLength(1)
+  })
+
+  test('a partial undo (a relink failed) alerts', async () => {
+    const { deps, alerts } = harness({ shops: [shop('a')], plan: paidAfter(2), unpause: { outcome: 'active', complete: false } })
+    await runPlanPause(deps, { dryRun: false })
+    expect(alerts).toHaveLength(1)
+  })
+
+  test('end to end with the REAL restore hook running inside the pause call: the paid shop ends active', async () => {
+    // One world: the seller's status, the claim, and whether a payment was recorded. The Backend refuses a no-op.
+    const world = { status: 'active' as 'active' | 'paused', claim: null as unknown, paid: false }
+    const backend = (to: 'active' | 'paused') => {
+      if (world.status === to) return { ok: false as const, status: 409, message: 'no_change' }
+      world.status = to
+      return { ok: true as const, to, complete: true }
+    }
+    const restoreDeps: PlanRestoreDeps = {
+      readMetadata: async () => ({ ...(world.claim ? { [PLAN_PAUSE_KEY]: world.claim } : {}), medusa_seller_id: 'sel_a' }),
+      activate: async () => { const r = backend('active'); return r.ok ? { outcome: 'active', complete: r.complete } : { outcome: 'already_active' } },
+      clearClaim: async (_id, expected) => { if (JSON.stringify(world.claim) === JSON.stringify(expected)) { world.claim = null; return true } return false },
+      alert: () => {},
+    }
+    const { deps } = harness({ shops: [shop('a')] })
+    deps.readPlan = async () => (world.paid ? PLANS.tienda_subscription : PLANS.unpaid)
+    deps.claim = async (_s, c) => { world.claim = c; return true }
+    deps.readClaim = async () => world.claim
+    deps.release = async (_s, c) => { if (claimIsOurs(world.claim, c)) world.claim = null; return true }
+    deps.restoreClaim = async (_s, c) => { world.claim = c; return true }
+    deps.unpause = async () => { const r = backend('active'); return r.ok ? { outcome: 'active', complete: true } : { outcome: 'already_active' } }
+    deps.pause = async () => {
+      // The payment lands after the re-check and its hook runs to the end BEFORE the Backend pauses.
+      world.paid = true
+      await restoreAfterPlanPaid('a', restoreDeps)
+      const r = backend('paused')
+      return r.ok ? { outcome: 'paused', complete: true } : { outcome: 'already_paused' }
+    }
+    await runPlanPause(deps, { dryRun: false })
+    expect(world.status).toBe('active')
+    expect(world.claim).toBeNull()
+  })
+})
+

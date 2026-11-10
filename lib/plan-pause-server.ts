@@ -17,6 +17,9 @@
  *   pause            — `POST /internal/sellers/:id/status { status: 'paused', reason: 'plan_unpaid' }` through
  *                      `changeSellerStatus`, the same transport the admin uses.
  *   release          — `merge_shop_metadata` with an `equals` guard on the claim written (`planPauseClearArgs`).
+ *   readClaim        — `plan_pause` read fresh, for the settle step (lib/plan-pause.ts explains the race).
+ *   unpause          — the same status route with `active`, reason `plan_paid`: the settle step's undo.
+ *   restoreClaim     — puts the claim back only where none is (guard absent, then json_null).
  *
  * server-only.
  */
@@ -35,6 +38,9 @@ import {
   claimLanded,
   planPauseClaimArgs,
   planPauseClearArgs,
+  unpauseOutcomeOf,
+  PLAN_PAUSE_KEY,
+  PLAN_RESTORE_REASON,
   planPauseMarketOf,
   pauseOutcomeOf,
   type PauseCandidate,
@@ -103,6 +109,25 @@ export function planPauseDeps(): PlanPauseDeps {
     release: async (shop, claim) => {
       const { data, error } = await db.rpc('merge_shop_metadata', planPauseClearArgs(shop.id, claim))
       return !error && Array.isArray(data) && data.length === 1
+    },
+    readClaim: async (shop) => {
+      const fresh = await freshMetadata(shop.id)
+      if (!fresh) return 'unavailable'
+      const meta = fresh.metadata && typeof fresh.metadata === 'object' ? (fresh.metadata as Record<string, unknown>) : {}
+      return meta[PLAN_PAUSE_KEY] ?? null
+    },
+    unpause: async (shop) => {
+      const medusaSellerId = medusaSellerIdOf(shop.metadata)
+      if (!medusaSellerId) return { outcome: 'failed', detail: 'no medusa_seller_id' }
+      return unpauseOutcomeOf(await changeSellerStatus({ medusaSellerId, status: 'active', reason: PLAN_RESTORE_REASON }))
+    },
+    restoreClaim: async (shop, claim) => {
+      // Only where no claim is: absent, or the JSON null a release leaves. Never over another value.
+      for (const mode of ['absent', 'json_null'] as const) {
+        const { data, error } = await db.rpc('merge_shop_metadata', { p_shop_id: shop.id, p_patch: { [PLAN_PAUSE_KEY]: claim }, p_guard_key: PLAN_PAUSE_KEY, p_guard_mode: mode, p_expected: null })
+        if (!error && Array.isArray(data) && data.length === 1) return true
+      }
+      return false
     },
     alert: (m) => tg.alert(m),
     now: () => new Date(),
