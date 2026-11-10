@@ -1,9 +1,9 @@
 /**
  * A promoter pays the platform its share of a package BY CARD (epic 08 · plans-gratis-negocio S4.2, README D12 as
  * amended: settled at source). The promoter collected the full price in person; the card pays exactly the
- * platform's share (price − the promoter's rate). The webhook then adds the package's months of Negocio (none for the
- * free-plan setup) and records the attribution as paid with the full list price, accruing nothing — the promoter
- * already kept their part.
+ * platform's share (price − the promoter's rate). The webhook then writes the package's grants (plan-tienda D11:
+ * Negocio, and for `tienda_anual` Tienda after it, dated from the payment day) and records the attribution as paid
+ * with the full list price, accruing nothing — the promoter already kept their part.
  *
  * Card only, and the grant is written only for a `paid` session, so a delayed method can never give Negocio away.
  *
@@ -16,8 +16,8 @@ import { tg } from '@/lib/telegram'
 import { db } from '@/lib/supabase'
 import { markAttributionPaid } from '@/lib/promoter'
 import { notifyMerchantCloseReceipt } from '@/lib/promoter-close-notify'
-import { applyNegocioPayment } from '@/lib/negocio-webhook'
-import { PACKAGES, isPackageSku, packageSplit, type PackageSku } from '@/lib/promoter-packages'
+import { applyNegocioPayment, applyTiendaPayment } from '@/lib/negocio-webhook'
+import { PACKAGES, applyPackageGrants, isPackageSku, packageSplit, type PackageGrantDeps, type PackageSku } from '@/lib/promoter-packages'
 import { formatReceiptAmount } from '@/lib/promoter-receipt'
 
 export const PROMOTER_PACKAGE_CHECKOUT_KIND = 'promoter_package'
@@ -77,6 +77,11 @@ export async function recordPackageAttribution(input: { promoterId: string; shop
   }
 }
 
+/** The plan seam's two appliers, as `applyPackageGrants` takes them. */
+export const PACKAGE_GRANT_DEPS: PackageGrantDeps = {
+  apply: (plan, input) => (plan === 'negocio' ? applyNegocioPayment(input) : applyTiendaPayment(input)),
+}
+
 export async function handlePromoterPackageComplete(session: Stripe.Checkout.Session): Promise<void> {
   const sku = session.metadata?.promoter_sku
   const shopId = session.metadata?.shop_id
@@ -86,38 +91,40 @@ export async function handlePromoterPackageComplete(session: Stripe.Checkout.Ses
     tg.alert(`⚠️ Paquete de promotor: sesión completada SIN pago (${session.payment_status}) — no se activó.\nSession: ${session.id}`)
     return
   }
+  // A RETIRED package is still honoured here: a checkout opened before the retirement may complete after it, and that
+  // money was already taken (D11: only the SALE is refused, at the route).
   if (!isPackageSku(sku) || !shopId || !promoterId || !Number.isInteger(gross) || gross <= 0) {
     console.error('[promoter package] bad metadata:', session.id)
     tg.alert(`🚨 Paquete de promotor PAGADO con datos inválidos — revisar.\nSession: ${session.id}`)
     return
   }
-  const months = PACKAGES[sku].negocioMonths
-  if (months > 0) {
-    try {
-      const outcome = await applyNegocioPayment({ shopId, paymentId: session.id, months, note: `promoter ${sku}` })
-      if (outcome === 'replay') {
-        // The grant was already counted, but the attribution may not have landed on the first delivery (Codex, #474):
-        // re-record it — markAttributionPaid is idempotent — and send no second receipt.
-        await recordPackageAttribution({ promoterId, shopId, sku, gross, sessionId: session.id })
-        return
-      }
-      if (outcome === 'comp') {
-        // Refused at close start, so only a race gets here: the promoter paid for a shop that already has Negocio.
-        tg.alert(`⚠️ Paquete ${PACKAGES[sku].label} pagado en una tienda que ya tenía Negocio sin costo — revisar reembolso.\nShop: ${shopId}\nSession: ${session.id}`)
-        return
-      }
-    } catch (e) {
-      console.error('[promoter package] grant write failed:', e)
-      tg.alert(
-        `🚨 Paquete de promotor PAGADO pero Negocio NO activado — reparar a mano.\nShop: ${shopId}\nSession: ${session.id}\n` +
-        `Error: ${e instanceof Error ? e.message : String(e)}`,
-      )
-      return
-    }
+  let outcome: Awaited<ReturnType<typeof applyPackageGrants>>
+  try {
+    // Every grant of the package under the session id: a replay adds nothing, and a delivery after a crash between
+    // the Negocio and the Tienda write completes only the missing half (applyPackageGrants).
+    outcome = await applyPackageGrants({ sku, shopId, paymentId: session.id }, PACKAGE_GRANT_DEPS)
+  } catch (e) {
+    console.error('[promoter package] grant write failed:', e)
+    tg.alert(
+      `🚨 Paquete de promotor PAGADO pero el plan NO quedó completo — reenviar el evento desde Stripe lo completa sin repetir nada.\nShop: ${shopId}\nSession: ${session.id}\n` +
+      `Error: ${e instanceof Error ? e.message : String(e)}`,
+    )
+    return
   }
-  // The free-plan setup has no Negocio grant to remember the payment, so a replayed delivery is detected on the
+  if (outcome === 'replay') {
+    // The grants were already counted, but the attribution may not have landed on the first delivery (Codex, #474):
+    // re-record it — markAttributionPaid is idempotent — and send no second receipt.
+    await recordPackageAttribution({ promoterId, shopId, sku, gross, sessionId: session.id })
+    return
+  }
+  if (outcome === 'comp') {
+    // Refused at close start, so only a race gets here: the promoter paid for a shop that already has Negocio.
+    tg.alert(`⚠️ Paquete ${PACKAGES[sku].label} pagado en una tienda que ya tenía Negocio sin costo — revisar reembolso.\nShop: ${shopId}\nSession: ${session.id}`)
+    return
+  }
+  // The free-plan setup (retired) has no grant to remember the payment, so a replayed delivery is detected on the
   // attribution: already paid ⇒ re-record (idempotent) and send no second receipt or alert (Codex, #474).
-  if (months === 0 && (await packageAlreadyPaid({ promoterId, shopId, sku }))) {
+  if (outcome === 'none' && (await packageAlreadyPaid({ promoterId, shopId, sku }))) {
     await recordPackageAttribution({ promoterId, shopId, sku, gross, sessionId: session.id })
     return
   }
@@ -128,5 +135,11 @@ export async function handlePromoterPackageComplete(session: Stripe.Checkout.Ses
     promoterId,
     items: [{ label: PACKAGES[sku].summary, amountMxn: formatReceiptAmount(gross) }],
   }).catch((e) => console.error('[promoter package] receipt failed:', e))
-  tg.alert(`✅ Paquete ${PACKAGES[sku].label} pagado por el promotor${months ? ` — Negocio ${months} meses` : ''}\nShop: ${shopId}`)
+  tg.alert(`✅ Paquete ${PACKAGES[sku].label} pagado por el promotor — ${packageGrantsLine(sku)}\nShop: ${shopId}`)
+}
+
+/** «Negocio 3 meses + Tienda 12 meses» for the operator's alert. */
+export function packageGrantsLine(sku: PackageSku): string {
+  const grants = PACKAGES[sku].grants
+  return grants.length ? grants.map((g) => `${g.plan === 'negocio' ? 'Negocio' : 'Tienda'} ${g.months} meses`).join(' + ') : 'sin plan'
 }

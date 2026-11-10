@@ -28,8 +28,8 @@ import {
  */
 
 test.describe('promoter-transfer · SKU + method narrowing', () => {
-  test('TRANSFER_SKUS is exactly the close-workspace SKUs plus the three packages (print_ad excluded)', () => {
-    expect(TRANSFER_SKUS).toEqual(['custom_domain', 'subdomain', 'ml_sync', 'migration', 'negocio_anual', 'negocio_arranque', 'setup_gratis'])
+  test('TRANSFER_SKUS is exactly the close-workspace SKUs plus every package, sold or retired (print_ad excluded)', () => {
+    expect(TRANSFER_SKUS).toEqual(['custom_domain', 'subdomain', 'ml_sync', 'migration', 'negocio_anual', 'negocio_arranque', 'setup_gratis', 'tienda_anual', 'negocio_semestral'])
   })
 
   test('isTransferSku narrows correctly', () => {
@@ -109,10 +109,12 @@ test.describe('promoter-transfer · per-SKU activation mapping (SKU_GRANT_KEYS)'
       subdomain: 'subdomain_grant',
       ml_sync: 'ml_sync_grant',
       migration: 'migration_grant',
-      // The packages grant Negocio through applyNegocioPayment; the free setup grants nothing.
+      // The packages grant through applyPackageGrants (plan-tienda D11); the value names the first key written.
       negocio_anual: 'negocio_grant',
       negocio_arranque: 'negocio_grant',
       setup_gratis: '',
+      tienda_anual: 'negocio_grant',
+      negocio_semestral: 'negocio_grant',
     })
   })
 

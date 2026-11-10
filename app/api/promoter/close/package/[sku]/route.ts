@@ -1,12 +1,13 @@
 /**
  * POST /api/promoter/close/package/<sku>  { shopId | slug, paymentMethod: 'transfer' | 'card', transferMethod? }
  *
- * A bound promoter closes one of the three packages on a merchant's shop (epic 08 · plans-gratis-negocio S4.2, D12):
- * `negocio_anual` (setup + 12 months of Negocio), `negocio_arranque` (setup + 3 months), `setup_gratis` (setup on the
- * free plan). The promoter collected the package price in person and sends the platform only its share:
+ * A bound promoter sells one of the three packages on a merchant's shop (plan-tienda-three-free-months S4, D11):
+ * `tienda_anual`, `negocio_semestral`, `negocio_anual` — each with three free months of Plan Negocio on top, see
+ * lib/promoter-packages.ts. The retired `negocio_arranque` and `setup_gratis` answer 410. The promoter collected the
+ * package price in person and sends the platform only its share:
  *   - `transfer` → a pending SPEI/DiMo/CoDi transfer of (price − the promoter's rate), approved by the admin, which then
- *     adds the months of Negocio (`activatePromoterOneTimeGrant`);
- *   - `card`     → a card checkout for exactly that share; the webhook adds the months
+ *     writes the package's grants (`activatePromoterOneTimeGrant`);
+ *   - `card`     → a card checkout for exactly that share; the webhook writes the grants
  *     (`handlePromoterPackageComplete`).
  * Either way the price is the package's own list price (no promoter discount, no clamp) and nothing accrues.
  *
@@ -20,7 +21,7 @@ import { getConfiguredCommissionRate, getPromoterByClerkId } from '@/lib/promote
 import { readNegocioGrant } from '@/lib/plan'
 import { resolveTargetShop } from '@/lib/promoter-server'
 import { startPromoterTransferClose } from '@/lib/promoter-transfers'
-import { PACKAGES, isPackageSku } from '@/lib/promoter-packages'
+import { PACKAGES, RETIRED_PACKAGE_MESSAGE, isPackageSku, isRetiredPackageSku } from '@/lib/promoter-packages'
 import { startPackageCardCheckout } from '@/lib/promoter-package-server'
 import { promoterMayCloseShop } from '@/lib/promoter-shop-access'
 
@@ -34,6 +35,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sku
 
   const { sku } = await params
   if (!isPackageSku(sku)) return NextResponse.json({ ok: false, error: 'Paquete no válido.' }, { status: 404 })
+  // A retired package (plan-tienda D11) is a known word, so not a 404: it is GONE from sale, by card and by transfer.
+  // Its old transfers, attributions and receipts still read; only a new sale is refused, before anything else runs.
+  if (isRetiredPackageSku(sku)) return NextResponse.json({ ok: false, error: RETIRED_PACKAGE_MESSAGE }, { status: 410 })
 
   const rl = await checkRateLimit('checkout', getClientIp(req))
   if (!rl.allowed) {

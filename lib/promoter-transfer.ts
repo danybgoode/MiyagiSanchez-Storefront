@@ -32,6 +32,9 @@ export const TRANSFER_SKUS = [
   'custom_domain', 'subdomain', 'ml_sync', 'migration',
   // plans-gratis-negocio S4 (D12): the three packages, settled at source by transfer (M1 widened the DB CHECK).
   'negocio_anual', 'negocio_arranque', 'setup_gratis',
+  // plan-tienda S4 (D11, D13): the two new packages (M1 20261111000000 widens the DB CHECK). The retired two stay, so
+  // their old transfers still read and a pending one can still be approved.
+  'tienda_anual', 'negocio_semestral',
 ] as const
 export type TransferSku = (typeof TRANSFER_SKUS)[number]
 
@@ -106,10 +109,13 @@ export const SKU_GRANT_KEYS: Record<TransferSku, string> = {
   subdomain: 'subdomain_grant',
   ml_sync: 'ml_sync_grant',
   migration: 'migration_grant',
-  // The packages grant Negocio through `applyNegocioPayment` (lib/negocio-webhook.ts), not a per-SKU key.
+  // The packages grant their plans through `applyPackageGrants` (lib/promoter-packages.ts), never through this map;
+  // the value names the key the package writes first, for readers only.
   negocio_anual: 'negocio_grant',
   negocio_arranque: 'negocio_grant',
   setup_gratis: '',
+  tienda_anual: 'negocio_grant',
+  negocio_semestral: 'negocio_grant',
 }
 
 /** es-MX display label per SKU — for transfer-approval/rejection email subjects. */
@@ -118,9 +124,12 @@ export const TRANSFER_SKU_LABEL: Record<TransferSku, string> = {
   subdomain: 'Subdominio propio',
   ml_sync: 'Sincronización Mercado Libre',
   migration: 'Migración de tienda',
-  negocio_anual: 'Plan Negocio · 1 año (tienda lista + 12 meses)',
+  // Named for the email subject and the admin list; the package's own label from lib/promoter-packages.ts leads.
+  negocio_anual: 'Plan Negocio · 1 año (tienda lista + 3 meses gratis + 12 meses)',
   negocio_arranque: 'Plan Negocio · 3 meses (tienda lista + 3 meses)',
   setup_gratis: 'Plan Gratis · tienda lista',
+  tienda_anual: 'Plan Tienda · 1 año (tienda lista + 3 meses de Plan Negocio gratis + 12 meses de Plan Tienda)',
+  negocio_semestral: 'Plan Negocio · 6 meses (tienda lista + 3 meses gratis + 6 meses)',
 }
 
 // ── Transfer-details completeness (the "never a dead-end destination" guard) ──

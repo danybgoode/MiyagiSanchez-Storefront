@@ -1,4 +1,4 @@
-import { PACKAGES, PACKAGE_SKUS, packageSentence, packageSplit } from '@/lib/promoter-packages'
+import { PACKAGES, PACKAGE_FREE_MONTHS, SELLABLE_PACKAGE_SKUS, packageSentence, packageSplit } from '@/lib/promoter-packages'
 import type { Dictionary } from '@/lib/dictionary'
 import {
   resolveSellerPersonaRoute,
@@ -350,9 +350,13 @@ export function buildPromoterPageConfig(
     negocio_arranque: 0,
     setup_gratis: 0,
     negocio_renewal: 0,
+    tienda_anual: 0,
+    negocio_semestral: 0,
+    tienda_renewal: 0,
+    negocio_upgrade: 0,
   }
   const anualKeepMxn = Math.round(packageSplit('negocio_anual', commissionRates.negocio_anual ?? 0).keepCents / 100)
-  const gratisKeepMxn = Math.round(packageSplit('setup_gratis', commissionRates.setup_gratis ?? 0).keepCents / 100)
+  const tiendaKeepMxn = Math.round(packageSplit('tienda_anual', commissionRates.tienda_anual ?? 0).keepCents / 100)
   const renewalPct = commissionRates.negocio_renewal ?? 0
   const pesosStat = (n: number) => '$' + n.toLocaleString('en-US')
   // The close workspace (`/promotor/cerrar`) 404s when the program is off — hide both CTAs
@@ -383,25 +387,24 @@ export function buildPromoterPageConfig(
     // Pricing figures — the custom-domain + subdomain prices are fixed numbers; the commission
     // stat is computed from the live admin config (US-1.4) and hidden (not "%"/"0%") until a rate
     // is configured.
-    // plans-gratis-negocio S4.1 (D12): what a promoter keeps per package, from the live rates. The old "max
-    // commission %" stat is gone: the free-plan setup's 80% would read as the headline and mislead.
-    // What a promoter keeps, from the live rates (Daniel, 2026-11-05: the money must be the clearest thing on the page).
+    // What a promoter keeps per package, from the live rates (Daniel, 2026-11-05: the money must be the clearest thing
+    // on the page). plan-tienda S4.4: the largest and the smallest package on sale; the retired ones are gone.
     heroStats: anualKeepMxn > 0
       ? [
           { value: pesosStat(anualKeepMxn), label: `te quedas por cada ${PACKAGES.negocio_anual.label}` },
-          { value: pesosStat(gratisKeepMxn), label: `te quedas por cada ${PACKAGES.setup_gratis.label}` },
+          ...(tiendaKeepMxn > 0 ? [{ value: pesosStat(tiendaKeepMxn), label: `te quedas por cada ${PACKAGES.tienda_anual.label}` }] : []),
         ]
       : [],
     proofTitle: page.proofTitle,
     proofLead: page.proofLead,
-    // Only the three options a promoter sells, each with its money in three plain sentences. No print ads and no
-    // retired extras (Daniel, 2026-11-05).
-    proofPoints: PACKAGE_SKUS.map((sku) => ({
-      icon: sku === 'setup_gratis' ? 'iconoir-shop' : 'iconoir-sparks',
+    // Only the three packages on sale (plan-tienda D11), each with its money first in three plain sentences, then what
+    // the merchant gets — the three free months on top. No print ads and no retired packages (Daniel, 2026-11-05).
+    proofPoints: SELLABLE_PACKAGE_SKUS.map((sku) => ({
+      icon: sku === 'tienda_anual' ? 'iconoir-shop' : 'iconoir-sparks',
       title: PACKAGES[sku].label,
       body: commissionRates[sku]
-        ? `${PACKAGES[sku].summary}. ${packageSentence(sku, commissionRates[sku])}.`
-        : `${PACKAGES[sku].summary}. Cobras $${PACKAGES[sku].priceMxn.toLocaleString('en-US')}; tu parte se confirma con Miyagi Sánchez.`,
+        ? `${packageSentence(sku, commissionRates[sku])}. ${PACKAGES[sku].summary}: los ${PACKAGE_FREE_MONTHS} meses gratis van además del tiempo pagado.`
+        : `Cobras $${PACKAGES[sku].priceMxn.toLocaleString('en-US')}; tu parte se confirma con Miyagi Sánchez. ${PACKAGES[sku].summary}.`,
     })),
     stepsTitle: page.stepsTitle,
     steps: page.steps,

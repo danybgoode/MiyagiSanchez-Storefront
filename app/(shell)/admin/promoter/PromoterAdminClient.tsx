@@ -13,6 +13,7 @@ import type { OperatorDetailsV1, OperatorDetailsV2, PromoterApplication } from '
 import { PROMOTER_SKU_BASE_PRICE_MXN } from '@/lib/promoter-earnings'
 import { buildSkuPriceTable, computeBundleRow, type PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { TRANSFER_SKU_LABEL, type TransferSku } from '@/lib/promoter-transfer'
+import { PACKAGES } from '@/lib/promoter-packages'
 import type { PromoterTransfer } from '@/lib/promoter-transfers'
 import { SELLER_LANDING_PATHS } from '@/lib/seller-acquisition'
 
@@ -33,10 +34,15 @@ const SKU_LABEL: Record<PromoterSku, string> = {
   subdomain: 'Subdominio propio',
   ml_sync: 'Sincronización Mercado Libre',
   migration: 'Migración de tienda',
-  negocio_anual: 'Plan Negocio · 1 año (tienda lista + 12 meses)',
-  negocio_arranque: 'Plan Negocio · 3 meses (tienda lista + 3 meses)',
-  setup_gratis: 'Plan Gratis · tienda lista',
+  // The packages are named by lib/promoter-packages.ts (plan-tienda D18); retired ones keep a label so old rows read.
+  tienda_anual: PACKAGES.tienda_anual.label,
+  negocio_semestral: PACKAGES.negocio_semestral.label,
+  negocio_anual: PACKAGES.negocio_anual.label,
+  negocio_arranque: `${PACKAGES.negocio_arranque.label} (ya no se vende)`,
+  setup_gratis: `${PACKAGES.setup_gratis.label} (ya no se vende)`,
   negocio_renewal: 'Renovación del Plan Negocio (año 2)',
+  tienda_renewal: 'Renovación del Plan Tienda (año 2)',
+  negocio_upgrade: 'Cambio de Plan Tienda a Plan Negocio (primer año)',
 }
 
 /**

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { PACKAGES, packageSplit, type PackageSku } from '@/lib/promoter-packages'
+import { PACKAGES, SELLABLE_PACKAGE_SKUS, packageSplit, type PackageSku, type SellablePackageSku } from '@/lib/promoter-packages'
 import type { Dictionary } from '@/lib/dictionary'
 
 /**
@@ -22,9 +22,10 @@ type Transfer = {
   status: 'pending' | 'reported' | 'approved' | 'rejected'
 }
 
-// The package names and prices come from `lib/promoter-packages.ts`, never typed here.
-const PACKAGE_OPTIONS: PackageSku[] = ['negocio_anual', 'negocio_arranque', 'setup_gratis']
-type Option = `package/${PackageSku}` | 'migration'
+// The package names and prices come from `lib/promoter-packages.ts`, never typed here. Only the packages ON SALE
+// (plan-tienda D11): a retired one would answer 410.
+const PACKAGE_OPTIONS: readonly SellablePackageSku[] = SELLABLE_PACKAGE_SKUS
+type Option = `package/${SellablePackageSku}` | 'migration'
 const TRANSFER_METHODS: Array<{ id: Transfer['method']; label: string }> = [
   { id: 'spei', label: 'SPEI' },
   { id: 'dimo', label: 'DiMo' },
@@ -35,7 +36,7 @@ const field = 'mt-1 w-full rounded-lg border border-[var(--color-border)] px-3 p
 const pesos = (cents: number) => `$${Math.round(cents / 100).toLocaleString('en-US')}`
 const fill = (template: string, values: Record<string, string>) =>
   Object.entries(values).reduce((s, [k, v]) => s.split(`{${k}}`).join(v), template)
-const packageOf = (option: Option): PackageSku | null => (option.startsWith('package/') ? (option.slice('package/'.length) as PackageSku) : null)
+const packageOf = (option: Option): SellablePackageSku | null => (option.startsWith('package/') ? (option.slice('package/'.length) as SellablePackageSku) : null)
 
 export default function CobraStep({ copy, shop, transferEnabled, packageRates }: {
   copy: Copy
@@ -44,7 +45,7 @@ export default function CobraStep({ copy, shop, transferEnabled, packageRates }:
   packageRates: Partial<Record<PackageSku, number>>
 }) {
   const t = copy.cobra
-  const [option, setOption] = useState<Option>('package/negocio_anual')
+  const [option, setOption] = useState<Option>(`package/${PACKAGE_OPTIONS[0]}`)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [payMethod, setPayMethod] = useState<'card' | 'transfer'>(transferEnabled ? 'transfer' : 'card')

@@ -11,7 +11,7 @@
  * option, the promoter, the amount and the time. It doesn't expire (a receipt is permanent).
  */
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { isPackageSku, PACKAGES, type PackageSku } from './promoter-packages'
+import { isPackageSku, packageMonths, PACKAGES, type PackageSku } from './promoter-packages'
 
 export type ReceiptPayload = {
   v: 1
@@ -62,10 +62,12 @@ export function verifyReceiptToken(token: string, secret: string): ReceiptPayloa
  *    `pending`.
  * 3. It arrived: the free setup is `ready`; a Negocio package is `active` while the grant runs, and `ended` once it ran
  *    out — never «Activo hasta» a date already past. A grant with no end date (a permanent one) is `active`.
+ *    A package that grants Plan Tienda after its free Negocio months (`tienda_anual`, plan-tienda D11) reads the
+ *    TIENDA grant's end — that is when what the merchant paid for runs out — and says so (`plan: 'tienda'`).
  */
 export type ReceiptStatus =
-  | { kind: 'active'; endsAt: string | null }
-  | { kind: 'ended'; endsAt: string }
+  | { kind: 'active'; endsAt: string | null; plan?: 'tienda' }
+  | { kind: 'ended'; endsAt: string; plan?: 'tienda' }
   | { kind: 'ready' }
   | { kind: 'pending' }
   | { kind: 'problem' }
@@ -75,14 +77,19 @@ export function receiptStatus(input: {
   attributionPaid: boolean
   transferStatus: string | null
   negocioEndsAt: string | null
+  /** The shop's Tienda grant end; read only for a package that grants Plan Tienda. */
+  tiendaEndsAt?: string | null
   now: Date
 }): ReceiptStatus {
   if (input.transferStatus === 'pending' || input.transferStatus === 'reported') return { kind: 'pending' }
   if (!input.attributionPaid) return input.transferStatus === 'rejected' ? { kind: 'problem' } : { kind: 'pending' }
-  if (PACKAGES[input.sku].negocioMonths === 0) return { kind: 'ready' }
-  const ends = input.negocioEndsAt ? Date.parse(input.negocioEndsAt) : NaN
-  if (input.negocioEndsAt && Number.isFinite(ends) && ends <= input.now.getTime()) return { kind: 'ended', endsAt: input.negocioEndsAt }
-  return { kind: 'active', endsAt: input.negocioEndsAt }
+  if (PACKAGES[input.sku].grants.length === 0) return { kind: 'ready' }
+  const tienda = packageMonths(input.sku, 'tienda') > 0
+  const endsAt = tienda ? (input.tiendaEndsAt ?? null) : input.negocioEndsAt
+  const plan = tienda ? { plan: 'tienda' as const } : {}
+  const ends = endsAt ? Date.parse(endsAt) : NaN
+  if (endsAt && Number.isFinite(ends) && ends <= input.now.getTime()) return { kind: 'ended', endsAt, ...plan }
+  return { kind: 'active', endsAt, ...plan }
 }
 
 /**

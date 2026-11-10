@@ -7,9 +7,11 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
-  PACKAGES,
   PACKAGE_SKUS,
+  SELLABLE_PACKAGE_SKUS,
+  RETIRED_PACKAGE_SKUS,
   isPackageSku,
+  packageMonths,
   isRenewalPayment,
   packageSentence,
   packageSplit,
@@ -37,10 +39,10 @@ test("Daniel's splits, exactly: charge, pay the platform, keep", () => {
   expect(packageSentence('negocio_anual', 55)).toBe('Cobras $2,000. Le pasas $900 a Miyagi Sánchez. Te quedas $1,100')
 })
 
-test('what each package grants: 12 months, 3 months, nothing (the trial still runs)', () => {
-  expect(PACKAGES.negocio_anual.negocioMonths).toBe(12)
-  expect(PACKAGES.negocio_arranque.negocioMonths).toBe(3)
-  expect(PACKAGES.setup_gratis.negocioMonths).toBe(0)
+test('what each package grants (plan-tienda D11: 15 months for the year, three of them free; the retired keep theirs)', () => {
+  expect(packageMonths('negocio_anual', 'negocio')).toBe(15)
+  expect(packageMonths('negocio_arranque', 'negocio')).toBe(3)
+  expect(packageMonths('setup_gratis', 'negocio')).toBe(0)
 })
 
 test('an unset rate means the promoter keeps nothing and the platform gets it all — never a negative share', () => {
@@ -55,7 +57,10 @@ test('the renewal window is months 12 to 24 after the first package payment', ()
   expect(isRenewalPayment(first, new Date('2028-05-01T00:00:00Z'))).toBe(true)
   expect(isRenewalPayment(first, new Date('2028-11-10T12:00:00Z'))).toBe(false) // year 3
   expect(startsRenewalWindow('negocio_anual')).toBe(true)
+  expect(startsRenewalWindow('negocio_semestral')).toBe(true)
   expect(startsRenewalWindow('setup_gratis')).toBe(false)
+  // A tienda_anual's Negocio months were free: a later Negocio payment there is an upgrade, never a Negocio renewal.
+  expect(startsRenewalWindow('tienda_anual')).toBe(false)
 })
 
 test('a package transfer is charged at its own list price, never through the promoter discount (no clamp)', () => {
@@ -70,7 +75,10 @@ test('the close workspace offers the three packages first, and the card path pay
   // promoter-panel S4: «Cobra» lives in its own step; the option list is the three packages, then the migration.
   const ui = readFileSync('app/(shell)/promotor/cerrar/CobraStep.tsx', 'utf8')
   const options = ui.slice(ui.indexOf('const PACKAGE_OPTIONS'), ui.indexOf('\n', ui.indexOf('const PACKAGE_OPTIONS')))
-  for (const sku of PACKAGE_SKUS) expect(options).toContain(`'${sku}'`)
+  // plan-tienda D11: the options are the packages ON SALE, never a literal list that could keep a retired one.
+  expect(options).toContain('= SELLABLE_PACKAGE_SKUS')
+  expect(SELLABLE_PACKAGE_SKUS.length).toBe(3)
+  for (const sku of RETIRED_PACKAGE_SKUS) expect(options).not.toContain(`'${sku}'`)
   expect(ui).toContain('<option value="migration">')
   expect(ui).not.toMatch(/close\/(domain|ml-sync|subdomain)/)
   const card = readFileSync('lib/promoter-package-server.ts', 'utf8')
@@ -103,7 +111,7 @@ test('money guards (pr-reviewer, #474): an unread rate refuses, a comp shop refu
   }
   expect(route).not.toContain('rates[sku] ?? 0')
   const attribute = readFileSync('app/api/promoter/attribute/route.ts', 'utf8')
-  expect(attribute).toContain('isPackageSku(sku) || sku === RENEWAL_SKU')
+  expect(attribute).toContain('isPackageSku(sku) || isShareSku(sku)')
   const webhook = readFileSync('app/api/webhooks/stripe/route.ts', 'utf8')
   expect(webhook).toContain('platform-payee kind from a connected account, ignored')
   const renewal = readFileSync('lib/promoter-renewal-server.ts', 'utf8')

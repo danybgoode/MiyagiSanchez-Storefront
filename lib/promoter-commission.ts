@@ -33,6 +33,11 @@ export const DEFAULT_COMMISSION_RATES: Record<PromoterSku, number> = {
   negocio_arranque: 0,
   setup_gratis: 0,
   negocio_renewal: 0,
+  // plan-tienda S4 (D12): the real rates (60 / 55 / 10 / 20) are rows seeded by M1 (20261111000000); 0 is only the floor.
+  tienda_anual: 0,
+  negocio_semestral: 0,
+  tienda_renewal: 0,
+  negocio_upgrade: 0,
 }
 
 /**

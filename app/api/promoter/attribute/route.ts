@@ -9,7 +9,7 @@
  *
  * Gated by `promoter.enabled` (default off) — 404 when the program is hidden.
  */
-import { RENEWAL_SKU, isPackageSku } from '@/lib/promoter-packages'
+import { isPackageSku, isShareSku } from '@/lib/promoter-packages'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { currentUser } from '@clerk/nextjs/server'
@@ -37,9 +37,9 @@ export async function POST(req: NextRequest) {
   // Nothing actionable (no code / unknown code / no shop / transient error) → leave
   // the 30-day promo cookie intact so a valid code survives for a later retry. Only
   // a FRESH successful enrollment burns it (one enrollment per share link).
-  // Packages and the renewal share are recorded only by the server when money arrives; a seller must not be able to
-  // pre-create one (it would move a renewal window) — plans-gratis-negocio, pr-reviewer #474.
-  if (!code || !isPromoterSku(sku) || isPackageSku(sku) || sku === RENEWAL_SKU) return NextResponse.json({ ok: true, attributed: false })
+  // Packages and the shares after the sale (renewals, the upgrade) are recorded only by the server when money arrives;
+  // a seller must not be able to pre-create one (it would move a renewal or upgrade window) — pr-reviewer #474.
+  if (!code || !isPromoterSku(sku) || isPackageSku(sku) || isShareSku(sku)) return NextResponse.json({ ok: true, attributed: false })
 
   const promoter = await getPromoterByCode(code)
   if (!promoter) return NextResponse.json({ ok: true, attributed: false })

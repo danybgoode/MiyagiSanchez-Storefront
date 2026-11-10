@@ -2568,9 +2568,9 @@
         "ratesPending": "Your share is confirmed with Miyagi Sánchez.",
         "sayTitle": "What you say",
         "say": {
-          "negocio_anual": "«Today I'll leave your shop online with your products, and you won't pay us anything else all year. If you have a domain, like yourbusiness.com, we connect it too.»",
-          "negocio_arranque": "«Today I'll leave your shop ready and you get the Negocio plan for three months. After that, you decide whether to keep it.»",
-          "setup_gratis": "«Today I'll leave your shop online, free forever: no monthly fee and no commission on your sales.»"
+          "tienda_anual": "«Today I'll leave your shop online with your products. You get 3 months of the Negocio plan free, then a year of the Tienda plan, with nothing more to pay.»",
+          "negocio_semestral": "«Today I'll leave your shop online with your products. You get 3 months of the Negocio plan free, then 6 more months, with nothing more to pay.»",
+          "negocio_anual": "«Today I'll leave your shop online with your products. You get 3 months of the Negocio plan free, then a full year more, with nothing more to pay. If you have a domain, like yourbusiness.com, we connect it too.»"
         },
         "stepsTitle": "Step by step",
         "steps": [

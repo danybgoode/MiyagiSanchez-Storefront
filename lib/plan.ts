@@ -361,7 +361,20 @@ export type NegocioPaymentDecision =
 
 export type TiendaPaymentDecision = { action: 'replay' } | PlanGrantWrite
 
-export type PlanPayment = { paymentId: string; months: number; now?: Date; note?: string }
+export type PlanPayment = {
+  paymentId: string
+  months: number
+  now?: Date
+  note?: string
+  /**
+   * A promoter package (plan-tienda D11 and the rabbit hole «packages do not use the trial»): its months are dated
+   * from the payment day, so a live trial does NOT push them back. Without this a package sold the day a shop opens
+   * would start after the shop's 90-day trial and give three extra free months on top of the three it already
+   * includes. A live PAID term still comes first (paid time is never thrown away), and the trial stays guarded in
+   * the write like every other key read (`PLAN_PAYMENT_READS`).
+   */
+  ignoreTrial?: boolean
+}
 
 /** The end of the shop's trial while it is still running, or null. */
 function liveTrialEnd(metadata: unknown, now: Date): Date | null {
@@ -411,7 +424,7 @@ export function decideNegocioPayment(metadata: unknown, payment: PlanPayment): N
   if (current?.payments?.includes(payment.paymentId)) return { action: 'replay' }
   if (current?.type === 'comp') return { action: 'comp' }
   const now = payment.now ?? new Date()
-  const decision = decideGrantPayment(metadata, NEGOCIO_GRANT_KEY, current, payment, liveTrialEnd(metadata, now))
+  const decision = decideGrantPayment(metadata, NEGOCIO_GRANT_KEY, current, payment, payment.ignoreTrial ? null : liveTrialEnd(metadata, now))
   if (decision.action !== 'write') return decision
   const tienda = readTiendaGrant(metadata)
   if (!isLiveDatedGrant(tienda, now)) return decision
@@ -438,7 +451,8 @@ export function decideNegocioPayment(metadata: unknown, payment: PlanPayment): N
 export function decideTiendaPayment(metadata: unknown, payment: PlanPayment): TiendaPaymentDecision {
   const now = payment.now ?? new Date()
   const negocio = readNegocioGrant(metadata)
-  const waits = [liveTrialEnd(metadata, now)?.getTime() ?? 0, isLiveDatedGrant(negocio, now) ? Date.parse(negocio.expires_at) : 0]
+  const trialWait = payment.ignoreTrial ? 0 : (liveTrialEnd(metadata, now)?.getTime() ?? 0)
+  const waits = [trialWait, isLiveDatedGrant(negocio, now) ? Date.parse(negocio.expires_at) : 0]
   const startAfter = Math.max(...waits)
   return decideGrantPayment(metadata, TIENDA_GRANT_KEY, readTiendaGrant(metadata), payment, startAfter > 0 ? new Date(startAfter) : null)
 }

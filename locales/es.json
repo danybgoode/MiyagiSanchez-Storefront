@@ -2432,9 +2432,9 @@
         "ratesPending": "Tu parte se confirma con Miyagi Sánchez.",
         "sayTitle": "Qué le dices",
         "say": {
-          "negocio_anual": "«Hoy te dejo tu tienda en línea con tus productos, y en todo el año no nos pagas nada más. Si tienes un dominio, como tunegocio.com, también lo conectamos.»",
-          "negocio_arranque": "«Hoy te dejo tu tienda lista y tienes el Plan Negocio tres meses. Después tú decides si sigues.»",
-          "setup_gratis": "«Hoy te dejo tu tienda en línea, gratis para siempre: sin mensualidad y sin comisión por vender.»"
+          "tienda_anual": "«Hoy te dejo tu tienda en línea con tus productos. Tienes 3 meses de Plan Negocio gratis y después un año de Plan Tienda, sin pagar nada más.»",
+          "negocio_semestral": "«Hoy te dejo tu tienda en línea con tus productos. Tienes 3 meses de Plan Negocio gratis y después 6 meses más, sin pagar nada más.»",
+          "negocio_anual": "«Hoy te dejo tu tienda en línea con tus productos. Tienes 3 meses de Plan Negocio gratis y después un año más, sin pagar nada más. Si tienes un dominio, como tunegocio.com, también lo conectamos.»"
         },
         "stepsTitle": "Paso a paso",
         "steps": [

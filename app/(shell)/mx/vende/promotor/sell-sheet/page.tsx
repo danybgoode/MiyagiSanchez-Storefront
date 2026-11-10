@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { PACKAGES, PACKAGE_SKUS, packageSplit } from '@/lib/promoter-packages'
+import { PACKAGES, SELLABLE_PACKAGE_SKUS, packageSplit } from '@/lib/promoter-packages'
 import { getCommissionRates } from '@/lib/promoter'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
 
@@ -79,7 +79,7 @@ export default async function PromoterSellSheetPage() {
           </tr>
         </thead>
         <tbody>
-          {PACKAGE_SKUS.map((sku) => {
+          {SELLABLE_PACKAGE_SKUS.map((sku) => {
             const rate = rates[sku]
             const split = rate ? packageSplit(sku, rate) : null
             return (
@@ -108,7 +108,7 @@ export default async function PromoterSellSheetPage() {
 
       <h2 className="ss-h2">{g.sayTitle}</h2>
       <ul className="ss-say">
-        {PACKAGE_SKUS.map((sku) => (
+        {SELLABLE_PACKAGE_SKUS.map((sku) => (
           <li key={sku}><strong>{PACKAGES[sku].label}:</strong> {g.say[sku]}</li>
         ))}
       </ul>
