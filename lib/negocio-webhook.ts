@@ -49,7 +49,7 @@ import {
 } from '@/lib/plan-subscription-sync'
 import { markAttributionPaid, isPromoterSku } from '@/lib/promoter'
 import { releaseCustomDomainForShop } from '@/lib/domain-lapse-server'
-import { recordRenewalShare } from '@/lib/promoter-renewal-server'
+import { recordNegocioPaymentShares } from '@/lib/promoter-renewal-server'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const MEDUSA_PUB_KEY = process.env.MEDUSA_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -223,7 +223,7 @@ export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session
       // When the payment COMPLETED (the event's own timestamp, seconds) — never the webhook's processing time nor the
       // session's creation, which can sit on the other side of a renewal boundary (Codex security, #474).
       const paidAt = completedAt ? new Date(completedAt * 1000) : new Date()
-      await recordRenewalShare({ shopId, paymentRef: session.id, grossCents: session.amount_total ?? 0, paidAt })
+      await recordNegocioPaymentShares({ shopId, paymentRef: session.id, grossCents: session.amount_total ?? 0, paidAt })
     }
     const promoterId = session.metadata?.promoter_id
     if (promoterId && isPromoterSku(promoterSku)) {
@@ -283,7 +283,7 @@ export async function handlePlanInvoicePaid(invoice: Stripe.Invoice, subscriptio
   if (out.outcome === 'patched' && out.plan === 'negocio' && shopId && invoice.id) {
     const paidAt = invoice.status_transitions?.paid_at ? new Date(invoice.status_transitions.paid_at * 1000) : new Date()
     // Keyed by the invoice id (`payment_ref` is unique), so the retried delivery that finally lands records it once.
-    await recordRenewalShare({ shopId, paymentRef: invoice.id, grossCents: invoice.amount_paid ?? 0, paidAt })
+    await recordNegocioPaymentShares({ shopId, paymentRef: invoice.id, grossCents: invoice.amount_paid ?? 0, paidAt })
   }
   return syncWebhookOutcome(out)
 }

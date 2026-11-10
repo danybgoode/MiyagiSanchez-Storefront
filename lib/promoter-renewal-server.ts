@@ -19,10 +19,13 @@ import { db } from '@/lib/supabase'
 import { tg } from '@/lib/telegram'
 import { accrueCommissionForAttribution } from '@/lib/promoter'
 import {
+  NEGOCIO_PACKAGE_SKUS,
   RENEWAL_ANCHOR_SKUS,
   RENEWAL_SKU,
   TIENDA_RENEWAL_SKU,
+  UPGRADE_SKU,
   decideRenewalShare,
+  decideUpgradeShare,
   type RenewalSku,
   type ShareSku,
 } from '@/lib/promoter-packages'
@@ -144,4 +147,78 @@ export function accrueTiendaPaymentShare(input: { shopId: string; paymentRef: st
     grossCents: input.amountCents,
     paidAt: input.paidAt,
   })
+}
+
+export type UpgradeOutcome = 'recorded' | 'replay' | 'no_anchor' | 'outside_window' | 'superseded' | 'not_attributed' | 'failed'
+
+/**
+ * 20% of the FIRST Plan Negocio payment a shop makes within 12 months of a `tienda_anual` package (plan-tienda S4.3,
+ * D14), to the promoter who sold that package. Called for every merchant Negocio payment (yearly one-time, every
+ * monthly invoice): the decision (`decideUpgradeShare`) and the anchor-keyed `payment_ref` make every payment after
+ * the first one collide and add nothing. Never called for a promoter's Negocio package — that is a package sale, not
+ * an upgrade (see `recordNegocioPaymentShares`). Never throws; a failure alerts.
+ */
+export async function recordUpgradeShare(input: { shopId: string; paymentRef: string; grossCents: number; paidAt: Date }): Promise<UpgradeOutcome> {
+  const { shopId, paymentRef, grossCents, paidAt } = input
+  if (!shopId || !paymentRef || !(grossCents > 0)) return 'not_attributed'
+  try {
+    // The shop's LATEST paid tienda_anual: each one opens its own 12 months and its own single share.
+    const { data: anchorRow, error } = await db
+      .from('marketplace_promoter_attributions')
+      .select('id, promoter_id, created_at')
+      .eq('seller_id', shopId)
+      .eq('sku', 'tienda_anual')
+      .eq('status', 'paid')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw new Error(`tienda_anual attribution read failed: ${error.message}`)
+    const anchor = anchorRow as { id: string; promoter_id: string; created_at: string } | null
+    let negocioPackageAfterAnchor = false
+    if (anchor) {
+      const { data: later, error: laterError } = await db
+        .from('marketplace_promoter_attributions')
+        .select('id')
+        .eq('seller_id', shopId)
+        .in('sku', [...NEGOCIO_PACKAGE_SKUS])
+        .eq('status', 'paid')
+        .gt('created_at', anchor.created_at)
+        .limit(1)
+        .maybeSingle()
+      // Could not look ≠ none: refuse to decide rather than pay a share that a package may have superseded.
+      if (laterError) throw new Error(`Negocio package read failed: ${laterError.message}`)
+      negocioPackageAfterAnchor = !!later
+    }
+    const decision = decideUpgradeShare({
+      anchor: anchor ? { attributionId: anchor.id, paidAt: new Date(anchor.created_at) } : null,
+      paidAt,
+      negocioPackageAfterAnchor,
+    })
+    if (decision.action === 'skip' || !anchor) return decision.action === 'skip' ? decision.reason : 'no_anchor'
+    // `paymentRef` (this Stripe payment) is not the row's key: the anchor's ref is, so a second payment collides.
+    return await recordShareAttribution({
+      sku: UPGRADE_SKU,
+      promoterId: anchor.promoter_id,
+      shopId,
+      paymentRef: decision.paymentRef,
+      grossCents,
+      cadence: 'upgrade',
+    })
+  } catch (e) {
+    alertShareFailed(UPGRADE_SKU, shopId, paymentRef, e)
+    return 'failed'
+  }
+}
+
+/**
+ * Every share a MERCHANT's own Plan Negocio payment can earn a promoter (D13, D14): the year-2 Negocio renewal and
+ * the Tienda-to-Negocio upgrade. Called from the Negocio payment paths in lib/negocio-webhook.ts — the yearly one-time
+ * checkout (only when its grant was `written`, and never for a checkout that carries a `promoter_sku`) and every paid
+ * monthly invoice (the first one included) — and from nowhere else. A promoter's Negocio PACKAGE never calls it: a
+ * promoter who sells a Negocio package to a Tienda shop they opened kept the package share; paying them 20% more of
+ * their own sale would pay twice for one move up.
+ */
+export async function recordNegocioPaymentShares(input: { shopId: string; paymentRef: string; grossCents: number; paidAt: Date }): Promise<void> {
+  await recordRenewalShare(input)
+  await recordUpgradeShare(input)
 }

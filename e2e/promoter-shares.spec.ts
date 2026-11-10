@@ -6,8 +6,11 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
+  NEGOCIO_PACKAGE_SKUS,
   RENEWAL_ANCHOR_SKUS,
   decideRenewalShare,
+  decideUpgradeShare,
+  upgradePaymentRef,
   isRenewalPayment,
   startsRenewalWindow,
 } from '../lib/promoter-packages'
@@ -61,5 +64,64 @@ test.describe('tienda_renewal — 10% of a Plan Tienda payment in year 2 (S4.2)'
     const entry = src.slice(src.indexOf('export function accrueTiendaPaymentShare'))
     expect(entry).toContain('recordRenewalShareFor(TIENDA_RENEWAL_SKU, {')
     expect(entry).toContain('grossCents: input.amountCents')
+  })
+})
+
+test.describe('negocio_upgrade — 20% of the FIRST Plan Negocio payment within 12 months of a tienda_anual (S4.3)', () => {
+  const anchor = { attributionId: 'attr-tienda-1', paidAt: PACKAGE_PAID }
+  const upgrade = (paidAt: string, opts: { anchor?: typeof anchor | null; superseded?: boolean } = {}) =>
+    decideUpgradeShare({ anchor: opts.anchor === undefined ? anchor : opts.anchor, paidAt: new Date(paidAt), negocioPackageAfterAnchor: opts.superseded ?? false })
+
+  test('within 12 months of the package: recorded under the ANCHOR\'s ref', () => {
+    expect(upgrade('2026-11-10T12:00:00.000Z')).toEqual({ action: 'record', paymentRef: 'negocio_upgrade:attr-tienda-1' })
+    expect(upgrade('2027-11-10T11:59:59.999Z')).toEqual({ action: 'record', paymentRef: 'negocio_upgrade:attr-tienda-1' })
+  })
+
+  test('at or after 12 months, or before the package: nothing', () => {
+    expect(upgrade('2027-11-10T12:00:00.000Z')).toEqual({ action: 'skip', reason: 'outside_window' })
+    expect(upgrade('2026-11-09T00:00:00.000Z')).toEqual({ action: 'skip', reason: 'outside_window' })
+  })
+
+  test('only after a tienda_anual: a shop with none earns nothing', () => {
+    expect(upgrade('2027-01-01T00:00:00.000Z', { anchor: null })).toEqual({ action: 'skip', reason: 'no_anchor' })
+  })
+
+  test('the first payment only: every payment under one tienda_anual gets the SAME ref, so the unique index admits one', () => {
+    const first = upgrade('2027-01-01T00:00:00.000Z')
+    const second = upgrade('2027-02-01T00:00:00.000Z')
+    expect(first).toEqual(second)
+    expect(first.action === 'record' && first.paymentRef).toBe(upgradePaymentRef('attr-tienda-1'))
+    // A different tienda_anual (a later sale) opens its own single share.
+    expect(upgradePaymentRef('attr-tienda-2')).not.toBe(upgradePaymentRef('attr-tienda-1'))
+    // The ref can never collide with a Stripe payment id (the renewals' key) in the same unique index.
+    expect(upgradePaymentRef('x').startsWith('negocio_upgrade:')).toBe(true)
+  })
+
+  test('a Negocio PACKAGE sold after the tienda_anual supersedes it: the move up was a package sale', () => {
+    expect(upgrade('2027-01-01T00:00:00.000Z', { superseded: true })).toEqual({ action: 'skip', reason: 'superseded' })
+    expect([...NEGOCIO_PACKAGE_SKUS].sort()).toEqual(['negocio_anual', 'negocio_arranque', 'negocio_semestral'])
+  })
+
+  test('wired into the merchant Negocio payments only — yearly (not a promoter checkout) and every paid invoice; never a package', () => {
+    const webhook = readFileSync('lib/negocio-webhook.ts', 'utf8')
+    const yearly = webhook.slice(webhook.indexOf('export async function handleNegocioOneTimeComplete'), webhook.indexOf('export async function handleNegocioSubscriptionChanged'))
+    expect(yearly).toContain("if (outcome === 'written' && !promoterSku) {")
+    expect(yearly.indexOf('recordNegocioPaymentShares(')).toBeGreaterThan(yearly.indexOf("if (outcome === 'written' && !promoterSku) {"))
+    const invoice = webhook.slice(webhook.indexOf('export async function handleNegocioInvoicePaid'))
+    expect(invoice).toContain('if ((invoice.amount_paid ?? 0) <= 0) return')
+    expect(invoice).toContain('recordNegocioPaymentShares({ shopId, paymentRef: invoice.id')
+    expect(webhook).not.toContain('recordRenewalShare(')
+    for (const pkg of ['lib/promoter-package-server.ts', 'lib/promoter-grant-server.ts']) {
+      expect(readFileSync(pkg, 'utf8'), pkg).not.toMatch(/recordNegocioPaymentShares|recordUpgradeShare/)
+    }
+    const shares = readFileSync('lib/promoter-renewal-server.ts', 'utf8')
+    const both = shares.slice(shares.indexOf('export async function recordNegocioPaymentShares'))
+    expect(both).toContain('await recordRenewalShare(input)')
+    expect(both).toContain('await recordUpgradeShare(input)')
+    // The upgrade's row is keyed by the decision's ref, never by the Stripe payment id.
+    const up = shares.slice(shares.indexOf('export async function recordUpgradeShare'), shares.indexOf('export async function recordNegocioPaymentShares'))
+    expect(up).toContain('paymentRef: decision.paymentRef')
+    // Could not read the later packages ≠ none.
+    expect(up).toContain('if (laterError) throw')
   })
 })
