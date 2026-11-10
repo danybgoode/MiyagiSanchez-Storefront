@@ -226,7 +226,10 @@ export function pauseOutcomeOf(result: StatusChangeAnswer): PauseCallResult {
     return { outcome: 'failed', detail: `HTTP ${result.status}: ${result.message}` }
   }
   // `to` is the status the seller ACTUALLY holds: a pause whose every unlink failed leaves it active.
-  if (result.to === 'paused') return { outcome: 'paused', complete: true }
+  // `complete: false` is a PARTIAL pause: the seller reads paused but some of its products are still linked to a
+  // market channel (an unlink failed, or the ledger held entries it could not parse). The Backend cannot finish it on
+  // a re-run: asking for `paused` again is refused as `no_change` (409) before any work. So it is never a clean pause.
+  if (result.to === 'paused') return { outcome: 'paused', complete: result.complete }
   return { outcome: 'failed', detail: `the Backend left the seller ${result.to} (no product could be unlinked)` }
 }
 
@@ -298,6 +301,7 @@ export type PlanPauseEntry = {
     | 'no_seller'
     | 'claim_lost'
     | 'paid_meanwhile'
+    | 'paused_partly'
     | 'unpaused_after_payment'
     | 'plan_unavailable'
     | 'failed'
@@ -400,8 +404,11 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
     const stillUnpaid = !!plan && plan.plan === 'unpaid' && plan.reason === 'unpaid'
     if (ours && stillUnpaid) {
       paused += 1
-      void complete
-      candidates.push(entry(shop, 'paused', detail))
+      if (complete) { candidates.push(entry(shop, 'paused', detail)); return }
+      // The seller reads paused but some products are still on sale. A re-run of the Backend route cannot finish it
+      // (paused → paused is refused), so a person must; the claim stays, so a payment still restores the shop.
+      candidates.push(entry(shop, 'paused_partly', detail))
+      deps.alert(`🚨 Pausa por falta de plan INCOMPLETA: la tienda quedó en pausa pero algunos productos siguen publicados — revisar a mano en /admin/tenants.\nShop: ${shop.slug ?? shop.id}`)
       return
     }
     // Something happened while we paused: undo our own pause.
@@ -471,7 +478,8 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
       // We do not know whether the Backend paused it. Read the status back before deciding the claim's fate:
       // releasing over a pause that DID land would leave a paused shop that a payment cannot bring back.
       const after = await deps.readSellerStatus(shop).catch((): SellerStatusFact => 'unavailable')
-      if (after === 'paused') { await settle(shop, claim, true, 'confirmed by re-read'); continue }
+      // Confirmed paused, but the answer that would say whether every link came off was lost: not a clean pause.
+      if (after === 'paused') { await settle(shop, claim, false, 'confirmed by re-read'); continue }
       if (after === 'active') {
         await deps.release(shop, claim).catch(() => false)
         candidates.push(entry(shop, 'failed', result.detail)); failed += 1

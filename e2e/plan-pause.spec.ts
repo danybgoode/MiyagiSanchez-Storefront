@@ -174,6 +174,8 @@ test.describe('the market fact', () => {
 test.describe('the Backend answer', () => {
   test('paused, already paused (409), failed, unknown — and a 200 that left the seller active is a failure', () => {
     expect(pauseOutcomeOf({ ok: true, to: 'paused', complete: true })).toEqual({ outcome: 'paused', complete: true })
+    // A partial unlink is passed through as such, never as a clean pause (Codex, PR 487).
+    expect(pauseOutcomeOf({ ok: true, to: 'paused', complete: false })).toEqual({ outcome: 'paused', complete: false })
     expect(pauseOutcomeOf({ ok: false, status: 409, message: 'ya' })).toEqual({ outcome: 'already_paused' })
     expect(pauseOutcomeOf({ ok: false, status: 400, message: 'no' }).outcome).toBe('failed')
     expect(pauseOutcomeOf({ ok: 'unknown', message: 'timeout' }).outcome).toBe('unknown')
@@ -318,13 +320,13 @@ test.describe('runPlanPause — validate, claim, re-check, apply, release', () =
   })
 
   test('an unknown answer is settled by reading the status back: paused keeps the claim, active releases it, unreadable keeps it and asks a person', async () => {
-    const cases: Array<[SellerStatusFact, string, boolean]> = [['paused', 'paused', false], ['active', 'failed', true], ['unavailable', 'unknown', false]]
+    const cases: Array<[SellerStatusFact, string, boolean]> = [['paused', 'paused_partly', false], ['active', 'failed', true], ['unavailable', 'unknown', false]]
     for (const [after, result, released] of cases) {
       const { deps, log, alerts } = harness({ shops: [shop('a')], pause: { outcome: 'unknown', detail: 'timeout' }, status: (_s, n) => (n === 1 ? 'active' : after) })
       const run = await runPlanPause(deps, { dryRun: false })
       expect(run.ok && run.candidates[0].result).toBe(result)
       expect(log.some((l) => l.startsWith('release'))).toBe(released)
-      if (after !== 'paused') expect(alerts.length).toBe(1)
+      expect(alerts.length).toBe(1)
     }
   })
 
@@ -482,3 +484,12 @@ test.describe('settle: a payment landing while the job pauses never leaves a pai
   })
 })
 
+test.describe('a partial pause (Codex, PR 487)', () => {
+  test('`complete: false` is never a clean pause: it alerts, keeps the claim, and is reported as partial', async () => {
+    const { deps, log, alerts } = harness({ shops: [shop('a')], pause: { outcome: 'paused', complete: false } })
+    const run = await runPlanPause(deps, { dryRun: false })
+    expect(run.ok && run.candidates[0].result).toBe('paused_partly')
+    expect(alerts).toHaveLength(1)
+    expect(log.some((l) => l.startsWith('release'))).toBe(false)
+  })
+})
