@@ -1040,7 +1040,7 @@ const TOOLS = [
   },
   {
     name: 'get_plan',
-    description: "SELLER TOOL. Read YOUR OWN shop's Miyagi Sánchez plan: Gratis (free forever), its 30-day Negocio trial, or Negocio. Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop (a partner credential may read it too). Returns the plan, why, when it ends and days left, exactly what it includes (custom domain, Mercado Libre sync, the «Tienda impulsada por Miyagi Sánchez» badge, the monthly check-in, chat answers and photos per month), Negocio's prices, and which checkout can be started now. Use before start_negocio.",
+    description: "SELLER TOOL. Read YOUR OWN shop's Miyagi Sánchez plan. `plan` is one of five: `negocio` (Plan Negocio), `trial` (the free Negocio trial, with its end date), `tienda` (Plan Tienda), `gratis` (Plan Gratis, kept only by shops that existed before Plan Tienda) or `unpaid` (no active plan). `reason` says why: comp, one_time, subscription, trial, tienda_one_time, tienda_subscription, trial_ended, legacy, unpaid, or unavailable (the subscription could not be read just now: retry, and do not treat it as Gratis or as unpaid). Requires the shop agent token (Authorization: Bearer ms_agent_…), scoped to one shop (a partner credential may read it too). Returns the plan, why, when it ends and days left, exactly what it includes (custom domain, Mercado Libre sync, the «Tienda impulsada por Miyagi Sánchez» badge, the monthly check-in, chat answers and photos per month), Negocio's prices, and which checkout can be started now. Use before start_negocio.",
     inputSchema: { type: 'object', properties: {} },
   },
   {

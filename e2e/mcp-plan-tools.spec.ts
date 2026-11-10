@@ -63,3 +63,26 @@ test('Plan Tienda and "no plan" are named truthfully to an agent (plan-tienda S1
   expect(unpaid.json).toMatchObject({ plan: 'unpaid', reason: 'unpaid', includes: { custom_domain: false, mercadolibre_sync: false, badge_shown: true, monthly_checkin: false } })
   for (const v of [tienda, unpaid]) expect(JSON.stringify(v)).not.toContain('undefined')
 })
+
+test('the get_plan description names the five plans and every reason the tool can return — and nothing it cannot (plan-tienda S1.1 review)', () => {
+  const src = readFileSync('app/api/ucp/mcp/route.ts', 'utf8')
+  const at = src.indexOf("name: 'get_plan'")
+  const description = src.slice(at, src.indexOf('inputSchema', at))
+  // Each PlanName and PlanReason is listed here by hand ON PURPOSE, typed against the unions: adding a plan or a
+  // reason in lib/plan.ts is a type error on these two lines until the description is looked at again.
+  const plans: Record<PlanState['plan'], true> = { negocio: true, trial: true, tienda: true, gratis: true, unpaid: true }
+  const reasons: Record<PlanState['reason'], true> = {
+    comp: true, one_time: true, subscription: true, trial: true, tienda_one_time: true, tienda_subscription: true,
+    trial_ended: true, legacy: true, unpaid: true, unavailable: true,
+  }
+  for (const plan of Object.keys(plans)) expect(description).toContain('`' + plan + '`')
+  const listed = description.slice(description.indexOf('`reason` says why:'), description.indexOf('Requires'))
+  for (const reason of Object.keys(reasons)) expect({ reason, listed: new RegExp(`\\b${reason}\\b`).test(listed) }).toEqual({ reason, listed: true })
+  // Stale or untrue: Gratis is no longer for every shop, the trial's length is not typed here, `none` is gone.
+  expect(description).not.toContain('free forever')
+  expect(description).not.toContain('30-day')
+  expect(listed).not.toMatch(/\bnone\b/)
+  // No price is typed, and nothing says Plan Tienda can be bought through an agent yet (that is sprint 2).
+  expect(description).not.toMatch(/\$\s?\d|\d+\s?MXN/)
+  expect(description).not.toMatch(/start_tienda|buy Plan Tienda|contrata(r)? (el )?Plan Tienda/i)
+})
