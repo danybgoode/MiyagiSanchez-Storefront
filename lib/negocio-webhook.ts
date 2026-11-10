@@ -53,6 +53,7 @@ import { markAttributionPaid, isPromoterSku } from '@/lib/promoter'
 import { releaseCustomDomainForShop } from '@/lib/domain-lapse-server'
 import { accrueTiendaPaymentShare, recordNegocioPaymentShares } from '@/lib/promoter-renewal-server'
 import { runOneTimeSteps } from '@/lib/plan-one-time-steps'
+import { paymentInstant } from '@/lib/promoter-packages'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const MEDUSA_PUB_KEY = process.env.MEDUSA_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -203,10 +204,12 @@ export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session
     tg.alert(`🚨 ${name} (pago único) PAGADO con datos inválidos — revisar.\nSession: ${session.id}`)
     return 'final'
   }
-  const paidAt = completedAt ? new Date(completedAt * 1000) : new Date()
+  // The payment's own moment (the event's `created`): the grant AND the shares are dated from it, so a delayed or
+  // redelivered event writes the same term as a prompt one (Codex, PR 486).
+  const paidAt = paymentInstant(completedAt) ?? new Date()
   const { outcome } = await runOneTimeSteps({
     applyGrant: () =>
-      applyPlanPayment(plan, { shopId, paymentId: session.id, months, note: promoterSku ? `promoter ${promoterSku}` : `yearly ${months}m` }, PLAN_PAYMENT_DB),
+      applyPlanPayment(plan, { shopId, paymentId: session.id, months, note: promoterSku ? `promoter ${promoterSku}` : `yearly ${months}m`, now: paidAt }, PLAN_PAYMENT_DB),
     onGrantFailed: (e) => {
       console.error(`[${plan} one-time] grant write failed:`, e)
       tg.alert(`🚨 ${name} (pago único) PAGADO pero NO activado — Stripe lo reintentará; si sigue, reparar a mano.\nShop: ${shopId}\nSession: ${session.id}\nError: ${errText(e)}`)

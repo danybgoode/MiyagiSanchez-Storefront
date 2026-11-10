@@ -121,7 +121,7 @@ test.describe('the webhook route answers 5xx only for a failed plan step', () =>
       'await handlePlanSubscriptionComplete(session, sessionPlan)',
       'await handlePlanOneTimeComplete(session, sessionPlan, event.created)',
       // plan-tienda S4.1 review: a promoter package paid by card is a plan step too (its grants and attribution).
-      'await handlePromoterPackageComplete(session)',
+      'await handlePromoterPackageComplete(session, event.created)',
       "event.type === 'customer.subscription.updated' ? await handleSubscriptionUpdated(subscription) : await handleSubscriptionDeleted(subscription)",
       'await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice)',
       'await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice)',

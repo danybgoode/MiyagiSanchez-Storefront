@@ -157,6 +157,28 @@ export type PackageGrantDeps = {
  * Tienda months are never spent underneath a Negocio that never ends (the caller alerts for a refund); `none` for a
  * package that grants nothing (the retired free setup).
  */
+/**
+ * The instant a payment happened, from the Stripe event's own `created` (seconds). A Checkout Session carries no
+ * completion time of its own, so the `checkout.session.completed` event's `created` is the payment's moment; Stripe
+ * redelivers the SAME event, so every delivery — an hour or a day later — dates the grants identically (Codex,
+ * PR 486: dating them when the webhook RUNS starts the paid term late on a delayed or retried event). Undefined only
+ * when no event time was given, and then the plan seam falls back to now.
+ */
+export function paymentInstant(eventCreatedSec: number | undefined): Date | undefined {
+  return typeof eventCreatedSec === 'number' && Number.isFinite(eventCreatedSec) && eventCreatedSec > 0 ? new Date(eventCreatedSec * 1000) : undefined
+}
+
+/** What `applyPackageGrants` is asked for a card payment: the session id as the replay key, dated from the event. */
+export function packageGrantRequest(input: { sku: PackageSku; shopId: string; sessionId: string; eventCreatedSec?: number }): {
+  sku: PackageSku
+  shopId: string
+  paymentId: string
+  now?: Date
+} {
+  const now = paymentInstant(input.eventCreatedSec)
+  return { sku: input.sku, shopId: input.shopId, paymentId: input.sessionId, ...(now ? { now } : {}) }
+}
+
 export async function applyPackageGrants(
   input: { sku: PackageSku; shopId: string; paymentId: string; now?: Date },
   deps: PackageGrantDeps,

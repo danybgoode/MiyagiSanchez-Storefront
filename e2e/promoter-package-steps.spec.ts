@@ -6,7 +6,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { isDeepStrictEqual } from 'node:util'
-import { applyPackageGrants, type PackageGrantDeps, type PackageSku } from '../lib/promoter-packages'
+import { applyPackageGrants, packageGrantRequest, type PackageGrantDeps, type PackageSku } from '../lib/promoter-packages'
 import { runPackageSteps } from '../lib/promoter-package-steps'
 import { webhookAnswerStatus } from '../lib/plan-subscription-sync'
 import {
@@ -21,8 +21,12 @@ import {
 } from '../lib/plan'
 
 const PAID = new Date('2026-11-10T12:00:00.000Z')
+/** The `checkout.session.completed` event's own `created`: the same on every redelivery of that event. */
+const EVENT_CREATED = Math.floor(PAID.getTime() / 1000)
 
 function world(sku: PackageSku) {
+  // When THIS delivery runs. The grants must not depend on it.
+  let wall = PAID
   let metadata: Record<string, unknown> = {}
   let writes = 0
   let crashAtWrite: number | null = null
@@ -36,7 +40,7 @@ function world(sku: PackageSku) {
   const grantDeps: PackageGrantDeps = {
     apply: async (plan, input) => {
       if (crashAtWrite !== null && writes >= crashAtWrite) throw new Error('grant rpc down')
-      const d = plan === 'negocio' ? decideNegocioPayment(metadata, { ...input, now: PAID }) : decideTiendaPayment(metadata, { ...input, now: PAID })
+      const d = plan === 'negocio' ? decideNegocioPayment(metadata, { ...input, now: input.now ?? wall }) : decideTiendaPayment(metadata, { ...input, now: input.now ?? wall })
       if (d.action !== 'write') return d.action
       const args = grantWriteRpcArgs('shop', plan === 'negocio' ? NEGOCIO_GRANT_KEY : TIENDA_GRANT_KEY, d)
       if (!args.p_guards.every(holds)) throw new Error('guard')
@@ -47,7 +51,7 @@ function world(sku: PackageSku) {
   }
   const deliver = () =>
     runPackageSteps({
-      applyGrants: () => applyPackageGrants({ sku, shopId: 'shop', paymentId: 'cs_pkg' }, grantDeps),
+      applyGrants: () => applyPackageGrants(packageGrantRequest({ sku, shopId: 'shop', sessionId: 'cs_pkg', eventCreatedSec: EVENT_CREATED }), grantDeps),
       alreadyPaid: async () => { if (failRead) throw new Error('read'); return attributions.get(`prm|shop|${sku}`) === 'paid' },
       attribution: async () => {
         if (failAttribution) { failAttribution = false; return false }
@@ -65,6 +69,7 @@ function world(sku: PackageSku) {
     receipts,
     alerts,
     crashAt: (n: number | null) => { crashAtWrite = n },
+    runAt: (d: Date) => { wall = d },
     failAttributionOnce: () => { failAttribution = true },
     failReadOnce: () => { failRead = true },
     healRead: () => { failRead = false },
@@ -153,5 +158,41 @@ test('the webhook routes the package through this order, and only unfixable meta
   // A failed read of "already paid" is a throw, never "not paid".
   expect(src).toContain('if (error) throw new Error(`package attribution read failed: ${error.message}`)')
   const route = readFileSync('app/api/webhooks/stripe/route.ts', 'utf8')
-  expect(route).toContain('planOutcome = await handlePromoterPackageComplete(session)')
+  expect(route).toContain('planOutcome = await handlePromoterPackageComplete(session, event.created)')
+})
+
+test('dated from the payment, not the delivery: a redelivery an hour (or a day) later writes the same end dates', async () => {
+  const prompt = world('tienda_anual')
+  await prompt.deliver()
+
+  const late = world('tienda_anual')
+  late.runAt(new Date(PAID.getTime() + 86_400_000)) // the first delivery itself runs a day late, and fails halfway
+  late.crashAt(1)
+  expect(await late.deliver()).toBe('retry')
+  late.crashAt(null)
+  late.runAt(new Date(PAID.getTime() + 86_400_000 + 3_600_000)) // Stripe redelivers an hour after that
+  expect(await late.deliver()).toBe('done')
+
+  expect(readNegocioGrant(late.metadata)?.expires_at).toBe(readNegocioGrant(prompt.metadata)?.expires_at)
+  expect(readTiendaGrant(late.metadata)?.expires_at).toBe(readTiendaGrant(prompt.metadata)?.expires_at)
+  expect(readTiendaGrant(late.metadata)?.expires_at).toBe('2028-02-10T12:00:00.000Z')
+})
+
+test('the request is dated from the event and keyed by the session', () => {
+  expect(packageGrantRequest({ sku: 'negocio_anual', shopId: 's', sessionId: 'cs_1', eventCreatedSec: EVENT_CREATED })).toEqual({
+    sku: 'negocio_anual', shopId: 's', paymentId: 'cs_1', now: PAID,
+  })
+  // No event time: no date, and the plan seam falls back to now (never a made-up instant).
+  expect(packageGrantRequest({ sku: 'negocio_anual', shopId: 's', sessionId: 'cs_1' })).toEqual({ sku: 'negocio_anual', shopId: 's', paymentId: 'cs_1' })
+  const src = readFileSync('lib/promoter-package-server.ts', 'utf8')
+  expect(src).toContain('applyPackageGrants(packageGrantRequest({ sku, shopId, sessionId: session.id, eventCreatedSec }), PACKAGE_GRANT_DEPS)')
+})
+
+test("the merchant's yearly plan payment is dated from its event too, the grant and the shares alike", () => {
+  const webhook = readFileSync('lib/negocio-webhook.ts', 'utf8')
+  const yearly = webhook.slice(webhook.indexOf('export async function handlePlanOneTimeComplete'), webhook.indexOf('function syncDeps('))
+  expect(yearly).toContain('const paidAt = paymentInstant(completedAt) ?? new Date()')
+  expect(yearly).toContain('now: paidAt }, PLAN_PAYMENT_DB)')
+  expect(yearly).toContain('paymentRef: session.id, paidAt }')
+  expect(readFileSync('app/api/webhooks/stripe/route.ts', 'utf8')).toContain('await handlePlanOneTimeComplete(session, sessionPlan, event.created)')
 })

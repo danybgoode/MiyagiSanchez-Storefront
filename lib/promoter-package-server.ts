@@ -17,7 +17,7 @@ import { db } from '@/lib/supabase'
 import { markAttributionPaid } from '@/lib/promoter'
 import { notifyMerchantCloseReceipt } from '@/lib/promoter-close-notify'
 import { applyNegocioPayment, applyTiendaPayment } from '@/lib/negocio-webhook'
-import { PACKAGES, applyPackageGrants, isPackageSku, packageSplit, type PackageGrantDeps, type PackageSku } from '@/lib/promoter-packages'
+import { PACKAGES, applyPackageGrants, isPackageSku, packageGrantRequest, packageSplit, type PackageGrantDeps, type PackageSku } from '@/lib/promoter-packages'
 import { formatReceiptAmount } from '@/lib/promoter-receipt'
 import { runPackageSteps } from '@/lib/promoter-package-steps'
 import type { PlanWebhookOutcome } from '@/lib/plan-subscription-sync'
@@ -88,7 +88,7 @@ export const PACKAGE_GRANT_DEPS: PackageGrantDeps = {
   apply: (plan, input) => (plan === 'negocio' ? applyNegocioPayment(input) : applyTiendaPayment(input)),
 }
 
-export async function handlePromoterPackageComplete(session: Stripe.Checkout.Session): Promise<PlanWebhookOutcome> {
+export async function handlePromoterPackageComplete(session: Stripe.Checkout.Session, eventCreatedSec?: number): Promise<PlanWebhookOutcome> {
   const sku = session.metadata?.promoter_sku
   const shopId = session.metadata?.shop_id
   const promoterId = session.metadata?.promoter_id
@@ -107,7 +107,9 @@ export async function handlePromoterPackageComplete(session: Stripe.Checkout.Ses
   }
   // The order and why each step may or may not repeat: lib/promoter-package-steps.ts.
   return runPackageSteps({
-    applyGrants: () => applyPackageGrants({ sku, shopId, paymentId: session.id }, PACKAGE_GRANT_DEPS),
+    // Dated from the payment (the event's own time), never from when this delivery runs: a redelivery an hour later
+    // writes the same end dates (packageGrantRequest).
+    applyGrants: () => applyPackageGrants(packageGrantRequest({ sku, shopId, sessionId: session.id, eventCreatedSec }), PACKAGE_GRANT_DEPS),
     onGrantFailed: (e) => {
       console.error('[promoter package] grant write failed:', e)
       tg.alert(

@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
         planOutcome = await handlePlanOneTimeComplete(session, sessionPlan, event.created)
       } else if (session.metadata?.kind === PROMOTER_PACKAGE_CHECKOUT_KIND) {
         // A promoter pays the platform its share of a package by card (plans-gratis-negocio S4.2, D12).
-        planOutcome = await handlePromoterPackageComplete(session)
+        planOutcome = await handlePromoterPackageComplete(session, event.created)
       } else if (session.metadata?.kind === MIGRATION_CHECKOUT_KIND) {
         // migration SKU (epic 03 · platform-migrations S2): a one-time consulting
         // service, no subscription — writes an inert migration_grant marker.
