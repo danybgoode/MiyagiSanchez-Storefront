@@ -475,20 +475,17 @@ export async function runPlanPause(deps: PlanPauseDeps, opts: { dryRun: boolean 
     if (result.outcome === 'paused') { await settle(shop, claim, result.complete); continue }
 
     if (result.outcome === 'unknown') {
-      // We do not know whether the Backend paused it. Read the status back before deciding the claim's fate:
-      // releasing over a pause that DID land would leave a paused shop that a payment cannot bring back.
+      // We do not know whether the Backend paused it, and a read-back cannot settle it: the Backend flips the status
+      // LAST, after draining the catalog, writing the ledger and unlinking — all of which can still be running after
+      // our client gave up. So the claim is NEVER released here (verifier B1): releasing over a pause that lands a
+      // moment later would leave a plan pause with no claim, and a payment would then find nothing to restore. A claim
+      // left on a shop that stays active is harmless: the next payment's restore gets 409 and clears it.
       const after = await deps.readSellerStatus(shop).catch((): SellerStatusFact => 'unavailable')
-      // Confirmed paused, but the answer that would say whether every link came off was lost: not a clean pause.
+      // Already paused: the race with a payment still applies, so settle (the answer saying whether every link came
+      // off was lost, so it is not a clean pause).
       if (after === 'paused') { await settle(shop, claim, false, 'confirmed by re-read'); continue }
-      if (after === 'active') {
-        await deps.release(shop, claim).catch(() => false)
-        candidates.push(entry(shop, 'failed', result.detail)); failed += 1
-        deps.alert(`⚠️ Pausa por falta de plan: el backend no respondió claro y la tienda sigue activa; se reintenta mañana.\nShop: ${shop.slug ?? shop.id}\n${result.detail}`)
-        continue
-      }
-      // Still unknown: keep the claim (a payment can then always restore) and ask a person.
-      candidates.push(entry(shop, 'unknown', result.detail)); failed += 1
-      deps.alert(`🚨 Pausa por falta de plan: NO sabemos si la tienda quedó en pausa — revisar a mano en /admin/tenants.\nShop: ${shop.slug ?? shop.id}\n${result.detail}`)
+      candidates.push(entry(shop, 'unknown', `${result.detail} · status read back: ${after}`)); failed += 1
+      deps.alert(`🚨 Pausa por falta de plan: NO sabemos si la tienda quedó en pausa (el backend no respondió claro; puede seguir pausándola). La marca plan_pause se queda — revisar a mano en /admin/tenants.\nShop: ${shop.slug ?? shop.id}\n${result.detail}`)
       continue
     }
 

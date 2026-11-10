@@ -319,8 +319,10 @@ test.describe('runPlanPause — validate, claim, re-check, apply, release', () =
     expect(log.at(-1)).toBe(`release:a:${NOW.toISOString()}`)
   })
 
-  test('an unknown answer is settled by reading the status back: paused keeps the claim, active releases it, unreadable keeps it and asks a person', async () => {
-    const cases: Array<[SellerStatusFact, string, boolean]> = [['paused', 'paused_partly', false], ['active', 'failed', true], ['unavailable', 'unknown', false]]
+  test('an unknown answer keeps the claim whatever the status read back says, and asks a person', async () => {
+    // NEVER released on an unknown answer, whatever the read-back says: the Backend flips the status last, so `active`
+    // may mean "still pausing" (verifier B1).
+    const cases: Array<[SellerStatusFact, string, boolean]> = [['paused', 'paused_partly', false], ['active', 'unknown', false], ['unavailable', 'unknown', false]]
     for (const [after, result, released] of cases) {
       const { deps, log, alerts } = harness({ shops: [shop('a')], pause: { outcome: 'unknown', detail: 'timeout' }, status: (_s, n) => (n === 1 ? 'active' : after) })
       const run = await runPlanPause(deps, { dryRun: false })
