@@ -9,7 +9,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { NEGOCIO_GRANT_KEY, NEGOCIO_TRIAL_KEY, addMonthsClamped, decideNegocioPayment, type PlanState } from '../lib/plan'
-import { NEGOCIO_CHECKOUT_WINDOW_MS, STRIPE_MIN_TRIAL_SECONDS, invoiceSubscriptionId, monthlyFirstChargeAt } from '../lib/negocio-checkout-rules'
+import { NEGOCIO_CHECKOUT_WINDOW_MS, PLAN_CHECKOUT_WINDOW_MS, STRIPE_MIN_TRIAL_SECONDS, invoiceSubscriptionId, monthlyFirstChargeAt } from '../lib/negocio-checkout-rules'
 import { isSafeSearchValue, pickNegocioSubscription, startNegocioManage, type NegocioSubscriptionLike } from '../lib/negocio-manage'
 
 const NOW = new Date('2026-11-10T12:00:00Z')
@@ -64,7 +64,8 @@ test.describe('a monthly subscription during the trial first charges when the tr
     const late = monthlyFirstChargeAt(trial(1), new Date(windowStart + NEGOCIO_CHECKOUT_WINDOW_MS - 1_000))
     expect(early).toBe(late)
     // And the key shares the window constant.
-    expect(readFileSync('lib/negocio-checkout.ts', 'utf8')).toContain('Math.floor(Date.now() / NEGOCIO_CHECKOUT_WINDOW_MS)')
+    expect(readFileSync('lib/negocio-checkout.ts', 'utf8')).toContain('Math.floor(Date.now() / PLAN_CHECKOUT_WINDOW_MS)')
+    expect(PLAN_CHECKOUT_WINDOW_MS).toBe(NEGOCIO_CHECKOUT_WINDOW_MS)
   })
 
   test('no trial, no wait: Gratis and an ended trial charge today', () => {
@@ -75,7 +76,7 @@ test.describe('a monthly subscription during the trial first charges when the tr
 
   test('the checkout passes it to Stripe as subscription_data.trial_end', () => {
     const checkout = readFileSync('lib/negocio-checkout.ts', 'utf8')
-    expect(checkout).toContain('trialEnd: monthlyFirstChargeAt(plan)')
+    expect(checkout).toContain('trialEnd: monthlyFirstChargeAt(state)')
     const stripe = readFileSync('lib/stripe-subscriptions.ts', 'utf8')
     expect(stripe).toContain('trial_end: trialEnd')
   })
@@ -94,15 +95,17 @@ test("an invoice's subscription is read on every API version: old top-level fiel
 
 test('a monthly bought during the trial is recorded as trialing, not active', () => {
   const src = readFileSync('lib/negocio-webhook.ts', 'utf8')
-  expect(src).toContain("status: mapNegocioStatus(stripeSub.status) === 'trialing' ? 'trialing' : 'active'")
+  expect(src).toContain("status: stripeSub.status === 'trialing' ? 'trialing' : 'active'")
 })
 
-test('the $0 invoice that opens a free period is not a payment: it returns before any status flip or renewal share', () => {
+// plan-tienda S2.2: the status sync now runs on EVERY plan event, the $0 invoice included — it sends Stripe's current
+// status (`trialing` while the free period runs), never a guessed `active`, so it is harmless there. What the $0
+// invoice must still never do is earn a promoter a renewal share.
+test('the $0 invoice that opens a free period is not a payment: it returns before any renewal share', () => {
   const src = readFileSync('lib/negocio-webhook.ts', 'utf8')
-  const body = src.slice(src.indexOf('export async function handleNegocioInvoicePaid'))
+  const body = src.slice(src.indexOf('export async function handlePlanInvoicePaid'))
   const guard = body.indexOf('(invoice.amount_paid ?? 0) <= 0) return')
   expect(guard).toBeGreaterThan(-1)
-  expect(guard).toBeLessThan(body.indexOf('handleNegocioSubscriptionChanged('))
   expect(guard).toBeLessThan(body.indexOf('recordRenewalShare('))
 })
 

@@ -14,6 +14,7 @@
 import 'server-only'
 import { db } from '@/lib/supabase'
 import { getNegocioSubscription } from '@/lib/negocio-subscription'
+import { getTiendaSubscription } from '@/lib/tienda-subscription'
 import {
   NEGOCIO_TRIAL_KEY,
   buildNegocioTrial,
@@ -22,6 +23,7 @@ import {
   derivePlanFromMetadata,
   isLiveDatedGrant,
   readNegocioGrant,
+  tiendaLookupNeeded,
   type PlanState,
 } from '@/lib/plan'
 
@@ -32,48 +34,58 @@ export type ResolvePlanOptions = {
   shopId?: string | null
   /** Pass a known Negocio answer (a caller that already read it, or a test) to skip the lookup. */
   hasActiveSubscription?: boolean
-  /** Pass a known Tienda answer. See `tiendaSubscriptionFacts` for what is used when it is omitted. */
+  /** Pass a known Tienda answer to skip its lookup. Omitted: looked up when needed (`tiendaSubscriptionFacts`). */
   hasActiveTiendaSubscription?: boolean
   now?: Date
 }
 
 /**
- * The monthly Plan Tienda subscription answer.
- *
- * Sprint 1 of plan-tienda ships the seam BEFORE the plan: the Medusa Commerce plan of kind `tienda_plan` and its
- * internal lookup route are created in sprint 2 (S2.2). Until then nobody CAN hold a monthly Tienda subscription, so
- * "not subscribed" is a KNOWN absence, the same call `getNegocioSubscription` makes for `reason: 'no_plan'` — it is
- * not "could not look", and reporting it as unavailable would turn every shop's plan into `unavailable`.
- * Sprint 2 replaces this body with the real lookup, which MUST report a failed read as
- * `{ hasActiveTiendaSubscription: undefined, tiendaSubscriptionUnavailable: true }`.
+ * The monthly Plan Tienda subscription answer (plan-tienda S2.2, replacing sprint 1's "nobody can hold one yet").
+ * Read from Medusa Commerce through `lib/tienda-subscription.ts`, and ONLY when nothing that outranks it already
+ * decides the plan (`tiendaLookupNeeded`) — most shops pay no extra round trip. A failed read is
+ * `{ hasActiveTiendaSubscription: undefined, tiendaSubscriptionUnavailable: true }`, never "not subscribed": the plan
+ * then reads `unavailable` unless something that WAS read is live (lib/plan.ts header).
  */
-function tiendaSubscriptionFacts(opts: ResolvePlanOptions): { hasActiveTiendaSubscription: boolean | undefined; tiendaSubscriptionUnavailable?: boolean } {
-  return { hasActiveTiendaSubscription: opts.hasActiveTiendaSubscription ?? false }
+async function tiendaSubscriptionFacts(
+  metadata: unknown,
+  hasActiveSubscription: boolean | undefined,
+  opts: ResolvePlanOptions,
+  now: Date,
+): Promise<{ hasActiveTiendaSubscription: boolean | undefined; tiendaSubscriptionUnavailable?: boolean }> {
+  if (opts.hasActiveTiendaSubscription !== undefined) return { hasActiveTiendaSubscription: opts.hasActiveTiendaSubscription }
+  if (!tiendaLookupNeeded(metadata, hasActiveSubscription, now)) return { hasActiveTiendaSubscription: undefined }
+  // Without BOTH ids there is no subscription to look up — an unowned shop cannot hold one, exactly as the Negocio
+  // lookup below treats it. That is a known absence, not "could not look".
+  if (!opts.sellerClerkId || !opts.shopId) return { hasActiveTiendaSubscription: false }
+  const sub = await getTiendaSubscription(opts.sellerClerkId, opts.shopId)
+  return sub.unavailable
+    ? { hasActiveTiendaSubscription: undefined, tiendaSubscriptionUnavailable: true }
+    : { hasActiveTiendaSubscription: sub.active }
 }
 
 /**
  * The shop's plan. The Negocio subscription is looked up only when nothing on the shop already makes it Negocio (a
- * comp or a live dated grant), so most reads cost no backend round-trip. A failed lookup yields
- * `reason: 'unavailable'` (Gratis for gating, never a grant and never `unpaid`) unless something that was read is
- * live — see the header of `lib/plan.ts`.
+ * comp or a live dated grant), and the Tienda subscription only when neither Negocio nor a live trial (nor a live
+ * Tienda grant) decides it, so most reads cost no backend round-trip. A failed lookup yields `reason: 'unavailable'`
+ * (Gratis for gating, never a grant and never `unpaid`) unless something that was read is live — see the header of
+ * `lib/plan.ts`.
  */
 export async function resolvePlan(metadata: unknown, opts: ResolvePlanOptions = {}): Promise<PlanState> {
   const now = opts.now ?? new Date()
   const grant = readNegocioGrant(metadata)
   const grantDecides = grant?.type === 'comp' || isLiveDatedGrant(grant, now)
-  const tienda = tiendaSubscriptionFacts(opts)
 
-  // No lookup without BOTH ids: the Backend requires shop_id (Negocio is per shop), so an unowned shop or a caller
+  // No lookup without BOTH ids: the Backend requires shop_id (a plan is per shop), so an unowned shop or a caller
   // without the shop id never reaches it.
   if (grantDecides || opts.hasActiveSubscription !== undefined || !opts.sellerClerkId || !opts.shopId) {
-    return derivePlanFromMetadata(metadata, { hasActiveSubscription: opts.hasActiveSubscription ?? false, ...tienda }, now)
+    const hasActiveSubscription = opts.hasActiveSubscription ?? false
+    const tienda = await tiendaSubscriptionFacts(metadata, hasActiveSubscription, opts, now)
+    return derivePlanFromMetadata(metadata, { hasActiveSubscription, ...tienda }, now)
   }
   const sub = await getNegocioSubscription(opts.sellerClerkId, opts.shopId)
-  return derivePlanFromMetadata(
-    metadata,
-    { hasActiveSubscription: sub.unavailable ? undefined : sub.active, subscriptionUnavailable: sub.unavailable, ...tienda },
-    now,
-  )
+  const hasActiveSubscription = sub.unavailable ? undefined : sub.active
+  const tienda = await tiendaSubscriptionFacts(metadata, hasActiveSubscription, opts, now)
+  return derivePlanFromMetadata(metadata, { hasActiveSubscription, subscriptionUnavailable: sub.unavailable, ...tienda }, now)
 }
 
 export type OwnedShopRow = { id: string; slug: string; clerk_user_id: string | null; metadata: unknown }

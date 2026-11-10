@@ -609,11 +609,16 @@ test.describe('paying for Negocio or Tienda once — replays, where the months s
   })
 
   test('the webhook writes through that one function: no second write of the Tienda key, and never the single-guard merge', () => {
+    // Since plan-tienda S2.1 the read-decide-write loop is `lib/plan-payment.ts` (I/O injected) and the webhook only
+    // wires it: one RPC call site, fed only by `grantWriteRpcArgs`.
     const src = readFileSync('lib/negocio-webhook.ts', 'utf8')
-    expect(src).toContain('db.rpc(GRANT_WRITE_RPC, grantWriteRpcArgs(input.shopId, NEGOCIO_GRANT_KEY, decision))')
+    expect(src).toContain('db.rpc(GRANT_WRITE_RPC, args)')
     expect(src.match(/db\.rpc\(/g)).toHaveLength(1)
     expect(src).not.toContain("'merge_shop_metadata'")
     expect(src).not.toContain('TIENDA_GRANT_KEY')
+    const loop = readFileSync('lib/plan-payment.ts', 'utf8')
+    expect(loop).toContain('deps.writeGrant(grantWriteRpcArgs(input.shopId, key, decision))')
+    expect(loop.match(/writeGrant\(/g)).toHaveLength(1)
   })
 
   test('Tienda, first payment: the same rules under the Tienda key', () => {
