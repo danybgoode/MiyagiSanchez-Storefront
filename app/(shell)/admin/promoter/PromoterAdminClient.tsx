@@ -13,6 +13,7 @@ import type { OperatorDetailsV1, OperatorDetailsV2, PromoterApplication } from '
 import { PROMOTER_SKU_BASE_PRICE_MXN } from '@/lib/promoter-earnings'
 import { buildSkuPriceTable, computeBundleRow, type PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { TRANSFER_SKU_LABEL, type TransferSku } from '@/lib/promoter-transfer'
+import { PACKAGES, PACKAGE_FREE_MONTHS, isSellablePackageSku, packageSentence } from '@/lib/promoter-packages'
 import type { PromoterTransfer } from '@/lib/promoter-transfers'
 import { SELLER_LANDING_PATHS } from '@/lib/seller-acquisition'
 
@@ -33,10 +34,15 @@ const SKU_LABEL: Record<PromoterSku, string> = {
   subdomain: 'Subdominio propio',
   ml_sync: 'Sincronización Mercado Libre',
   migration: 'Migración de tienda',
-  negocio_anual: 'Plan Negocio · 1 año (tienda lista + 12 meses)',
-  negocio_arranque: 'Plan Negocio · 3 meses (tienda lista + 3 meses)',
-  setup_gratis: 'Plan Gratis · tienda lista',
-  negocio_renewal: 'Renovación del Plan Negocio (año 2)',
+  // The packages are named by lib/promoter-packages.ts (plan-tienda D18); retired ones keep a label so old rows read.
+  tienda_anual: PACKAGES.tienda_anual.label,
+  negocio_semestral: PACKAGES.negocio_semestral.label,
+  negocio_anual: PACKAGES.negocio_anual.label,
+  negocio_arranque: `${PACKAGES.negocio_arranque.label} (ya no se vende)`,
+  setup_gratis: `${PACKAGES.setup_gratis.label} (ya no se vende)`,
+  negocio_renewal: 'Renovación del Plan Negocio (12 meses después del paquete)',
+  tienda_renewal: 'Renovación del Plan Tienda (12 meses después del paquete)',
+  negocio_upgrade: 'Cambio de Plan Tienda a Plan Negocio (primer año)',
 }
 
 /**
@@ -808,7 +814,9 @@ export default function PromoterAdminClient({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Comisión por SKU</h2>
         <p className="text-sm text-[var(--color-muted)]">
-          Porcentaje que gana el promotor sobre cada venta pagada y atribuida. Se acumula solo en el primer pago.
+          Porcentaje que gana el promotor. En un paquete es lo que se queda del precio al cobrar, así que no genera
+          comisión aparte. En una renovación gana en cada pago del negocio dentro de su año; en el cambio de Plan Tienda a
+          Plan Negocio, solo en el primer pago. En los demás productos, solo en el primer pago.
         </p>
         <ul className="space-y-2">
           {PROMOTER_SKUS.map((sku) => (
@@ -826,6 +834,12 @@ export default function PromoterAdminClient({
                   />
                   <span className="text-sm text-[var(--color-muted)]">%</span>
                 </div>
+                {/* plan-tienda S4.4: a package on sale reads as the promoter says it, from the rate being edited. */}
+                {isSellablePackageSku(sku) && rates[sku] ? (
+                  <span className="block mt-1 text-xs text-[var(--color-muted)]" data-testid={`admin-package-sentence-${sku}`}>
+                    {packageSentence(sku, rates[sku])}. {PACKAGES[sku].summary}: los {PACKAGE_FREE_MONTHS} meses gratis van además del tiempo pagado.
+                  </span>
+                ) : null}
               </label>
               <button
                 onClick={() => saveRate(sku)}

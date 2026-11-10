@@ -311,7 +311,7 @@ const EXTRA_SKUS_SOLD: readonly PromoterSku[] = ['migration']
 
 /** The SKUs that were ever sold as an extra (each has a row). The promoter packages and the renewal share are not
  *  extras: they are promoter deals (lib/promoter-packages.ts), never on the price list. */
-type ExtraSku = Exclude<PromoterSku, 'negocio_anual' | 'negocio_arranque' | 'setup_gratis' | 'negocio_renewal'>
+type ExtraSku = Exclude<PromoterSku, 'negocio_anual' | 'negocio_arranque' | 'setup_gratis' | 'negocio_renewal' | 'tienda_anual' | 'negocio_semestral' | 'tienda_renewal' | 'negocio_upgrade'>
 const isExtraSku = (sku: PromoterSku): sku is ExtraSku => (EXTRA_SKUS_SOLD as readonly string[]).includes(sku)
 
 function extraRows(input: PricingCatalogInput): ExtraRow[] {

@@ -12,7 +12,7 @@
  * receipt they ever issued into a 404.
  */
 import { receiptStatus, type ReceiptPayload, type ReceiptStatus } from './promoter-receipt'
-import { readNegocioGrant } from './plan'
+import { readNegocioGrant, readTiendaGrant } from './plan'
 
 type Result = { data: unknown; error: unknown }
 /** The slice of the supabase-js builder these reads use. */
@@ -75,6 +75,7 @@ export async function readReceiptViewWith(db: ReceiptDb, payload: ReceiptPayload
       attributionPaid: (attribution.data as { status?: string } | null)?.status === 'paid',
       transferStatus: (transfer.data as { status?: string } | null)?.status ?? null,
       negocioEndsAt: readNegocioGrant(s?.metadata)?.expires_at ?? null,
+      tiendaEndsAt: readTiendaGrant(s?.metadata)?.expires_at ?? null,
       now,
     }),
   }

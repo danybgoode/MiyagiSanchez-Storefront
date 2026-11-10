@@ -2383,7 +2383,7 @@
         }
       ],
       "pitchTitle": "Cuánto puedes ganar",
-      "pitchBody": "Sabes desde el primer día cuánto cobras, cuánto nos pasas y cuánto te queda. Sin cuotas y sin letra chiquita. Y si el negocio renueva su Plan Negocio el segundo año, vuelves a ganar.",
+      "pitchBody": "Sabes desde el primer día cuánto cobras, cuánto le pasas a Miyagi Sánchez y cuánto te queda. Sin cuotas y sin letra chiquita. Y si el negocio sigue pagando su plan cuando se acaba el tiempo del paquete, o pasa de Plan Tienda a Plan Negocio en su primer año, vuelves a ganar.",
       "pitchStats": [
         {
           "value": "3",
@@ -2413,11 +2413,11 @@
         },
         {
           "title": "¿Y si el negocio no quiere pagar mensualidad?",
-          "body": "Ofrécele el Plan Gratis: su tienda queda en línea para siempre, sin mensualidad, y tú cobras por dejársela lista."
+          "body": "Ofrécele el Plan Tienda · 1 año: paga una sola vez y tiene 3 meses de Plan Negocio gratis y después un año de Plan Tienda, sin mensualidad."
         },
         {
           "title": "¿Gano algo después?",
-          "body": "Sí. Si el negocio vuelve a pagar su Plan Negocio el segundo año, te llevas una parte de ese pago."
+          "body": "Sí. Si el negocio sigue pagando su plan cuando se acaba el tiempo del paquete, te llevas una parte de lo que pague durante 12 meses. Y si una tienda con Plan Tienda pasa a Plan Negocio en su primer año, te llevas una parte de ese primer pago."
         }
       ],
       "guide": {
@@ -2426,15 +2426,18 @@
         "packagesTitle": "Lo que vendes",
         "colOption": "Opción",
         "colCharge": "Cobras",
-        "colPay": "Nos pasas",
+        "colPay": "Le pasas",
         "colKeep": "Te quedas",
-        "renewalLine": "Si el negocio renueva su Plan Negocio el segundo año, te llevas el {renewalPct}% de ese pago.",
+        "renewalLine": "Si el negocio sigue pagando su Plan Negocio cuando se acaba el tiempo del paquete, te llevas el {renewalPct}% de lo que pague durante 12 meses.",
+        "onTop": "Los {meses} meses de Plan Negocio gratis van además del tiempo pagado.",
+        "tiendaRenewalLine": "Si el negocio paga su Plan Tienda cuando se acaba el tiempo del paquete, te llevas el {pct}% de lo que pague durante 12 meses.",
+        "upgradeLine": "Si una tienda con Plan Tienda · 1 año pasa a Plan Negocio en su primer año, te llevas el {pct}% de ese primer pago.",
         "ratesPending": "Tu parte se confirma con Miyagi Sánchez.",
         "sayTitle": "Qué le dices",
         "say": {
-          "negocio_anual": "«Hoy te dejo tu tienda en línea con tus productos, y en todo el año no nos pagas nada más. Si tienes un dominio, como tunegocio.com, también lo conectamos.»",
-          "negocio_arranque": "«Hoy te dejo tu tienda lista y tienes el Plan Negocio tres meses. Después tú decides si sigues.»",
-          "setup_gratis": "«Hoy te dejo tu tienda en línea, gratis para siempre: sin mensualidad y sin comisión por vender.»"
+          "tienda_anual": "«Hoy te dejo tu tienda en línea con tus productos. Tienes 3 meses de Plan Negocio gratis y después un año de Plan Tienda, sin pagar nada más.»",
+          "negocio_semestral": "«Hoy te dejo tu tienda en línea con tus productos. Tienes 3 meses de Plan Negocio gratis y después 6 meses más, sin pagar nada más.»",
+          "negocio_anual": "«Hoy te dejo tu tienda en línea con tus productos. Tienes 3 meses de Plan Negocio gratis y después un año más, sin pagar nada más. Si tienes un dominio, como tunegocio.com, también lo conectamos.»"
         },
         "stepsTitle": "Paso a paso",
         "steps": [
@@ -5599,9 +5602,10 @@
       "migration": "Migración desde otra plataforma",
       "charges": "cobras {monto}",
       "colCharge": "Cobras",
-      "colPay": "Nos pasas",
+      "colPay": "Le pasas",
       "colKeep": "Te quedas",
       "ratePending": "Cobras {monto}. Tu parte se confirma con Miyagi Sánchez.",
+      "onTop": "{resumen}. Los {meses} meses gratis van además del tiempo pagado.",
       "quote": "ID de cotización (solo catálogos de más de 150 productos)",
       "quotePlaceholder": "Pégalo desde el reporte del comerciante",
       "byTransfer": "Por transferencia",
@@ -5637,6 +5641,8 @@
       "for": "Por: {opcion}.",
       "active": "Activo: tu Plan Negocio está encendido hasta el {fecha}.",
       "activeNoDate": "Activo: tu Plan Negocio está encendido.",
+      "activeTienda": "Activo: tu plan está pagado hasta el {fecha}. Primero tienes Plan Negocio y después Plan Tienda.",
+      "endedTienda": "Tu Plan Tienda terminó el {fecha}. Puedes renovarlo desde tu panel.",
       "ready": "Listo: tu tienda en el Plan Gratis ya está armada.",
       "pending": "Pendiente: Miyagi Sánchez está confirmando el pago de tu promotor. Te avisamos cuando quede activo.",
       "problem": "Hay un problema con este pago. Escríbenos y lo resolvemos.",

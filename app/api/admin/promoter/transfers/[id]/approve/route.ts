@@ -41,7 +41,10 @@ export const POST = withAdmin(async (_req: Request, { params }: { params: Promis
     shopId: transfer.seller_id,
     promoterId: transfer.promoter_id,
     sellerClerkId: shop?.clerkUserId ?? '',
-    // The transfer's own id: a retried approval adds a package's Negocio months once (plans-gratis-negocio D12).
+    // The transfer's own id: a retried approval adds a package's months once, and completes a half that a failure
+    // between the Negocio and the Tienda write left missing (plan-tienda D11). A package's grants are decided HERE, at
+    // approval: the `negocio_anual` transfer pending on 2026-11-09, approved after the plan-tienda deploy, grants 15
+    // months of Negocio (3 free + 12), not the 12 it was sold with.
     paymentId: `transfer:${transfer.id}`,
   })
   if (!activated.ok) {

@@ -57,7 +57,7 @@ test.describe('computePromoterSkuEarnings', () => {
 test.describe('buildPromoterEarningsTable', () => {
   test('one row per PROMOTER_SKUS entry; print_ad + migration are variablePrice (no fixed mxn)', () => {
     const table = buildPromoterEarningsTable(ZERO_RATES, NO_DISCOUNT)
-    expect(table).toHaveLength(9) // 5 items + 3 packages + the renewal share (plans-gratis-negocio S4)
+    expect(table).toHaveLength(13) // 5 items + 5 packages (3 on sale, 2 retired) + 3 shares (plan-tienda S4)
     const printAd = table.find((r) => r.sku === 'print_ad')
     expect(printAd?.variablePrice).toBe(true)
     if (printAd?.variablePrice) expect(printAd.commissionPct).toBeNull()

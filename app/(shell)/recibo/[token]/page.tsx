@@ -36,8 +36,8 @@ export default async function ReceiptPage({ params }: { params: Promise<{ token:
   const s = view.status
   const statusLine =
     s.kind === 'active'
-      ? s.endsAt ? fillTemplate(t.active, { fecha: formatReceiptDate(s.endsAt) }) : t.activeNoDate
-      : s.kind === 'ended' ? fillTemplate(t.ended, { fecha: formatReceiptDate(s.endsAt) })
+      ? s.endsAt ? fillTemplate(s.plan === 'tienda' ? t.activeTienda : t.active, { fecha: formatReceiptDate(s.endsAt) }) : t.activeNoDate
+      : s.kind === 'ended' ? fillTemplate(s.plan === 'tienda' ? t.endedTienda : t.ended, { fecha: formatReceiptDate(s.endsAt) })
       : s.kind === 'ready' ? t.ready
       : s.kind === 'pending' ? t.pending
       : s.kind === 'problem' ? t.problem

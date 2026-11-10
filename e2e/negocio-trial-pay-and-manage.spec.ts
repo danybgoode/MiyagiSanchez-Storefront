@@ -106,7 +106,9 @@ test('the $0 invoice that opens a free period is not a payment: it returns befor
   const body = src.slice(src.indexOf('export async function handlePlanInvoicePaid'))
   const guard = body.indexOf('(invoice.amount_paid ?? 0) <= 0) return')
   expect(guard).toBeGreaterThan(-1)
-  expect(guard).toBeLessThan(body.indexOf('recordRenewalShare('))
+  // plan-tienda S4.3: the renewal and the upgrade share are recorded together; the $0 guard still comes first.
+  expect(body.indexOf('recordNegocioPaymentShares(')).toBeGreaterThan(-1)
+  expect(guard).toBeLessThan(body.indexOf('recordNegocioPaymentShares('))
 })
 
 test.describe('managing the monthly plan: only your own shop, only your own user', () => {

@@ -13,10 +13,14 @@ const mxn = (cents: number) =>
 // The options a promoter sells now take their names from lib/promoter-packages.ts; the older products stay named so
 // commissions earned on them before 2026-11 still read correctly.
 const SKU_LABEL: Record<string, string> = {
+  tienda_anual: PACKAGES.tienda_anual.label,
+  negocio_semestral: PACKAGES.negocio_semestral.label,
   negocio_anual: PACKAGES.negocio_anual.label,
   negocio_arranque: PACKAGES.negocio_arranque.label,
   setup_gratis: PACKAGES.setup_gratis.label,
-  negocio_renewal: 'Renovación del Plan Negocio (año 2)',
+  negocio_renewal: 'Renovación del Plan Negocio (12 meses después del paquete)',
+  tienda_renewal: 'Renovación del Plan Tienda (12 meses después del paquete)',
+  negocio_upgrade: 'Pasó de Plan Tienda a Plan Negocio (primer año)',
   migration: 'Migración desde otra plataforma',
   custom_domain: 'Dominio propio',
   subdomain: 'Subdominio',

@@ -18,7 +18,7 @@ import { isEnabled } from '@/lib/flags'
 import { getPromoterByClerkId } from '@/lib/promoter'
 import { resolveTargetShop } from '@/lib/promoter-server'
 import { promoterMayCloseShop } from '@/lib/promoter-shop-access'
-import { PACKAGES, isPackageSku } from '@/lib/promoter-packages'
+import { PACKAGES, RETIRED_PACKAGE_MESSAGE, isPackageSku, isRetiredPackageSku } from '@/lib/promoter-packages'
 import { fillTemplate, formatReceiptAmount, formatReceiptDate, receiptWhatsappUrl, signReceiptToken } from '@/lib/promoter-receipt'
 import { readReceiptRecipient, receiptSecret } from '@/lib/promoter-receipt-server'
 import { sendPromoterReceipt } from '@/lib/email'
@@ -47,6 +47,9 @@ export async function POST(req: NextRequest) {
   let body: { shopId?: string; sku?: string } = {}
   try { body = await req.json() } catch { /* validated below */ }
   if (!isPackageSku(body.sku)) return NextResponse.json({ ok: false, error: 'Elige qué le vendiste.' }, { status: 400 })
+  // A new receipt records a new sale, and a retired package is no longer sold (plan-tienda D11). Receipts already
+  // issued for one still open: `verifyReceiptToken` accepts every package in the vocabulary.
+  if (isRetiredPackageSku(body.sku)) return NextResponse.json({ ok: false, error: RETIRED_PACKAGE_MESSAGE }, { status: 410 })
   const sku = body.sku
 
   const shop = await resolveTargetShop({ shopId: body.shopId })

@@ -137,10 +137,19 @@ test.describe('promoter landing · CTA + wording sweep (promoter-funnel-v2 S1 ·
   const fullCopy = sa as any
 
   test('the promoter page sells only the three options, each with its money in plain words (Daniel, 2026-11-05)', () => {
-    const rates = { custom_domain: 0, print_ad: 0, subdomain: 0, ml_sync: 0, migration: 0, negocio_anual: 55, negocio_arranque: 50, setup_gratis: 80, negocio_renewal: 10 }
+    const rates = {
+      custom_domain: 0, print_ad: 0, subdomain: 0, ml_sync: 0, migration: 0, negocio_anual: 55, negocio_arranque: 50, setup_gratis: 80,
+      negocio_renewal: 10, tienda_anual: 60, negocio_semestral: 55, tienda_renewal: 10, negocio_upgrade: 20,
+    }
     const config = buildPromoterPageConfig(fullCopy, { customDomainPriceMxn: 499, enabled: true, commissionRates: rates })
-    expect(config.proofPoints.map((p) => p.title)).toEqual(['Plan Negocio · 1 año', 'Plan Negocio · 3 meses', 'Plan Gratis · tienda lista'])
-    expect(config.proofPoints[0].body).toContain('Cobras $2,000. Le pasas $900 a Miyagi Sánchez. Te quedas $1,100.')
+    // plan-tienda D11: the three packages on sale; the retired two never appear for sale.
+    expect(config.proofPoints.map((p) => p.title)).toEqual(['Plan Tienda · 1 año', 'Plan Negocio · 6 meses', 'Plan Negocio · 1 año'])
+    // The money first, then what the merchant gets, with the three free months on top.
+    expect(config.proofPoints[0].body.startsWith('Cobras $500. Le pasas $200 a Miyagi Sánchez. Te quedas $300.')).toBe(true)
+    expect(config.proofPoints[1].body.startsWith('Cobras $1,100. Le pasas $495 a Miyagi Sánchez. Te quedas $605.')).toBe(true)
+    expect(config.proofPoints[2].body.startsWith('Cobras $2,000. Le pasas $900 a Miyagi Sánchez. Te quedas $1,100.')).toBe(true)
+    for (const p of config.proofPoints) expect(p.body).toContain('3 meses gratis van además del tiempo pagado')
+    expect(JSON.stringify(config.proofPoints)).not.toMatch(/Plan Gratis|3 meses \(|Plan Negocio · 3 meses/)
     // The retired single products and the printed ad are gone, and so is the old "your code is a discount" claim.
     const words = JSON.stringify(promoterCopy)
     for (const gone of ['Anuncio impreso', 'Subdominio', 'descuento', 'Muy pronto']) expect(words).not.toContain(gone)

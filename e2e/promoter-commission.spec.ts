@@ -48,6 +48,8 @@ test.describe('promoter-commission · rate validation (US-7)', () => {
       custom_domain: 0, print_ad: 0, subdomain: 0, ml_sync: 0, migration: 0,
       // plans-gratis-negocio S4: the packages and the renewal share (real rates are rows seeded by M1).
       negocio_anual: 0, negocio_arranque: 0, setup_gratis: 0, negocio_renewal: 0,
+      // plan-tienda S4: the two new packages and the two new shares (real rates are rows seeded by M1 20261111000000).
+      tienda_anual: 0, negocio_semestral: 0, tienda_renewal: 0, negocio_upgrade: 0,
     })
   })
 })

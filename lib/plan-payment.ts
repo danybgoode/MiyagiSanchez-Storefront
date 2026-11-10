@@ -39,6 +39,9 @@ export type PlanPaymentInput = {
   months: number
   note: string
   now?: Date
+  /** A promoter package (plan-tienda D11): dated from the payment day, never after a live trial (`PlanPayment` in
+   *  lib/plan.ts). Carried into the decision below — dropping it would start a package's months after the trial. */
+  ignoreTrial?: boolean
 }
 
 /** `comp` only for Negocio: a permanent Negocio has nothing to extend (Plan Tienda has no comp, README D3). */
@@ -64,7 +67,7 @@ type Decided = { action: 'replay' } | { action: 'comp' } | PlanGrantWrite
 
 /** The pure decision for `plan` — each plan's own rules, never restated here. */
 export function decidePlanPayment(plan: PaidPlan, metadata: unknown, input: PlanPaymentInput): Decided {
-  const payment = { paymentId: input.paymentId, months: input.months, note: input.note, now: input.now }
+  const payment = { paymentId: input.paymentId, months: input.months, note: input.note, now: input.now, ignoreTrial: input.ignoreTrial }
   return plan === 'negocio' ? decideNegocioPayment(metadata, payment) : decideTiendaPayment(metadata, payment)
 }
 

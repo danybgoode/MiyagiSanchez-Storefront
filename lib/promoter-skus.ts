@@ -12,6 +12,9 @@ export const PROMOTER_SKUS = [
   'custom_domain', 'print_ad', 'subdomain', 'ml_sync', 'migration',
   // plans-gratis-negocio S4 (D12, D13): the three promoter packages and the year-2 renewal share.
   'negocio_anual', 'negocio_arranque', 'setup_gratis', 'negocio_renewal',
+  // plan-tienda-three-free-months S4 (D11–D14): two new packages, the Tienda renewal share and the upgrade share.
+  // `negocio_arranque` and `setup_gratis` stay: retired from sale, still read (lib/promoter-packages.ts).
+  'tienda_anual', 'negocio_semestral', 'tienda_renewal', 'negocio_upgrade',
 ] as const
 export type PromoterSku = (typeof PROMOTER_SKUS)[number]
 

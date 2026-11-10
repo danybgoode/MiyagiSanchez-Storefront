@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { PACKAGES, PACKAGE_SKUS, packageSplit } from '@/lib/promoter-packages'
+import { PACKAGES, PACKAGE_FREE_MONTHS, SELLABLE_PACKAGE_SKUS, packageSplit } from '@/lib/promoter-packages'
 import { getCommissionRates } from '@/lib/promoter'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
 
@@ -13,7 +13,8 @@ export const metadata: Metadata = {
  * 2026-11-05 for promoters recruited on the street, who will not read a handbook).
  *
  * Order is deliberate: the money first and largest (what you charge, what you pass us, what you keep), then one
- * sentence per option to say out loud, then four steps, then how our share is paid. Every amount comes from the live
+ * sentence per option to say out loud, then four steps, then how our share is paid. Only the three packages on sale
+ * (plan-tienda D11), with the three free months on top and the shares after the sale. Every amount comes from the live
  * commission rates through `packageSplit`; no amount is typed here. No printed ads and no retired extras (Daniel).
  *
  * Reuses the admin print view's idiom: an injected <style> with @media print that hides the site chrome and a
@@ -55,6 +56,8 @@ export default async function PromoterSellSheetPage() {
   const g = (await getOverriddenDictionary('es')).sellerAcquisition.promotor.guide
   const rates = await getCommissionRates()
   const renewalPct = rates.negocio_renewal ?? 0
+  const tiendaRenewalPct = rates.tienda_renewal ?? 0
+  const upgradePct = rates.negocio_upgrade ?? 0
 
   return (
     <main className="ss-root" data-testid="sell-sheet">
@@ -79,7 +82,7 @@ export default async function PromoterSellSheetPage() {
           </tr>
         </thead>
         <tbody>
-          {PACKAGE_SKUS.map((sku) => {
+          {SELLABLE_PACKAGE_SKUS.map((sku) => {
             const rate = rates[sku]
             const split = rate ? packageSplit(sku, rate) : null
             return (
@@ -102,13 +105,21 @@ export default async function PromoterSellSheetPage() {
           })}
         </tbody>
       </table>
+      <p className="ss-note" data-testid="sell-sheet-on-top">{g.onTop.replace('{meses}', String(PACKAGE_FREE_MONTHS))}</p>
+      {/* The shares after the sale, each read from its live rate and hidden until it has one (plan-tienda D14). */}
       {renewalPct > 0 ? (
         <p className="ss-note" data-testid="sell-sheet-renewal">{g.renewalLine.replace('{renewalPct}', String(renewalPct))}</p>
+      ) : null}
+      {tiendaRenewalPct > 0 ? (
+        <p className="ss-note" data-testid="sell-sheet-tienda-renewal">{g.tiendaRenewalLine.replace('{pct}', String(tiendaRenewalPct))}</p>
+      ) : null}
+      {upgradePct > 0 ? (
+        <p className="ss-note" data-testid="sell-sheet-upgrade">{g.upgradeLine.replace('{pct}', String(upgradePct))}</p>
       ) : null}
 
       <h2 className="ss-h2">{g.sayTitle}</h2>
       <ul className="ss-say">
-        {PACKAGE_SKUS.map((sku) => (
+        {SELLABLE_PACKAGE_SKUS.map((sku) => (
           <li key={sku}><strong>{PACKAGES[sku].label}:</strong> {g.say[sku]}</li>
         ))}
       </ul>

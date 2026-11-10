@@ -120,6 +120,8 @@ test.describe('the webhook route answers 5xx only for a failed plan step', () =>
     expect(assigned).toEqual([
       'await handlePlanSubscriptionComplete(session, sessionPlan)',
       'await handlePlanOneTimeComplete(session, sessionPlan, event.created)',
+      // plan-tienda S4.1 review: a promoter package paid by card is a plan step too (its grants and attribution).
+      'await handlePromoterPackageComplete(session, event.created)',
       "event.type === 'customer.subscription.updated' ? await handleSubscriptionUpdated(subscription) : await handleSubscriptionDeleted(subscription)",
       'await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice)',
       'await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice)',
@@ -144,15 +146,21 @@ test.describe('a retried delivery cannot repeat a side effect', () => {
     return WEBHOOK.slice(at, WEBHOOK.indexOf('\nexport ', at + 1))
   }
 
-  test('the yearly grant: retry is returned before the renewal share, the attribution, the ✅ alert, D19 and the hook', () => {
-    const b = body('handlePlanOneTimeComplete')
-    const retry = b.indexOf("return 'retry'")
+  test('the yearly grant: retry is returned before every later step, and a replay repeats only the idempotent ones', () => {
+    // plan-tienda S4: the order lives in lib/plan-one-time-steps.ts (behaviour in e2e/plan-one-time-steps.spec.ts). A
+    // failed grant returns `retry` before anything else; the shares and the attribution, idempotent by their keys, run
+    // on a replay too (a share that failed after the grant landed is then recorded); the ✅ alert, D19 and the hook
+    // run only on the delivery that wrote.
+    const steps = readFileSync('lib/plan-one-time-steps.ts', 'utf8')
+    const run = steps.slice(steps.indexOf('export async function runOneTimeSteps'))
+    const retry = run.indexOf("return { outcome: 'retry', grant: null }")
     expect(retry).toBeGreaterThan(-1)
-    for (const later of ['recordRenewalShare(', 'markAttributionPaid(', '✅', 'cancelTiendaUnderNegocio(', 'afterPlanPaid(']) {
-      expect({ later, after: b.indexOf(later) > retry }).toEqual({ later, after: true })
-    }
-    // And the replay — what a retry of a LANDED grant becomes — returns before all of them too.
-    expect(b.indexOf("if (outcome === 'replay') return 'done'")).toBeLessThan(b.indexOf('recordRenewalShare('))
+    for (const later of ['deps.shares()', 'deps.attribution()', 'deps.firstTime(']) expect(run.indexOf(later)).toBeGreaterThan(retry)
+    expect(run).toContain("if (grant !== 'replay') await deps.firstTime(grant)")
+    const b = body('handlePlanOneTimeComplete')
+    const first = b.slice(b.indexOf('firstTime: async'))
+    for (const once of ['✅', 'cancelTiendaUnderNegocio(', 'afterPlanPaid(']) expect(first).toContain(once)
+    expect(b.slice(0, b.indexOf('firstTime: async'))).not.toMatch(/✅|cancelTiendaUnderNegocio\(|afterPlanPaid\(/)
   })
 
   test('the monthly activation: retry is returned before the ✅ alert, D19 and the hook', () => {
@@ -173,7 +181,9 @@ test.describe('a retried delivery cannot repeat a side effect', () => {
 
   test('the renewal share runs only after the status landed, and is keyed by the invoice id', () => {
     const b = body('handlePlanInvoicePaid')
-    expect(b).toContain("out.outcome === 'patched' && out.plan === 'negocio'")
+    // plan-tienda S4: both plans' shares, only after the status landed; a share that did not land answers retry.
+    expect(b).toContain("if (out.outcome !== 'patched' || !shopId || !invoice.id) return result")
     expect(b).toContain('paymentRef: invoice.id')
+    expect(b).toContain("return shared ? result : 'retry'")
   })
 })

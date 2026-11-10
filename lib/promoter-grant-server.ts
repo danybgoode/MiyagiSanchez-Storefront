@@ -22,8 +22,8 @@ import { db } from '@/lib/supabase'
 import { tg } from '@/lib/telegram'
 import { buildOneTimeGrant } from '@/lib/domain-entitlement'
 import { SKU_GRANT_KEYS, type TransferSku } from '@/lib/promoter-transfer'
-import { PACKAGES, isPackageSku } from '@/lib/promoter-packages'
-import { applyNegocioPayment } from '@/lib/negocio-webhook'
+import { applyPackageGrants, isPackageSku } from '@/lib/promoter-packages'
+import { PACKAGE_GRANT_DEPS, packageGrantsLine } from '@/lib/promoter-package-server'
 
 export type ActivateGrantResult =
   | { ok: true }
@@ -43,34 +43,39 @@ export async function activatePromoterOneTimeGrant(input: {
   promoterId: string
   sellerClerkId: string
   note?: string
-  /** A stable id for this payment (e.g. `transfer:<id>`), so a retried approval can never add Negocio twice. */
+  /** A stable id for this payment (e.g. `transfer:<id>`), so a retried approval can never add a package's months twice. */
   paymentId?: string
 }): Promise<ActivateGrantResult> {
   const { sku, shopId, promoterId, sellerClerkId, note = 'S4 transfer' } = input
 
-  // plans-gratis-negocio S4 (D12): a package adds its months of Negocio through the same replay-safe compare-and-swap
-  // the yearly payment uses; the free-plan setup grants nothing (the shop's own trial still runs).
+  // plan-tienda S4 (D11): a package writes its grants — Negocio, and for `tienda_anual` Tienda after it — dated from
+  // the APPROVAL (the moment the platform confirms its share arrived), through the same replay-safe compare-and-swap
+  // the card path uses. All under `transfer:<id>`, so an approval retried after a released claim completes a missing
+  // half and repeats nothing (applyPackageGrants).
+  //
+  // The one `negocio_anual` transfer pending on 2026-11-09, if approved after this deploys, grants FIFTEEN months
+  // (3 free + 12), not the 12 it was sold with: D11 decides the package's grants at approval time, and the merchant
+  // gains three months. A retired package's pending transfer (none live on 2026-11-09) is still approved with its
+  // original grants: only the SALE of a retired package is refused.
   if (isPackageSku(sku)) {
-    const months = PACKAGES[sku].negocioMonths
-    if (months === 0) return { ok: true }
+    let outcome: Awaited<ReturnType<typeof applyPackageGrants>>
     try {
-      const outcome = await applyNegocioPayment({
-        shopId,
-        paymentId: input.paymentId ?? `transfer:${promoterId}:${shopId}:${sku}`,
-        months,
-        note: `promoter ${sku}`,
-      })
-      if (outcome === 'comp') {
-        tg.alert(`⚠️ Paquete aprobado en una tienda que ya tenía Negocio sin costo — revisar reembolso.\nShop: ${shopId}\nPromotor: ${promoterId}`)
-        return { ok: true }
-      }
+      outcome = await applyPackageGrants(
+        { sku, shopId, paymentId: input.paymentId ?? `transfer:${promoterId}:${shopId}:${sku}` },
+        PACKAGE_GRANT_DEPS,
+      )
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       console.error('[promoter grant] package activation failed:', message)
-      tg.alert(`🚨 Paquete aprobado pero NO se activó Negocio (${sku}) — reparar a mano.\nShop: ${shopId}\nPromotor: ${promoterId}\nError: ${message}`)
-      return { ok: false, error: 'No se pudo activar Negocio.' }
+      tg.alert(`🚨 Paquete aprobado pero el plan NO quedó completo (${sku}) — volver a aprobar lo completa sin repetir nada.\nShop: ${shopId}\nPromotor: ${promoterId}\nError: ${message}`)
+      return { ok: false, error: 'No se pudo activar el plan.' }
     }
-    tg.alert(`✅ Paquete aprobado — Negocio ${months} meses\nShop: ${shopId}\nPromotor: ${promoterId}`)
+    if (outcome === 'comp') {
+      tg.alert(`⚠️ Paquete aprobado en una tienda que ya tenía Negocio sin costo — revisar reembolso.\nShop: ${shopId}\nPromotor: ${promoterId}`)
+      return { ok: true }
+    }
+    // Only when this approval wrote a grant: a re-approval that finds every grant counted (`replay`) says nothing new.
+    if (outcome === 'written') tg.alert(`✅ Paquete aprobado — ${packageGrantsLine(sku)}\nShop: ${shopId}\nPromotor: ${promoterId}`)
     return { ok: true }
   }
   const grantKey = SKU_GRANT_KEYS[sku]
