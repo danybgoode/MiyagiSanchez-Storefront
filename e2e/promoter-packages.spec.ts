@@ -50,12 +50,15 @@ test('an unset rate means the promoter keeps nothing and the platform gets it al
   expect(packageSplit('negocio_anual', 100).payPlatformCents).toBe(0)
 })
 
-test('the renewal window is months 12 to 24 after the first package payment', () => {
+test('a retired package keeps the renewal window it was sold with: months 12 to 24 (plan-tienda S4.2 review)', () => {
   const first = new Date('2026-11-10T12:00:00Z')
-  expect(isRenewalPayment(first, new Date('2027-11-09T12:00:00Z'))).toBe(false) // still year 1
-  expect(isRenewalPayment(first, new Date('2027-11-10T12:00:00Z'))).toBe(true)
-  expect(isRenewalPayment(first, new Date('2028-05-01T00:00:00Z'))).toBe(true)
-  expect(isRenewalPayment(first, new Date('2028-11-10T12:00:00Z'))).toBe(false) // year 3
+  expect(isRenewalPayment('negocio_arranque', first, new Date('2027-11-09T12:00:00Z'))).toBe(false) // still year 1
+  expect(isRenewalPayment('negocio_arranque', first, new Date('2027-11-10T12:00:00Z'))).toBe(true)
+  expect(isRenewalPayment('negocio_arranque', first, new Date('2028-05-01T00:00:00Z'))).toBe(true)
+  expect(isRenewalPayment('negocio_arranque', first, new Date('2028-11-10T12:00:00Z'))).toBe(false) // year 3
+  // A package on sale: the 12 months after its paid time (15 months for the year).
+  expect(isRenewalPayment('negocio_anual', first, new Date('2027-11-10T12:00:00Z'))).toBe(false)
+  expect(isRenewalPayment('negocio_anual', first, new Date('2028-02-10T12:00:00Z'))).toBe(true)
   expect(startsRenewalWindow('negocio_anual')).toBe(true)
   expect(startsRenewalWindow('negocio_semestral')).toBe(true)
   expect(startsRenewalWindow('setup_gratis')).toBe(false)

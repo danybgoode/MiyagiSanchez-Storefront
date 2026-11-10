@@ -1,6 +1,6 @@
 /**
  * The promoter's shares after the sale (epic 08 · plan-tienda-three-free-months S4.2, S4.3, README D14):
- * `tienda_renewal` 10% of a Plan Tienda payment in months [12, 24) after the shop's first package, and
+ * `tienda_renewal` 10% of a Plan Tienda payment in the 12 months after the shop's first package's paid time ends, and
  * `negocio_upgrade` 20% of the FIRST Plan Negocio payment within 12 months of a `tienda_anual`. Each once.
  */
 import { test, expect } from '@playwright/test'
@@ -11,7 +11,8 @@ import {
   decideRenewalShare,
   decideUpgradeShare,
   upgradePaymentRef,
-  isRenewalPayment,
+  UPGRADE_WINDOW_MONTHS,
+  renewalWindowMonths,
   startsRenewalWindow,
 } from '../lib/promoter-packages'
 
@@ -35,20 +36,44 @@ test.describe('tienda_renewal — 10% of a Plan Tienda payment in year 2 (S4.2)'
   const tienda = (sku: string | null, paidAt: string) =>
     decideRenewalShare({ renewalSku: 'tienda_renewal', anchor: sku ? { sku, paidAt: PACKAGE_PAID } : null, paidAt: new Date(paidAt) })
 
-  test('the window is months [12, 24) after the first package payment: the edges, exactly', () => {
-    expect(tienda('tienda_anual', '2027-11-10T11:59:59.999Z')).toEqual({ action: 'skip', reason: 'outside_window' })
-    expect(tienda('tienda_anual', '2027-11-10T12:00:00.000Z')).toEqual({ action: 'record' })
-    expect(tienda('tienda_anual', '2028-06-01T00:00:00.000Z')).toEqual({ action: 'record' })
-    expect(tienda('tienda_anual', '2028-11-10T11:59:59.999Z')).toEqual({ action: 'record' })
-    expect(tienda('tienda_anual', '2028-11-10T12:00:00.000Z')).toEqual({ action: 'skip', reason: 'outside_window' })
-    // A tienda_anual's own Tienda months run to month 15 — paid by the promoter's package, never a merchant payment —
-    // so the first merchant Tienda payment it can see is in the window.
-    expect(isRenewalPayment(PACKAGE_PAID, new Date('2028-02-10T12:00:00.000Z'))).toBe(true)
+  test('the 12 months after each package\'s paid time ends — the edges, exactly, for both renewals (Daniel, 2026-11-10)', () => {
+    const windows: Array<[string, string, string]> = [
+      // sku, first month in, first month out (paid 2026-11-10T12:00Z)
+      ['negocio_semestral', '2027-08-10T12:00:00.000Z', '2028-08-10T12:00:00.000Z'], // [9, 21)
+      ['negocio_anual', '2028-02-10T12:00:00.000Z', '2029-02-10T12:00:00.000Z'], // [15, 27)
+      ['tienda_anual', '2028-02-10T12:00:00.000Z', '2029-02-10T12:00:00.000Z'], // [15, 27): 3 free + 12
+      ['negocio_arranque', '2027-11-10T12:00:00.000Z', '2028-11-10T12:00:00.000Z'], // retired: the old [12, 24), kept
+    ]
+    for (const renewalSku of ['negocio_renewal', 'tienda_renewal'] as const) {
+      for (const [sku, open, close] of windows) {
+        if (!startsRenewalWindow(sku, renewalSku)) continue // tienda_anual opens only the Tienda renewal
+        const at = (iso: string) => decideRenewalShare({ renewalSku, anchor: { sku, paidAt: PACKAGE_PAID }, paidAt: new Date(iso) })
+        const ms = (iso: string, d: number) => new Date(Date.parse(iso) + d).toISOString()
+        expect(at(ms(open, -1)), `${renewalSku} ${sku} just before`).toEqual({ action: 'skip', reason: 'outside_window' })
+        expect(at(open), `${renewalSku} ${sku} first instant`).toEqual({ action: 'record' })
+        expect(at(ms(close, -1)), `${renewalSku} ${sku} last instant`).toEqual({ action: 'record' })
+        expect(at(close), `${renewalSku} ${sku} first instant after`).toEqual({ action: 'skip', reason: 'outside_window' })
+      }
+    }
+  })
+
+  test('the windows are derived from the grants, and the retired packages keep the old one', () => {
+    expect(renewalWindowMonths('negocio_semestral')).toEqual({ from: 9, to: 21 })
+    expect(renewalWindowMonths('negocio_anual')).toEqual({ from: 15, to: 27 })
+    expect(renewalWindowMonths('tienda_anual')).toEqual({ from: 15, to: 27 })
+    expect(renewalWindowMonths('negocio_arranque')).toEqual({ from: 12, to: 24 })
+    expect(renewalWindowMonths('setup_gratis')).toEqual({ from: 12, to: 24 })
+    // A package's paid time is its own grants: the window follows them, nothing is typed per sku.
+    const src = readFileSync('lib/promoter-packages.ts', 'utf8')
+    const fn = src.slice(src.indexOf('export function renewalWindowMonths'), src.indexOf('\n}\n', src.indexOf('export function renewalWindowMonths')))
+    expect(fn).not.toMatch(/negocio_|tienda_/)
+    // The upgrade window is unchanged: [0, 12) from the tienda_anual payment.
+    expect(UPGRADE_WINDOW_MONTHS).toEqual({ from: 0, to: 12 })
   })
 
   test('every package that sold a plan opens it; the free setup and no package do not', () => {
     for (const sku of ['tienda_anual', 'negocio_semestral', 'negocio_anual', 'negocio_arranque']) {
-      expect(tienda(sku, '2028-01-01T00:00:00.000Z'), sku).toEqual({ action: 'record' })
+      expect(tienda(sku, '2028-03-01T00:00:00.000Z'), sku).toEqual({ action: 'record' })
     }
     expect(tienda('setup_gratis', '2028-01-01T00:00:00.000Z')).toEqual({ action: 'skip', reason: 'not_attributed' })
     expect(tienda(null, '2028-01-01T00:00:00.000Z')).toEqual({ action: 'skip', reason: 'not_attributed' })

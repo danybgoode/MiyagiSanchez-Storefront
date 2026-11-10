@@ -19,8 +19,10 @@
  * platform only its share, so no commission accrues for a package.
  *
  * After the sale the promoter earns again (D14), each share recorded once:
- *   - `negocio_renewal` 10% — a Negocio payment in months [12, 24) after the first Negocio package for that shop;
- *   - `tienda_renewal`  10% — a Tienda payment in months [12, 24) after the first package for that shop;
+ *   - `negocio_renewal` 10% — a Negocio payment in the 12 months after the first Negocio package's paid time ends;
+ *   - `tienda_renewal`  10% — a Tienda payment in the 12 months after the first package's paid time ends;
+ *     (the window is `renewalWindowMonths`: [9, 21) for the six months, [15, 27) for the two yearly packages,
+ *     and the old [12, 24) for the retired packages, which were sold with it);
  *   - `negocio_upgrade` 20% — the FIRST Negocio payment within 12 months of a `tienda_anual` for that shop.
  *
  * Pure + next-free: the rate card, the close routes, the webhook and the specs read the same numbers.
@@ -215,15 +217,36 @@ export function isWithinMonths(anchor: Date, paidAt: Date, from: number, to: num
   return paidAt.getTime() >= monthsAfter(anchor, from).getTime() && paidAt.getTime() < monthsAfter(anchor, to).getTime()
 }
 
-/** The renewal window after the first package payment: months [12, 24). */
-export const RENEWAL_WINDOW_MONTHS = { from: 12, to: 24 } as const
+/** How long a renewal share lasts once the package's paid time has ended (Daniel, 2026-11-10). */
+export const RENEWAL_SHARE_MONTHS = 12
+
+/**
+ * The window the RETIRED packages were sold with: months [12, 24) after the package payment, whatever they granted.
+ * Kept exactly so no promoter's existing expectation changes. Told apart by sku: only `negocio_arranque` and
+ * `setup_gratis` (`RETIRED_PACKAGE_SKUS`) were sold under the old rule and never under the new one. (`negocio_anual`
+ * kept its sku but not its terms; on 2026-11-09 no package attribution existed live, and its one pending transfer
+ * grants 15 months when approved after the deploy, so every `negocio_anual` attribution follows the new window.)
+ */
+export const LEGACY_RENEWAL_WINDOW_MONTHS = { from: 12, to: 24 } as const
+
+/**
+ * The renewal window of a package, in months after its payment: the 12 months after its paid time ends (Daniel,
+ * 2026-11-10). Derived from the package's own grants, never typed per sku: `negocio_semestral` 9 → [9, 21),
+ * `negocio_anual` 15 and `tienda_anual` 3 + 12 → [15, 27). The retired ones keep `LEGACY_RENEWAL_WINDOW_MONTHS`.
+ */
+export function renewalWindowMonths(sku: PackageSku): { from: number; to: number } {
+  if (isRetiredPackageSku(sku)) return LEGACY_RENEWAL_WINDOW_MONTHS
+  const paid = PACKAGES[sku].grants.reduce((n, g) => n + g.months, 0)
+  return { from: paid, to: paid + RENEWAL_SHARE_MONTHS }
+}
 
 /** The upgrade window after a `tienda_anual` payment: months [0, 12). */
 export const UPGRADE_WINDOW_MONTHS = { from: 0, to: 12 } as const
 
-/** Does a payment at `paidAt` earn a renewal share? Only in months [12, 24) after the anchoring package payment. */
-export function isRenewalPayment(firstPackagePaidAt: Date, paidAt: Date): boolean {
-  return isWithinMonths(firstPackagePaidAt, paidAt, RENEWAL_WINDOW_MONTHS.from, RENEWAL_WINDOW_MONTHS.to)
+/** Does a payment at `paidAt` earn a renewal share? Only inside the anchoring package's `renewalWindowMonths`. */
+export function isRenewalPayment(sku: PackageSku, firstPackagePaidAt: Date, paidAt: Date): boolean {
+  const w = renewalWindowMonths(sku)
+  return isWithinMonths(firstPackagePaidAt, paidAt, w.from, w.to)
 }
 
 /**
@@ -249,15 +272,18 @@ export type RenewalDecision = { action: 'record' } | { action: 'skip'; reason: '
 /**
  * A renewal share (D14): given the EARLIEST paid package for this shop among those that open `renewalSku`'s window
  * (`RENEWAL_ANCHOR_SKUS`), does a payment at `paidAt` earn that package's promoter the share? Only in months
- * [12, 24) after it. Pure; the caller reads the anchor. Once per payment is the caller's `payment_ref` (unique).
+ * inside that package's `renewalWindowMonths`. Pure; the caller reads the anchor. Once per payment is the caller's
+ * `payment_ref` (unique).
  */
 export function decideRenewalShare(input: {
   renewalSku: RenewalSku
   anchor: { sku: string | null; paidAt: Date } | null
   paidAt: Date
 }): RenewalDecision {
-  if (!input.anchor || !startsRenewalWindow(input.anchor.sku, input.renewalSku)) return { action: 'skip', reason: 'not_attributed' }
-  if (!isRenewalPayment(input.anchor.paidAt, input.paidAt)) return { action: 'skip', reason: 'outside_window' }
+  if (!input.anchor || !startsRenewalWindow(input.anchor.sku, input.renewalSku) || !isPackageSku(input.anchor.sku)) {
+    return { action: 'skip', reason: 'not_attributed' }
+  }
+  if (!isRenewalPayment(input.anchor.sku, input.anchor.paidAt, input.paidAt)) return { action: 'skip', reason: 'outside_window' }
   return { action: 'record' }
 }
 

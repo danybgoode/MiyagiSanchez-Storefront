@@ -4,7 +4,8 @@
  *
  * Called by the Stripe webhook on every plan payment the MERCHANT makes (a monthly invoice, or a yearly one-time
  * payment). If the shop's earliest package that opens this renewal's window (`RENEWAL_ANCHOR_SKUS`) was sold by a
- * promoter, and this payment falls 12–24 months after that package payment (`decideRenewalShare`), it records an
+ * promoter, and this payment falls in the 12 months after that package's paid time ends (`decideRenewalShare`,
+ * `renewalWindowMonths`), it records an
  * attribution of the renewal sku for that promoter — one per payment, keyed by the Stripe payment id in `payment_ref`
  * (unique since plans-gratis-negocio M1), so a replayed webhook finds its row and adds nothing — and accrues the
  * commission at that sku's rate (10%, seeded by the M1 migrations) through the existing accrual path. The admin

@@ -418,7 +418,7 @@ export function buildPromoterPageConfig(
       ? [
           { value: pesosStat(anualKeepMxn), label: `por cada ${PACKAGES.negocio_anual.label}` },
           { value: pesosStat(anualKeepMxn * 5), label: 'al mes, si dejas 5 tiendas así' },
-          ...(renewalPct > 0 ? [{ value: `${renewalPct}%`, label: 'de cada renovación al segundo año' }] : [page.pitchStats[2]]),
+          ...(renewalPct > 0 ? [{ value: `${renewalPct}%`, label: 'de lo que pague el negocio los 12 meses después del paquete' }] : [page.pitchStats[2]]),
         ]
       : page.pitchStats,
     faqTitle: copy.shared.faqTitle,

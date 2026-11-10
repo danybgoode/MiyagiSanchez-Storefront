@@ -40,8 +40,8 @@ const SKU_LABEL: Record<PromoterSku, string> = {
   negocio_anual: PACKAGES.negocio_anual.label,
   negocio_arranque: `${PACKAGES.negocio_arranque.label} (ya no se vende)`,
   setup_gratis: `${PACKAGES.setup_gratis.label} (ya no se vende)`,
-  negocio_renewal: 'Renovación del Plan Negocio (año 2)',
-  tienda_renewal: 'Renovación del Plan Tienda (año 2)',
+  negocio_renewal: 'Renovación del Plan Negocio (12 meses después del paquete)',
+  tienda_renewal: 'Renovación del Plan Tienda (12 meses después del paquete)',
   negocio_upgrade: 'Cambio de Plan Tienda a Plan Negocio (primer año)',
 }
 

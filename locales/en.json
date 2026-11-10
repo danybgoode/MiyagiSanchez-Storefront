@@ -2519,7 +2519,7 @@
         }
       ],
       "pitchTitle": "How much you can earn",
-      "pitchBody": "From day one you know what you charge, what you pass on to Miyagi Sánchez and what you keep. No fees and no fine print. And if the business renews its plan in year two, or moves from the Tienda plan to the Negocio plan in year one, you earn again.",
+      "pitchBody": "From day one you know what you charge, what you pass on to Miyagi Sánchez and what you keep. No fees and no fine print. And if the business keeps paying for its plan once the package's time ends, or moves from the Tienda plan to the Negocio plan in its first year, you earn again.",
       "pitchStats": [
         {
           "value": "3",
@@ -2553,7 +2553,7 @@
         },
         {
           "title": "Do I earn anything later?",
-          "body": "Yes. If the business pays for its plan again in year two, you get a share of that payment. And if a shop on the Tienda plan moves to the Negocio plan in its first year, you get a share of that first payment."
+          "body": "Yes. If the business keeps paying for its plan once the package's time ends, you get a share of what it pays for 12 months. And if a shop on the Tienda plan moves to the Negocio plan in its first year, you get a share of that first payment."
         }
       ],
       "guide": {
@@ -2564,9 +2564,9 @@
         "colCharge": "You charge",
         "colPay": "You pass on",
         "colKeep": "You keep",
-        "renewalLine": "If the business renews its Negocio plan in year two, you get {renewalPct}% of that payment.",
+        "renewalLine": "If the business keeps paying for its Negocio plan once the package's time ends, you get {renewalPct}% of what it pays for 12 months.",
         "onTop": "The {meses} free months of the Negocio plan come on top of the paid time.",
-        "tiendaRenewalLine": "If the business renews its Tienda plan in year two, you get {pct}% of that payment.",
+        "tiendaRenewalLine": "If the business pays for its Tienda plan once the package's time ends, you get {pct}% of what it pays for 12 months.",
         "upgradeLine": "If a shop with the Tienda plan · 1 year moves to the Negocio plan in its first year, you get {pct}% of that first payment.",
         "ratesPending": "Your share is confirmed with Miyagi Sánchez.",
         "sayTitle": "What you say",
