@@ -18,13 +18,8 @@ import {
   readPlanLegacyState,
   type ShopForLegacyMarking,
 } from '../lib/plan'
-import {
-  LEGACY_PAGE_SIZE,
-  formatLegacyMarkingReport,
-  parseArgs,
-  readAllPages,
-  summarizeLegacyMarking,
-} from '../scripts/mark-plan-legacy'
+import { LEGACY_PAGE_SIZE, formatLegacyMarkingReport, parseArgs, summarizeLegacyMarking } from '../scripts/mark-plan-legacy'
+import { readAllPages } from '../lib/paged-read'
 
 const CUTOFF = '2026-11-10T00:00:00.000Z'
 const BEFORE = '2026-08-01T12:00:00.123456+00:00' // the shape PostgREST returns a timestamptz in
@@ -150,7 +145,7 @@ test.describe('reading the table — paged, and never a partial list', () => {
   test('an error on ANY page throws — a partial list is never returned as the table', async () => {
     let n = 0
     const failing = async (from: number, to: number) => (n++ === 1 ? { data: null, error: { message: 'timeout' } } : { data: table(30).slice(from, to + 1), error: null })
-    await expect(readAllPages(failing, 10)).rejects.toThrow('could not read marketplace_shops (rows 10–19): timeout')
+    await expect(readAllPages(failing, 10, 'marketplace_shops')).rejects.toThrow('could not read marketplace_shops (rows 10–19): timeout')
     await expect(readAllPages(async () => ({ data: null, error: null }), 10)).rejects.toThrow('no rows array')
   })
 
@@ -184,5 +179,8 @@ test.describe('the script shell', () => {
     expect(src).toContain('p_guard_mode: d.guard.mode')
     expect(src).toContain("process.argv[1]?.endsWith('mark-plan-legacy.ts')")
     expect(src).toContain('planLegacyMarking(await readShops(db), PLAN_LEGACY_CUTOFF)')
+    // The table is read through the paged reader, never one unpaged select.
+    expect(src).toContain("}, LEGACY_PAGE_SIZE, 'marketplace_shops')")
+    expect(src).toContain('.range(from, to)')
   })
 })

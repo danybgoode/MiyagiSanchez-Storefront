@@ -35,6 +35,7 @@ import {
   type LegacyMarkingDecision,
   type ShopForLegacyMarking,
 } from '../lib/plan'
+import { DEFAULT_PAGE_SIZE, readAllPages } from '../lib/paged-read'
 
 /** Parse argv; an unknown flag is fatal rather than silently ignored. */
 export function parseArgs(argv: readonly string[]): { ok: true; apply: boolean } | { ok: false; error: string } {
@@ -47,34 +48,8 @@ export function parseArgs(argv: readonly string[]): { ok: true; apply: boolean }
   return { ok: true, apply }
 }
 
-/**
- * PostgREST answers at most 1,000 rows per request by default, and says nothing when it cuts a result short. A
- * single unpaged read would therefore "succeed" on the first 1,000 shops and leave the rest unmarked — and unmarked
- * is the state that gets a shop paused. So the read is paged, and smaller than that ceiling on purpose.
- */
-export const LEGACY_PAGE_SIZE = 500
-
-export type PageResult<T> = { data: T[] | null; error: { message: string } | null }
-
-/**
- * Read every row, `pageSize` at a time, until a page comes back short. Any page that errors, or answers without an
- * array, throws: a partial list must never be planned as if it were the table. The `fetchPage` it is given must
- * order by a stable, unique key (here `created_at, id`), or rows could repeat or be skipped between pages.
- */
-export async function readAllPages<T>(
-  fetchPage: (from: number, to: number) => Promise<PageResult<T>>,
-  pageSize: number = LEGACY_PAGE_SIZE,
-): Promise<T[]> {
-  if (!Number.isInteger(pageSize) || pageSize < 1) throw new Error(`readAllPages: pageSize must be a positive integer (got ${pageSize})`)
-  const rows: T[] = []
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await fetchPage(from, from + pageSize - 1)
-    if (error) throw new Error(`could not read marketplace_shops (rows ${from}–${from + pageSize - 1}): ${error.message}`)
-    if (!Array.isArray(data)) throw new Error(`could not read marketplace_shops (rows ${from}–${from + pageSize - 1}): no rows array in the answer`)
-    rows.push(...data)
-    if (data.length < pageSize) return rows
-  }
-}
+/** The page the table is read in (`lib/paged-read.ts` explains why it is paged, and why below 1,000). */
+export const LEGACY_PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 export type LegacyMarkingSummary = { total: number; toMark: number; alreadyMarked: number; afterCutoff: number; unreadable: number }
 
@@ -122,7 +97,7 @@ async function readShops(db: Db): Promise<ShopForLegacyMarking[]> {
       .order('id', { ascending: true }) // the tie-break that makes paging stable
       .range(from, to)
     return { data: data as ShopForLegacyMarking[] | null, error }
-  })
+  }, LEGACY_PAGE_SIZE, 'marketplace_shops')
   if (shops.length === 0) throw new Error('marketplace_shops is empty — refusing to report success against no shops')
   return shops
 }
