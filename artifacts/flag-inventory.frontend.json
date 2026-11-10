@@ -337,7 +337,7 @@
         "app/api/orders/[id]/ship/route.ts:120",
         "app/api/webhooks/mercadopago/route.ts:176",
         "app/api/webhooks/mercadopago/route.ts:544",
-        "app/api/webhooks/stripe/route.ts:457",
+        "app/api/webhooks/stripe/route.ts:463",
         "lib/orders/manual-order-emails.ts:158"
       ]
     },

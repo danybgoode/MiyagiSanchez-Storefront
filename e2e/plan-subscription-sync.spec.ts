@@ -70,7 +70,7 @@ test.describe('plan-kind routing — a subscription is Tienda or Negocio by the 
   test('a kind that contradicts its seeded price sends nothing and asks a person', async () => {
     expect(decidePlanStatusSync('sub_1', sub({ kind: 'tienda', lookupKey: 'negocio_monthly' }))).toMatchObject({ action: 'alert', reason: 'kind_price_mismatch' })
     const x = deps(sub({ kind: 'negocio', lookupKey: 'tienda_monthly' }))
-    expect(await syncPlanSubscriptionStatus('sub_1', x.d)).toEqual({ outcome: 'failed', plan: 'negocio' })
+    expect(await syncPlanSubscriptionStatus('sub_1', x.d)).toEqual({ outcome: 'failed', plan: 'negocio', retry: false })
     expect(x.calls.negocio).toEqual([])
     expect(x.calls.tienda).toEqual([])
     expect(x.calls.alerts).toHaveLength(1)
@@ -112,7 +112,7 @@ test.describe('the CURRENT status from Stripe — never the event payload', () =
 
   test('a retrieve that fails sends nothing (no fallback to the event) and alerts; so does an answer about another subscription', async () => {
     const down = deps(async () => { throw new Error('stripe down') })
-    expect(await syncPlanSubscriptionStatus('sub_1', down.d)).toEqual({ outcome: 'failed', plan: null })
+    expect(await syncPlanSubscriptionStatus('sub_1', down.d)).toEqual({ outcome: 'failed', plan: null, retry: true })
     expect(down.calls.tienda.length + down.calls.negocio.length).toBe(0)
     expect(down.calls.alerts).toHaveLength(1)
     const other = deps(sub({ id: 'sub_OTHER' }))
@@ -122,7 +122,7 @@ test.describe('the CURRENT status from Stripe — never the event payload', () =
 
   test('{ updated: 0 } is a failure and alerts; a throwing PATCH too', async () => {
     const zero = deps(sub({ status: 'unpaid' }), 0)
-    expect(await syncPlanSubscriptionStatus('sub_1', zero.d)).toEqual({ outcome: 'failed', plan: 'tienda' })
+    expect(await syncPlanSubscriptionStatus('sub_1', zero.d)).toEqual({ outcome: 'failed', plan: 'tienda', retry: true })
     expect(zero.calls.alerts[0]).toContain('Plan Tienda')
     expect(zero.calls.alerts[0]).toContain('unpaid')
     const x = deps(sub())
@@ -133,9 +133,9 @@ test.describe('the CURRENT status from Stripe — never the event payload', () =
 
   test('the webhook routes all four subscription events by plan kind into the sync, and nothing reads the event status', () => {
     const route = readFileSync('app/api/webhooks/stripe/route.ts', 'utf8')
-    expect(route).toContain('await handlePlanSubscriptionEvent(subscription.id, { deleted: false })')
-    expect(route).toContain('await handlePlanSubscriptionEvent(subscription.id, { deleted: true })')
-    expect(route).toContain('await handlePlanInvoicePaid(invoice, stripeSub)')
+    expect(route).toContain('return handlePlanSubscriptionEvent(subscription.id, { deleted: false })')
+    expect(route).toContain('return handlePlanSubscriptionEvent(subscription.id, { deleted: true })')
+    expect(route).toContain('return handlePlanInvoicePaid(invoice, stripeSub)')
     expect(route).toContain('await handlePlanInvoiceFailed(sub)')
     expect(route).not.toContain('NEGOCIO_CHECKOUT_KIND')
     const webhook = readFileSync('lib/negocio-webhook.ts', 'utf8')

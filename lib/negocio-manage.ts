@@ -28,8 +28,14 @@ const MANAGEABLE = new Set(['active', 'trialing', 'past_due', 'unpaid'])
 
 /**
  * Which plan's page to open when the shop holds BOTH for a while (D19: moving up to Negocio leaves the Tienda
- * subscription running until its period end): Negocio first, the plan «Tu suscripción» says the shop is on. Stripe's
- * page is per customer, so it lists every subscription of that customer anyway.
+ * subscription running until its period end): Negocio first, the plan «Tu suscripción» says the shop is on.
+ *
+ * Stripe's page is per CUSTOMER, and the portal is opened for the PICKED subscription's own customer — so it always
+ * shows the plan that was picked. Our checkouts pass `customer_email`, not `customer`, so each checkout usually creates
+ * its own Stripe customer and a Negocio and a Tienda subscription sit on DIFFERENT customers: the Negocio page will
+ * usually not list the Tienda subscription. That is acceptable only because of D19: by the time a shop holds both, the
+ * webhook has already set the Tienda one to end at its period end, so there is nothing left on it to manage. (If D19's
+ * cancel failed, it alerted, and a person cancels it in Stripe.)
  */
 const PLAN_RANK: Readonly<Record<PaidPlan, number>> = { negocio: 0, tienda: 1 }
 

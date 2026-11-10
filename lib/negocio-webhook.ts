@@ -16,8 +16,15 @@
  *     Stripe, goes to that plan's Backend route (`syncPlanSubscriptionStatus`, lib/plan-subscription-sync.ts).
  *   - Plan Negocio activating (monthly or yearly) sets a live monthly Plan Tienda to cancel at its period end (D19).
  *
- * The seller PAID in every one of these paths, so a write that does not land alerts on Telegram for hand repair —
- * Stripe will not retry, because the route answers 200.
+ * The seller PAID in every one of these paths, so a write that does not land alerts on Telegram. Every handler here
+ * returns a `PlanWebhookOutcome`: `retry` when a later delivery can fix the failure (a grant write that errored or
+ * lost its races, an activation or status PATCH that failed or matched nothing), and the route then answers Stripe
+ * 500 so Stripe delivers the event again (PR 485 review). That is safe because every step that can fail runs FIRST
+ * and is idempotent: the grant is replay-checked by payment id, `/store/subscriptions` dedupes on the Stripe
+ * subscription id, the status PATCH is a conditional write of the freshly retrieved status. The steps that are not
+ * safe to repeat (the ✅ alert, the renewal share, the promoter attribution, D19, the D10 hook) run only AFTER the
+ * money step landed, so a retried delivery either repeats nothing (a replayed grant returns early) or runs them for
+ * the first time. `final` is a failure no retry can fix (an unpaid session, missing metadata): alert, answer 200.
  *
  * server-only.
  */
@@ -32,7 +39,14 @@ import { GRANT_WRITE_RPC } from '@/lib/plan'
 import { sessionMonths, subscriptionPeriod } from '@/lib/negocio-checkout-rules'
 import { PLAN_CHECKOUT_KINDS, PLAN_DISPLAY_NAMES, paidPlanOfKind, type PaidPlan } from '@/lib/plan-kind'
 import { applyPlanPayment, type PlanPaymentDeps, type PlanPaymentInput, type PlanPaymentOutcome } from '@/lib/plan-payment'
-import { cancelTiendaOnNegocio, syncPlanSubscriptionStatus, type PlanStatusSyncDeps, type RetrievedPlanSubscription } from '@/lib/plan-subscription-sync'
+import {
+  cancelTiendaOnNegocio,
+  syncPlanSubscriptionStatus,
+  syncWebhookOutcome,
+  type PlanStatusSyncDeps,
+  type PlanWebhookOutcome,
+  type RetrievedPlanSubscription,
+} from '@/lib/plan-subscription-sync'
 import { markAttributionPaid, isPromoterSku } from '@/lib/promoter'
 import { releaseCustomDomainForShop } from '@/lib/domain-lapse-server'
 import { recordRenewalShare } from '@/lib/promoter-renewal-server'
@@ -79,7 +93,7 @@ async function cancelTiendaUnderNegocio(shopId: string, sellerClerkId: string | 
   )
 }
 
-export async function handlePlanSubscriptionComplete(session: Stripe.Checkout.Session, plan: PaidPlan): Promise<void> {
+export async function handlePlanSubscriptionComplete(session: Stripe.Checkout.Session, plan: PaidPlan): Promise<PlanWebhookOutcome> {
   const name = PLAN_DISPLAY_NAMES[plan]
   const shopId = session.metadata?.shop_id
   const sellerClerkId = session.metadata?.seller_clerk_id
@@ -87,7 +101,7 @@ export async function handlePlanSubscriptionComplete(session: Stripe.Checkout.Se
   if (!shopId || !sellerClerkId || !stripeSubscriptionId) {
     console.error(`[${plan} sub] missing metadata/subscription:`, session.id)
     tg.alert(`🚨 ${name} mensual PAGADO sin datos para activarlo — revisar.\nSession: ${session.id}`)
-    return
+    return 'final' // the same session will carry the same missing data on every delivery
   }
   try {
     const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
@@ -127,15 +141,18 @@ export async function handlePlanSubscriptionComplete(session: Stripe.Checkout.Se
   } catch (e) {
     console.error(`[${plan} sub] Medusa activation failed:`, e)
     tg.alert(
-      `🚨 ${name} mensual PAGADO pero NO activado — reparar a mano.\nShop: ${shopId}\nSeller: ${sellerClerkId}\n` +
+      `🚨 ${name} mensual PAGADO pero NO activado — Stripe lo reintentará; si sigue, reparar a mano.\nShop: ${shopId}\nSeller: ${sellerClerkId}\n` +
       `Stripe sub: ${stripeSubscriptionId}\nError: ${errText(e)}`,
     )
-    return
+    // Retried: `/store/subscriptions` dedupes on the Stripe subscription id, and nothing below has run yet.
+    return 'retry'
   }
   tg.alert(`✅ ${name} mensual activado\nShop: ${shopId}`)
-  // AFTER the activation landed, never before: a failed Tienda cancel must not cost the merchant their Negocio.
+  // AFTER the activation landed, never before: a failed Tienda cancel must not cost the merchant their Negocio. D19
+  // stays best-effort (it alerts; it never asks Stripe to retry the activation).
   if (plan === 'negocio') await cancelTiendaUnderNegocio(shopId, sellerClerkId)
   await afterPlanPaid({ plan, shopId, paymentRef: stripeSubscriptionId })
+  return 'done'
 }
 
 /** `applyPlanPayment`'s I/O: the shop row read and the ONE guarded grant write (`merge_shop_metadata_guards`). */
@@ -165,7 +182,7 @@ export function applyTiendaPayment(input: PlanPaymentInput): Promise<PlanPayment
   return applyPlanPayment('tienda', input, PLAN_PAYMENT_DB)
 }
 
-export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session, plan: PaidPlan, completedAt?: number): Promise<void> {
+export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session, plan: PaidPlan, completedAt?: number): Promise<PlanWebhookOutcome> {
   const name = PLAN_DISPLAY_NAMES[plan]
   const shopId = session.metadata?.shop_id
   const months = sessionMonths(session.metadata?.months)
@@ -176,12 +193,12 @@ export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session
   if (session.payment_status !== 'paid') {
     console.error(`[${plan} one-time] session not paid:`, session.id, session.payment_status)
     tg.alert(`⚠️ ${name} (pago único): sesión completada SIN pago (${session.payment_status}) — no se activó.\nSession: ${session.id}`)
-    return
+    return 'final'
   }
   if (!shopId || months === null) {
     console.error(`[${plan} one-time] bad metadata:`, session.id)
     tg.alert(`🚨 ${name} (pago único) PAGADO con datos inválidos — revisar.\nSession: ${session.id}`)
-    return
+    return 'final'
   }
   let outcome: PlanPaymentOutcome
   try {
@@ -192,10 +209,11 @@ export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session
     )
   } catch (e) {
     console.error(`[${plan} one-time] grant write failed:`, e)
-    tg.alert(`🚨 ${name} (pago único) PAGADO pero NO activado — reparar a mano.\nShop: ${shopId}\nSession: ${session.id}\nError: ${errText(e)}`)
-    return
+    tg.alert(`🚨 ${name} (pago único) PAGADO pero NO activado — Stripe lo reintentará; si sigue, reparar a mano.\nShop: ${shopId}\nSession: ${session.id}\nError: ${errText(e)}`)
+    // Retried: the grant is replay-checked by the session id, and nothing below has run yet.
+    return 'retry'
   }
-  if (outcome === 'replay') return // already counted: no second attribution, no second alert
+  if (outcome === 'replay') return 'done' // already counted: no second attribution, no second alert
 
   if (plan === 'negocio') {
     // A merchant's own yearly payment may be the year-2 renewal of a promoter's package (D13): 10% to that promoter.
@@ -217,9 +235,10 @@ export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session
       ? `ℹ️ Negocio pagado en una tienda que ya lo tenía sin costo — revisar si hay que reembolsar.\nShop: ${shopId}\nSession: ${session.id}`
       : `✅ ${name} activado (${months} meses)\nShop: ${shopId}`,
   )
-  if (outcome !== 'written') return
+  if (outcome !== 'written') return 'done'
   if (plan === 'negocio') await cancelTiendaUnderNegocio(shopId, session.metadata?.seller_clerk_id)
   await afterPlanPaid({ plan, shopId, paymentRef: session.id })
+  return 'done'
 }
 
 function syncDeps(retrieved?: RetrievedPlanSubscription): PlanStatusSyncDeps {
@@ -236,37 +255,47 @@ function syncDeps(retrieved?: RetrievedPlanSubscription): PlanStatusSyncDeps {
  * the event's) to the right plan's route. On a Negocio deletion, the custom domain the shop had THROUGH Negocio is
  * released, unless it is still entitled another way — the one release function decides (Codex, #471), unchanged.
  */
-export async function handlePlanSubscriptionEvent(subscriptionId: string, opts: { deleted: boolean }): Promise<void> {
+export async function handlePlanSubscriptionEvent(subscriptionId: string, opts: { deleted: boolean }): Promise<PlanWebhookOutcome> {
   const out = await syncPlanSubscriptionStatus(subscriptionId, syncDeps())
-  if (out.outcome !== 'patched' || !opts.deleted || out.plan !== 'negocio') return
+  // The domain release runs only after the PATCH landed, so a retried delivery reaches it once the status is in.
+  if (out.outcome !== 'patched' || !opts.deleted || out.plan !== 'negocio') return syncWebhookOutcome(out)
   try {
     await releaseCustomDomainForShop(out.shopId ?? undefined, 'negocio_ended')
   } catch (e) {
     console.error('[negocio sub] domain release failed:', e)
     tg.alert(`🚨 Negocio: no se pudo liberar el dominio propio al cancelar — revisar.\nStripe sub: ${subscriptionId}\nError: ${errText(e)}`)
   }
+  // The plan step landed; a failed domain release is alerted and is not a reason to replay the event (unchanged).
+  return 'done'
 }
 
 /**
  * A monthly renewal paid (or a recovery from past_due / unpaid): send the current status. The platform is the payee —
  * this path must NEVER reach the seller-subscription transfer below it in the webhook.
  */
-export async function handlePlanInvoicePaid(invoice: Stripe.Invoice, subscription: RetrievedPlanSubscription): Promise<void> {
+export async function handlePlanInvoicePaid(invoice: Stripe.Invoice, subscription: RetrievedPlanSubscription): Promise<PlanWebhookOutcome> {
   const out = await syncPlanSubscriptionStatus(subscription.id, syncDeps(subscription))
   // The $0 invoice that opens a free period is not a payment: no renewal share for a promoter.
-  if ((invoice.amount_paid ?? 0) <= 0) return
+  if ((invoice.amount_paid ?? 0) <= 0) return syncWebhookOutcome(out)
   // A monthly Negocio payment in year 2 of a promoter's package earns that promoter 10% (D13), once per invoice.
   // Plan Tienda's renewal share is sprint 4's (plan-tienda D14).
   const shopId = subscription.metadata?.shop_id
   if (out.outcome === 'patched' && out.plan === 'negocio' && shopId && invoice.id) {
     const paidAt = invoice.status_transitions?.paid_at ? new Date(invoice.status_transitions.paid_at * 1000) : new Date()
+    // Keyed by the invoice id (`payment_ref` is unique), so the retried delivery that finally lands records it once.
     await recordRenewalShare({ shopId, paymentRef: invoice.id, grossCents: invoice.amount_paid ?? 0, paidAt })
   }
+  return syncWebhookOutcome(out)
 }
 
 /** A failed renewal: send the current status (past_due is a grace state the Backend keeps live; unpaid is not). */
-export async function handlePlanInvoiceFailed(subscription: RetrievedPlanSubscription): Promise<void> {
-  await syncPlanSubscriptionStatus(subscription.id, syncDeps(subscription))
-  const plan = paidPlanOfKind(subscription.metadata?.kind)
-  tg.alert(`⚠️ Pago fallido en ${plan ? PLAN_DISPLAY_NAMES[plan] : 'un plan'} — estado en Stripe: ${subscription.status}\nSubscription: ${subscription.id}`)
+export async function handlePlanInvoiceFailed(subscription: RetrievedPlanSubscription): Promise<PlanWebhookOutcome> {
+  const result = syncWebhookOutcome(await syncPlanSubscriptionStatus(subscription.id, syncDeps(subscription)))
+  // Said once, on the delivery that settles the event: a retried delivery would otherwise repeat it. (A failed sync has
+  // already alerted on its own.)
+  if (result !== 'retry') {
+    const plan = paidPlanOfKind(subscription.metadata?.kind)
+    tg.alert(`⚠️ Pago fallido en ${plan ? PLAN_DISPLAY_NAMES[plan] : 'un plan'} — estado en Stripe: ${subscription.status}\nSubscription: ${subscription.id}`)
+  }
+  return result
 }

@@ -20,8 +20,13 @@
  *      depend on that). The plan is the RETRIEVED subscription's `metadata.kind`, which our server wrote at checkout
  *      (`lib/plan-kind.ts` says why the client cannot set it), cross-checked against the price's seeded
  *      `lookup_key`: when the price names the OTHER plan, nothing is sent and a person is asked.
- *   4. `{ updated: 0 }` is a failure (nothing matched) and alerts on Telegram, as before: the route answers Stripe 200,
- *      so Stripe will not retry.
+ *   4. `{ updated: 0 }` is a failure (nothing matched) and alerts on Telegram. A failure that a later attempt can fix
+ *      (Stripe or the Backend could not be reached, the PATCH errored or matched nothing) is `retry: true`, and the
+ *      webhook then answers Stripe with a 5xx so Stripe delivers the event again (`webhookAnswerStatus`; PR 485
+ *      review). Retrying is safe: every attempt retrieves the subscription afresh and the Backend's write is
+ *      conditional (a cancelled row stays cancelled). A failure no retry can fix (a kind that contradicts its price,
+ *      a status we do not know, an answer about another subscription) is `retry: false`: it alerts and answers 200,
+ *      because a retry would only repeat the alert for three days.
  *
  * D19 (moving up from Plan Tienda): when Plan Negocio activates, a live monthly Plan Tienda subscription on the same
  * shop is set to cancel at its period end — no refund, no charge after the period already paid. One Stripe call,
@@ -42,6 +47,8 @@ export const STRIPE_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
 export type RetrievedPlanSubscription = {
   id: string
   status: string
+  /** Unix seconds the subscription was created (Stripe's `created`). */
+  created?: number
   metadata?: Record<string, string> | null
   items?: { data?: Array<{ price?: { lookup_key?: string | null } | null } | null> } | null
 }
@@ -72,12 +79,49 @@ export type PlanStatusSyncDeps = {
   /** Each plan's Backend PATCH (`setNegocioSubscriptionStatus`, `setTiendaSubscriptionStatus`): rows written. */
   patch: Readonly<Record<PaidPlan, (subscriptionId: string, status: string) => Promise<number>>>
   alert: (message: string) => void
+  /** The clock, for the young-subscription rule below. */
+  now?: () => Date
 }
 
 export type PlanStatusSyncOutcome =
   | { outcome: 'patched'; plan: PaidPlan; status: string; shopId: string | null }
   | { outcome: 'not_a_plan' }
-  | { outcome: 'failed'; plan: PaidPlan | null }
+  | { outcome: 'failed'; plan: PaidPlan | null; retry: boolean }
+
+/**
+ * A subscription younger than this whose PATCH matched no row is not alerted on — it is still retried. WHY: Stripe
+ * does not order events, so `customer.subscription.updated` and the $0 trial `invoice.payment_succeeded` routinely
+ * arrive BEFORE `checkout.session.completed` has created the Backend row (verifier, PR 485). With a 5xx Stripe
+ * delivers them again a little later, when the row exists, and they land. An alert for every new subscriber would
+ * teach whoever reads Telegram to ignore this alert, which is the one that means "a plan is out of step with what the
+ * merchant pays". Past this age the row should exist; if it still does not, the activation itself failed (and alerted
+ * on its own) or something else is wrong, and every further attempt alerts. Ten minutes covers a slow activation and
+ * Stripe's first retries; it is not a business number.
+ */
+export const YOUNG_SUBSCRIPTION_MS = 10 * 60_000
+
+/** No alert yet for "no row matched" on a subscription created moments ago (see `YOUNG_SUBSCRIPTION_MS`). */
+export function quietNoRowYet(created: number | undefined, now: Date): boolean {
+  return typeof created === 'number' && Number.isFinite(created) && now.getTime() - created * 1000 < YOUNG_SUBSCRIPTION_MS
+}
+
+/** What a plan step of the webhook amounted to, for the answer to Stripe. */
+export type PlanWebhookOutcome = 'done' | 'retry' | 'final'
+
+/**
+ * The HTTP status the webhook answers Stripe with (PR 485 review). Only a plan step that failed in a way a later
+ * delivery can fix answers 500, so Stripe retries it; everything else — every other event type and handler (`null`,
+ * no plan step ran), a plan step that landed, a plan failure no retry can fix — answers 200 exactly as before.
+ */
+export function webhookAnswerStatus(plan: PlanWebhookOutcome | null | undefined): 200 | 500 {
+  return plan === 'retry' ? 500 : 200
+}
+
+/** A sync outcome as the webhook's plan outcome. */
+export function syncWebhookOutcome(out: PlanStatusSyncOutcome): PlanWebhookOutcome {
+  if (out.outcome === 'failed') return out.retry ? 'retry' : 'final'
+  return 'done'
+}
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -88,8 +132,8 @@ export async function syncPlanSubscriptionStatus(subscriptionId: string, deps: P
     sub = await deps.retrieve(subscriptionId)
   } catch (e) {
     // No fallback to the event's status (rule 1): a guess is exactly what a delayed event would exploit.
-    deps.alert(`🚨 Plan: no se pudo leer la suscripción en Stripe, su estado NO se actualizó — revisar.\nStripe sub: ${subscriptionId}\nError: ${errText(e)}`)
-    return { outcome: 'failed', plan: null }
+    deps.alert(`🚨 Plan: no se pudo leer la suscripción en Stripe, su estado NO se actualizó — Stripe lo reintentará.\nStripe sub: ${subscriptionId}\nError: ${errText(e)}`)
+    return { outcome: 'failed', plan: null, retry: true }
   }
   const decision = decidePlanStatusSync(subscriptionId, sub)
   if (decision.action === 'not_a_plan') return { outcome: 'not_a_plan' }
@@ -100,15 +144,21 @@ export async function syncPlanSubscriptionStatus(subscriptionId: string, deps: P
       unknown_status: `Stripe reporta un estado desconocido («${sub.status}»)`,
     }[decision.reason]
     deps.alert(`🚨 Plan: ${why}; NO se actualizó — revisar.\nStripe sub: ${subscriptionId}`)
-    return { outcome: 'failed', plan: decision.plan }
+    return { outcome: 'failed', plan: decision.plan, retry: false }
   }
   const name = PLAN_DISPLAY_NAMES[decision.plan]
+  let updated: number
   try {
-    const updated = await deps.patch[decision.plan](decision.subscriptionId, decision.status)
-    if (updated === 0) throw new Error(`no ${name} subscription row matched`)
+    updated = await deps.patch[decision.plan](decision.subscriptionId, decision.status)
   } catch (e) {
-    deps.alert(`🚨 ${name}: no se pudo actualizar la suscripción a «${decision.status}» — revisar.\nStripe sub: ${subscriptionId}\nError: ${errText(e)}`)
-    return { outcome: 'failed', plan: decision.plan }
+    deps.alert(`🚨 ${name}: no se pudo actualizar la suscripción a «${decision.status}» — Stripe lo reintentará.\nStripe sub: ${subscriptionId}\nError: ${errText(e)}`)
+    return { outcome: 'failed', plan: decision.plan, retry: true }
+  }
+  if (updated === 0) {
+    if (!quietNoRowYet(sub.created, deps.now?.() ?? new Date())) {
+      deps.alert(`🚨 ${name}: no se pudo actualizar la suscripción a «${decision.status}» — Stripe lo reintentará.\nStripe sub: ${subscriptionId}\nError: no ${name} subscription row matched`)
+    }
+    return { outcome: 'failed', plan: decision.plan, retry: true }
   }
   return { outcome: 'patched', plan: decision.plan, status: decision.status, shopId: decision.shopId }
 }
