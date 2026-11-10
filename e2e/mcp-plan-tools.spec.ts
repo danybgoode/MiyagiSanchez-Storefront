@@ -54,7 +54,7 @@ test('Plan Tienda and "no plan" are named truthfully to an agent (plan-tienda S1
   expect(tienda.summary).toBe('La tienda tiene el Plan Tienda pagado hasta 2027-11-04.')
   expect(tienda.json).toMatchObject({
     plan: 'tienda', reason: 'tienda_one_time',
-    includes: { custom_domain: false, mercadolibre_sync: false, badge_shown: false, monthly_checkin: false, chat_answers_per_month: PLAN_ALLOWANCES.tienda.chatAnswersPerMonth, photos_per_month: PLAN_ALLOWANCES.tienda.photosPerMonth },
+    includes: { custom_domain: false, mercadolibre_sync: false, badge_shown: true, monthly_checkin: false, chat_answers_per_month: PLAN_ALLOWANCES.tienda.chatAnswersPerMonth, photos_per_month: PLAN_ALLOWANCES.tienda.photosPerMonth },
   })
   expect(planAgentView(st('tienda', 'tienda_subscription'), NOW).summary).toBe('La tienda tiene el Plan Tienda activo.')
   const unpaid = planAgentView(st('unpaid', 'unpaid'), NOW)

@@ -519,13 +519,15 @@ export function daysLeft(state: PlanState, now: Date = new Date()): number | nul
  *
  *   customDomain — Negocio only; never the trial (a domain is DNS work that does not undo cleanly).
  *   mlSync, checkin — Negocio and its trial.
- *   badge — «Hecho con Miyagi Sánchez» shows on a shop that pays nothing: legacy Gratis, and unpaid. Tienda is a
- *           paid plan and does not carry it.
+ *   badge — the Miyagi Sánchez link at the foot of the shop comes off with Plan Negocio and its trial ONLY. It
+ *           stays on Plan Tienda: "no Miyagi Sánchez link" is a Plan Negocio feature in the plan table the product
+ *           owner approved on 2026-11-09, and Plan Tienda is today's Plan Gratis with a price — paying for Tienda
+ *           does not remove it. It also stays on legacy Gratis and on unpaid.
  */
 const PLAN_OPENS: Readonly<Record<PlanName, { customDomain: boolean; mlSync: boolean; checkin: boolean; badge: boolean }>> = Object.freeze({
   negocio: { customDomain: true, mlSync: true, checkin: true, badge: false },
   trial: { customDomain: false, mlSync: true, checkin: true, badge: false },
-  tienda: { customDomain: false, mlSync: false, checkin: false, badge: false },
+  tienda: { customDomain: false, mlSync: false, checkin: false, badge: true },
   gratis: { customDomain: false, mlSync: false, checkin: false, badge: true },
   unpaid: { customDomain: false, mlSync: false, checkin: false, badge: true },
 })
@@ -540,7 +542,7 @@ export function planOpensMlSync(state: PlanState): boolean {
   return PLAN_OPENS[state.plan].mlSync
 }
 
-/** «Hecho con Miyagi Sánchez» shows on shops that pay nothing (legacy Gratis, unpaid). */
+/** The Miyagi Sánchez link shows on every plan except Negocio and its trial (see `PLAN_OPENS`). */
 export function planShowsBadge(state: PlanState): boolean {
   return PLAN_OPENS[state.plan].badge
 }

@@ -215,8 +215,11 @@ test.describe('what each plan opens (D5, D7, D9; plan-tienda S1.3)', () => {
     expect(all.map(planOpensMlSync)).toEqual([false, true, true, false, false])
     expect(all.map(planGetsCheckin)).toEqual([false, true, true, false, false])
   })
-  test('the badge shows on shops that pay nothing (legacy Gratis, unpaid) and never on a paid plan or the trial', () => {
-    expect(all.map(planShowsBadge)).toEqual([true, false, false, false, true])
+  test('the Miyagi Sánchez link comes off with Plan Negocio and its trial only — it stays on Plan Tienda, Gratis and unpaid', () => {
+    // Order: gratis, trial, negocio, tienda, unpaid. Plan Tienda is today's Plan Gratis with a price: "no link" is a
+    // Plan Negocio feature in the plan table the product owner approved on 2026-11-09.
+    expect(all.map(planShowsBadge)).toEqual([true, false, false, true, true])
+    expect(planShowsBadge({ plan: 'tienda', reason: 'tienda_subscription', endsAt: null })).toBe(true)
   })
 })
 
