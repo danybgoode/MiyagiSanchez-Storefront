@@ -1,5 +1,5 @@
 /**
- * The I/O shell for the trial's emails (plans-gratis-negocio S2.3). Reads owned shops with a trial, resolves each
+ * The I/O shell for the free months' notices (plans-gratis-negocio S2.3; plan-tienda S3.2). Reads owned shops with a trial, resolves each
  * plan (uncached: a daily job, and a paid shop must not get the reminder), claims through `merge_shop_metadata` with
  * an `equals` guard on the exact trial read, and sends through `dispatchToSeller` (the merchant's own channel switches).
  *
@@ -9,11 +9,19 @@ import 'server-only'
 import { db } from '@/lib/supabase'
 import { dispatchToSeller } from '@/lib/notifications/dispatch'
 import { sendNegocioTrialNotice } from '@/lib/email'
-import { NEGOCIO_TRIAL_KEY, readNegocioTrial } from '@/lib/plan'
+import { NEGOCIO_TRIAL_KEY, readNegocioTrial, readPlanLegacyState } from '@/lib/plan'
+import { hasPlanPause, rawPlanPause } from '@/lib/plan-pause'
+import { noticeVariantFor } from '@/lib/negocio-trial-notices'
 import { resolvePlan } from '@/lib/plan-server'
 import type { TrialNoticeDeps, TrialShop } from '@/lib/negocio-trial-notices'
 
 const BATCH = 1000
+
+/** The claim's `paused_at`, when it is a string; anything else is null (the decision then counts from the end). */
+function pausedAtOf(metadata: unknown): string | null {
+  const raw = rawPlanPause(metadata) as { paused_at?: unknown } | null
+  return raw && typeof raw === 'object' && typeof raw.paused_at === 'string' ? raw.paused_at : null
+}
 
 export function trialNoticeDeps(): TrialNoticeDeps {
   return {
@@ -36,6 +44,11 @@ export function trialNoticeDeps(): TrialNoticeDeps {
           clerk_user_id: row.clerk_user_id,
           trial: trial!,
           rawTrial: row.metadata?.[NEGOCIO_TRIAL_KEY] ?? null,
+          facts: {
+            legacy: readPlanLegacyState(row.metadata),
+            planPaused: hasPlanPause(row.metadata),
+            pausedAt: pausedAtOf(row.metadata),
+          },
         }))
     },
     readPlan: async (shop: TrialShop) => {
@@ -69,7 +82,7 @@ export function trialNoticeDeps(): TrialNoticeDeps {
       await dispatchToSeller(shop.clerk_user_id, {
         group: 'onboarding',
         email: async (to) => {
-          const r = await sendNegocioTrialNotice({ to, shopName: shop.name ?? shop.slug, notice, endsAt: shop.trial.expires_at, shopId: shop.id })
+          const r = await sendNegocioTrialNotice({ to, shopName: shop.name ?? shop.slug, notice, variant: noticeVariantFor(shop.facts.legacy), endsAt: shop.trial.expires_at, shopId: shop.id })
           if (!r.ok) emailFailed = r.reason
         },
       })
