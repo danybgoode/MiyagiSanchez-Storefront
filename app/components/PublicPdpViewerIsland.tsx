@@ -3,7 +3,7 @@
 import { useAuth } from '@clerk/nextjs'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
+import { BuyerCopyText, useBuyerFormatters } from '@/app/components/BuyerPresentationContext'
 import AskSellerButton from '@/app/components/AskSellerButton'
 import FavoriteButton from '@/app/components/FavoriteButton'
 import MakeOfferButton from '@/app/components/MakeOfferButton'
@@ -15,7 +15,7 @@ import EventBuyBox from '@/app/(shell)/l/[id]/EventBuyBox'
 import RentalBooking from '@/app/(shell)/l/[id]/RentalBooking'
 import SubscriptionSection, { type SubscriptionTier } from '@/app/(shell)/l/[id]/SubscriptionSection'
 import { checkoutHopHref, signInHopHref } from '@/lib/checkout-hop'
-import type { PdpViewerState } from '@/lib/pdp-viewer-state'
+import { agreedDealDisplay, type PdpViewerState } from '@/lib/pdp-viewer-state'
 import type { PriceGrid } from '@/lib/price-grid'
 import type { CustomFieldDef } from '@/lib/personalization'
 import type { RatePeriod } from '@/lib/rental-pricing'
@@ -63,6 +63,7 @@ export default function PublicPdpViewerIsland({
   commerceReadiness,
 }: Props) {
   const { isLoaded } = useAuth()
+  const formatters = useBuyerFormatters()
   const requestKey = `${listing.id}:${shopSlug}`
   const started = useRef<string | null>(null)
   const [result, setResult] = useState<{ key: string; state: PdpViewerState } | null>(null)
@@ -124,6 +125,8 @@ export default function PublicPdpViewerIsland({
   }
 
   const deal = state.activeDeal
+  // The agreed price, as the dynamic PDP shows it (see `agreedDealDisplay`).
+  const agreed = agreedDealDisplay(deal, listing.priceCents)
   const checkoutHref = checkoutHopHref(`/checkout?listingId=${listing.id}&market=mx`, customDomain)
   const signInHref = signInHopHref(`/checkout?listingId=${listing.id}&market=mx`, customDomain)
 
@@ -263,14 +266,23 @@ export default function PublicPdpViewerIsland({
         <FavoriteButton listingId={listing.id} initialFavorited={state.favorited} isSignedIn={state.signedIn} />
       </div>
 
-      {deal?.status === 'accepted_unpaid' && deal.dealPriceCents ? (
+      {deal?.status === 'accepted_unpaid' && agreed ? (
         <div className="flex flex-col gap-2">
-          <div className="rounded-lg p-3 bg-[var(--success-soft)] text-sm font-semibold"><BuyerCopyText copyKey="l.id.page.6252ff7c" /></div>
+          <div data-testid="agreed-deal" className="rounded-lg p-3 bg-[var(--success-soft)]">
+            <p className="text-xs font-bold text-[var(--success)]"><BuyerCopyText copyKey="l.id.page.6252ff7c" /></p>
+            <p className="text-2xl font-extrabold">{formatters.currency(agreed.dealCents, agreed.currency, { maximumFractionDigits: 0 })}</p>
+            {agreed.listCents && (
+              <p className="text-xs text-[var(--fg-muted)]">
+                <BuyerCopyText copyKey="l.id.page.c5d76f70" />{' '}
+                <span className="line-through">{formatters.currency(agreed.listCents, listing.currency, { maximumFractionDigits: 0 })}</span>
+              </p>
+            )}
+          </div>
           {commerceReadiness.ready ? (
             <OfferCheckoutButton
               listingId={listing.id}
               offerId={deal.offerId}
-              amountCents={deal.dealPriceCents}
+              amountCents={agreed.dealCents}
               currency={deal.currency}
               isSignedIn={state.signedIn}
               customDomain={customDomain}
