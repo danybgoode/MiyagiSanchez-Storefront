@@ -47,7 +47,7 @@ test('volume, break-even and the DEMAND constraint (the stove could make enough,
   expect(plan.current_profit_cents).toBe(40 * 5700 + 20 * 1000 - 390000)
   // demand binds → get buyers first, then push the best earner per sale
   expect(plan.moves.map((m) => m.kind)).toEqual(['grow_demand', 'push'])
-  expect(plan.moves[0]).toMatchObject({ kind: 'grow_demand', extra_units: (plan.needed_units as number) - 60, href: '/shop/manage/comparte' })
+  expect(plan.moves[0]).toMatchObject({ kind: 'grow_demand', extra_units: (plan.needed_units as number) - 60, href: '/shop/manage/canal-propio' })
   expect(plan.moves[1]).toMatchObject({ kind: 'push', offer: 'p:plato' })
 })
 

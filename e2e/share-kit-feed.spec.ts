@@ -154,7 +154,7 @@ test.describe('share kit · get_share_kit is the seller\'s own shop only (D19)',
 
   test('the feed route answers through metaFeedResponse, and the tile also needs a claimed shop', () => {
     expect(read('app/api/feeds/meta/[slug]/route.ts')).toContain('const plan = metaFeedResponse(')
-    expect(read('app/(shell)/shop/manage/comparte/page.tsx')).toContain('const metaFeed = model?.shop.claimed')
+    expect(read('app/(shell)/shop/manage/canal-propio/page.tsx')).toContain('const metaFeed = model?.shop.claimed')
   })
 })
 

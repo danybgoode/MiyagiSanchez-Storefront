@@ -155,7 +155,7 @@ export const enforcedSweptPaths = new Set<string>([
   'app/(shell)/shop/manage/canal-propio/SubdomainSection.tsx',
   'app/(shell)/shop/manage/catalogo/CatalogTable.tsx',
   'app/(shell)/shop/manage/catalogo/page.tsx',
-  'app/(shell)/shop/manage/comparte/ComparteClient.tsx',
+  'app/(shell)/shop/manage/canal-propio/ShareToolsSection.tsx',
   'app/(shell)/shop/manage/content/ContentClient.tsx',
   'app/(shell)/shop/manage/import/ImportClient.tsx',
   'app/(shell)/shop/manage/ManageDashboard.tsx',

@@ -213,17 +213,17 @@ function decideMoves(p: { offers: OfferEconomics[]; constraint: Constraint; inpu
   const c = p.constraint
   if (c.kind === 'capacity') {
     const top = best('per_hour')
-    if (top) moves.push({ kind: 'push', offer: top.key, title: top.title, contribution_cents: top.contribution_cents as number, per_hour_cents: top.contribution_per_hour_cents, href: '/shop/manage/comparte' })
+    if (top) moves.push({ kind: 'push', offer: top.key, title: top.title, contribution_cents: top.contribution_cents as number, per_hour_cents: top.contribution_per_hour_cents, href: '/shop/manage/canal-propio' })
     const resource = p.inputs.capacity?.resource.value
     if (resource && p.avg_minutes) {
       const extra_hours = Math.ceil(((c.needed_units - c.capacity_units) * p.avg_minutes) / 60)
       moves.push({ kind: 'raise_capacity', resource, extra_hours, href: `${PLAN_HREF}#plan-capacity` })
     }
   } else if (c.kind === 'demand') {
-    moves.push({ kind: 'grow_demand', extra_units: c.needed_units - c.current_units, href: '/shop/manage/comparte' })
+    moves.push({ kind: 'grow_demand', extra_units: c.needed_units - c.current_units, href: '/shop/manage/canal-propio' })
     const top = best('per_unit')
     // Demand binds, not the resource: the push is "per sale", never "per hour of your limit".
-    if (top) moves.push({ kind: 'push', offer: top.key, title: top.title, contribution_cents: top.contribution_cents as number, per_hour_cents: null, href: '/shop/manage/comparte' })
+    if (top) moves.push({ kind: 'push', offer: top.key, title: top.title, contribution_cents: top.contribution_cents as number, per_hour_cents: null, href: '/shop/manage/canal-propio' })
   } else if (c.kind === 'inputs') {
     moves.unshift({ kind: 'fill_input', gap: c.gap, href: PLAN_HREF })
   }

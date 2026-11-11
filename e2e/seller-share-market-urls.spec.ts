@@ -9,7 +9,7 @@ const SELLER_SHARE_SURFACES = [
   'app/(shell)/sell/SellWizard.tsx',
   'app/(shell)/sell/setup/SetupClient.tsx',
   'app/(shell)/shop/manage/import/ImportClient.tsx',
-  'app/(shell)/shop/manage/comparte/ComparteClient.tsx',
+  'app/(shell)/shop/manage/canal-propio/ShareToolsSection.tsx',
 ] as const
 
 test.describe('seller public-shop share URLs', () => {

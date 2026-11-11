@@ -1,10 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { SellerBreadcrumb } from '../SellerBreadcrumb'
 import { Card } from '@/components/ui/Card'
 import { Toast, useToast } from '@/components/feedback/Toast'
-import ConnectAgentPanel from '@/components/ConnectAgentPanel'
 import CatalogLinkTile from '@/components/share-kit/CatalogLinkTile'
 import CatalogPdfTile from '@/components/share-kit/CatalogPdfTile'
 import MetaFeedTile from '@/components/share-kit/MetaFeedTile'
@@ -15,13 +13,17 @@ import { pushGrowthEvent } from '@/lib/growth-events'
 import { shopUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 
-export default function ComparteClient({
+/**
+ * «Comparte tu tienda» inside Canales (merchant-features-surfaced-by-promoter-kit D8): the shop link, the catalog
+ * link + QR, the catalog PDF and the Meta feed used to live on a page nothing linked to (/shop/manage/comparte,
+ * which now redirects here). They are channels, so they sit with the other channels.
+ */
+export default function ShareToolsSection({
   shopName,
   shopSlug,
   logoUrl,
   location,
   productCount,
-  agentTokenSet,
   catalogUrl,
   catalogPdfUrl,
   metaFeed,
@@ -31,7 +33,6 @@ export default function ComparteClient({
   logoUrl: string | null
   location: string | null
   productCount: number
-  agentTokenSet: boolean
   /** The shop's catalog page, or null when the shop has none (share-kit D5). */
   catalogUrl: string | null
   /** The shop's public catalog PDF link, null alongside `catalogUrl`. */
@@ -87,11 +88,10 @@ export default function ComparteClient({
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <div className="mb-5">
-        <SellerBreadcrumb extra={[{ label: 'Comparte', href: null }]} />
-        <h1 className="text-xl font-bold mt-2">Comparte tu tienda</h1>
-      </div>
+    <section id="comparte" className="mb-8" aria-labelledby="comparte-title" data-testid="share-tools">
+      <h2 id="comparte-title" className="font-semibold text-sm uppercase tracking-wide text-[var(--color-muted)] mb-3">
+        Comparte tu tienda
+      </h2>
 
       <Card variant="panel" className="p-5 text-center mb-6">
         {logoUrl ? (
@@ -162,15 +162,7 @@ export default function ComparteClient({
         </div>
       ) : null}
 
-      <Card variant="panel" className="p-5">
-        <h3 className="font-semibold mb-2">¿Sigues tú o sigue tu agente?</h3>
-        <p className="text-sm text-[var(--color-muted)] mb-4">
-          Conéctalo… tú apruebas los cambios.
-        </p>
-        <ConnectAgentPanel initialTokenSet={agentTokenSet} />
-      </Card>
-
       <Toast toast={toast} onDismiss={dismissToast} />
-    </div>
+    </section>
   )
 }

@@ -202,7 +202,7 @@ test.describe('market route population', () => {
   test('seller management success surfaces emit canonical marketplace shop URLs', () => {
     const seamBacked = [
       'app/(shell)/shop/manage/import/ImportClient.tsx',
-      'app/(shell)/shop/manage/comparte/ComparteClient.tsx',
+      'app/(shell)/shop/manage/canal-propio/ShareToolsSection.tsx',
     ]
     for (const file of seamBacked) {
       const source = readFileSync(path.join(ROOT, file), 'utf8')
@@ -220,7 +220,7 @@ test.describe('market route population', () => {
     expect(convocatoria).not.toContain('publicUrl={`/mx/s/')
 
     const comparte = readFileSync(
-      path.join(ROOT, 'app/(shell)/shop/manage/comparte/ComparteClient.tsx'),
+      path.join(ROOT, 'app/(shell)/shop/manage/canal-propio/ShareToolsSection.tsx'),
       'utf8',
     )
     expect(comparte).not.toMatch(/(?:^|\s)\/s\/\{shopSlug\}/)
