@@ -20,6 +20,8 @@ const ROOT = new URL('..', import.meta.url).pathname
 const ENFORCED_JSON = ['locales/es.json', 'locales/en.json']
 const ENFORCED_SOURCE = [
   'lib/about-content.ts',
+  // own-shop-positioning: the six feature stories name no peso figure.
+  'lib/shop-features.ts',
   'app/(shell)/mx/vende/_components/page-config.ts',
   'app/(shell)/mx/precios',
   // plan-tienda S2.3: «Tu suscripción» and the agents' plan answer state both plans' prices — only through the modules.

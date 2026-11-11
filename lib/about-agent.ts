@@ -86,6 +86,7 @@ export function aboutStructured(sections: readonly AboutSection[] = ABOUT_SECTIO
 export function aboutManifestBlock(base: string, sections: readonly AboutSection[] = ABOUT_SECTIONS) {
   const whatIs = findSection(sections, 'what_is')
   const whySell = findSection(sections, 'why_sell')
+  const features = findSection(sections, 'features')
   const howToStart = findSection(sections, 'how_to_start')
   const cost = findSection(sections, 'cost_transparency')
   const pricing = findSection(sections, 'pricing')
@@ -97,6 +98,8 @@ export function aboutManifestBlock(base: string, sections: readonly AboutSection
       en: whatIs.en.body[0],
     },
     why_sell: (whySell.en.points ?? []).map((p) => ({ title: p.title, body: p.body })),
+    // own-shop-positioning S2.1 — what the shop already does, each with the path of the real feature.
+    features: (features.en.points ?? []).map((p) => ({ title: p.title, body: p.body })),
     how_to_start: (howToStart.en.points ?? []).map((p) => `${p.title} — ${p.body}`),
     cost_transparency: cost.en.body[0],
     pricing: pricing.en.lead ?? pricing.en.body[0],
@@ -136,6 +139,7 @@ export function aboutLlmsTxt(base: string, sections: readonly AboutSection[] = A
   const whatIsEn = findSection(sections, 'what_is').en
   const whySellEn = findSection(sections, 'why_sell').en
   const howToStartEn = findSection(sections, 'how_to_start').en
+  const featuresEn = findSection(sections, 'features').en
   const whatIsEs = findSection(sections, 'what_is').es
   const whySellEs = findSection(sections, 'why_sell').es
   // Already filled from the pricing catalog by the caller's read path (pricing-page D7) — this
@@ -143,6 +147,7 @@ export function aboutLlmsTxt(base: string, sections: readonly AboutSection[] = A
   const pricingEn = findSection(sections, 'pricing').en
 
   const whyPoints = (whySellEn.points ?? []).map((p) => `- **${p.title}** — ${p.body}`).join('\n')
+  const featurePoints = (featuresEn.points ?? []).map((p) => `- **${p.title}** — ${p.body}`).join('\n')
   const startPoints = (howToStartEn.points ?? []).map((p) => `- ${p.title} — ${p.body}`).join('\n')
 
   return `# miyagisanchez.com
@@ -160,6 +165,9 @@ ${RELAY_LANGUAGE_DIRECTIVE}
 
 ## Why sell here
 ${whyPoints}
+
+## ${featuresEn.heading}
+${featurePoints}
 
 ## How to start
 ${startPoints}

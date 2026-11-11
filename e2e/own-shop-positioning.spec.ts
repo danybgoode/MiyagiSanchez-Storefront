@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { aboutLlmsTxt, aboutManifestBlock, aboutMcpResource } from '../lib/about-agent'
+import { SHOP_FEATURES, SHOP_FEATURE_IDS } from '../lib/shop-features'
 import { ABOUT_PAGE, ABOUT_SECTIONS, ABOUT_CTA_HREF } from '../lib/about-content'
 
 /**
@@ -115,6 +116,70 @@ test.describe('S1.1 · chrome and landing (http, no JS)', () => {
     // A self-serve page reads the agent line only (D4).
     expect(support).not.toContain('Tu promotor')
     expect(html).toMatch(/data-testid="[a-z-]*primary-cta"[^>]*>\s*Abrir mi tienda|Abrir mi tienda\s*<i/)
+  })
+})
+
+// ── S2.1 · six stories ──────────────────────────────────────────────────────────
+
+test.describe('S2.1 · what the shop already does', () => {
+  test('six stories, each with at least one link to a real feature page', () => {
+    expect(SHOP_FEATURE_IDS).toEqual(['omnichannel', 'finanzas', 'ofertas', 'ia', 'sorteos', 'en-linea'])
+    const known = ['/shop/manage/canal-propio', '/shop/manage/plan', '/shop/manage/analytics', '/shop/manage/offers', '/shop/manage/import', '/shop/manage/settings', '/shop/manage/sweepstakes', '/']
+    for (const f of SHOP_FEATURES) {
+      expect(f.links.length, f.id).toBeGreaterThan(0)
+      for (const l of f.links) expect(known, `${f.id} -> ${l.href}`).toContain(l.href)
+    }
+    expect(SHOP_FEATURES[0].es.title).toBe('Un inventario para cada mostrador')
+    expect(SHOP_FEATURES[1].es.title).toBe('Cuánto ganas, no sólo cuánto vendes')
+  })
+
+  test('the AI story claims only what the merchant\'s agent can really do over MCP', () => {
+    const ai = SHOP_FEATURES.find((f) => f.id === 'ia')!.es.body
+    const mcp = readFileSync(`${ROOT}app/api/ucp/mcp/route.ts`, 'utf8')
+    // Every verb the story promises maps to a tool the route actually registers.
+    for (const tool of ['create_listing', 'update_listing', 'respond_to_offer', 'get_business_plan', 'compare_costs']) {
+      expect(mcp, `${tool} must exist in the MCP route`).toContain(`name: '${tool}'`)
+    }
+    // The promise is the EXACT clause below, each verb paired with the tool that backs it. Asserting only that the
+    // verbs are present would let an invented one ride along («haga tu contabilidad») — an overclaim is the failure.
+    const promised = ai.match(/pídele que ([^.]+)\./)?.[1]
+    expect(promised).toBe('publique un producto, cambie un precio, responda una oferta, te diga cómo va tu plan o cuánto pagarías en otra plataforma')
+  })
+
+  test('about_miyagi, llms.txt and the manifest carry the six stories with their feature paths', () => {
+    const base = 'https://example.test'
+    const resource = aboutMcpResource(base)
+    const section = resource.structured.sections.find((s) => s.id === 'features')!
+    expect(section.es.points).toHaveLength(6)
+    expect(section.en.points).toHaveLength(6)
+    expect(section.es.points!.map((p) => p.title)).toContain('Un inventario para cada mostrador')
+    expect(resource.text).toContain('miyagisanchez.com/shop/manage/offers')
+    expect(aboutLlmsTxt(base)).toContain('What your shop already does')
+    expect(aboutManifestBlock(base).features).toHaveLength(6)
+  })
+
+  test('the live locale mirror of the features section has not drifted from the one source', () => {
+    const section = ABOUT_SECTIONS.find((s) => s.id === 'features')!
+    expect(es.acerca.sections.features).toEqual(section.es)
+    expect(en.acerca.sections.features).toEqual(section.en)
+  })
+
+  test('`/` renders the six stories (http, no JS), each with a working link', async ({ request }) => {
+    const html = await (await request.get('/', { headers: { Accept: 'text/html' } })).text()
+    for (const f of SHOP_FEATURES) {
+      const card = html.slice(html.indexOf(`data-testid="vende-feature-${f.id}"`))
+      expect(card.length, f.id).toBeGreaterThan(0)
+      expect(card.slice(0, 4000), f.id).toContain(f.es.title)
+      expect(card.slice(0, 4000), f.id).toContain(`href="${f.links[0].href}"`)
+    }
+  })
+
+  test('/mx/precios lists «Qué incluye tu tienda» and types no peso figure into it (http)', async ({ request }) => {
+    const html = await (await request.get('/mx/precios', { headers: { Accept: 'text/html' } })).text()
+    const list = block(html, 'precios-includes')
+    expect(list).toContain('Qué incluye tu tienda')
+    for (const f of SHOP_FEATURES) expect(list, f.id).toContain(f.es.title)
+    expect(stripTags(list)).not.toMatch(/\$\s?\d/)
   })
 })
 

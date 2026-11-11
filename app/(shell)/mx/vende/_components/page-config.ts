@@ -15,6 +15,7 @@ import type { PromoterSettings } from '@/lib/promoter'
 import type { PromoterSku } from '@/lib/promoter-skus'
 import type { PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
+import { SHOP_FEATURES, SHOP_FEATURES_HEADING } from '@/lib/shop-features'
 import type { SellerAcquisitionPageConfig, LandingCallout } from './SellerAcquisitionSections'
 
 type QueryParams = Record<string, string | string[] | undefined | null>
@@ -80,6 +81,19 @@ export function buildAnchorPageConfig(
       // own-shop-positioning D3: the single Vecindario-benefit line. The marketplace is a benefit of the shop, not the
       // way in, so the old «¿Vienes a comprar?» hero line is gone; a buyer finds the Vecindario in the footer.
       cta: { label: page.marketplaceBonus.ctaLabel, href: '/vecindario', testId: 'vende-marketplace-bonus' },
+    },
+    // own-shop-positioning S2.1: the six things the shop already does, each linking to the real feature.
+    featureStories: {
+      title: SHOP_FEATURES_HEADING.es.heading,
+      lead: SHOP_FEATURES_HEADING.es.lead,
+      items: SHOP_FEATURES.map((feature) => ({
+        id: feature.id,
+        icon: feature.icon,
+        title: feature.es.title,
+        tagline: feature.es.tagline,
+        body: feature.es.body,
+        links: feature.links,
+      })),
     },
     // D4 — a self-serve page reads the agent line only: no promoter stands behind a visitor who arrived alone.
     support: buildSupportBlock(copy, 'agent'),

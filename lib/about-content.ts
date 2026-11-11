@@ -31,6 +31,7 @@
  */
 
 import { SELLER_LANDING_PATHS } from './seller-acquisition'
+import { SHOP_FEATURES, SHOP_FEATURES_HEADING, type ShopFeature } from './shop-features'
 import { buildPricingCatalog, fillPricingTokens, type PricingCatalog } from './pricing-catalog'
 import { processorRatesFromDataset, type ComparatorDataset } from './cost-comparator-dataset'
 import comparatorDataset from './cost-comparator-dataset.json' with { type: 'json' }
@@ -40,6 +41,7 @@ export type AboutLocale = 'es' | 'en'
 export type AboutSectionId =
   | 'what_is'
   | 'why_sell'
+  | 'features'
   | 'how_to_start'
   | 'cost_transparency'
   | 'pricing'
@@ -103,6 +105,7 @@ export type AboutPageCopy = {
 export const ABOUT_SECTION_IDS: AboutSectionId[] = [
   'what_is',
   'why_sell',
+  'features',
   'how_to_start',
   'cost_transparency',
   'pricing',
@@ -148,6 +151,43 @@ export const ABOUT_PAGE: Record<AboutLocale, AboutPageCopy> = {
     metaTitle: 'About miyagisanchez.com — what it is and why sell here',
     metaDescription:
       'Miyagi Sánchez is your own online shop, built with you, with no commission on sales. What it includes, how to start, and what it costs.',
+  },
+}
+
+/**
+ * The `features` section (own-shop-positioning S2.1), built from `lib/shop-features.ts` — the single source the
+ * landing page, `/mx/precios` and every agent surface share. Each story carries the path of the real feature, so an
+ * agent that repeats it can point the merchant at the page. `locales/*.json → acerca.sections.features` mirrors this
+ * for the admin-overridable live render; `e2e/shop-features.spec.ts` fails if the two drift.
+ */
+function featurePoint(feature: ShopFeature, locale: AboutLocale): AboutPoint {
+  const copy = feature[locale]
+  const where = locale === 'es' ? 'Dónde' : 'Where'
+  const paths = feature.links
+    .filter((l) => l.href !== '/')
+    .map((l) => `miyagisanchez.com${l.href}`)
+    .join(', ')
+  return {
+    title: copy.title,
+    body: paths ? `${copy.body} ${where}: ${paths}.` : copy.body,
+    icon: feature.icon,
+  }
+}
+
+export const FEATURES_SECTION: AboutSection = {
+  id: 'features',
+  stub: false,
+  es: {
+    heading: SHOP_FEATURES_HEADING.es.heading,
+    lead: SHOP_FEATURES_HEADING.es.lead,
+    body: [SHOP_FEATURES_HEADING.es.intro],
+    points: SHOP_FEATURES.map((f) => featurePoint(f, 'es')),
+  },
+  en: {
+    heading: SHOP_FEATURES_HEADING.en.heading,
+    lead: SHOP_FEATURES_HEADING.en.lead,
+    body: [SHOP_FEATURES_HEADING.en.intro],
+    points: SHOP_FEATURES.map((f) => featurePoint(f, 'en')),
   },
 }
 
@@ -214,6 +254,7 @@ const ABOUT_SECTION_TEMPLATES: AboutSection[] = [
       ],
     },
   },
+  FEATURES_SECTION,
   {
     id: 'how_to_start',
     stub: false,

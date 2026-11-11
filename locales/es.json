@@ -3254,6 +3254,45 @@
           }
         ]
       },
+      "features": {
+        "heading": "Lo que tu tienda ya hace",
+        "lead": "Seis cosas que vienen con tu tienda y que casi nadie ve a primera vista.",
+        "body": [
+          "Todo esto ya está en tu tienda; cada historia lleva a la página donde lo usas."
+        ],
+        "points": [
+          {
+            "title": "Un inventario para cada mostrador",
+            "body": "Subes tus productos una sola vez. De ahí salen tu tienda con tu propia dirección, el link de catálogo para WhatsApp, un PDF para mandar o imprimir, el catálogo de Meta para Instagram y Facebook, el Vecindario de Miyagi Sánchez, Mercado Libre (con el Plan Negocio) y el mostrador de tu local, para cobrar en persona desde tu celular. Un solo catálogo, sin copiar y pegar en cada lado. Dónde: miyagisanchez.com/shop/manage/canal-propio.",
+            "icon": "iconoir-share-android"
+          },
+          {
+            "title": "Cuánto ganas, no sólo cuánto vendes",
+            "body": "Tu plan junta los números de tu negocio y te dice de dónde salió cada uno; lo que no pudo leer, lo dice en vez de poner un cero. Analíticas te muestra cómo se mueve tu tienda. Y Ganancias descuenta lo que te cuesta cada producto, para que veas tu margen real y no solo el total vendido. Dónde: miyagisanchez.com/shop/manage/plan, miyagisanchez.com/shop/manage/analytics.",
+            "icon": "iconoir-stats-report"
+          },
+          {
+            "title": "Regatea sin perder la tarde",
+            "body": "Tus compradores te mandan ofertas y contraofertas desde la ficha del producto, sin salirse a un chat. Tú respondes cuando puedas, o fijas reglas: aceptar solas las ofertas buenas, contraofertar a un porcentaje que tú elijas y rechazar las que no te convienen. También puedes pedir que solo ofrezcan compradores con cierto nivel de confianza. Dónde: miyagisanchez.com/shop/manage/offers.",
+            "icon": "iconoir-hand-cash"
+          },
+          {
+            "title": "IA que trabaja para tu tienda",
+            "body": "El chat de tu tienda contesta a tus compradores con lo que tú publicaste (envíos, pagos, devoluciones y tus productos con su precio); si no sabe, deja el mensaje en tus Preguntas en vez de inventar. Importar convierte un archivo, un texto pegado o un JSON en productos, y tú los revisas antes de que se cree nada. Y puedes conectar tu propio Claude, ChatGPT o Gemini a tu tienda con tu dirección personal, en los ajustes: pídele que publique un producto, cambie un precio, responda una oferta, te diga cómo va tu plan o cuánto pagarías en otra plataforma. Dónde: miyagisanchez.com/shop/manage/import, miyagisanchez.com/shop/manage/settings.",
+            "icon": "iconoir-sparks"
+          },
+          {
+            "title": "Un sorteo para el Buen Fin y la Navidad",
+            "body": "Arma un sorteo desde tu tienda para el Buen Fin o la Navidad. Cada participante confirma su correo con un código, tú haces el sorteo cuando termina y la tienda le avisa por correo a quien gana. Sin pagar otra herramienta aparte. Dónde: miyagisanchez.com/shop/manage/sweepstakes.",
+            "icon": "iconoir-gift"
+          },
+          {
+            "title": "Pon tu negocio en línea",
+            "body": "Si hoy tu negocio solo existe en Google Maps o en un grupo de WhatsApp, empieza con una frase: describe qué vendes y en segundos ves tu tienda con nombre, textos y productos de ejemplo. No necesitas cuenta para verla. Si te gusta, es tuya, con tu propia dirección y tu dinero directo a tu cuenta.",
+            "icon": "iconoir-map-pin"
+          }
+        ]
+      },
       "how_to_start": {
         "heading": "Cómo empezar",
         "lead": "De cero a tienda con catálogo en minutos — y tu agente puede hacer casi todo.",

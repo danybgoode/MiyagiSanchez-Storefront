@@ -126,6 +126,16 @@ type LandingAiChannel = {
   note: string
 }
 
+/** One of the six «what the shop already does» stories (own-shop-positioning S2.1). */
+type FeatureStory = {
+  id: string
+  icon: string
+  title: string
+  tagline: string
+  body: string
+  links: Array<{ label: string; href: string }>
+}
+
 /**
  * The support promise (own-shop-positioning D4): the promoter on their OWN WhatsApp, and the merchant's own AI agent.
  * No platform phone number and no promised hours — there is no platform support line. A self-serve page passes only
@@ -195,6 +205,8 @@ export type SellerAcquisitionPageConfig = {
    * above the fold on a 375 px phone; only the anchor page passes one.
    */
   describe?: React.ReactNode
+  /** Six stories of what the shop already does, each linking to the real feature (anchor only). */
+  featureStories?: { title: string; lead: string; items: FeatureStory[] }
   /** D4 — who answers: the promoter (on their own WhatsApp) and the merchant's AI agent. */
   support?: SupportBlock
 }
@@ -235,6 +247,7 @@ function AnchorSections({ config }: { config: SellerAcquisitionPageConfig }) {
     <>
       <ProofSection config={config} />
       <StepsSection config={config} />
+      {config.featureStories ? <FeatureStoriesSection stories={config.featureStories} pageId={config.pageId} /> : null}
       {config.pricingCallout ? (
         <CalloutSection callout={config.pricingCallout} pageId={config.pageId} slug="pricing" />
       ) : null}
@@ -1015,6 +1028,59 @@ function AiChannelSection({
           {aiChannel.note}
         </p>
       ) : null}
+    </section>
+  )
+}
+
+function FeatureStoriesSection({
+  stories,
+  pageId,
+}: {
+  stories: NonNullable<SellerAcquisitionPageConfig['featureStories']>
+  pageId: string
+}) {
+  return (
+    <section
+      aria-labelledby={`${pageId}-features-title`}
+      data-testid="vende-feature-stories"
+      style={{ marginBottom: 'var(--s-10)' }}
+    >
+      <SectionIntro id={`${pageId}-features-title`} title={stories.title} lead={stories.lead} />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
+          gap: 'var(--s-3)',
+        }}
+      >
+        {stories.items.map((story) => (
+          <article
+            key={story.id}
+            className="card-panel"
+            data-testid={`vende-feature-${story.id}`}
+            style={{ padding: 'var(--s-5)', display: 'flex', flexDirection: 'column', gap: 'var(--s-3)' }}
+          >
+            <i className={story.icon} aria-hidden="true" style={{ color: 'var(--accent)', fontSize: 28, display: 'block' }} />
+            <h3 className="t-h4" style={{ letterSpacing: 0, margin: 0 }}>
+              {story.title}
+            </h3>
+            <p className="t-small" style={{ color: 'var(--fg)', fontWeight: 600, margin: 0 }}>
+              {story.tagline}
+            </p>
+            <p className="t-small" style={{ color: 'var(--fg-muted)', margin: 0 }}>
+              {story.body}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-2)', marginTop: 'auto' }}>
+              {story.links.map((link) => (
+                <Link key={link.href} href={link.href} className="btn btn-secondary btn-sm" prefetch={false}>
+                  {link.label}
+                  <i className="iconoir-arrow-right" aria-hidden="true" />
+                </Link>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   )
 }

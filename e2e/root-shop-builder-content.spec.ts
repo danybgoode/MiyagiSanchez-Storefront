@@ -101,6 +101,7 @@ test.describe('the root leads with the shop, not the marketplace', () => {
     const order = [
       at('<ProofSection'),
       at('<StepsSection'),
+      at('<FeatureStoriesSection'),
       at('callout={config.pricingCallout}'),
       at('<BenchmarkSection'),
       at('<PersonaRouterSection'),

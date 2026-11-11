@@ -3254,6 +3254,45 @@
           }
         ]
       },
+      "features": {
+        "heading": "What your shop already does",
+        "lead": "Six things that come with your shop and that almost nobody sees at first glance.",
+        "body": [
+          "All of this is already in your shop; each story points to the page where you use it."
+        ],
+        "points": [
+          {
+            "title": "One inventory for every counter",
+            "body": "You upload your products once. From there they feed your shop at your own address, the catalog link for WhatsApp, a PDF to send or print, the Meta catalog for Instagram and Facebook, the Miyagi Sánchez Vecindario, Mercado Libre (with the Negocio plan), and the counter at your store, to take payment in person from your phone. One catalog, no copying and pasting into each one. Where: miyagisanchez.com/shop/manage/canal-propio.",
+            "icon": "iconoir-share-android"
+          },
+          {
+            "title": "What you earn, not just what you sell",
+            "body": "Your plan gathers your business numbers and tells you where each one came from; what it could not read, it says so instead of showing a zero. Analytics shows how your shop is moving. And Profit subtracts what each product costs you, so you see your real margin and not just the total sold. Where: miyagisanchez.com/shop/manage/plan, miyagisanchez.com/shop/manage/analytics.",
+            "icon": "iconoir-stats-report"
+          },
+          {
+            "title": "Haggle without losing your afternoon",
+            "body": "Buyers send you offers and counteroffers from the product page, without leaving for a chat. You answer when you can, or set rules: accept good offers automatically, counter at a percentage you choose, and turn down the ones that do not work for you. You can also require buyers to have a certain level of trust before they can offer. Where: miyagisanchez.com/shop/manage/offers.",
+            "icon": "iconoir-hand-cash"
+          },
+          {
+            "title": "AI that works for your shop",
+            "body": "Your shop’s chat answers buyers using what you published (shipping, payments, returns, and your products with their price); if it does not know, it leaves the message in your Questions instead of making something up. Import turns a file, pasted text or a JSON into products, and you review them before anything is created. And you can connect your own Claude, ChatGPT or Gemini to your shop with your personal address, in settings: ask it to publish a product, change a price, answer an offer, tell you how your plan is going, or what you would pay on another platform. Where: miyagisanchez.com/shop/manage/import, miyagisanchez.com/shop/manage/settings.",
+            "icon": "iconoir-sparks"
+          },
+          {
+            "title": "A giveaway for Buen Fin and Christmas",
+            "body": "Set up a giveaway from your shop for Buen Fin or Christmas. Each participant confirms their email with a code, you run the draw when it ends, and the shop emails the winner. No separate tool to pay for. Where: miyagisanchez.com/shop/manage/sweepstakes.",
+            "icon": "iconoir-gift"
+          },
+          {
+            "title": "Put your business online",
+            "body": "If today your business only exists on Google Maps or in a WhatsApp group, start with one sentence: describe what you sell and in seconds you see your shop with a name, text and sample products. You do not need an account to look. If you like it, it is yours, with your own address and your money straight to your account.",
+            "icon": "iconoir-map-pin"
+          }
+        ]
+      },
       "how_to_start": {
         "heading": "How to start",
         "lead": "From zero to a stocked shop in minutes — and your agent can do almost all of it.",

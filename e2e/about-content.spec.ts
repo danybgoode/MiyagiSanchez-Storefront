@@ -16,13 +16,14 @@ const LOCALES: AboutLocale[] = ['es', 'en']
 // The /acerca mobile+content refresh: `founder` is now grounded too
 // (real bio from the founder's own CV) — no section is a stub any more.
 const STUB_IDS: readonly AboutSectionId[] = []
-const GROUNDED_IDS = ['what_is', 'why_sell', 'how_to_start', 'cost_transparency', 'pricing', 'founder', 'philosophy'] as const
+const GROUNDED_IDS = ['what_is', 'why_sell', 'features', 'how_to_start', 'cost_transparency', 'pricing', 'founder', 'philosophy'] as const
 
 test.describe('about-content · single bilingual source', () => {
-  test('section ids cover exactly the seven sections, in order, no dupes', () => {
+  test('section ids cover exactly the eight sections, in order, no dupes', () => {
     expect(ABOUT_SECTION_IDS).toEqual([
       'what_is',
       'why_sell',
+      'features', // own-shop-positioning S2.1 — what the shop already does
       'how_to_start',
       'cost_transparency',
       'pricing',

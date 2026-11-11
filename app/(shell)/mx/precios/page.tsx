@@ -5,6 +5,7 @@ import es from '@/locales/es.json'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { getPricingCatalog } from '@/lib/pricing-catalog-server'
 import { contactMailto } from '@/lib/contact'
+import { SHOP_FEATURES, SHOP_INCLUDES_HEADING } from '@/lib/shop-features'
 import { fillFixedPricingTokens, type ExtraRow, type PricingCatalog } from '@/lib/pricing-catalog'
 import { PreciosTrackedLink, PreciosViewed } from './_components/PreciosTracking'
 
@@ -152,6 +153,25 @@ export default async function PreciosPage() {
             </article>
           ))}
         </div>
+      </section>
+
+      {/* own-shop-positioning S2.1 — what the price already includes. Names no price: every figure on this page comes
+          from the catalog above, and the list is the same six stories `/` and the agent surfaces tell. */}
+      <section aria-labelledby="precios-includes-title" data-testid="precios-includes" style={SECTION}>
+        <h2 id="precios-includes-title" className="t-h2" style={{ letterSpacing: 0, marginBottom: 'var(--s-2)' }}>{SHOP_INCLUDES_HEADING.title}</h2>
+        <p className="t-lead" style={{ color: 'var(--fg-muted)', marginBottom: 'var(--s-5)' }}>{SHOP_INCLUDES_HEADING.lead}</p>
+        <ul style={{ ...GRID, listStyle: 'none', margin: 0, padding: 0 }}>
+          {SHOP_FEATURES.map((feature) => (
+            <li key={feature.id} className="card-panel" data-testid={`precios-includes-${feature.id}`} style={{ padding: 'var(--s-5)', display: 'flex', flexDirection: 'column', gap: 'var(--s-2)' }}>
+              <i className={feature.icon} aria-hidden="true" style={{ color: 'var(--accent)', fontSize: 24 }} />
+              <h3 className="t-h4" style={{ letterSpacing: 0, margin: 0 }}>{feature.es.title}</h3>
+              <p className="t-small" style={{ color: 'var(--fg-muted)', margin: 0 }}>{feature.es.tagline}</p>
+              <Link href={feature.links[0].href} className="t-small" prefetch={false} style={{ color: 'var(--accent)', marginTop: 'auto' }}>
+                {feature.links[0].label}
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section aria-labelledby="precios-extras-title" data-testid="precios-extras" style={SECTION}>
