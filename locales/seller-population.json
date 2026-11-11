@@ -39,6 +39,7 @@
     "app/(shell)/shop/manage/canal-propio/DomainPaywallUpsell.tsx",
     "app/(shell)/shop/manage/canal-propio/EmbedSnippetSection.tsx",
     "app/(shell)/shop/manage/canal-propio/PromoterCodeField.tsx",
+    "app/(shell)/shop/manage/canal-propio/ShareToolsSection.tsx",
     "app/(shell)/shop/manage/canal-propio/SubdomainSection.tsx",
     "app/(shell)/shop/manage/canal-propio/page.tsx",
     "app/(shell)/shop/manage/catalogo/BulkActionBar.tsx",
@@ -51,7 +52,6 @@
     "app/(shell)/shop/manage/cobros/page.tsx",
     "app/(shell)/shop/manage/collections/CollectionsClient.tsx",
     "app/(shell)/shop/manage/collections/page.tsx",
-    "app/(shell)/shop/manage/comparte/ComparteClient.tsx",
     "app/(shell)/shop/manage/comparte/page.tsx",
     "app/(shell)/shop/manage/content/ContentClient.tsx",
     "app/(shell)/shop/manage/content/page.tsx",
@@ -75,6 +75,9 @@
     "app/(shell)/shop/manage/mercadolibre/import/MercadoLibreImport.tsx",
     "app/(shell)/shop/manage/mercadolibre/import/page.tsx",
     "app/(shell)/shop/manage/mercadolibre/page.tsx",
+    "app/(shell)/shop/manage/negocio/NegocioBuyButtons.tsx",
+    "app/(shell)/shop/manage/negocio/NegocioManageButton.tsx",
+    "app/(shell)/shop/manage/negocio/page.tsx",
     "app/(shell)/shop/manage/offers/OfferInbox.tsx",
     "app/(shell)/shop/manage/offers/page.tsx",
     "app/(shell)/shop/manage/orders/OrdersInbox.tsx",
@@ -84,6 +87,11 @@
     "app/(shell)/shop/manage/orders/loading.tsx",
     "app/(shell)/shop/manage/orders/page.tsx",
     "app/(shell)/shop/manage/page.tsx",
+    "app/(shell)/shop/manage/plan/PlanClient.tsx",
+    "app/(shell)/shop/manage/plan/PlanSummary.tsx",
+    "app/(shell)/shop/manage/plan/page.tsx",
+    "app/(shell)/shop/manage/preguntas/QuestionsClient.tsx",
+    "app/(shell)/shop/manage/preguntas/page.tsx",
     "app/(shell)/shop/manage/profit/PricingCard.tsx",
     "app/(shell)/shop/manage/profit/ProfitClient.tsx",
     "app/(shell)/shop/manage/profit/page.tsx",
@@ -943,21 +951,10 @@
     {
       "file": "app/(shell)/shop/manage/canal-propio/DomainPaywallUpsell.tsx",
       "keys": [
-        "s_d0646bf55b4a63c6",
-        "s_1cb5474eaac57c0a",
-        "s_2edbc537868f315b",
-        "s_815c54969562884b",
+        "s_fc7fdb975beb9c04",
         "s_301c9b5c7dd4633e",
-        "s_466a0433adee8dcc",
-        "s_f12c9f48ca2f15c3",
-        "s_30e4046a6b3affdd",
-        "s_b5b420c59808b269",
-        "s_3bf7170f1c8a9cfc",
-        "s_df245c70203254fa",
-        "s_1a57e970a047b153",
-        "s_2341fd92331277e5",
-        "s_0a6ff33d3f526012",
-        "s_992800b52d1aae21"
+        "s_d5f10e3610ddc1b6",
+        "s_d9ab4b756bbe37cc"
       ]
     },
     {
@@ -1005,31 +1002,26 @@
       ]
     },
     {
+      "file": "app/(shell)/shop/manage/canal-propio/ShareToolsSection.tsx",
+      "keys": [
+        "s_871862953e189964",
+        "s_e598fd19559b0bd0",
+        "s_d8dd878fb14359e9",
+        "s_db164690a5469f43",
+        "s_f7aa761caa6b3ddb",
+        "s_08f271887ce94707",
+        "s_567782a98469f195",
+        "s_497aee4628ed062e",
+        "s_85dc0c638f095c20",
+        "s_043a718774c572bd"
+      ]
+    },
+    {
       "file": "app/(shell)/shop/manage/canal-propio/SubdomainSection.tsx",
       "keys": [
-        "s_988e8734d54a2057",
-        "s_910f9b40aa0e3b01",
-        "s_59a260e3d67e7540",
-        "s_bd90e272538583ff",
-        "s_62d9bb6b23573760",
-        "s_b9c5730320c21d15",
-        "s_ada000093d8cf967",
-        "s_3aae23ebd3f60fff",
-        "s_466a0433adee8dcc",
-        "s_6a4e751af9fa2431",
-        "s_f12c9f48ca2f15c3",
-        "s_2d68e2438b22394c",
-        "s_b5b420c59808b269",
-        "s_3bf7170f1c8a9cfc",
-        "s_9d51a8b87e7a98c5",
-        "s_8c39217eaf987a17",
-        "s_6715627a557bd591",
-        "s_62afcc74654de6ab",
-        "s_adce5d0e3d0703ca",
-        "s_e79cd3577c7b5b5e",
-        "s_4a5e003eb48afce2",
-        "s_1a57e970a047b153",
-        "s_d18840cbbff8ba31"
+        "s_b489d3e680036557",
+        "s_b65dbaab2f178a40",
+        "s_c17f500461608105"
       ]
     },
     {
@@ -1317,30 +1309,6 @@
       "file": "app/(shell)/shop/manage/collections/page.tsx",
       "keys": [
         "s_be1b48261057f013"
-      ]
-    },
-    {
-      "file": "app/(shell)/shop/manage/comparte/ComparteClient.tsx",
-      "keys": [
-        "s_6fbc573195cd7b6b",
-        "s_871862953e189964",
-        "s_e598fd19559b0bd0",
-        "s_49ad65de07a6d851",
-        "s_d8dd878fb14359e9",
-        "s_db164690a5469f43",
-        "s_f7aa761caa6b3ddb",
-        "s_08f271887ce94707",
-        "s_567782a98469f195",
-        "s_497aee4628ed062e",
-        "s_85dc0c638f095c20",
-        "s_043a718774c572bd",
-        "s_f1034d7fe75c0c04"
-      ]
-    },
-    {
-      "file": "app/(shell)/shop/manage/comparte/page.tsx",
-      "keys": [
-        "s_871862953e189964"
       ]
     },
     {
@@ -1673,11 +1641,8 @@
     {
       "file": "app/(shell)/shop/manage/mercadolibre/MercadoLibreStatus.tsx",
       "keys": [
-        "s_6c251dc9087abdbf",
-        "s_7d6ddef9b536cf09",
         "s_3b9c0b63f4d7b08e",
         "s_d9350e3f771ac18e",
-        "s_1b582b5b65a0082e",
         "s_e92868180b611f59",
         "s_f108081c94cbbb72",
         "s_d7f3ce2eb16e23be",
@@ -1689,10 +1654,9 @@
         "s_89130f77b7fa436b",
         "s_3c8dc4dc7a83dd2d",
         "s_6a4b2a04e73bc137",
-        "s_1d41de7a462bb979",
+        "s_78acf7eca7456a02",
         "s_3adb88aefef2f6db",
         "s_875be4ebd33124f4",
-        "s_5d6e022e6a4edf6e",
         "s_4b002cc187dd4929",
         "s_01e0a8b879c20ccd",
         "s_2773286411a05e9d",
@@ -1701,10 +1665,9 @@
         "s_593469259f3486e9",
         "s_763a1e48d522ccb8",
         "s_0fb4618723afda76",
-        "s_442af5b5276b1e25",
+        "s_d9ab4b756bbe37cc",
         "s_7e7c9be2202cca81",
         "s_2f6e02783a525285",
-        "s_0977796508352c49",
         "s_7e9f00106acdede8"
       ]
     },
@@ -1748,6 +1711,33 @@
         "s_5a08cb2623acc57f",
         "s_95fa0c8c0f880d75",
         "s_213216bd2f922f27"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/negocio/NegocioBuyButtons.tsx",
+      "keys": [
+        "s_fef12c38e9cee1a0",
+        "s_117814a3584e4079"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/negocio/NegocioManageButton.tsx",
+      "keys": [
+        "s_aed9c2abd0f1f784",
+        "s_7a5d904332c90590",
+        "s_117814a3584e4079",
+        "s_5b3ca55dd0cfc0f8",
+        "s_ab1f131589e29033"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/negocio/page.tsx",
+      "keys": [
+        "s_ab2049e3b06a5aa7",
+        "s_9870260249368952",
+        "s_d65a0f54c338a023",
+        "s_d24f9e0044386c22",
+        "s_289639821aee4e7d"
       ]
     },
     {
@@ -2065,6 +2055,37 @@
       "file": "app/(shell)/shop/manage/page.tsx",
       "keys": [
         "s_77711fcaf7864671"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/plan/page.tsx",
+      "keys": [
+        "s_102abc3b41cec819"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/preguntas/QuestionsClient.tsx",
+      "keys": [
+        "s_460b3a7da007b7af",
+        "s_cfc4badc32042671",
+        "s_9415ac2416c5719d",
+        "s_ffe16d46910d58f4",
+        "s_417df196937f9e0c",
+        "s_4a2a7784c395a321",
+        "s_8630a0dc25e2395a",
+        "s_a09bef935cef1d42",
+        "s_2437d9a2394f9152",
+        "s_50824e5f99d14e4a"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/preguntas/page.tsx",
+      "keys": [
+        "s_40a5889ddb508c5b",
+        "s_e70575be0d53d089",
+        "s_04dab5c58a0d04ce",
+        "s_97cbcc9f3a60c5c8",
+        "s_cd128e7221d54d10"
       ]
     },
     {
@@ -3231,6 +3252,10 @@
       "source": "Reembolso aceptado. Haz la transferencia y marca \"Ya transferí\"."
     },
     {
+      "key": "s_04dab5c58a0d04ce",
+      "source": "No pudimos leer tus preguntas ahora. Inténtalo de nuevo en un momento."
+    },
+    {
       "key": "s_04f8f3d40a385cad",
       "source": "Gestionar →"
     },
@@ -3359,10 +3384,6 @@
       "source": "Publicar anuncio — Miyagi Sánchez"
     },
     {
-      "key": "s_0977796508352c49",
-      "source": "¿Trabajas con un promotor? También puede activártela por ti."
-    },
-    {
       "key": "s_09a5d36f2083e748",
       "source": "Se usará el correo asociado a tu cuenta de Miyagi Sánchez."
     },
@@ -3393,10 +3414,6 @@
     {
       "key": "s_0a6d39ea24a713e8",
       "source": "Cotizando…"
-    },
-    {
-      "key": "s_0a6ff33d3f526012",
-      "source": "y tu"
     },
     {
       "key": "s_0b49ed3685b768b5",
@@ -3551,6 +3568,10 @@
       "source": "24 horas"
     },
     {
+      "key": "s_102abc3b41cec819",
+      "source": "Tu plan — Mi tienda"
+    },
+    {
       "key": "s_104d044db8319ede",
       "source": "Desde aquí se calcularán tarifas y se generarán etiquetas con DHL, FedEx, Estafeta, UPS y más. Todos los campos son necesarios."
     },
@@ -3589,6 +3610,10 @@
     {
       "key": "s_116fb12e3621c0b9",
       "source": "Cambiar logo"
+    },
+    {
+      "key": "s_117814a3584e4079",
+      "source": "Un momento…"
     },
     {
       "key": "s_1183311738da4dd7",
@@ -3855,10 +3880,6 @@
       "source": "Contenido"
     },
     {
-      "key": "s_1a57e970a047b153",
-      "source": "URL gratis"
-    },
-    {
       "key": "s_1a878a55c594b0f7",
       "source": "Descartar"
     },
@@ -3923,10 +3944,6 @@
       "source": "Condición aceptada"
     },
     {
-      "key": "s_1b582b5b65a0082e",
-      "source": "Activar — $"
-    },
-    {
       "key": "s_1b614f1f624b51ea",
       "source": "Diseñar mi anuncio →"
     },
@@ -3971,10 +3988,6 @@
       "source": "Incluye LADA · p. ej. 55 1234 5678 (CDMX) ó 33 1234 5678 (GDL)"
     },
     {
-      "key": "s_1cb5474eaac57c0a",
-      "source": "Activar dominio propio →"
-    },
-    {
       "key": "s_1ce0cee583e62ea2",
       "source": "NOMBRE"
     },
@@ -3985,10 +3998,6 @@
     {
       "key": "s_1d09f6fa23235881",
       "source": "MB"
-    },
-    {
-      "key": "s_1d41de7a462bb979",
-      "source": "La sincronización automática de inventario es una función de pago. Actívala para no vender de más en ninguno de los dos canales — también hace que tus pedidos de Mercado Libre aparezcan automáticamente en tu bandeja de pedidos de Miyagi."
     },
     {
       "key": "s_1d44abc7a8277eef",
@@ -4175,10 +4184,6 @@
       "source": "Publica o programa la publicación antes de fijarla."
     },
     {
-      "key": "s_2341fd92331277e5",
-      "source": "subdominio"
-    },
-    {
       "key": "s_2354f259a738a375",
       "source": "Ya me llegó"
     },
@@ -4189,6 +4194,10 @@
     {
       "key": "s_23b5acaad2ebe8bf",
       "source": "Aún no tienes productos activos con precio en pesos."
+    },
+    {
+      "key": "s_2437d9a2394f9152",
+      "source": "Tu respuesta:"
     },
     {
       "key": "s_243bed4e005553be",
@@ -4309,6 +4318,10 @@
     {
       "key": "s_2872df3893a9447d",
       "source": "MXN"
+    },
+    {
+      "key": "s_289639821aee4e7d",
+      "source": "¡Gracias! Recibimos tu pago. Tu plan se actualiza en unos momentos; si no lo ves, recarga la página."
     },
     {
       "key": "s_28af2bb4c7d3a457",
@@ -4459,10 +4472,6 @@
       "source": "Navegación de vendedor"
     },
     {
-      "key": "s_2d68e2438b22394c",
-      "source": "Reactivar subdominio →"
-    },
-    {
       "key": "s_2d7ca259e8210758",
       "source": "El comprador espera que te contactes para acordar cómo y cuándo recibe el artículo. Tienes 24 h para escribirle."
     },
@@ -4521,10 +4530,6 @@
     {
       "key": "s_2eda16816f0174ee",
       "source": "Clic en \"Save\""
-    },
-    {
-      "key": "s_2edbc537868f315b",
-      "source": "Conecta tu propio dominio (tutienda.com) para que tu tienda viva en tu marca, con SSL e infraestructura nuestra y sin miyagisanchez.com en la URL. Se renueva cada año; puedes cancelar cuando quieras. Tu"
     },
     {
       "key": "s_2edd5c5bc4df99d7",
@@ -4605,10 +4610,6 @@
     {
       "key": "s_30d1a8cd45b235e9",
       "source": "Sin título"
-    },
-    {
-      "key": "s_30e4046a6b3affdd",
-      "source": "Reactivar dominio propio →"
     },
     {
       "key": "s_3149b95bc9d934e9",
@@ -4871,10 +4872,6 @@
       "source": "Canal Propio"
     },
     {
-      "key": "s_3aae23ebd3f60fff",
-      "source": "Frecuencia de pago"
-    },
-    {
       "key": "s_3ab46c424e63bca4",
       "source": "Anuncio activado."
     },
@@ -5063,6 +5060,10 @@
       "source": "Citas y Reservas"
     },
     {
+      "key": "s_40a5889ddb508c5b",
+      "source": "Aún no te dejan preguntas. Cuando el chat de tu tienda no sepa algo, aquí aparece."
+    },
+    {
       "key": "s_40d47dc8d8efc3b7",
       "source": "Copilot de catálogo"
     },
@@ -5081,6 +5082,10 @@
     {
       "key": "s_416220f5dd63d726",
       "source": "Artículo no disponible"
+    },
+    {
+      "key": "s_417df196937f9e0c",
+      "source": "No pudimos enviar tu respuesta."
     },
     {
       "key": "s_41baea6210e38e95",
@@ -5141,10 +5146,6 @@
     {
       "key": "s_43f6698cdd8189a3",
       "source": "Evento"
-    },
-    {
-      "key": "s_442af5b5276b1e25",
-      "source": "o $"
     },
     {
       "key": "s_4450b13e315c4c5b",
@@ -5211,12 +5212,12 @@
       "source": "Mi ciudad no aparece en la lista…"
     },
     {
-      "key": "s_46497c8ba268b67a",
-      "source": "Estado original"
+      "key": "s_460b3a7da007b7af",
+      "source": "Chat"
     },
     {
-      "key": "s_466a0433adee8dcc",
-      "source": "Función premium"
+      "key": "s_46497c8ba268b67a",
+      "source": "Estado original"
     },
     {
       "key": "s_46901acd6af7b840",
@@ -5291,12 +5292,8 @@
       "source": "Para tu historia"
     },
     {
-      "key": "s_49ad65de07a6d851",
-      "source": "Conéctalo… tú apruebas los cambios."
-    },
-    {
-      "key": "s_4a5e003eb48afce2",
-      "source": "Tu tienda se sirve como sitio independiente en"
+      "key": "s_4a2a7784c395a321",
+      "source": "No pudimos enviar tu respuesta. Revisa tu conexión."
     },
     {
       "key": "s_4ad92c5f3a54b945",
@@ -5477,6 +5474,10 @@
     {
       "key": "s_503615880cd5372f",
       "source": "El comprador aprobó la prueba."
+    },
+    {
+      "key": "s_50824e5f99d14e4a",
+      "source": "Ver la conversación"
     },
     {
       "key": "s_508c59e2337b1567",
@@ -5763,10 +5764,6 @@
       "source": "Opciones que verá el comprador"
     },
     {
-      "key": "s_59a260e3d67e7540",
-      "source": ") sigue activa siempre."
-    },
-    {
       "key": "s_59b40eb4813c00ab",
       "source": "Con espacio para subir precio"
     },
@@ -5833,6 +5830,10 @@
     {
       "key": "s_5b349d9523d3c4d4",
       "source": "Copia el token generado (solo se muestra una vez) y pégalo abajo"
+    },
+    {
+      "key": "s_5b3ca55dd0cfc0f8",
+      "source": "Ver mis pagos o cancelar"
     },
     {
       "key": "s_5b46992a065f3e16",
@@ -5917,10 +5918,6 @@
     {
       "key": "s_5d69868804693c2c",
       "source": "Tu link está listo"
-    },
-    {
-      "key": "s_5d6e022e6a4edf6e",
-      "source": "No pudimos iniciar el pago. Vuelve a intentarlo."
     },
     {
       "key": "s_5d81e12652744b8c",
@@ -6211,10 +6208,6 @@
       "source": "Puedes agregar la verificación después desde tu panel de gestión."
     },
     {
-      "key": "s_6715627a557bd591",
-      "source": "Subdominio propio activo"
-    },
-    {
       "key": "s_67a9ff291cd4f3fc",
       "source": "ingresos / mes"
     },
@@ -6355,10 +6348,6 @@
       "source": "Importar mi catálogo"
     },
     {
-      "key": "s_6a4e751af9fa2431",
-      "source": "No se pudo cambiar tu plan."
-    },
-    {
       "key": "s_6a710e7f1c5e20d1",
       "source": "Tipo de cobro"
     },
@@ -6401,10 +6390,6 @@
     {
       "key": "s_6c017af429ae91b5",
       "source": "productos × $3)"
-    },
-    {
-      "key": "s_6c251dc9087abdbf",
-      "source": "/año"
     },
     {
       "key": "s_6c64e278488d96d7",
@@ -6517,10 +6502,6 @@
     {
       "key": "s_6faa4cc055b8a2fa",
       "source": "Eliminar en 10 s ({0})"
-    },
-    {
-      "key": "s_6fbc573195cd7b6b",
-      "source": "Comparte"
     },
     {
       "key": "s_6fbfb793a22d5840",
@@ -6815,6 +6796,10 @@
       "source": "→ elige"
     },
     {
+      "key": "s_78acf7eca7456a02",
+      "source": "La sincronización automática de inventario viene incluida en Negocio (y en tu prueba de Negocio). Así no vendes de más en ninguno de los dos canales, y tus pedidos de Mercado Libre aparecen solos en tu bandeja de pedidos."
+    },
+    {
       "key": "s_78da35dabcb44ef0",
       "source": "Editar punto"
     },
@@ -6885,6 +6870,10 @@
     {
       "key": "s_7a5c87486c223d61",
       "source": "📦 Paquetería"
+    },
+    {
+      "key": "s_7a5d904332c90590",
+      "source": "No pudimos abrir tus pagos. Intenta de nuevo."
     },
     {
       "key": "s_7a90125e6484dc4c",
@@ -6979,10 +6968,6 @@
       "source": "Confirmar pago recibido"
     },
     {
-      "key": "s_7d6ddef9b536cf09",
-      "source": "/mes"
-    },
-    {
       "key": "s_7da29cb513275381",
       "source": "Algo salió mal. Inténtalo de nuevo."
     },
@@ -7069,10 +7054,6 @@
     {
       "key": "s_8159db18b7756a9f",
       "source": "Antes"
-    },
-    {
-      "key": "s_815c54969562884b",
-      "source": "Código de cupón (opcional)"
     },
     {
       "key": "s_816f14f419ed1f48",
@@ -7225,6 +7206,10 @@
     {
       "key": "s_8620948bd513e025",
       "source": "Sin señal: puedes cobrar en efectivo. Se guarda y se sube después."
+    },
+    {
+      "key": "s_8630a0dc25e2395a",
+      "source": "Responder"
     },
     {
       "key": "s_866996b042aa5cf2",
@@ -7423,10 +7408,6 @@
       "source": "← Volver"
     },
     {
-      "key": "s_8c39217eaf987a17",
-      "source": "Subdominio propio"
-    },
-    {
       "key": "s_8c57c2c4746c9b5c",
       "source": "Pagado"
     },
@@ -7581,10 +7562,6 @@
     {
       "key": "s_9104f4f7063cf88c",
       "source": "Política de devoluciones"
-    },
-    {
-      "key": "s_910f9b40aa0e3b01",
-      "source": ") está activo — incluido en tu tienda."
     },
     {
       "key": "s_91144ffb5c755fb7",
@@ -7783,6 +7760,10 @@
       "source": "Lo que ganas de verdad en cada venta — ingresos menos comisiones, envío y tu costo, congelados al momento de la venta."
     },
     {
+      "key": "s_97cbcc9f3a60c5c8",
+      "source": "Preguntas"
+    },
+    {
       "key": "s_97ccff8b5681db91",
       "source": "Cuéntale algo a quien visita tu tienda…"
     },
@@ -7807,16 +7788,16 @@
       "source": "Ofertas a {0}% o más del precio de lista se aceptan al instante."
     },
     {
+      "key": "s_9870260249368952",
+      "source": "Tu plan en Miyagi Sánchez y cómo pagarlo. Tu plan de negocio, con tus números, está en «Tu plan»."
+    },
+    {
       "key": "s_987d904d7afee232",
       "source": "Desactivada"
     },
     {
       "key": "s_987daf86e6b8b9be",
       "source": "No se pudo predecir la categoría."
-    },
-    {
-      "key": "s_988e8734d54a2057",
-      "source": "(sin la barra de la plataforma)."
     },
     {
       "key": "s_98cf389e481f7c76",
@@ -7963,10 +7944,6 @@
       "source": "Tus links"
     },
     {
-      "key": "s_9d51a8b87e7a98c5",
-      "source": "Sirve tu tienda como sitio independiente en"
-    },
-    {
       "key": "s_9e3330b289114cd5",
       "source": "El título es obligatorio."
     },
@@ -8045,6 +8022,10 @@
     {
       "key": "s_a0609c627179d606",
       "source": "Tu anuncio se publicará de inmediato y será visible para todos los compradores."
+    },
+    {
+      "key": "s_a09bef935cef1d42",
+      "source": "Tu respuesta"
     },
     {
       "key": "s_a0f2467e1aacceb5",
@@ -8435,6 +8416,14 @@
       "source": "https://…"
     },
     {
+      "key": "s_ab1f131589e29033",
+      "source": "hasta el final del mes que pagaste."
+    },
+    {
+      "key": "s_ab2049e3b06a5aa7",
+      "source": "Cancelaste el pago y no se te cobró nada. Puedes intentarlo cuando quieras."
+    },
+    {
       "key": "s_ab54917f451eb16f",
       "source": "Oculto"
     },
@@ -8539,10 +8528,6 @@
       "source": "— privado"
     },
     {
-      "key": "s_ada000093d8cf967",
-      "source": "Cambia tu facturación cuando quieras — se prorratea, sin cargo doble."
-    },
-    {
       "key": "s_ada3e0224eac73f0",
       "source": "Se subirá cuando haya señal."
     },
@@ -8561,10 +8546,6 @@
     {
       "key": "s_adc1ac4e4b066db7",
       "source": "Todos los pagos pasan por Compra Protegida sin excepción."
-    },
-    {
-      "key": "s_adce5d0e3d0703ca",
-      "source": "Tu subdominio propio ("
     },
     {
       "key": "s_ae2607d7471eb915",
@@ -8589,6 +8570,10 @@
     {
       "key": "s_aed7ea9bdfb1b79f",
       "source": "Mis anuncios ("
+    },
+    {
+      "key": "s_aed9c2abd0f1f784",
+      "source": "Ahí cambias tu tarjeta, ves tus pagos o cancelas. Si cancelas, sigues con el"
     },
     {
       "key": "s_aedc4bcda19ddb23",
@@ -8759,6 +8744,10 @@
       "source": "Responde rápido para cerrar el trato."
     },
     {
+      "key": "s_b489d3e680036557",
+      "source": ") está activo y es gratis en todos los planes."
+    },
+    {
       "key": "s_b4a5e919985497f9",
       "source": "Porcentaje"
     },
@@ -8787,10 +8776,6 @@
       "source": "No tienes productos de impresión configurables. Crea uno con tamaños/encuadernación o precios por cantidad."
     },
     {
-      "key": "s_b5b420c59808b269",
-      "source": "Redirigiendo…"
-    },
-    {
       "key": "s_b5bfb6d976306342",
       "source": ", los fondos se liberan automáticamente. Powered by Stripe."
     },
@@ -8817,6 +8802,10 @@
     {
       "key": "s_b64d208e6cc2aab4",
       "source": "Error al actualizar pedidos."
+    },
+    {
+      "key": "s_b65dbaab2f178a40",
+      "source": "Tu subdominio ("
     },
     {
       "key": "s_b66292585132b8e9",
@@ -8921,10 +8910,6 @@
     {
       "key": "s_b993d149271fa1d0",
       "source": "· con error {0}"
-    },
-    {
-      "key": "s_b9c5730320c21d15",
-      "source": "Activar subdominio propio →"
     },
     {
       "key": "s_b9cd12ed17ab75f8",
@@ -9051,10 +9036,6 @@
       "source": "Conecta tu cuenta para sincronizar tu catálogo e inventario."
     },
     {
-      "key": "s_bd90e272538583ff",
-      "source": "). Reactívala para volver a servir tu subdominio."
-    },
-    {
       "key": "s_bd9617f82fd93e10",
       "source": "Recomendamos Mercado Pago — tarjeta, OXXO, wallet y meses sin intereses, sin comisión de plataforma."
     },
@@ -9157,6 +9138,10 @@
     {
       "key": "s_c0bc1e08f9743b2d",
       "source": "es"
+    },
+    {
+      "key": "s_c17f500461608105",
+      "source": "Ya no tienes que pagarlo: tu suscripción termina al final del periodo que ya pagaste, sin ningún otro cargo."
     },
     {
       "key": "s_c1833af80c3d8987",
@@ -9571,6 +9556,10 @@
       "source": "g"
     },
     {
+      "key": "s_cd128e7221d54d10",
+      "source": "Preguntas — Mi tienda"
+    },
+    {
       "key": "s_cd25ee5b1db8f5b0",
       "source": "Pausar"
     },
@@ -9691,10 +9680,6 @@
       "source": "Colonia"
     },
     {
-      "key": "s_d0646bf55b4a63c6",
-      "source": "(arriba) siguen siendo gratis."
-    },
-    {
       "key": "s_d07e84752b05a1af",
       "source": "· agotado"
     },
@@ -9717,10 +9702,6 @@
     {
       "key": "s_d15f39d60e24e2f4",
       "source": "Entregado"
-    },
-    {
-      "key": "s_d18840cbbff8ba31",
-      "source": "{0} o {1} — el plan anual sale más barato; el mensual es sin compromiso."
     },
     {
       "key": "s_d1a32004248a963c",
@@ -9753,6 +9734,10 @@
     {
       "key": "s_d24d0ae4541cf1a3",
       "source": "Error al configurar."
+    },
+    {
+      "key": "s_d24f9e0044386c22",
+      "source": "Tu suscripción — Mi tienda"
     },
     {
       "key": "s_d260dbb6c467463c",
@@ -9895,8 +9880,16 @@
       "source": "Tema"
     },
     {
+      "key": "s_d5f10e3610ddc1b6",
+      "source": "Tu dominio propio se desconectó. Para volver a conectarlo, activa Negocio: el dominio propio viene incluido."
+    },
+    {
       "key": "s_d624ae7b8d83c8db",
       "source": "Valor {0} (p. ej. {1})"
+    },
+    {
+      "key": "s_d65a0f54c338a023",
+      "source": "Tu suscripción"
     },
     {
       "key": "s_d67c0098c3bcead1",
@@ -9993,6 +9986,10 @@
     {
       "key": "s_d9763c8360ad23dd",
       "source": "Serás redirigido a Mercado Pago para autorizar la conexión."
+    },
+    {
+      "key": "s_d9ab4b756bbe37cc",
+      "source": "Ver Negocio →"
     },
     {
       "key": "s_d9ab8c014a69233f",
@@ -10193,10 +10190,6 @@
     {
       "key": "s_df1f75906bad6539",
       "source": "o sube un archivo (.json)"
-    },
-    {
-      "key": "s_df245c70203254fa",
-      "source": "Tu suscripción al dominio propio terminó y tu dominio se desconectó. Tu tienda sigue activa en tu URL gratis y tu subdominio. Vuelve a activarla para reconectar tu dominio."
     },
     {
       "key": "s_df658bc31179406f",
@@ -10419,6 +10412,10 @@
       "source": "En camino"
     },
     {
+      "key": "s_e70575be0d53d089",
+      "source": "Lo que te preguntaron en el chat de tu tienda y el chat no supo responder. Tu respuesta le llega a su correo."
+    },
+    {
       "key": "s_e71ad42fcdea807d",
       "source": "Ej: Automotriz García, Moda Oaxaca, Gadgets MX..."
     },
@@ -10453,10 +10450,6 @@
     {
       "key": "s_e79c8b4a469e9d62",
       "source": "El comprador paga el envío de regreso"
-    },
-    {
-      "key": "s_e79cd3577c7b5b5e",
-      "source": "Tu suscripción al subdominio terminó y tu tienda volvió a tu URL gratis ("
     },
     {
       "key": "s_e7dd9078eb6dc1d1",
@@ -10733,10 +10726,6 @@
     {
       "key": "s_f0cece0731584ca2",
       "source": "Deja que tu agente lleve tu tienda"
-    },
-    {
-      "key": "s_f1034d7fe75c0c04",
-      "source": "¿Sigues tú o sigue tu agente?"
     },
     {
       "key": "s_f108081c94cbbb72",
@@ -11107,6 +11096,10 @@
       "source": "⚠️ Sin verificar"
     },
     {
+      "key": "s_fc7fdb975beb9c04",
+      "source": "Conecta tu propio dominio (tutienda.com). Viene incluido en Negocio, junto con Mercado Libre y más ayuda de la IA."
+    },
+    {
       "key": "s_fc927f05fcfa9f86",
       "source": "Método:"
     },
@@ -11179,6 +11172,10 @@
       "source": "listo"
     },
     {
+      "key": "s_fef12c38e9cee1a0",
+      "source": "No se pudo iniciar el pago. Intenta de nuevo."
+    },
+    {
       "key": "s_ff2c7c6813893250",
       "source": "No tienes anuncios publicados"
     },
@@ -11217,6 +11214,10 @@
     {
       "key": "s_ffd8a5437d5d059a",
       "source": "Dominio de tu tienda Shopify"
+    },
+    {
+      "key": "s_ffe16d46910d58f4",
+      "source": "Guardar como pregunta frecuente (el chat la responde la próxima vez)"
     }
   ]
 }
