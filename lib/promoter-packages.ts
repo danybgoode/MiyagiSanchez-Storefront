@@ -115,7 +115,9 @@ export const PACKAGES: Readonly<Record<PackageSku, PackageDef>> = Object.freeze(
 // ticket for more shops while the promoter program starts. The RATE does not change (60%), so the promoter keeps $150
 // and Miyagi Sánchez gets $100; no rate row and no migration. Mexico City has had no daylight saving since 2022, so
 // midnight there is 06:00 UTC. The price is CAPTURED when a sale starts (Stripe metadata `gross_cents`, the transfer's
-// `basePriceCents`), so a sale started on the 31st and approved later keeps $250. Every price READ goes through
+// `basePriceCents`), so a sale started on the 31st and approved later keeps $250. Known edge, accepted (pr-reviewer,
+// #488): the receipt reads the clock on its own, so a receipt at 23:55 and a transfer at 00:05 on 1 Jan disagree.
+// The window is minutes on New Year's Eve; an operator fixes it by hand if it ever happens. Every price READ goes through
 // `packagePriceMxn`: reading `PACKAGES[sku].priceMxn` directly would show the list price during the offer.
 export const FOUNDERS_PRICE = Object.freeze({
   sku: 'tienda_anual' as PackageSku,

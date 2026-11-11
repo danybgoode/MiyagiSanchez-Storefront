@@ -8,6 +8,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { isDeepStrictEqual } from 'node:util'
 import {
   FOUNDERS_PRICE,
@@ -127,15 +128,13 @@ test.describe('the three packages on sale and the two retired ones (D11)', () =>
   })
 
   test("every price READ goes through packagePriceMxn, so no surface shows $500 during the offer", () => {
-    const readers = [
-      'app/api/promoter/close/receipt/route.ts',
-      'app/api/promoter/close/package/[sku]/route.ts',
-      'app/(shell)/promotor/cerrar/CobraStep.tsx',
-      'app/(shell)/mx/vende/promotor/sell-sheet/page.tsx',
-      'app/(shell)/mx/vende/_components/page-config.ts',
-      'lib/promoter-package-server.ts',
-    ]
-    for (const f of readers) expect(readFileSync(f, 'utf8'), f).not.toMatch(/\.priceMxn\b/)
+    // Swept over the whole source, not a hand-listed set: a new reader anywhere would show the list price.
+    // git grep exits 1 when nothing matches; only 2+ is a real failure (a guard that cannot look must fail, not pass).
+    const r = spawnSync('git', ['grep', '-n', '-E', 'PACKAGES(\\[[^]]+\\]|\\.[a-z_]+)\\.priceMxn', '--', 'app', 'lib'], { encoding: 'utf8' })
+    expect(r.status === 0 || r.status === 1, r.stderr).toBe(true)
+    const out = r.stdout.trim()
+    const readers = out ? out.split('\n').filter((l) => !l.startsWith('lib/promoter-packages.ts:')) : []
+    expect(readers).toEqual([])
   })
 
   test('the six-month package cannot be split 500 / 600 with an integer rate — the reason it is 495 / 605 (D12)', () => {
