@@ -197,8 +197,8 @@ const read = (relative: string) => readFileSync(path.join(ROOT, relative), 'utf8
 test.describe('share kit · the catalog tiles are for Mexico shops only (D5)', () => {
   // A US shop shown a catalog link would share a page that 404s. Both hosts decide from the Medusa seller's market.
   // Observed red by deleting each gate in turn (verifier round 2, PR 447).
-  test('Comparte passes a catalog link only for a Mexico shop', () => {
-    const page = read('app/(shell)/shop/manage/comparte/page.tsx')
+  test('Canales passes a catalog link only for a Mexico shop', () => {
+    const page = read('app/(shell)/shop/manage/canal-propio/page.tsx')
     expect(page).toMatch(/const isMexicoShop = readPublicSellerMarket\(medusaShop\)\?\.market_code === 'mx'/)
     expect(page).toContain('catalogUrl={isMexicoShop ? catalogUrl(shop.slug) : null}')
   })

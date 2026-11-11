@@ -29,6 +29,7 @@ const AUTHOR_KIND_LABEL: Record<FeedbackAuthorKind, string> = {
   seller: 'Vendedor',
   partner: 'Socio',
   agent: 'Agente',
+  promoter: 'Promotor',
 }
 
 function buildFeedbackUrl(params: FeedbackSearchParams): string {

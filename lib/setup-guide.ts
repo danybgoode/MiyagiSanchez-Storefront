@@ -172,7 +172,7 @@ const STEP_META: StepMeta[] = [
     label: 'Comparte tu tienda',
     body: 'Comparte el enlace de tu tienda con tus primeros compradores.',
     ctaLabel: 'Compartir tienda',
-    ctaHref: '/shop/manage/comparte',
+    ctaHref: '/shop/manage/canal-propio',
   },
 ]
 
