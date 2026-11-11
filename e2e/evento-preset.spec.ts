@@ -360,3 +360,10 @@ test.describe('a crafted /api/checkout/start cannot buy a $0 cart (review #491)'
     expect(fn).not.toContain('guard skipped')
   })
 })
+
+test.describe('a free Evento shows only the RSVP panel (codex review #491)', () => {
+  test('the PDP hides the buy/offer/cart cascade when the RSVP panel is shown', () => {
+    const pdp = readFileSync(join(import.meta.dirname, '..', 'app/(shell)/l/[id]/ListingRenderer.tsx'), 'utf8')
+    expect(pdp).toMatch(/const showBuyerActions = isClaimed && !isOwnListing && !rsvpEvent\b/)
+  })
+})

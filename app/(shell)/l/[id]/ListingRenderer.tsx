@@ -392,7 +392,9 @@ export async function ListingPage({
     ? formatCents(agreedDealCents, activeDealCurrency)
     : rsvpEvent ? freeEventPriceLabel(presentation.language)
     : listing.price_cents ? formatCents(listing.price_cents, listing.currency) : buyerCopy['l.id.page.46ee2987']
-  const showBuyerActions = isClaimed && !isOwnListing
+  // A free Evento's only action is the RSVP panel: hide the whole buy/offer/cart cascade, or a buyer meets a
+  // «Comprar» that startCheckout then refuses (codex review #491).
+  const showBuyerActions = isClaimed && !isOwnListing && !rsvpEvent
   // Inventory modes (catalog-management epic, Sprint 2 · Story 2.1) — a
   // "sobre pedido" (backorder) listing never blocks the buy box even at
   // qty 0 (Medusa's own reserveInventoryStep/completeCartWorkflow already
