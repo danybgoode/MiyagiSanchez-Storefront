@@ -379,7 +379,7 @@ export function resolveUcpFulfillmentSelection(input: {
           currency: rate.currency,
           deliveryEstimate: rate.deliveryEstimate ?? null,
           deliveryLabel: rate.deliveryLabel ?? null,
-          signature: rate.signature ?? null,
+          ...(rate.signature ? { signature: rate.signature } : {}),
         },
       },
     }

@@ -173,6 +173,23 @@ test.describe('UCP fulfillment selection', () => {
     })
   })
 
+  test('the backend rate signature rides into the shipping quote unchanged', () => {
+    const destination = normalizeShippingDestination(DESTINATION)
+    const rates = RATES.map(r => ({ ...r, signature: '123.sig' }))
+    const projected = projectUcpFulfillment({
+      listingId: LISTING_ID, deliveryMethods: [SHIPPING], destination,
+      rateSource: { state: 'available', rates },
+    })!
+    const result = resolveUcpFulfillmentSelection({
+      listingId: LISTING_ID, methodId: 'shipping',
+      destinationId: projected.methods[0].selected_destination_id!,
+      optionId: projected.methods[0].groups![0].options[0].id,
+      destination, deliveryMethods: [SHIPPING],
+      rateSource: { state: 'available', rates },
+    })
+    expect(result.ok && result.value.shippingQuote?.signature).toBe('123.sig')
+  })
+
   test('a returned option id fails after the destination changes', () => {
     const original = normalizeShippingDestination(DESTINATION)
     const projected = projectUcpFulfillment({
