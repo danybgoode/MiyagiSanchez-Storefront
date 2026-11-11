@@ -38,6 +38,8 @@ export interface CreatePreferenceParams {
   offerId?: string
   origin: string
   channel?: string   // federated commerce channel tag
+  /** Preference lifetime; set for a reserved offer so an abandoned checkout frees it (lib/offer-reservation.ts). */
+  expiresInMs?: number
 }
 
 export interface MpPreference {
@@ -77,6 +79,7 @@ export async function createMpPreference(p: CreatePreferenceParams): Promise<MpP
         pending: `${p.origin}/payment/pending?source=mp`,
       },
       auto_return: 'approved',
+      ...(p.expiresInMs ? { expires: true, expiration_date_to: new Date(Date.now() + p.expiresInMs).toISOString() } : {}),
       statement_descriptor: 'MIYAGI SANCHEZ',
     },
   })

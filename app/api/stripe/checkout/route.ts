@@ -5,6 +5,7 @@ import { db } from '@/lib/supabase'
 import { detectChannel } from '@/lib/channel'
 import { resolveOrigin } from '@/lib/request-origin'
 import { listingUrlFor } from '@/lib/market-url'
+import { OFFER_SESSION_TTL_MS, dbOfferClaim, dbOfferLookup, dbOfferRelease, gateOfferPurchase, releaseOfferReservation } from '@/lib/offer-reservation'
 
 interface CheckoutBody {
   listingId: string
@@ -56,24 +57,30 @@ export async function POST(req: NextRequest) {
     }, { status: 422 })
   }
 
-  let priceCents = listing.price_cents
-  if (body.offerId) {
-    const { data: offer } = await db
-      .from('marketplace_offers')
-      .select('offer_amount_cents, counter_amount_cents, status')
-      .eq('id', body.offerId)
-      .eq('listing_id', listing.id)
-      .single()
-
-    if (offer?.status === 'accepted') {
-      priceCents = offer.counter_amount_cents ?? offer.offer_amount_cents
-    }
+  // An accepted offer sets the price ONLY for the buyer who made it, and only one checkout at a
+  // time may hold it (lib/offer-reservation.ts). Anything else the caller names is ignored.
+  const gate = await gateOfferPurchase({
+    offerId: body.offerId,
+    listingId: listing.id,
+    clerkUserId: userId ?? null,
+    now: new Date(),
+    lookup: dbOfferLookup(db),
+    claim: dbOfferClaim(db),
+  })
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error, code: gate.code }, { status: gate.status })
+  }
+  const priceCents = gate.priceCents ?? listing.price_cents
+  const reservedAt = gate.reservedAt
+  const releaseReservation = () => {
+    if (gate.offerId && reservedAt) void releaseOfferReservation(dbOfferRelease(db), gate.offerId, reservedAt)
   }
 
   let origin: string
   try {
     origin = resolveOrigin({ siteUrl: process.env.NEXT_PUBLIC_SITE_URL, host: req.headers.get('host') })
   } catch (e) {
+    releaseReservation()
     return NextResponse.json({ error: e instanceof Error ? e.message : 'No se pudo iniciar el pago.' }, { status: 500 })
   }
   const thumb = (listing.images as Array<{ url: string }> | null)?.[0]?.url
@@ -98,6 +105,7 @@ export async function POST(req: NextRequest) {
   // promises agents: commerce readiness suppresses US buy_now until its rail exists.
   const listingCurrency = (listing.currency ?? 'MXN').toUpperCase()
   if (listingCurrency !== 'MXN') {
+    releaseReservation()
     return NextResponse.json({
       error: 'Checkout for this market is not available on this endpoint.',
       code: 'CHECKOUT_MARKET_UNSUPPORTED',
@@ -106,8 +114,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Zero commission: full amount transferred to seller, platform_fee = 0
-  const session = await stripe.checkout.sessions.create({
+  let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>
+  try {
+  session = await stripe.checkout.sessions.create({
     mode: 'payment',
+    // A reserved offer's session is short, so an abandoned checkout frees the offer on its own.
+    ...(reservedAt ? { expires_at: Math.floor((Date.now() + OFFER_SESSION_TTL_MS) / 1000) } : {}),
     line_items: [{
       quantity: 1,
       price_data: {
@@ -139,12 +151,17 @@ export async function POST(req: NextRequest) {
       shop_id: listing.shop_id,
       buyer_clerk_id: userId ?? '',
       listing_type: listing.listing_type,
-      offer_id: body.offerId ?? '',
+      offer_id: gate.offerId ?? '',
       channel: detectChannel(req),
       is_physical: isPhysical ? 'true' : 'false',
     },
     ...(body.buyerEmail ? { customer_email: body.buyerEmail } : {}),
   })
+  } catch (e) {
+    // validate -> claim -> apply: the session never existed, so give the offer back.
+    releaseReservation()
+    throw e
+  }
 
   return NextResponse.json({ url: session.url, checkoutUrl: session.url })
 }
