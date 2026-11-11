@@ -72,15 +72,17 @@ export async function POST(req: NextRequest) {
   }
   const priceCents = gate.priceCents ?? listing.price_cents
   const reservedAt = gate.reservedAt
-  const releaseReservation = () => {
-    if (gate.offerId && reservedAt) void releaseOfferReservation(dbOfferRelease(db), gate.offerId, reservedAt)
+  // Awaited (still best-effort: releaseOfferReservation catches and logs, never throws) so the
+  // release is not lost when the serverless response ends.
+  const releaseReservation = async () => {
+    if (gate.offerId && reservedAt) await releaseOfferReservation(dbOfferRelease(db), gate.offerId, reservedAt)
   }
 
   let origin: string
   try {
     origin = resolveOrigin({ siteUrl: process.env.NEXT_PUBLIC_SITE_URL, host: req.headers.get('host') })
   } catch (e) {
-    releaseReservation()
+    await releaseReservation()
     return NextResponse.json({ error: e instanceof Error ? e.message : 'No se pudo iniciar el pago.' }, { status: 500 })
   }
   const thumb = (listing.images as Array<{ url: string }> | null)?.[0]?.url
@@ -105,7 +107,7 @@ export async function POST(req: NextRequest) {
   // promises agents: commerce readiness suppresses US buy_now until its rail exists.
   const listingCurrency = (listing.currency ?? 'MXN').toUpperCase()
   if (listingCurrency !== 'MXN') {
-    releaseReservation()
+    await releaseReservation()
     return NextResponse.json({
       error: 'Checkout for this market is not available on this endpoint.',
       code: 'CHECKOUT_MARKET_UNSUPPORTED',
@@ -159,7 +161,7 @@ export async function POST(req: NextRequest) {
   })
   } catch (e) {
     // validate -> claim -> apply: the session never existed, so give the offer back.
-    releaseReservation()
+    await releaseReservation()
     throw e
   }
 

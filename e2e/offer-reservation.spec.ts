@@ -75,4 +75,13 @@ test.describe('both legacy checkout routes go through the gate', () => {
       expect(src).not.toMatch(/from\('marketplace_offers'\)/)
     })
   }
+  test('every release is awaited, never fire-and-forget', () => {
+    for (const route of ['app/api/stripe/checkout/route.ts', 'app/api/mp/checkout/route.ts']) {
+      const src = readFileSync(join(process.cwd(), route), 'utf8')
+      expect(src).not.toMatch(/void releaseOfferReservation|void releaseReservation|[^t] releaseReservation\(\)\n/)
+      expect(src).toMatch(/await releaseOfferReservation\(/)
+    }
+    const stripe = readFileSync(join(process.cwd(), 'app/api/stripe/checkout/route.ts'), 'utf8')
+    expect(stripe.match(/await releaseReservation\(\)/g)?.length).toBe(3)
+  })
 })

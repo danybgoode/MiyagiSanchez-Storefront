@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
   })
   } catch (e) {
     // validate -> claim -> apply: the preference never existed, so give the offer back.
-    if (gate.offerId && gate.reservedAt) void releaseOfferReservation(dbOfferRelease(db), gate.offerId, gate.reservedAt)
+    if (gate.offerId && gate.reservedAt) await releaseOfferReservation(dbOfferRelease(db), gate.offerId, gate.reservedAt)
     throw e
   }
 
