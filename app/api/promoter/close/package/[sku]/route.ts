@@ -21,7 +21,7 @@ import { getConfiguredCommissionRate, getPromoterByClerkId } from '@/lib/promote
 import { readNegocioGrant } from '@/lib/plan'
 import { resolveTargetShop } from '@/lib/promoter-server'
 import { startPromoterTransferClose } from '@/lib/promoter-transfers'
-import { PACKAGES, RETIRED_PACKAGE_MESSAGE, isPackageSku, isRetiredPackageSku } from '@/lib/promoter-packages'
+import { RETIRED_PACKAGE_MESSAGE, isPackageSku, isRetiredPackageSku, packagePriceMxn } from '@/lib/promoter-packages'
 import { startPackageCardCheckout } from '@/lib/promoter-package-server'
 import { promoterMayCloseShop } from '@/lib/promoter-shop-access'
 
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sku
     const result = await startPromoterTransferClose({
       promoter,
       sku,
-      basePriceCents: PACKAGES[sku].priceMxn * 100,
+      basePriceCents: packagePriceMxn(sku) * 100,
       sellerId: shop.id,
       transferMethod: body.transferMethod,
       ratePct,

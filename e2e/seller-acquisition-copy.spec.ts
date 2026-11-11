@@ -1,3 +1,4 @@
+import { isFoundersPrice } from '../lib/promoter-packages'
 import { expect, test } from '@playwright/test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { sellerTrustPrompt } from '../lib/seller-acquisition'
@@ -145,7 +146,11 @@ test.describe('promoter landing · CTA + wording sweep (promoter-funnel-v2 S1 ·
     // plan-tienda D11: the three packages on sale; the retired two never appear for sale.
     expect(config.proofPoints.map((p) => p.title)).toEqual(['Plan Tienda · 1 año', 'Plan Negocio · 6 meses', 'Plan Negocio · 1 año'])
     // The money first, then what the merchant gets, with the three free months on top.
-    expect(config.proofPoints[0].body.startsWith('Cobras $500. Le pasas $200 a Miyagi Sánchez. Te quedas $300.')).toBe(true)
+    // Tienda shows today's price: the founders' $250 until the end of 2026 (Daniel 2026-11-11), then the list $500.
+    const tiendaLine = isFoundersPrice('tienda_anual')
+      ? 'Cobras $250. Le pasas $100 a Miyagi Sánchez. Te quedas $150.'
+      : 'Cobras $500. Le pasas $200 a Miyagi Sánchez. Te quedas $300.'
+    expect(config.proofPoints[0].body.startsWith(tiendaLine)).toBe(true)
     expect(config.proofPoints[1].body.startsWith('Cobras $1,100. Le pasas $495 a Miyagi Sánchez. Te quedas $605.')).toBe(true)
     expect(config.proofPoints[2].body.startsWith('Cobras $2,000. Le pasas $900 a Miyagi Sánchez. Te quedas $1,100.')).toBe(true)
     for (const p of config.proofPoints) expect(p.body).toContain('3 meses gratis van además del tiempo pagado')

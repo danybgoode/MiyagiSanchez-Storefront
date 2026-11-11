@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { PACKAGES, PACKAGE_FREE_MONTHS, SELLABLE_PACKAGE_SKUS, packageSplit, type PackageSku, type SellablePackageSku } from '@/lib/promoter-packages'
+import { PACKAGES, PACKAGE_FREE_MONTHS, SELLABLE_PACKAGE_SKUS, packageSplit, packagePriceMxn, isFoundersPrice, type PackageSku, type SellablePackageSku } from '@/lib/promoter-packages'
 import type { Dictionary } from '@/lib/dictionary'
 
 /**
@@ -122,7 +122,7 @@ export default function CobraStep({ copy, shop, transferEnabled, packageRates }:
         <select className={field} value={option} disabled={busy}
           onChange={(e) => { setOption(e.target.value as Option); setError(null) }}>
           {PACKAGE_OPTIONS.map((p) => (
-            <option key={p} value={`package/${p}`}>{PACKAGES[p].label} ({fill(t.charges, { monto: pesos(PACKAGES[p].priceMxn * 100) })})</option>
+            <option key={p} value={`package/${p}`}>{PACKAGES[p].label} ({fill(t.charges, { monto: pesos(packagePriceMxn(p) * 100) })}{isFoundersPrice(p) ? ' · precio de fundador' : ''})</option>
           ))}
           <option value="migration">{t.migration}</option>
         </select>
@@ -194,7 +194,7 @@ function SplitLine({ copy, sku, rate }: { copy: Copy; sku: PackageSku; rate: num
   if (!rate) {
     return (
       <>
-        <p className="text-sm" style={{ margin: 0 }}>{fill(t.ratePending, { monto: pesos(PACKAGES[sku].priceMxn * 100) })}</p>
+        <p className="text-sm" style={{ margin: 0 }}>{fill(t.ratePending, { monto: pesos(packagePriceMxn(sku) * 100) })}</p>
         {onTop}
       </>
     )

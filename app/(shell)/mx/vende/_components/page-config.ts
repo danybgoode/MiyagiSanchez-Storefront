@@ -1,4 +1,4 @@
-import { PACKAGES, PACKAGE_FREE_MONTHS, SELLABLE_PACKAGE_SKUS, packageSentence, packageSplit } from '@/lib/promoter-packages'
+import { PACKAGES, PACKAGE_FREE_MONTHS, SELLABLE_PACKAGE_SKUS, packageSentence, packageSplit, packagePriceMxn } from '@/lib/promoter-packages'
 import type { Dictionary } from '@/lib/dictionary'
 import {
   resolveSellerPersonaRoute,
@@ -404,7 +404,7 @@ export function buildPromoterPageConfig(
       title: PACKAGES[sku].label,
       body: commissionRates[sku]
         ? `${packageSentence(sku, commissionRates[sku])}. ${PACKAGES[sku].summary}: los ${PACKAGE_FREE_MONTHS} meses gratis van además del tiempo pagado.`
-        : `Cobras $${PACKAGES[sku].priceMxn.toLocaleString('en-US')}; tu parte se confirma con Miyagi Sánchez. ${PACKAGES[sku].summary}.`,
+        : `Cobras $${packagePriceMxn(sku).toLocaleString('en-US')}; tu parte se confirma con Miyagi Sánchez. ${PACKAGES[sku].summary}.`,
     })),
     stepsTitle: page.stepsTitle,
     steps: page.steps,
