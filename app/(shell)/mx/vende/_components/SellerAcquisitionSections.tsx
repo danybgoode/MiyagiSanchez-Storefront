@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import type { SellerAcquisitionVariant } from '@/lib/seller-acquisition'
+import type { RealShopProof, DemoShop } from '@/lib/business-types'
+import { BusinessProofSlot } from './BusinessProofSlot'
 import { PromptBlock } from './PromptBlock'
 import { SellerAcquisitionVariantTag } from './SellerAcquisitionVariantTag'
 import styles from './SellerAcquisitionHero.module.css'
@@ -147,6 +149,13 @@ type SupportBlock = {
   items: Array<{ icon: string; title: string; body: string }>
 }
 
+type DemoShopBlock = {
+  badge: string
+  title: string
+  disclaimer: string
+  shop: DemoShop
+}
+
 export type SellerAcquisitionPageConfig = {
   pageId: string
   variant: SellerAcquisitionVariant
@@ -207,8 +216,14 @@ export type SellerAcquisitionPageConfig = {
   describe?: React.ReactNode
   /** Six stories of what the shop already does, each linking to the real feature (anchor only). */
   featureStories?: { title: string; lead: string; items: FeatureStory[] }
+  /** «Tu tipo de negocio» — a link to each business-type page (anchor only). */
+  businessTypes?: { title: string; lead: string; cards: PersonaRouterCard[] }
   /** D4 — who answers: the promoter (on their own WhatsApp) and the merchant's AI agent. */
   support?: SupportBlock
+  /** A clearly labelled invented shop, so a merchant sees THEIR kind of shop working (business-type pages). */
+  demoShop?: DemoShopBlock
+  /** Real shops that consented to be shown. Empty ⇒ the slot renders nothing at all. */
+  realProof?: { title: string; shops: readonly RealShopProof[] }
 }
 
 export function SellerAcquisitionPage({ config }: { config: SellerAcquisitionPageConfig }) {
@@ -253,6 +268,9 @@ function AnchorSections({ config }: { config: SellerAcquisitionPageConfig }) {
       ) : null}
       {config.benchmark ? <BenchmarkSection benchmark={config.benchmark} pageId={config.pageId} /> : null}
       {config.personaRouter ? <PersonaRouterSection router={config.personaRouter} pageId={config.pageId} /> : null}
+      {config.businessTypes ? (
+        <PersonaRouterSection router={config.businessTypes} pageId={config.pageId} slug="business-types" />
+      ) : null}
       {config.aiChannel ? <AiChannelSection aiChannel={config.aiChannel} pageId={config.pageId} /> : null}
       {config.premiumFeatures ? (
         <PremiumFeaturesSection features={config.premiumFeatures} pageId={config.pageId} />
@@ -271,6 +289,10 @@ function PersonaSections({ config }: { config: SellerAcquisitionPageConfig }) {
   return (
     <>
       <ProofSection config={config} />
+      {config.demoShop ? <DemoShopSection demo={config.demoShop} pageId={config.pageId} /> : null}
+      {config.realProof ? (
+        <BusinessProofSlot title={config.realProof.title} shops={config.realProof.shops} pageId={config.pageId} />
+      ) : null}
       {config.benchmark ? <BenchmarkSection benchmark={config.benchmark} pageId={config.pageId} /> : null}
       {config.personaRouter ? <PersonaRouterSection router={config.personaRouter} pageId={config.pageId} /> : null}
       <StepsSection config={config} />
@@ -488,13 +510,16 @@ function ProofSection({ config }: { config: SellerAcquisitionPageConfig }) {
 function PersonaRouterSection({
   router,
   pageId,
+  slug = 'router',
 }: {
   router: NonNullable<SellerAcquisitionPageConfig['personaRouter']>
   pageId: string
+  /** Two routers can share a page (personas and business types), so each needs its own heading id. */
+  slug?: string
 }) {
   return (
-    <section aria-labelledby={`${pageId}-router-title`} style={{ marginBottom: 'var(--s-10)' }}>
-      <SectionIntro id={`${pageId}-router-title`} title={router.title} lead={router.lead} />
+    <section aria-labelledby={`${pageId}-${slug}-title`} style={{ marginBottom: 'var(--s-10)' }}>
+      <SectionIntro id={`${pageId}-${slug}-title`} title={router.title} lead={router.lead} />
       <div
         style={{
           display: 'grid',
@@ -1110,6 +1135,52 @@ function SupportSection({ support, pageId }: { support: SupportBlock; pageId: st
           </article>
         ))}
       </div>
+    </section>
+  )
+}
+
+/**
+ * A made-up shop that says «Ejemplo» on its face and names no real business. It exists so a merchant sees THEIR kind
+ * of shop working before any real shop has agreed to be shown (own-shop-positioning D6). It carries no price: a typed
+ * MXN figure would be a hand-typed price.
+ */
+function DemoShopSection({ demo, pageId }: { demo: DemoShopBlock; pageId: string }) {
+  return (
+    <section
+      aria-labelledby={`${pageId}-demo-title`}
+      data-testid="business-demo-shop"
+      style={{ marginBottom: 'var(--s-10)' }}
+    >
+      <h2 id={`${pageId}-demo-title`} className="t-h2" style={{ letterSpacing: 0, marginBottom: 'var(--s-4)' }}>
+        {demo.title}
+      </h2>
+      <article className="card-panel" style={{ padding: 'var(--s-6)', display: 'grid', gap: 'var(--s-4)' }}>
+        <header style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s-3)', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ minWidth: 0 }}>
+            <p className="t-h3" style={{ letterSpacing: 0, margin: 0 }}>{demo.shop.name}</p>
+            <p className="t-small" style={{ color: 'var(--fg-muted)', margin: 0 }}>{demo.shop.tagline}</p>
+          </div>
+          <span className="badge badge-warning" data-testid="business-demo-badge">{demo.badge}</span>
+        </header>
+        <ul
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
+            gap: 'var(--s-3)',
+          }}
+        >
+          {demo.shop.items.map((item) => (
+            <li key={item.name} style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--s-3)' }}>
+              <strong style={{ display: 'block', color: 'var(--fg)' }}>{item.name}</strong>
+              <span className="t-small" style={{ display: 'block', color: 'var(--fg-muted)' }}>{item.note}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="t-caption" style={{ margin: 0 }}>{demo.disclaimer}</p>
+      </article>
     </section>
   )
 }

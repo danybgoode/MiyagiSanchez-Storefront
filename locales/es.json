@@ -1818,16 +1818,16 @@
     },
     "autos": {
       "metadata": {
-        "title": "Vende autos con ficha, inspección y mensualidad — Miyagi Sánchez",
-        "description": "Publica tu catálogo de autos con ficha técnica, reporte de inspección, garantía y mensualidad informativa. Búsqueda real por marca, modelo, año y precio. 0% de comisión.",
-        "ogAlt": "Miyagi Sánchez para venta de autos: ficha técnica, inspección y mensualidad, sin comisiones."
+        "title": "Tu lote de autos en línea, con ficha e inspección — Miyagi Sánchez",
+        "description": "Tu propia tienda de autos, armada contigo: ficha técnica, reporte de inspección, garantía y mensualidad informativa en cada unidad. 0% de comisión.",
+        "ogAlt": "Miyagi Sánchez para autos: tu propia tienda con ficha técnica e inspección, sin comisiones."
       },
-      "eyebrow": "",
-      "heroTitle": "Vende autos con la confianza de un lote profesional.",
-      "heroLead": "Publica tu catálogo con ficha técnica, reporte de inspección y garantía. El comprador filtra por marca, modelo, año, precio y kilometraje — como en un sitio especializado, pero dentro del marketplace.",
+      "eyebrow": "Para lotes, agencias y venta particular",
+      "heroTitle": "Tu lote de autos en línea, con la confianza de un lote profesional.",
+      "heroLead": "Tu propia tienda de autos, armada contigo: cada unidad con ficha técnica, reporte de inspección y garantía. El comprador filtra por marca, modelo, año, precio y kilometraje, y tú recibes ofertas sin pagar comisión.",
       "trustLine": "Compruébalo tú mismo: pídele a tu IA que evalúe miyagisanchez.com/mx/vende/autos y te diga si sirve para tu catálogo de autos.",
-      "primaryCta": "Publicar mi catálogo de autos",
-      "secondaryCta": "Ver autos en el marketplace",
+      "primaryCta": "Abrir mi tienda",
+      "secondaryCta": "Ver autos en el Vecindario",
       "heroStats": [
         {
           "value": "0%",
@@ -1842,8 +1842,8 @@
           "label": "mensualidad informativa en cada ficha"
         }
       ],
-      "proofTitle": "Hecho para vender autos, no solo publicar anuncios",
-      "proofLead": "Cada auto tiene ficha técnica, filtros reales y las señales de confianza que un comprador espera antes de decidir.",
+      "proofTitle": "Hecho para vender autos, no solo para publicarlos",
+      "proofLead": "En tu propia tienda, cada auto tiene ficha técnica, filtros reales y las señales de confianza que un comprador espera antes de decidir.",
       "proofPoints": [
         {
           "icon": "iconoir-car",
@@ -1869,7 +1869,7 @@
       "stepsTitle": "De tu catálogo actual a un lote en línea",
       "steps": [
         {
-          "title": "Sube tu catálogo",
+          "title": "Cuéntanos tu inventario",
           "body": "Pega tu inventario o deja que tu agente lo importe con marca, modelo, año y precio de cada auto."
         },
         {
@@ -1897,14 +1897,14 @@
           "label": "sin comisión por venta"
         }
       ],
-      "closingTitle": "Tu catálogo de autos merece más que una lista de anuncios.",
-      "closingBody": "Publica tu inventario, agrega inspección y garantía, y deja que el comprador filtre como en un sitio especializado — sin comisión y con tu propia marca.",
-      "closingCta": "Publicar mi catálogo",
+      "closingTitle": "Tu lote merece su propia tienda, no un lugar en una lista de anuncios.",
+      "closingBody": "Cuéntanos qué autos manejas, agrega inspección y garantía, y deja que el comprador filtre como en un sitio especializado — sin comisión y con tu propia marca.",
+      "closingCta": "Abrir mi tienda",
       "variants": {
         "b": {
           "heroTitle": "Convierte tu catálogo de autos en un lote en línea.",
-          "primaryCta": "Publicar mis autos",
-          "closingCta": "Publicar mis autos"
+          "primaryCta": "Abrir mi tienda",
+          "closingCta": "Abrir mi tienda"
         }
       }
     },

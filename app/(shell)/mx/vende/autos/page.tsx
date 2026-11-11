@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import es from '@/locales/es.json'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
-import { sellerPersonaCtaHref } from '@/lib/seller-acquisition'
+import { sellerLandingRedirectPath } from '@/lib/seller-acquisition'
 import { SellerAcquisitionPage } from '../_components/SellerAcquisitionSections'
 import { buildAutosPageConfig } from '../_components/page-config'
 
@@ -56,7 +56,7 @@ export default async function AutosSellerPage({ searchParams }: AutosPageProps) 
     potentialAction: {
       '@type': 'CreateAction',
       name: ui.autos.primaryCta,
-      target: `${BASE_URL}${sellerPersonaCtaHref('autos', query)}`,
+      target: `${BASE_URL}${sellerLandingRedirectPath('mx', { ...query, from: 'autos' })}`,
     },
   }
 

@@ -3,6 +3,8 @@ import type { Dictionary } from '@/lib/dictionary'
 import {
   resolveSellerPersonaRoute,
   resolveSellerAcquisitionVariant,
+  parseSellerAcquisitionUtm,
+  sellerLandingRedirectPath,
   sellerPersonaCtaHref,
   sellerPersonaRouterHref,
   usSellerCtaHref,
@@ -16,6 +18,20 @@ import type { PromoterSku } from '@/lib/promoter-skus'
 import type { PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 import { SHOP_FEATURES, SHOP_FEATURES_HEADING } from '@/lib/shop-features'
+import {
+  BUSINESS_TYPE_CARDS,
+  BUSINESS_TYPE_COMMON,
+  BUSINESS_TYPE_PAGES,
+  BUSINESS_PROOF_COPY,
+  BUSINESS_TYPE_SLUGS,
+  DEMO_SHOPS,
+  DEMO_SHOP_COPY,
+  businessProofFor,
+  businessTypePath,
+  isBusinessTypeSlug,
+  type BusinessTypeSlug,
+  type NewBusinessTypeSlug,
+} from '@/lib/business-types'
 import type { SellerAcquisitionPageConfig, LandingCallout } from './SellerAcquisitionSections'
 
 type QueryParams = Record<string, string | string[] | undefined | null>
@@ -93,6 +109,19 @@ export function buildAnchorPageConfig(
         tagline: feature.es.tagline,
         body: feature.es.body,
         links: feature.links,
+      })),
+    },
+    // S3.1: one link per kind of business, so a promoter (or a merchant) finds the page that speaks to them.
+    businessTypes: {
+      title: 'Por tipo de negocio',
+      lead: 'Si ya sabes qué vendes, entra a la página hecha para tu tipo de negocio y mira una tienda de ejemplo.',
+      cards: BUSINESS_TYPE_SLUGS.map((slug) => ({
+        eyebrow: '',
+        title: BUSINESS_TYPE_CARDS[slug].title,
+        body: BUSINESS_TYPE_CARDS[slug].body,
+        icon: BUSINESS_TYPE_CARDS[slug].icon,
+        href: businessTypeHref(slug, query),
+        testId: `vende-business-type-${slug}`,
       })),
     },
     // D4 — a self-serve page reads the agent line only: no promoter stands behind a visitor who arrived alone.
@@ -507,6 +536,17 @@ export function buildUsMarketPageConfig(
 }
 
 /**
+ * Where a business-type card goes: the page itself, carrying the visitor's campaign (UTM) and A/B variant like every
+ * other router card does.
+ */
+function businessTypeHref(slug: BusinessTypeSlug, query: QueryParams): string {
+  const utm = parseSellerAcquisitionUtm(query)
+  const params = new URLSearchParams(utm)
+  const qs = params.toString()
+  return qs ? `${businessTypePath(slug)}?${qs}` : businessTypePath(slug)
+}
+
+/**
  * The D4 support block. `promoter` (a business-type page a promoter sends) names the promoter on their own WhatsApp and
  * the merchant's AI agent; `agent` (a self-serve page) names the agent only. There is no platform phone number and no
  * promised hours anywhere in it.
@@ -522,6 +562,76 @@ function buildSupportBlock(copy: SellerAcquisitionCopy, mode: 'promoter' | 'agen
     lead: support.promoterLead,
     items: [{ icon: 'iconoir-chat-bubble', title: support.promoter.title, body: support.promoter.body }, agent],
   }
+}
+
+/** A business-type page's primary/closing CTA: the shop builder at `/`, carrying the campaign and which page sent them. */
+function businessTypeCtaHref(slug: BusinessTypeSlug, query: QueryParams): string {
+  return sellerLandingRedirectPath('mx', { ...query, from: slug })
+}
+
+/**
+ * One of the eight business-type pages written in `lib/business-types.ts` (own-shop-positioning S3.1). Same section
+ * system as every other `/mx/vende/*` page, plus the labelled demo shop, the proof slot and the promoter support block.
+ */
+export function buildBusinessTypePageConfig(
+  copy: SellerAcquisitionCopy,
+  slug: NewBusinessTypeSlug,
+  query: QueryParams,
+): SellerAcquisitionPageConfig {
+  const page = BUSINESS_TYPE_PAGES[slug]
+  const common = BUSINESS_TYPE_COMMON
+  const url = `https://miyagisanchez.com${businessTypePath(slug)}`
+  const ctaHref = businessTypeCtaHref(slug, query)
+
+  return {
+    pageId: slug,
+    variant: resolveSellerAcquisitionVariant(query),
+    eyebrow: page.eyebrow,
+    title: page.heroTitle,
+    lead: page.heroLead,
+    trustLine: common.trustLine(url.replace('https://', '')),
+    trustPrompt: copy.shared.trustPrompt.replaceAll('{url}', url),
+    copyLabel: copy.shared.copyPrompt,
+    copiedLabel: copy.shared.copiedPrompt,
+    primaryCta: { label: common.primaryCta, href: ctaHref, testId: `${slug}-primary-cta` },
+    secondaryCta: { label: common.secondaryCta, href: '/mx/precios' },
+    heroStats: page.heroStats,
+    proofTitle: page.proofTitle,
+    proofLead: page.proofLead,
+    proofPoints: page.proofPoints,
+    demoShop: demoShopBlock(slug),
+    realProof: { title: BUSINESS_PROOF_COPY.title, shops: businessProofFor(slug) },
+    stepsTitle: common.stepsTitle,
+    steps: [...common.steps],
+    agentTitle: copy.shared.selfCheck.title,
+    agentBody: copy.shared.selfCheck.body,
+    socialTitle: '',
+    socialBody: '',
+    socialStats: [],
+    faqTitle: copy.shared.faqTitle,
+    faqs: copy.shared.faqs,
+    closingTitle: page.closingTitle,
+    closingBody: page.closingBody,
+    closingCta: { label: common.closingCta, href: ctaHref, testId: `${slug}-closing-cta` },
+    support: buildSupportBlock(copy, 'promoter'),
+  }
+}
+
+function demoShopBlock(slug: BusinessTypeSlug): NonNullable<SellerAcquisitionPageConfig['demoShop']> {
+  return {
+    badge: DEMO_SHOP_COPY.badge,
+    title: DEMO_SHOP_COPY.title,
+    disclaimer: DEMO_SHOP_COPY.disclaimer,
+    shop: DEMO_SHOPS[slug],
+  }
+}
+
+/**
+ * Where a persona page's CTA goes. `autos` is a business-type page now (S3.1) and says «Abrir mi tienda», so it opens the
+ * shop builder at `/` like the other nine; the older personas still go through account creation to the wizard.
+ */
+function personaCtaHref(personaId: SellerPersonaId, query: QueryParams): string {
+  return personaId === 'autos' ? businessTypeCtaHref('autos', query) : sellerPersonaCtaHref(personaId, query)
 }
 
 function baseConfig(
@@ -545,7 +655,7 @@ function baseConfig(
     copiedLabel: copy.shared.copiedPrompt,
     primaryCta: {
       label: variantPage.primaryCta,
-      href: sellerPersonaCtaHref(personaId, query),
+      href: personaCtaHref(personaId, query),
       testId: `${personaId}-primary-cta`,
     },
     heroStats: variantPage.heroStats,
@@ -566,10 +676,18 @@ function baseConfig(
     closingBody: variantPage.closingBody,
     closingCta: {
       label: variantPage.closingCta,
-      href: sellerPersonaCtaHref(personaId, query),
+      href: personaCtaHref(personaId, query),
       testId: `${personaId}-closing-cta`,
     },
-    support: buildSupportBlock(copy, 'agent'),
+    // `autos` and `servicios` are two of the ten business-type pages (S3.1): they gain the same labelled demo shop,
+    // proof slot and promoter support block as the eight written ones. The other personas stay as they were.
+    ...(isBusinessTypeSlug(personaId)
+      ? {
+          demoShop: demoShopBlock(personaId),
+          realProof: { title: BUSINESS_PROOF_COPY.title, shops: businessProofFor(personaId) },
+          support: buildSupportBlock(copy, 'promoter'),
+        }
+      : { support: buildSupportBlock(copy, 'agent') }),
   }
 }
 

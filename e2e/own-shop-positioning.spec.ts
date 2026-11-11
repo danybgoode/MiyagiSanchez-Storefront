@@ -1,8 +1,18 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { aboutLlmsTxt, aboutManifestBlock, aboutMcpResource } from '../lib/about-agent'
-import { SHOP_FEATURES, SHOP_FEATURE_IDS } from '../lib/shop-features'
 import { ABOUT_PAGE, ABOUT_SECTIONS, ABOUT_CTA_HREF } from '../lib/about-content'
+import {
+  BUSINESS_PROOF,
+  BUSINESS_TYPE_PAGES,
+  BUSINESS_TYPE_SLUGS,
+  DEMO_SHOPS,
+  NEW_BUSINESS_TYPE_SLUGS,
+  businessProofFor,
+  businessTypePath,
+} from '../lib/business-types'
+import { SHOP_FEATURES, SHOP_FEATURE_IDS } from '../lib/shop-features'
+import { BusinessProofSlot } from '../app/(shell)/mx/vende/_components/BusinessProofSlot'
 
 /**
  * own-shop-positioning — the three stories, as one deterministic gate.
@@ -183,3 +193,107 @@ test.describe('S2.1 · what the shop already does', () => {
   })
 })
 
+// ── S3.1 · ten business-type pages ──────────────────────────────────────────────
+
+test.describe('S3.1 · one page per business type', () => {
+  test('there are ten, the eight new ones are written, and every demo shop says «Ejemplo»', () => {
+    expect(BUSINESS_TYPE_SLUGS).toHaveLength(10)
+    expect(NEW_BUSINESS_TYPE_SLUGS).toHaveLength(8)
+    for (const slug of BUSINESS_TYPE_SLUGS) {
+      expect(DEMO_SHOPS[slug].name, slug).toMatch(/Ejemplo/)
+      expect(DEMO_SHOPS[slug].items.length, slug).toBeGreaterThanOrEqual(3)
+    }
+    for (const slug of NEW_BUSINESS_TYPE_SLUGS) {
+      const page = BUSINESS_TYPE_PAGES[slug]
+      expect(page.proofPoints, slug).toHaveLength(4)
+      expect(page.metaDescription.length, slug).toBeGreaterThan(60)
+    }
+  })
+
+  test('the proof slot holds no real shop until one consents, and an empty slot renders NOTHING', () => {
+    expect(Object.keys(BUSINESS_PROOF)).toEqual([])
+    for (const slug of BUSINESS_TYPE_SLUGS) expect(businessProofFor(slug), slug).toEqual([])
+
+    // The component is a plain function of its props, so call it: an empty list yields `null` — React renders nothing at
+    // all for it (no wrapper, no heading, no placeholder). (Playwright's JSX transform cannot render to a string.)
+    expect(BusinessProofSlot({ title: 'Negocios como el tuyo', shops: [], pageId: 'x' })).toBeNull()
+
+    // …and the slot is not inert: a consenting shop does render.
+    const filled = BusinessProofSlot({
+      title: 'Negocios como el tuyo',
+      shops: [{ shopName: 'Tienda con permiso', href: '/mx/s/con-permiso' }],
+      pageId: 'x',
+    })
+    expect(filled).not.toBeNull()
+  })
+
+  for (const slug of BUSINESS_TYPE_SLUGS) {
+    const path = businessTypePath(slug)
+
+    test(`${path} renders without JS with its canonical, OG card, labelled demo shop and support block`, async ({ request }) => {
+      const res = await request.get(path, { headers: { Accept: 'text/html' } })
+      expect(res.status(), path).toBe(200)
+      const html = await res.text()
+
+      // canonical + OG, like the existing verticals
+      expect(html).toContain(`<link rel="canonical" href="https://miyagisanchez.com${path}"`)
+      expect(html).toContain(`<meta property="og:url" content="https://miyagisanchez.com${path}"`)
+      const ogImage = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1]
+      expect(ogImage, 'og:image must be present').toBeTruthy()
+      expect(new URL(ogImage!).pathname).toContain(`${path}/opengraph-image`)
+      // The tag names the production origin; fetch the same route from the server under test.
+      const img = await request.get(new URL(ogImage!).pathname)
+      expect(img.ok(), `the OG image route must render: ${ogImage}`).toBeTruthy()
+      expect(img.headers()['content-type']).toContain('image/')
+
+      // the h1 and the CTA are in the HTML itself (no JS needed)
+      expect(html).toMatch(/<h1[^>]*>[^<]+/)
+      // …and the page's OWN buttons read «Abrir mi tienda» and open the shop builder (the header carries the same words,
+      // so the text alone would prove nothing). `servicios` is the one exception: its button still opens the
+      // service-listing wizard (`/sell?type=service`), a destination the shop builder does not replace yet.
+      if (slug !== 'servicios') {
+        for (const id of [`${slug}-primary-cta`, `${slug}-closing-cta`]) {
+          const cta = html.match(new RegExp(`<a[^>]*data-testid="${id}"[^>]*>([\\s\\S]*?)</a>`))
+          expect(cta, id).toBeTruthy()
+          expect(cta![0], id).toMatch(/href="\/\?[^"]*from=/)
+          expect(stripTags(cta![1]).trim(), id).toBe('Abrir mi tienda')
+        }
+      }
+
+      // demo shop is clearly labelled and carries no price
+      const demo = block(html, 'business-demo-shop')
+      expect(demo, 'demo shop must render').not.toBe('')
+      expect(stripTags(demo)).toContain('Ejemplo')
+      // the badge itself says it, not just the invented name («Imprenta Ejemplo»)
+      expect(demo).toMatch(/data-testid="business-demo-badge"[^>]*>Ejemplo</)
+      expect(stripTags(demo)).toContain('No es un negocio real')
+      expect(stripTags(demo)).not.toMatch(/\$\s?\d/)
+
+      // the proof slot is empty ⇒ nothing at all
+      expect(html).not.toContain('data-testid="business-proof"')
+      expect(html).not.toContain('Negocios como el tuyo ya venden aquí')
+
+      // promoter support block: promoter on their own WhatsApp + the agent; no platform number
+      const support = stripTags(block(html, 'seller-support'))
+      expect(support).toContain('por su WhatsApp')
+      expect(support).toContain('desde la primera visita') // the promoter CARD, not only the lead
+      expect(support).toContain(AGENT_LINE)
+      expect(support).not.toMatch(/\+52|\d{2}[\s-]?\d{4}[\s-]?\d{4}|horario/i)
+    })
+  }
+
+  test('an unknown business type is a real 404, not a thin page', async ({ request }) => {
+    const res = await request.get('/mx/vende/no-existe-este-negocio', { headers: { Accept: 'text/html' } })
+    expect(res.status()).toBe(404)
+  })
+
+  test('the platform sitemap lists all ten business-type pages', async ({ request }) => {
+    const xml = await (await request.get('/sitemap.xml')).text()
+    for (const slug of BUSINESS_TYPE_SLUGS) expect(xml, slug).toContain(`https://miyagisanchez.com${businessTypePath(slug)}</loc>`)
+  })
+
+  test('`/` links to every business-type page', async ({ request }) => {
+    const html = await (await request.get('/', { headers: { Accept: 'text/html' } })).text()
+    for (const slug of BUSINESS_TYPE_SLUGS) expect(html, slug).toContain(`href="${businessTypePath(slug)}"`)
+  })
+})
