@@ -19,8 +19,8 @@ test.describe('Comparte moved into Canales (D8)', () => {
 
   test('Canales renders the catalog link, PDF and Meta feed tiles', () => {
     const section = read(`${MANAGE}/canal-propio/ShareToolsSection.tsx`)
-    for (const tile of ['<CatalogLinkTile', '<CatalogPdfTile', '<MetaFeedTile']) expect(section).toContain(tile)
-    expect(read(`${MANAGE}/canal-propio/page.tsx`)).toContain('<ShareToolsSection')
+    for (const tile of ['CatalogLinkTile', 'CatalogPdfTile', 'MetaFeedTile']) expect(section).toMatch(new RegExp(`<${tile}[\\s/>]`))
+    expect(read(`${MANAGE}/canal-propio/page.tsx`)).toMatch(/<ShareToolsSection[\s/>]/)
     // the Meta feed keeps its claimed-shop condition
     expect(read(`${MANAGE}/canal-propio/page.tsx`)).toContain('const metaFeed = model?.shop.claimed')
   })
