@@ -8,8 +8,12 @@
  */
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { isDeepStrictEqual } from 'node:util'
 import {
+  FOUNDERS_PRICE,
+  isFoundersPrice,
+  packagePriceMxn,
   PACKAGES,
   PACKAGE_SKUS,
   RETIRED_PACKAGE_SKUS,
@@ -24,6 +28,8 @@ import {
   type PackageGrantDeps,
   type PackageGrantInput,
 } from '../lib/promoter-packages'
+
+const AFTER_FOUNDERS = new Date('2027-02-01T12:00:00Z')
 import { isValidRatePct } from '../lib/promoter-commission'
 import { PROMOTER_SKUS } from '../lib/promoter-skus'
 import { TRANSFER_SKUS } from '../lib/promoter-transfer'
@@ -96,11 +102,39 @@ test.describe('the three packages on sale and the two retired ones (D11)', () =>
   })
 
   test("each split from an INTEGER rate, exactly: Daniel's numbers", () => {
-    expect(packageSplit('tienda_anual', 60)).toEqual({ chargeCents: 50_000, keepCents: 30_000, payPlatformCents: 20_000 })
+    // After the founders' price ends: the list price.
+    expect(packageSplit('tienda_anual', 60, AFTER_FOUNDERS)).toEqual({ chargeCents: 50_000, keepCents: 30_000, payPlatformCents: 20_000 })
     expect(packageSplit('negocio_semestral', 55)).toEqual({ chargeCents: 110_000, keepCents: 60_500, payPlatformCents: 49_500 })
     expect(packageSplit('negocio_anual', 55)).toEqual({ chargeCents: 200_000, keepCents: 110_000, payPlatformCents: 90_000 })
-    expect(packageSentence('tienda_anual', 60)).toBe('Cobras $500. Le pasas $200 a Miyagi Sánchez. Te quedas $300')
+    expect(packageSentence('tienda_anual', 60, AFTER_FOUNDERS)).toBe('Cobras $500. Le pasas $200 a Miyagi Sánchez. Te quedas $300')
     expect(packageSentence('negocio_semestral', 55)).toBe('Cobras $1,100. Le pasas $495 a Miyagi Sánchez. Te quedas $605')
+  })
+
+  test("the founders' price: Tienda · 1 año is $250 until the end of 31 Dec 2026 in Mexico City, then $500 (Daniel 2026-11-11)", () => {
+    const opening = new Date('2026-11-11T18:00:00Z')
+    expect(packagePriceMxn('tienda_anual', opening)).toBe(250)
+    expect(packageSplit('tienda_anual', 60, opening)).toEqual({ chargeCents: 25_000, keepCents: 15_000, payPlatformCents: 10_000 })
+    expect(packageSentence('tienda_anual', 60, opening)).toBe('Cobras $250. Le pasas $100 a Miyagi Sánchez. Te quedas $150')
+    // The boundary is midnight Mexico City (UTC-6, no daylight saving since 2022), not midnight UTC.
+    expect(packagePriceMxn('tienda_anual', new Date('2027-01-01T05:59:59Z'))).toBe(250)
+    expect(packagePriceMxn('tienda_anual', new Date('2027-01-01T06:00:00Z'))).toBe(500)
+    expect(isFoundersPrice('tienda_anual', new Date('2027-01-01T06:00:00Z'))).toBe(false)
+    // Only Tienda: the Negocio packages keep their list price during the offer.
+    expect(packagePriceMxn('negocio_semestral', opening)).toBe(1100)
+    expect(packagePriceMxn('negocio_anual', opening)).toBe(2000)
+    expect(isFoundersPrice('negocio_anual', opening)).toBe(false)
+    expect(PACKAGES.tienda_anual.priceMxn).toBe(500) // the list price itself never changes
+    expect(FOUNDERS_PRICE.sku).toBe('tienda_anual')
+  })
+
+  test("every price READ goes through packagePriceMxn, so no surface shows $500 during the offer", () => {
+    // Swept over the whole source, not a hand-listed set: a new reader anywhere would show the list price.
+    // git grep exits 1 when nothing matches; only 2+ is a real failure (a guard that cannot look must fail, not pass).
+    const r = spawnSync('git', ['grep', '-n', '-E', 'PACKAGES(\\[[^]]+\\]|\\.[a-z_]+)\\.priceMxn', '--', 'app', 'lib'], { encoding: 'utf8' })
+    expect(r.status === 0 || r.status === 1, r.stderr).toBe(true)
+    const out = r.stdout.trim()
+    const readers = out ? out.split('\n').filter((l) => !l.startsWith('lib/promoter-packages.ts:')) : []
+    expect(readers).toEqual([])
   })
 
   test('the six-month package cannot be split 500 / 600 with an integer rate — the reason it is 495 / 605 (D12)', () => {

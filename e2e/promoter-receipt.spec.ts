@@ -163,7 +163,7 @@ test('the route: only a shop the promoter may close, the amount from the package
   // The exact guard, refusing with 403: a check that is only present (or short-circuited) would not stop anything.
   expect(route).toMatch(/\n  if \(!\(await promoterMayCloseShop\(\{ promoter: \{ \.\.\.promoter, clerk_user_id: user\.id \}, shop \}\)\)\) \{\n    return NextResponse\.json\([^\n]*\{ status: 403 \}\)/)
   expect(route.indexOf('promoterMayCloseShop(')).toBeLessThan(route.indexOf('signReceiptToken('))
-  expect(route).toContain('const amountCents = PACKAGES[sku].priceMxn * 100')
+  expect(route).toContain('const amountCents = packagePriceMxn(sku) * 100')
   expect(route).not.toMatch(/body\.amount/)
   expect(route).toContain('await sendPromoterReceipt(')
   expect(route).toContain('idempotencyKey: `promoter-receipt/${shop.id}/${sku}`')

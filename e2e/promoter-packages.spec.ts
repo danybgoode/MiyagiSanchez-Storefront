@@ -71,7 +71,7 @@ test('a package transfer is charged at its own list price, never through the pro
   const branch = src.slice(src.indexOf('if (isPackageSku(sku)) {'), src.indexOf('} else {', src.indexOf('if (isPackageSku(sku)) {')))
   expect(branch).toContain('grossAmountCents = basePriceCents')
   const route = readFileSync('app/api/promoter/close/package/[sku]/route.ts', 'utf8')
-  expect(route).toContain('basePriceCents: PACKAGES[sku].priceMxn * 100')
+  expect(route).toContain('basePriceCents: packagePriceMxn(sku) * 100') // today's price, incl. the founders' price
 })
 
 test('the close workspace offers the three packages first, and the card path pays only the platform share', () => {

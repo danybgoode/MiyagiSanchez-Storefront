@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
-import { PACKAGES, PACKAGE_FREE_MONTHS, SELLABLE_PACKAGE_SKUS, packageSplit } from '@/lib/promoter-packages'
+import { PACKAGES, PACKAGE_FREE_MONTHS, SELLABLE_PACKAGE_SKUS, packageSplit, packagePriceMxn, isFoundersPrice, FOUNDERS_PRICE } from '@/lib/promoter-packages'
 import { getCommissionRates } from '@/lib/promoter'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
+
+// Dynamic: the founders' price ends on a date (FOUNDERS_PRICE), and a prerendered sheet would keep printing it.
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Guía rápida del promotor',
@@ -90,8 +93,9 @@ export default async function PromoterSellSheetPage() {
                 <td className="ss-option">
                   {PACKAGES[sku].label}
                   <small>{PACKAGES[sku].summary}</small>
+                  {isFoundersPrice(sku) ? <small data-testid="sell-sheet-founders">Precio de fundador hasta el {FOUNDERS_PRICE.untilLabel}</small> : null}
                 </td>
-                <td className="ss-num">{pesos(PACKAGES[sku].priceMxn * 100)}</td>
+                <td className="ss-num">{pesos(packagePriceMxn(sku) * 100)}</td>
                 {split ? (
                   <>
                     <td className="ss-num">{pesos(split.payPlatformCents)}</td>

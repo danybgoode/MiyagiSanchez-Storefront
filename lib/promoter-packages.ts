@@ -5,6 +5,7 @@
  * The deal a promoter says in one sentence: "you charge X, you pass us Y, you keep Z". Three packages are sold, each
  * with three free months of Plan Negocio ON TOP of the paid time, all dated from the payment day (D11):
  *   - Tienda · 1 año    — charge 500,   rate 60 → pass 200, keep 300.   Negocio 3 months, then Tienda 12.
+ *                         (Founders' price until 31 Dec 2026: charge 250 → pass 100, keep 150. See FOUNDERS_PRICE.)
  *   - Negocio · 6 meses — charge 1,100, rate 55 → pass 495, keep 605.   Negocio 9 months (3 + 6).
  *   - Negocio · 1 año   — charge 2,000, rate 55 → pass 900, keep 1,100. Negocio 15 months (3 + 12).
  * The six-month split is 495 / 605, not 500 / 600: the rate column is an integer and 600 of 1,100 is 54.54% (D12,
@@ -109,6 +110,32 @@ export const PACKAGES: Readonly<Record<PackageSku, PackageDef>> = Object.freeze(
   setup_gratis: { priceMxn: 250, grants: [], label: 'Plan Gratis · tienda lista', summary: 'Le armas su tienda en el Plan Gratis, sin mensualidad' },
 })
 
+// ── The founders' price (Daniel 2026-11-11) ─────────────────────────────────
+// Plan Tienda · 1 año sells at $250 instead of $500 until the end of 31 December 2026, Mexico City time. Why: lower
+// ticket for more shops while the promoter program starts. The RATE does not change (60%), so the promoter keeps $150
+// and Miyagi Sánchez gets $100; no rate row and no migration. Mexico City has had no daylight saving since 2022, so
+// midnight there is 06:00 UTC. The price is CAPTURED when a sale starts (Stripe metadata `gross_cents`, the transfer's
+// `basePriceCents`), so a sale started on the 31st and approved later keeps $250. Known edge, accepted (pr-reviewer,
+// #488): the receipt reads the clock on its own, so a receipt at 23:55 and a transfer at 00:05 on 1 Jan disagree.
+// The window is minutes on New Year's Eve; an operator fixes it by hand if it ever happens. Every price READ goes through
+// `packagePriceMxn`: reading `PACKAGES[sku].priceMxn` directly would show the list price during the offer.
+export const FOUNDERS_PRICE = Object.freeze({
+  sku: 'tienda_anual' as PackageSku,
+  priceMxn: 250,
+  endsAt: '2027-01-01T06:00:00Z',
+  untilLabel: '31 de diciembre de 2026',
+})
+
+/** Is the founders' price on for this package at `now`? */
+export function isFoundersPrice(sku: PackageSku, now: Date = new Date()): boolean {
+  return sku === FOUNDERS_PRICE.sku && now.getTime() < Date.parse(FOUNDERS_PRICE.endsAt)
+}
+
+/** What a promoter charges for this package at `now`: the founders' price while it runs, else the list price. */
+export function packagePriceMxn(sku: PackageSku, now: Date = new Date()): number {
+  return isFoundersPrice(sku, now) ? FOUNDERS_PRICE.priceMxn : PACKAGES[sku].priceMxn
+}
+
 /** How many months of `plan` a package grants in total (0 when none). */
 export function packageMonths(sku: PackageSku, plan: PackageGrant['plan']): number {
   return PACKAGES[sku].grants.filter((g) => g.plan === plan).reduce((n, g) => n + g.months, 0)
@@ -116,9 +143,9 @@ export function packageMonths(sku: PackageSku, plan: PackageGrant['plan']): numb
 
 export type PackageSplit = { chargeCents: number; keepCents: number; payPlatformCents: number }
 
-/** Charge = the list price; keep = the promoter's rate of it; pay = the rest (never negative). */
-export function packageSplit(sku: PackageSku, ratePct: number): PackageSplit {
-  const chargeCents = PACKAGES[sku].priceMxn * 100
+/** Charge = today's price (`packagePriceMxn`); keep = the promoter's rate of it; pay = the rest (never negative). */
+export function packageSplit(sku: PackageSku, ratePct: number, now: Date = new Date()): PackageSplit {
+  const chargeCents = packagePriceMxn(sku, now) * 100
   const keepCents = computeCommissionCents(ratePct, chargeCents)
   return { chargeCents, keepCents, payPlatformCents: Math.max(0, chargeCents - keepCents) }
 }
@@ -126,8 +153,8 @@ export function packageSplit(sku: PackageSku, ratePct: number): PackageSplit {
 const pesos = (cents: number) => '$' + Math.round(cents / 100).toLocaleString('en-US')
 
 /** "Cobras $2,000. Le pasas $900 a Miyagi Sánchez. Te quedas $1,100" — the money first, always in this order. */
-export function packageSentence(sku: PackageSku, ratePct: number): string {
-  const s = packageSplit(sku, ratePct)
+export function packageSentence(sku: PackageSku, ratePct: number, now: Date = new Date()): string {
+  const s = packageSplit(sku, ratePct, now)
   return `Cobras ${pesos(s.chargeCents)}. Le pasas ${pesos(s.payPlatformCents)} a Miyagi Sánchez. Te quedas ${pesos(s.keepCents)}`
 }
 

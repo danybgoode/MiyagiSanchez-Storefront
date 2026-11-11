@@ -18,7 +18,7 @@ import { isEnabled } from '@/lib/flags'
 import { getPromoterByClerkId } from '@/lib/promoter'
 import { resolveTargetShop } from '@/lib/promoter-server'
 import { promoterMayCloseShop } from '@/lib/promoter-shop-access'
-import { PACKAGES, RETIRED_PACKAGE_MESSAGE, isPackageSku, isRetiredPackageSku } from '@/lib/promoter-packages'
+import { PACKAGES, RETIRED_PACKAGE_MESSAGE, isPackageSku, isRetiredPackageSku, packagePriceMxn } from '@/lib/promoter-packages'
 import { fillTemplate, formatReceiptAmount, formatReceiptDate, receiptWhatsappUrl, signReceiptToken } from '@/lib/promoter-receipt'
 import { readReceiptRecipient, receiptSecret } from '@/lib/promoter-receipt-server'
 import { sendPromoterReceipt } from '@/lib/email'
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   const secret = receiptSecret()
   if (!secret) return NextResponse.json({ ok: false, error: 'Configuración incompleta en el servidor.' }, { status: 500 })
 
-  const amountCents = PACKAGES[sku].priceMxn * 100
+  const amountCents = packagePriceMxn(sku) * 100
   const issuedAt = new Date().toISOString()
   const token = signReceiptToken({ shopId: shop.id, sku, promoterId: promoter.id, amountCents, issuedAt }, secret)
   const receiptUrl = `${SITE_ORIGIN}/recibo/${token}`
