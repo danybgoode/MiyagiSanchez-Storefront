@@ -23,6 +23,7 @@ import { readPublicSellerMarket } from '@/lib/owned-market'
 import { readableTextOn } from '@/lib/platform-theme'
 import { normalizeSections } from './sections'
 import { resolveTheme } from './theme'
+import { shopListingBase } from './chrome'
 import { resolveSectionAvailability } from './availability'
 import type { SectionConfig, SectionAvailability, ResolvedTheme } from './types'
 import type { Shop } from '@/lib/types'
@@ -41,10 +42,9 @@ export interface ShopPresentationContext {
   /** Where the SHOP's own routes live: `''` on an owned host, `/mx/s/<slug>` otherwise. */
   basePath: string
   /**
-   * Where a PRODUCT lives: `''` on an owned host, `/mx` on the marketplace.
-   *
-   * Deliberately NOT the same as `basePath` — a PDP is not shop-scoped on the
-   * marketplace, and using the shop base for one 404s. See `ShopBases`.
+   * Where a PRODUCT lives — decided by `shopListingBase`: `''` on an owned host,
+   * the shop base on the Mexico marketplace (the shop-scoped PDP), the market
+   * base elsewhere. Kept as its own field so no call site guesses. See `ShopBases`.
    */
   listingBase: string
   accent: string
@@ -158,7 +158,7 @@ export async function resolveShopPresentation(
     collections,
     theme: resolveTheme(settings),
     basePath: onOwnedHost ? '' : `${marketBasePath}/s/${shop.slug}`,
-    listingBase: onOwnedHost ? '' : marketBasePath,
+    listingBase: shopListingBase({ onOwnedHost, marketBasePath, shopSlug: shop.slug }),
     accent,
     accentTextColor: readableTextOn(theme.accent_color ?? undefined),
     htmlLang: resolveMarketPresentation(presentationMarket).htmlLang,

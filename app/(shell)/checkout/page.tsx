@@ -4,7 +4,9 @@ import { redirect, notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { currentUser } from '@clerk/nextjs/server'
-import { getListing, getPriceGrid } from '@/lib/listings'
+import { getListing, getOwnedShopListing, getOwnedShopPriceGrid, getPriceGrid } from '@/lib/listings'
+import { resolveOwnedPriceGridForPdp } from '@/lib/owned-market'
+import { resolveCheckoutListing, shopScopedListingPath } from '@/lib/checkout-listing'
 import { unitPriceCentsFor } from '@/lib/price-grid'
 import { isShopClaimed } from '@/lib/claim'
 import { db } from '@/lib/supabase'
@@ -47,6 +49,24 @@ async function resolvePublicListingId(listingId: string) {
     .maybeSingle()
 
   return data?.medusa_product_id ?? listingId
+}
+
+/**
+ * The owning shop's slug from the listings mirror — the lookup middleware uses to
+ * route `/mx/l/<id>`. A read error is treated as "no row" (the page 404s, exactly
+ * as it did before this fallback existed); it never admits anything.
+ */
+async function mirrorShopSlugFor(productId: string): Promise<string | null> {
+  const { data, error } = await db
+    .from('marketplace_listings')
+    .select('marketplace_shops!inner(slug)')
+    .eq('medusa_product_id', productId)
+    .eq('status', 'active')
+    .maybeSingle()
+  if (error || !data) return null
+  const relation = (data as { marketplace_shops?: unknown }).marketplace_shops
+  const shop = (Array.isArray(relation) ? relation[0] : relation) as { slug?: unknown } | undefined
+  return typeof shop?.slug === 'string' ? shop.slug : null
 }
 
 async function getAcceptedOfferPrice(offerId: string | undefined, listingId: string, buyerUserId: string) {
@@ -114,13 +134,26 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   const user = await currentUser()
   if (!user) redirect(`/sign-in?redirect_url=${encodeURIComponent(`/checkout?listingId=${listingId}&market=${market}${offerId ? `&offerId=${offerId}` : ''}${params.provider ? `&provider=${params.provider}` : ''}${params.qty ? `&qty=${params.qty}` : ''}${variantId ? `&variantId=${variantId}` : ''}${params.origin ? `&origin=${encodeURIComponent(params.origin)}` : ''}${checkIn ? `&checkIn=${checkIn}` : ''}${checkOut ? `&checkOut=${checkOut}` : ''}`)}`)
 
-  const listing = await getListing(listingId, market)
-  if (!listing) notFound()
+  // The marketplace listing, or — for a «Solo mi tienda» product the marketplace
+  // does not carry — the shop's own. Display + back link only; the cart admission
+  // seam is still the money gate. See lib/checkout-listing.ts.
+  const resolved = await resolveCheckoutListing(listingId, market, {
+    marketplace: (id, m) => getListing(id, m),
+    mirrorShopSlug: mirrorShopSlugFor,
+    owned: (slug, id) => getOwnedShopListing(slug, id),
+  })
+  if (resolved.kind === 'absent') notFound()
+  const listing = resolved.listing
+  const ownedShopSlug = resolved.kind === 'owned' ? resolved.shopSlug : null
   const presentation = resolveMarketPresentation(listing.shop?.market_code ?? 'mx')
   const buyerCopy = (await getDictionary(presentation.language)).buyerCopy
   const formatCents = (cents: number, currency: string) =>
     formatPresentationCurrency(presentation, cents, currency, { maximumFractionDigits: 0 })
-  const listingPath = new URL(listingUrlFor(marketOrigin, listing.id)).pathname
+  // An owned-only product has no `/mx/l` page; on the platform its PDP is the
+  // shop-scoped one. A tenant host serves it at `/l/<id>` as before.
+  const listingPath = ownedShopSlug && !onTenantChannel
+    ? shopScopedListingPath(ownedShopSlug, listing.id)
+    : new URL(listingUrlFor(marketOrigin, listing.id)).pathname
 
   // Last-line money-path guard: /checkout is directly URL-reachable (the deep-link
   // target of checkoutHopHref/signInHopHref), so an unclaimed (gem) shop must be
@@ -201,7 +234,10 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   // price — a silent fallback here would show/charge less than the buyer's
   // actual chosen combination (cross-agent review catch, 2026-07-05).
   if (isConfiguratorCheckout) {
-    const priceGrid = await getPriceGrid(listing.id)
+    // Same grid the PDP showed: the shop's own grid for an owned-only product.
+    const priceGrid = ownedShopSlug
+      ? resolveOwnedPriceGridForPdp(await getOwnedShopPriceGrid(ownedShopSlug, listing.id), listing.shop?.market_code)
+      : await getPriceGrid(listing.id)
     const resolved = priceGrid ? unitPriceCentsFor(priceGrid, variantId!, quantity) : null
     if (resolved == null) redirect(`${listingPath}?checkout=unavailable`)
     amountCents = resolved

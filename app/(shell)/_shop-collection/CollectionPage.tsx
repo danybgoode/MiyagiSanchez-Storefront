@@ -2,8 +2,7 @@ import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
 import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 import {
-  getShopListings,
-  getMarketplaceShopListings,
+  readShopListings,
   getShopCollections,
   formatPrice,
 } from '@/lib/listings'
@@ -18,6 +17,7 @@ import ShopCollectionNav from '../s/[slug]/ShopCollectionNav'
 import ShopSectionNav from '../_shop-sections/ShopSectionNav'
 import ShopThemeShell from '../_shop-sections/ShopThemeShell'
 import { resolveShopNav } from '@/lib/shop-presentation/context'
+import { listingHref, shopListingBase } from '@/lib/shop-presentation/chrome'
 import ClosetListingCard from '../s/[slug]/ClosetListingCard'
 import type { AnnouncementSettings } from '@/lib/shop-settings/types'
 import type { Shop } from '@/lib/types'
@@ -60,18 +60,17 @@ export default async function CollectionPage({
     resolveShopNav(shop),
     getDictionary(resolveMarketPresentation(market ?? 'mx').language),
     getShopCollections(shop.slug, market),
-    market
-      ? getMarketplaceShopListings(shop.slug, market)
-      : getShopListings(shop.slug).then((listings) => ({
-          listings,
-          market_code: null,
-          market_unavailable: null,
-        })),
+    // The shop's OWN catalog on every channel, as the shop home and `/tienda` read
+    // it — a «Solo mi tienda» product belongs in its collection too (2026-11-11).
+    readShopListings(shop.slug),
   ])
   const navCopy = navDict.buyerCopy
-  // Do not collapse a missing/mismatched market echo into a healthy empty
-  // collection: those are different facts and only the latter may render.
-  if (listingRead.market_unavailable) notFound()
+  // Do not collapse an unreadable catalog into a healthy empty collection: those
+  // are different facts and only the latter may render. Throwing keeps the last
+  // good render; a partial read still has real products and renders them.
+  if (!listingRead.complete && listingRead.listings.length === 0) {
+    throw new Error(`[collection] catalog read unavailable for ${shop.slug}`)
+  }
   const allListings = listingRead.listings
   const publishedCollectionHandles = new Set(allListings.flatMap((listing) => listing.collections ?? []))
   const collections = market
@@ -82,6 +81,12 @@ export default async function CollectionPage({
   // simply absent from THIS shop's own collection list — this lookup IS the
   // per-shop isolation check (scoped by shop.slug, never trusts the raw id).
   if (!matched) notFound()
+  // Where product cards point — the one decision in `shopListingBase` (see `ShopBases`).
+  const productLinkBase = shopListingBase({
+    onOwnedHost: !isMarketplaceRoute,
+    marketBasePath,
+    shopSlug: shop.slug,
+  })
 
   if (isMarketplaceRoute && !marketBasePath) {
     const domain = await getActiveCustomDomain(shop.slug)
@@ -166,7 +171,7 @@ export default async function CollectionPage({
                     mp: paymentAvailability.mercadopago,
                     spei: paymentAvailability.bankTransfer,
                   },
-                  href: `${marketBasePath}/l/${listing.id}`,
+                  href: listingHref({ listingBase: productLinkBase }, listing.id),
                   formattedPrice: formatPrice(listing, resolveMarketPresentation(market ?? 'mx').htmlLang),
                   status: listing.status,
                   hasExcerpt: hasExcerpt(listing.metadata),

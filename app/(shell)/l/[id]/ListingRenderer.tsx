@@ -28,6 +28,7 @@ import FavoriteButton from '@/app/components/FavoriteButton'
 import AskSellerButton from '@/app/components/AskSellerButton'
 import OfferCheckoutButton from '@/app/components/OfferCheckoutButton'
 import SellerBundleSection from '@/app/components/SellerBundleSection'
+import { shopListingBase } from '@/lib/shop-presentation/chrome'
 import SpecsTable from './SpecsTable'
 import { listingSpecs } from '@/lib/listing-attributes'
 import SellerTrustCard from '@/app/components/SellerTrustCard'
@@ -80,6 +81,14 @@ export type ListingRequestContext = {
   mode: 'dynamic' | 'public'
   channelSlug?: string | null
   customDomain?: string | null
+  /**
+   * The shop-scoped PDP on the PLATFORM host (`/mx/s/<slug>/l/<id>`): read
+   * through the shop's own channel (`channelSlug`) like an owned host does, but
+   * we are NOT on the shop's domain — so shop links keep the market base and
+   * there is no tenant domain to hop from. Without this flag `channelSlug` means
+   * both things at once, and the trust card would link to `/` (the marketplace home).
+   */
+  platformShopScoped?: boolean
   userId?: string | null
   buyerPrefill?: { name: string; email: string } | null
   favorited?: boolean
@@ -104,6 +113,21 @@ export async function generateListingMetadata({
     ? await getOwnedShopListing(channelSlug, id)
     : await getListing(id, market)
   if (!listing) return { title: 'Anuncio no encontrado' }
+  if (channelSlug && requestContext.platformShopScoped && marketBasePath) {
+    // One page per product for search: a product the marketplace also carries is
+    // canonical at `/mx/l/<id>`; a «Solo mi tienda» product has no marketplace
+    // page, so the shop-scoped URL IS its canonical.
+    const inMarketplace = !!(await getListing(id, market))
+    const canonical = inMarketplace
+      ? `${marketBasePath}/l/${listing.id}`
+      : `${marketBasePath}/s/${channelSlug}/l/${listing.id}`
+    return {
+      title: listing.title,
+      description: listing.description ?? undefined,
+      ...marketCatalogCanonical(canonical),
+      openGraph: { url: `https://miyagisanchez.com${canonical}` },
+    }
+  }
   if (marketBasePath) {
     const canonical = `${marketBasePath}/l/${listing.id}`
     return {
@@ -240,9 +264,19 @@ export async function ListingPage({
   // leaking a different seller's listing under this brand.
   const onChannel = !!channelSlug
   if (onChannel && listing.shop?.slug !== channelSlug) notFound()
+  // On the shop's own domain (subdomain / custom domain) vs. the platform's
+  // shop-scoped PDP — both read through the shop channel, only one is its host.
+  const onOwnedHost = onChannel && !requestContext.platformShopScoped
+  // "More from this shop" lists the shop's OWN catalog, so it links where the
+  // shop links its products — never bare `/mx/l` (see `ShopBases`).
+  const siblingListingBase = shopListingBase({
+    onOwnedHost,
+    marketBasePath,
+    shopSlug: listing.shop?.slug ?? channelSlug ?? '',
+  })
   // On a custom domain the buyer can't sign in / pay (Clerk is platform-only), so
   // the buy + sign-in CTAs hop to the platform carrying this origin domain.
-  const customDomain = onChannel ? requestContext.customDomain ?? null : null
+  const customDomain = onOwnedHost ? requestContext.customDomain ?? null : null
 
   // SEO continuity: on the marketplace host, if this product's shop has a LIVE
   // custom domain, 308-redirect the legacy /l/[id] link to the tenant's own
@@ -883,7 +917,7 @@ export async function ListingPage({
   const sellerTrustCard = listing.shop ? (
     <SellerTrustCard
       shop={listing.shop}
-      onChannel={onChannel}
+      onChannel={onOwnedHost}
       isClaimed={isClaimed}
       listingTitle={listing.title}
       whatsappPhone={whatsappPhone}
@@ -1355,7 +1389,7 @@ export async function ListingPage({
         {sellerTrustCard && <div className="hidden md:block">{sellerTrustCard}</div>}
 
         {!isPublicViewer && bundleItems.length > 1 && listing.shop && !suppressGenericBar && (
-          <SellerBundleSection sellerName={listing.shop.name} items={bundleItems} bundleTiers={shopBundleTiers} marketBasePath={marketBasePath} />
+          <SellerBundleSection sellerName={listing.shop.name} items={bundleItems} bundleTiers={shopBundleTiers} listingBase={siblingListingBase} />
         )}
 
         {/* ── Especificaciones (S3.3 · finding #7) ────────────────────────────────

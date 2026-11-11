@@ -1,8 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { test, expect } from '@playwright/test'
 import {
   listingHref,
+  shopListingBase,
+  SHOP_SCOPED_PDP_MARKET_BASE,
   shopInitials,
   heroContent,
   trustChips,
@@ -360,45 +362,66 @@ test.describe('chrome · no fact is claimed twice in one panel', () => {
   })
 })
 
-test.describe('chrome · a product is NOT shop-scoped (reported live: 404)', () => {
-  test('on the marketplace a PDP href is /mx/l/<id>, never /mx/s/<slug>/l/<id>', () => {
-    // 🚨 THE REPORTED BUG. Every product on /mx/s/el-manchon/tienda 404'd while
-    // the same product from the homepage grid worked, because the homepage built
-    // its links from the MARKET base and everything added later built them from
-    // the SHOP base. `/mx/s/<slug>/l/<id>` is not a route and never was.
-    expect(listingHref({ listingBase: '/mx' }, 'prod_1')).toBe('/mx/l/prod_1')
-    expect(listingHref({ listingBase: '/mx' }, 'prod_1')).not.toContain('/s/')
+test.describe('chrome · every shop product link opens a page that exists (reported live: 404, twice)', () => {
+  test('on the Mexico marketplace a shop links its products to the SHOP-SCOPED PDP', () => {
+    // 🚨 REPORTED LIVE 2026-11-11 (miel-verduras, a promoter training): a «Solo mi
+    // tienda» product showed on /mx/s/<slug>/tienda and 404'd on click, because
+    // the card pointed at /mx/l/<id> — the MARKETPLACE PDP, which only knows
+    // products published into the Mexico marketplace. The shop-scoped PDP reads
+    // through the shop's own channel, so it serves every product the shop shows.
+    const base = shopListingBase({ onOwnedHost: false, marketBasePath: '/mx', shopSlug: 'miel-verduras' })
+    expect(base).toBe('/mx/s/miel-verduras')
+    expect(listingHref({ listingBase: base }, 'prod_1')).toBe('/mx/s/miel-verduras/l/prod_1')
   })
 
-  test('on an owned host the two bases coincide, which is why this hid', () => {
-    // Subdomain and custom domain serve the PDP at /l/<id>, so the shop base and
-    // the listing base are both '' and the mistake is invisible there.
+  test('the shop-scoped PDP route EXISTS — the first 404 was a link to a route that did not', () => {
+    // 🚨 The earlier report (el-manchon, every card on /tienda 404'd) was links
+    // built from the shop base while `/mx/s/<slug>/l/<id>` was not a route. The
+    // link and the route must ship together; this pins the route's existence.
+    const route = path.join(ROOT, 'app/(shell)/mx/s/[slug]/l/[id]/page.tsx')
+    expect(existsSync(route), 'shop links point at /mx/s/<slug>/l/<id>, so that route must exist').toBe(true)
+    expect(SHOP_SCOPED_PDP_MARKET_BASE).toBe('/mx')
+  })
+
+  test('on an owned host the product lives at /l/<id>', () => {
+    expect(shopListingBase({ onOwnedHost: true, marketBasePath: '/mx', shopSlug: 'x' })).toBe('')
     expect(listingHref({ listingBase: '' }, 'prod_1')).toBe('/l/prod_1')
   })
 
-  test('no surface builds a PDP href from the SHOP base, whatever it is called', () => {
-    // The POPULATION, not the one spelling that was reported.
+  test('a market WITHOUT a shop-scoped route keeps its market PDP (the negation)', () => {
+    // Owned-shop-only selling is Mexico-only; there is no /us/s/<slug>/l/<id>, so a
+    // US shop must keep linking /us/l/<id> rather than inherit a route that 404s.
+    expect(shopListingBase({ onOwnedHost: false, marketBasePath: '/us', shopSlug: 'x' })).toBe('/us')
+    expect(shopListingBase({ onOwnedHost: false, marketBasePath: '', shopSlug: 'x' })).toBe('')
+  })
+
+  test('no shop surface builds a PDP href from a raw base, whatever it is called', () => {
+    // The POPULATION, not the one spelling that was reported. Both live 404s were
+    // a surface picking its own base for a product link — first the shop base,
+    // then the market base. Every shop surface must take the base from
+    // `shopListingBase` (directly, or via `listingBase`/`productLinkBase`).
     //
-    // The first version of this test matched only `${basePath}/l/` — the exact
-    // form the reported bug happened to use — and stayed green through a
-    // mutation that rebuilt the same defect as `${bases.shopBase}/l/`. A guard
-    // pinned to one spelling of a name guards one spelling of a name.
-    //
-    // Every identifier below IS the shop base under some name; none of them may
-    // be followed by `/l/`. `marketBasePath` and `listingBase` are absent from
-    // the list on purpose — those are the correct bases for a PDP.
-    const SHOP_BASE_NAMES = ['basePath', 'ctx.basePath', 'shopBase', 'bases.shopBase', 'navBasePath']
+    // The first version of this guard matched only `${basePath}/l/` and stayed
+    // green through a mutation that rebuilt the defect as `${bases.shopBase}/l/`.
+    // A guard pinned to one spelling of a name guards one spelling of a name.
+    const RAW_BASE_NAMES = [
+      'basePath', 'ctx.basePath', 'shopBase', 'bases.shopBase', 'navBasePath', 'marketBasePath',
+    ]
     const pattern = new RegExp(
-      `\\$\\{\\s*(?:${SHOP_BASE_NAMES.map((n) => n.replace('.', '\\.')).join('|')})\\s*\\}/l/`,
+      `\\$\\{\\s*(?:${RAW_BASE_NAMES.map((n) => n.replace('.', '\\.')).join('|')})\\s*\\}/l/`,
     )
     for (const file of [
       'lib/wall/views.ts',
       'app/(shell)/_shop-sections/ShopIndexBody.tsx',
+      'app/(shell)/_shop-sections/ShopIndexGrid.tsx',
+      'app/(shell)/_shop-sections/CatalogBody.tsx',
       'app/(shell)/s/[slug]/ShopRenderer.tsx',
       'app/(shell)/_wall/WallEntryCard.tsx',
+      'app/(shell)/embed/s/[slug]/page.tsx',
+      'app/components/SellerBundleSection.tsx',
     ]) {
       const source = readFileSync(path.join(ROOT, file), 'utf8')
-      expect(source, `${file} builds a PDP href from the shop base`).not.toMatch(pattern)
+      expect(source, `${file} builds a PDP href from a raw base`).not.toMatch(pattern)
     }
   })
 

@@ -23,15 +23,23 @@ import type { Shop } from '@/lib/types'
  * `/c/[handle]`, `/acerca`. On the marketplace that is `/mx/s/<slug>`; on an
  * owned host it is `''`.
  *
- * `listingBase` is where a PRODUCT lives, and a product is NOT shop-scoped on
- * the marketplace: the PDP is `/mx/l/<id>`, never `/mx/s/<slug>/l/<id>` — no
- * such route exists. On an owned host the two coincide (`''`), which is exactly
- * why the mistake was invisible until someone opened a marketplace shop.
+ * `listingBase` is where a PRODUCT lives. On an owned host it is `''` (the
+ * product is `/l/<id>`). On the Mexico marketplace it is the SHOP base
+ * (`/mx/s/<slug>`): a shop links its products to the shop-scoped PDP
+ * `/mx/s/<slug>/l/<id>`, which reads through the shop's own channel.
  *
- * Reported live: every product on `/mx/s/el-manchon/tienda` 404'd, while the
- * same product from the homepage grid worked, because the homepage happened to
- * build its own links from the market base and everything I added built them
- * from the shop base.
+ * History, so nobody "simplifies" this back: it used to be `/mx`, sending every
+ * shop card to the marketplace PDP `/mx/l/<id>`. That PDP only knows products
+ * published INTO the Mexico marketplace, so a «Solo mi tienda» product rendered
+ * in the shop and 404'd on click — reported live 2026-11-11 during a promoter
+ * training (`miel-verduras`). Before THAT, `/mx/s/el-manchon/tienda` 404'd every
+ * card because links were built from the shop base when no shop-scoped PDP
+ * route existed. Both bugs are the same confusion; `shopListingBase` below is
+ * the one place that decides it, and the route now exists.
+ *
+ * Other markets (`/us`) keep the market base: owned-shop-only selling is a
+ * Mexico capability (owned-shop-operating-channel non-goal), so there is no
+ * `/us/s/<slug>/l/<id>` route.
  *
  * Returning them as one object with two names is deliberate: a single
  * `basePath` string invites exactly this bug, and a call site that has to pick
@@ -40,11 +48,30 @@ import type { Shop } from '@/lib/types'
 export interface ShopBases {
   /** `/mx/s/<slug>` on the marketplace, `''` on an owned host. */
   shopBase: string
-  /** `/mx` on the marketplace, `''` on an owned host. Products live here. */
+  /** See `shopListingBase`. Products live here. */
   listingBase: string
 }
 
-/** The PDP href for a listing. The ONE place that knows a product is not shop-scoped. */
+/** The one market whose shops have a shop-scoped PDP route (`app/(shell)/mx/s/[slug]/l/[id]`). */
+export const SHOP_SCOPED_PDP_MARKET_BASE = '/mx'
+
+/**
+ * Where a shop's product links point. `''` on an owned host; the shop base on the
+ * Mexico marketplace (the shop-scoped PDP serves owned-shop-only products too);
+ * the market base anywhere else.
+ */
+export function shopListingBase(args: {
+  onOwnedHost: boolean
+  marketBasePath: string
+  shopSlug: string
+}): string {
+  if (args.onOwnedHost) return ''
+  if (args.marketBasePath === SHOP_SCOPED_PDP_MARKET_BASE) return `${args.marketBasePath}/s/${args.shopSlug}`
+  return args.marketBasePath
+}
+
+
+/** The PDP href for a listing, from the base `shopListingBase` chose. */
 export function listingHref(bases: Pick<ShopBases, 'listingBase'>, listingId: string): string {
   return `${bases.listingBase}/l/${listingId}`
 }

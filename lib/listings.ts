@@ -720,51 +720,12 @@ export async function getShopListings(sellerSlug: string): Promise<Listing[]> {
   return (await readShopListings(sellerSlug)).listings
 }
 
-/**
- * Country-market view of one seller's catalog.
- *
- * Keep this separate from `getShopListings`: that function is the seller-owned
- * channel and intentionally ignores marketplace Sales Channel membership (D4).
- * A `/mx/s/:slug` page is marketplace discovery, so it uses the same channel
- * filter and market-echo verification as the main marketplace grid.
- */
-export async function getMarketplaceShopListings(
-  sellerSlug: string,
-  market?: unknown,
-): Promise<{ listings: Listing[] } & MarketScopedMeta> {
-  const decision = planMarketCatalogRead(market)
-  if (isMarketUnavailable(decision)) {
-    return { listings: [], ...marketMetaUnavailable(decision) }
-  }
-  const unconfigured = marketCredentialUnavailable(decision.market)
-  if (unconfigured) return { listings: [], ...marketMetaUnavailable(unconfigured) }
-  const qs = new URLSearchParams({ seller_slug: sellerSlug, limit: '100' })
-  const res = await marketCatalogFetch(
-    decision.query,
-    `/store/listings?${qs.toString()}`,
-    { next: { revalidate: CACHE.LISTING, tags: ['listings'] } } as RequestInit,
-  )
-  if (!res.ok) {
-    const unavailable = await unavailableResponseOrThrow(
-      res,
-      decision.market,
-      'getMarketplaceShopListings',
-    )
-    return { listings: [], ...marketMetaUnavailable(unavailable) }
-  }
-  const data = await res.json()
-  const { value: listings, unavailable } = takeMarketScopedField<Listing[]>(
-    decision.market,
-    data,
-    'listings',
-    [],
-  )
-  if (unavailable) {
-    console.error('[listings] marketplace shop market filter unconfirmed', unavailable.reason)
-    return { listings, ...marketMetaUnavailable(unavailable) }
-  }
-  return { listings, ...marketMetaFor(decision.market) }
-}
+// There is deliberately no marketplace-filtered "one shop's listings" read: a shop
+// page (`/mx/s/<slug>`, its collections, `/tienda`) is the merchant's OWN shop and
+// reads `getShopListings`, so a «Solo mi tienda» product appears there and opens
+// on the shop-scoped PDP. `getMarketplaceShopListings` did this until 2026-11-11,
+// when the shop home said «sin anuncios» while `/tienda` listed the product.
+// Marketplace discovery (the `/mx` grid, search) keeps its own channel filter.
 
 /**
  * A shop's seller-defined collections (own-shop-premium-presentation S2),

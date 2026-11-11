@@ -6,6 +6,7 @@ import { isLikelyShopSlug } from '@/lib/route-shape'
 import { readPublicWall } from '@/lib/wall/public'
 import { resolvePublicWallShop } from '@/lib/wall/store'
 import { WALL_PAGE_SIZE } from '@/lib/wall/validate'
+import { shopListingBase } from '@/lib/shop-presentation/chrome'
 
 /**
  * Living Shop — the public Wall's next page (epic 07, Story 2.1).
@@ -74,8 +75,8 @@ export async function GET(req: NextRequest) {
     // Relative hrefs on an owned host; the marketplace prefix otherwise. The
     // channel header is what tells the two apart, exactly as the pages do it.
     basePath: channelSlug ? '' : `/mx/s/${wallShop.slug}`,
-    // A product is not shop-scoped on the marketplace. See `ShopBases`.
-    listingBase: channelSlug ? '' : '/mx',
+    // Where product cards point — the one decision in `shopListingBase` (see `ShopBases`).
+    listingBase: shopListingBase({ onOwnedHost: !!channelSlug, marketBasePath: '/mx', shopSlug: wallShop.slug }),
     offset,
     pageSize: WALL_PAGE_SIZE,
   })

@@ -2,7 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { shopSlugFromHost, ROOT_DOMAIN } from '@/lib/subdomain'
+import { publicHostRedirectUrl, shopSlugFromHost, unentitledSubdomainPath, ROOT_DOMAIN } from '@/lib/subdomain'
 import { pickAliasTarget, type PreviousSlug } from '@/lib/slug'
 import {
   isShortLinkHost, firstSegment, shopTarget, listingTarget, HOME_TARGET, NOT_FOUND_TARGET,
@@ -136,12 +136,8 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
     // Retired slug → 301 to the current shop's subdomain.
     if (!slug && redirectTo) {
-      const url = req.nextUrl.clone()
-      url.protocol = 'https:'
-      url.host = `${redirectTo}.${ROOT_DOMAIN}`
-      url.pathname = '/'
-      url.search = ''
-      return NextResponse.redirect(url, 301)
+      // Fresh URL, not a `nextUrl` clone: the clone keeps the container port (see helper).
+      return NextResponse.redirect(publicHostRedirectUrl(`${redirectTo}.${ROOT_DOMAIN}`, '/'), 301)
     }
 
     if (slug) {
@@ -149,7 +145,8 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       // The white-label subdomain is a paid SKU. When the paywall is ON and this
       // shop isn't entitled (no grandfather/comp grant, no LIVE one-time grant, and
       // no active recurring subscription — US-4), 301 the WHOLE subdomain to the
-      // free `/s/slug` on the apex — the subdomain is honestly the upgrade it isn't
+      // free `/mx/s/slug` on the apex (a `/l/<id>` product link to that product's
+      // shop-scoped PDP — `unentitledSubdomainPath`) — the subdomain is honestly the upgrade it isn't
       // paying for. The flag is fail-open OFF (today's free-for-all), so a flag
       // outage never traps a seller or breaks a live subdomain.
       //
@@ -163,12 +160,8 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
         sellerClerkId: shopClerkId ?? undefined,
       })
       if (!entitled) {
-        const url = req.nextUrl.clone()
-        url.protocol = 'https:'
-        url.host = ROOT_DOMAIN
-        url.pathname = `/mx/s/${slug}`
-        url.search = ''
-        return NextResponse.redirect(url, 301)
+        // Fresh URL, not a `nextUrl` clone: the clone keeps the container port (see helper).
+        return NextResponse.redirect(publicHostRedirectUrl(ROOT_DOMAIN, unentitledSubdomainPath(slug, req.nextUrl.pathname)), 301)
       }
 
       const publicCandidate = subdomainPublicReadCandidate(req.nextUrl.pathname, req.nextUrl.search)
