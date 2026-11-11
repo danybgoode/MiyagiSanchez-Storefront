@@ -95,3 +95,14 @@ test.describe('event seats · the number the buyer cap reads', () => {
     expect(ticketQuantityCap({ available: 0, enabled: true })).toBe(1)
   })
 })
+
+test.describe('the importer never invents seats (merchant-panel-gaps S1, orchestrator review)', () => {
+  test('a service row with an event block is created without a quantity; a product row keeps its stock', async () => {
+    const { buildCreateBody } = await import('../lib/seller-product-create')
+    const base = { title: 'Taller', category: 'servicios', price: 100 } as any
+    const service = buildCreateBody({ ...base, listing_type: 'service', attrs: { event_date: '2026-12-01', venue_name: 'Foro' } }, [])
+    expect(service.quantity).toBeUndefined()
+    const product = buildCreateBody({ ...base, listing_type: 'product', quantity: 3 }, [])
+    expect(product.quantity).toBe(3)
+  })
+})

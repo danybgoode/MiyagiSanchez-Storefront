@@ -40,7 +40,10 @@ export function buildCreateBody(row: CatalogImportRow, images: Array<{ url: stri
     state: row.state || null,
     municipio: row.city || null,
     location,
-    quantity: isStockable(listingType) ? Math.max(1, Math.floor(row.quantity ?? 1)) : 1,
+    // Non-stockable rows send NO quantity: since merchant-panel-gaps S1 the backend reads «a quantity was sent» on a
+    // service/digital listing with an event block as «these are its seats», so a defaulted 1 would make an imported
+    // event a one-seat event.
+    quantity: isStockable(listingType) ? Math.max(1, Math.floor(row.quantity ?? 1)) : undefined,
     weight_grams: row.weight_grams ?? null,
     images,
     metadata: { external_id: row.external_id ?? null, ...(extras.metadata ?? {}) },
