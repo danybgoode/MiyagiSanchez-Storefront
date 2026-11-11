@@ -126,6 +126,17 @@ type LandingAiChannel = {
   note: string
 }
 
+/**
+ * The support promise (own-shop-positioning D4): the promoter on their OWN WhatsApp, and the merchant's own AI agent.
+ * No platform phone number and no promised hours — there is no platform support line. A self-serve page passes only
+ * the agent item.
+ */
+type SupportBlock = {
+  title: string
+  lead: string
+  items: Array<{ icon: string; title: string; body: string }>
+}
+
 export type SellerAcquisitionPageConfig = {
   pageId: string
   variant: SellerAcquisitionVariant
@@ -177,12 +188,6 @@ export type SellerAcquisitionPageConfig = {
   sectionOrder?: 'anchor'
   /** «Y además, apareces en el marketplace» — the marketplace as a bonus, not the headline. */
   marketplaceBonus?: LandingCallout
-  /**
-   * A quiet «¿Vienes a comprar?» line for the buyer who typed the domain. Rendered INSIDE the hero,
-   * under the prompt card: the hero is taller than a desktop screen, so a line after it was never
-   * seen without scrolling (the browser spec caught that on the first build).
-   */
-  buyerLink?: { question: string; label: string; href: string }
   /** «¿Cuánto cuesta?» → /mx/precios (pricing-page D10). In the page sections, never the hero. */
   pricingCallout?: LandingCallout
   /**
@@ -190,6 +195,8 @@ export type SellerAcquisitionPageConfig = {
    * above the fold on a 375 px phone; only the anchor page passes one.
    */
   describe?: React.ReactNode
+  /** D4 — who answers: the promoter (on their own WhatsApp) and the merchant's AI agent. */
+  support?: SupportBlock
 }
 
 export function SellerAcquisitionPage({ config }: { config: SellerAcquisitionPageConfig }) {
@@ -207,6 +214,7 @@ export function SellerAcquisitionPage({ config }: { config: SellerAcquisitionPag
       <LandingHero config={config} />
       {config.sectionOrder === 'anchor' ? <AnchorSections config={config} /> : <PersonaSections config={config} />}
       <FaqSection config={config} />
+      {config.support ? <SupportSection support={config.support} pageId={config.pageId} /> : null}
       {config.applyTeaser ? <ApplyTeaserSection teaser={config.applyTeaser} /> : null}
       {config.migrationCallout ? (
         <CalloutSection callout={config.migrationCallout} pageId={config.pageId} slug="migration" />
@@ -263,20 +271,6 @@ function PersonaSections({ config }: { config: SellerAcquisitionPageConfig }) {
         <CalloutSection callout={config.pricingCallout} pageId={config.pageId} slug="pricing" />
       ) : null}
     </>
-  )
-}
-
-function BuyerLink({ link }: { link: { question: string; label: string; href: string } }) {
-  return (
-    <p
-      data-testid="vende-buyer-link"
-      style={{ marginTop: 'var(--s-4)', marginBottom: 0, fontSize: 14, color: 'var(--fg-muted)' }}
-    >
-      {link.question}{' '}
-      <Link href={link.href} prefetch={false} style={{ color: 'var(--fg)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
-        {link.label}
-      </Link>
-    </p>
   )
 }
 
@@ -354,7 +348,6 @@ function LandingHero({ config }: { config: SellerAcquisitionPageConfig }) {
           copiedLabel={config.copiedLabel}
           testId={`${config.pageId}-prompt-copy`}
         />
-        {config.buyerLink ? <BuyerLink link={config.buyerLink} /> : null}
       </div>
 
       <HeroValueList values={values} className={styles.values} />
@@ -1022,6 +1015,35 @@ function AiChannelSection({
           {aiChannel.note}
         </p>
       ) : null}
+    </section>
+  )
+}
+
+function SupportSection({ support, pageId }: { support: SupportBlock; pageId: string }) {
+  return (
+    <section
+      aria-labelledby={`${pageId}-support-title`}
+      data-testid="seller-support"
+      style={{ marginBottom: 'var(--s-10)' }}
+    >
+      <SectionIntro id={`${pageId}-support-title`} title={support.title} lead={support.lead} />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
+          gap: 'var(--s-3)',
+        }}
+      >
+        {support.items.map((item) => (
+          <article key={item.title} className="card-panel" style={{ padding: 'var(--s-5)', display: 'flex', gap: 'var(--s-3)', alignItems: 'flex-start' }}>
+            <i className={item.icon} aria-hidden="true" style={{ color: 'var(--accent)', fontSize: 26, lineHeight: 1, flexShrink: 0 }} />
+            <span style={{ minWidth: 0 }}>
+              <strong style={{ display: 'block', color: 'var(--fg)', marginBottom: 'var(--s-1)' }}>{item.title}</strong>
+              <span className="t-small" style={{ display: 'block', color: 'var(--fg-muted)' }}>{item.body}</span>
+            </span>
+          </article>
+        ))}
+      </div>
     </section>
   )
 }

@@ -46,7 +46,7 @@ test.describe('Agent discovery surface', () => {
 
     // es-MX markers on the page's own authored prose (headings/labels).
     expect(html).toContain('Ficha para agentes')
-    expect(html).toContain('¿Qué es este marketplace?')
+    expect(html).toContain('¿Qué es Miyagi Sánchez?')
     expect(html).toContain('Tipos de producto compatibles')
     expect(html).toContain('Métodos de pago')
     expect(html).toContain('Configuración del servidor MCP')
@@ -54,6 +54,7 @@ test.describe('Agent discovery surface', () => {
     // Known English sentences from before the translation must not come back.
     expect(html).not.toContain('Agent Briefing')
     expect(html).not.toContain('What is this marketplace?')
+    expect(html).not.toContain('¿Qué es este marketplace?')
     expect(html).not.toContain('Supported product types')
     expect(html).not.toContain('Payment methods</h2>')
     expect(html).not.toContain('For sellers — /mx/vende')

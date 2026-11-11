@@ -18,7 +18,7 @@
     "neighborhood": "Vecindario",
     "messages": "Mensajes",
     "publish": "Publicar",
-    "publishFree": "Publicar gratis",
+    "publishFree": "Abrir mi tienda",
     "signIn": "Iniciar sesión",
     "cart": "Ver carrito",
     "account": "Cuenta",
@@ -54,7 +54,7 @@
       "copyright": "© 2026 Miyagi Sánchez",
       "listings": "Anuncios",
       "neighborhood": "Vecindario",
-      "sellFree": "Vende gratis",
+      "sellFree": "Abrir mi tienda",
       "createAccount": "Crear cuenta",
       "agentApi": "Agent API",
       "about": "Acerca de",
@@ -1169,7 +1169,7 @@
         },
         {
           "title": "¿Entonces cómo ganan ustedes?",
-          "body": "Con el Plan Negocio: los negocios que quieren su propio dominio, Mercado Libre y más ayuda de la IA pagan una mensualidad. Nunca tomamos un porcentaje de tus ventas."
+          "body": "Con los planes: cuando terminan tus meses sin costo eliges el Plan Tienda o el Plan Negocio y pagas una mensualidad o un año por adelantado. Nunca tomamos un porcentaje de tus ventas."
         },
         {
           "title": "¿Necesito saber de tecnología?",
@@ -1184,6 +1184,19 @@
           "body": "Pídele a tu propia IA que lea la página y compare la oferta con lo que pagas hoy. Si no te conviene, no la uses. Abrir tu tienda no cuesta ni te amarra a nada."
         }
       ],
+      "support": {
+        "title": "Siempre hay alguien contigo",
+        "promoterLead": "Tu promotor te arma la tienda y te atiende por su WhatsApp; entre visitas, tu agente de IA responde.",
+        "agentLead": "Tu agente de IA responde cuando lo necesitas.",
+        "promoter": {
+          "title": "Tu promotor",
+          "body": "Te arma la tienda contigo y te atiende por su WhatsApp, desde la primera visita."
+        },
+        "agent": {
+          "title": "Tu agente de IA",
+          "body": "Conecta tu propio Claude, ChatGPT o Gemini a tu tienda. Pregúntale cómo va tu plan, qué ofertas tienes o cuánto pagarías en otra plataforma, y pídele que cambie un precio o publique un producto."
+        }
+      },
       "selfCheck": {
         "title": "Compruébalo tú mismo",
         "body": "Copia el prompt y pégalo en tu IA para que evalúe la oferta por ti."
@@ -1196,7 +1209,7 @@
       },
       "pricingCallout": {
         "title": "¿Cuánto cuesta?",
-        "body": "Abrir tu tienda y vender es gratis, con 0% de comisión, y tu subdominio también. El Plan Negocio ({negocioMonthly}) te deja conectar tu propio dominio, sincronizar Mercado Libre y más.",
+        "body": "Abrir tu tienda no cuesta: empiezas con {trialLength} del Plan Negocio gratis, sin tarjeta y con 0% de comisión. Después eliges el Plan Tienda ({tiendaFrom}) o el Plan Negocio ({negocioMonthly}), que suma tu propio dominio, Mercado Libre y más.",
         "ctaLabel": "Ver precios"
       }
     },
@@ -1228,9 +1241,9 @@
       },
       "eyebrow": "",
       "heroTitle": "Describe tu negocio. En segundos tienes tu tienda en línea, lista para cobrar y compartir — sin comisión.",
-      "heroLead": "Tu tienda con tu propia dirección, cobros directos a tu cuenta y tu catálogo listo para WhatsApp e Instagram. Y además, apareces en el marketplace.",
+      "heroLead": "Tu tienda con tu propia dirección, cobros directos a tu cuenta y tu catálogo listo para WhatsApp e Instagram. Armada contigo, sin comisión por venta.",
       "trustLine": "Compruébalo tú mismo: pídele a Claude, Gemini o ChatGPT que evalúe miyagisanchez.com y te diga si te conviene.",
-      "primaryCta": "Empieza gratis",
+      "primaryCta": "Abrir mi tienda",
       "secondaryCta": "¿Qué puedo vender?",
       "heroStats": [
         {
@@ -1264,12 +1277,12 @@
         }
       ],
       "proofTitle": "Lo que te llevas",
-      "proofLead": "Una tienda en línea completa y tuya desde el primer día. El marketplace viene de regalo.",
+      "proofLead": "Una tienda en línea completa y tuya desde el primer día, armada contigo.",
       "proofPoints": [
         {
           "icon": "iconoir-shop",
           "title": "Tu tienda, con tu dirección",
-          "body": "Tu subdominio viene gratis; con Negocio conectas tu propio dominio."
+          "body": "Tu subdominio viene con tu plan; con Negocio conectas tu propio dominio."
         },
         {
           "icon": "iconoir-percentage",
@@ -1389,14 +1402,14 @@
           }
         ]
       },
-      "closingTitle": "Empieza gratis y déjalo si no te gusta.",
+      "closingTitle": "Abre tu tienda y déjala si no te gusta.",
       "closingBody": "No hay contrato, no hay comisión escondida y no necesitas rehacer tu negocio. Sube tu primera oferta y pruébalo.",
       "closingCta": "Abrir mi tienda",
       "variants": {
         "b": {
           "heroTitle": "Abre tu tienda gratis en México. 0% de comisión.",
-          "primaryCta": "Crear tienda gratis",
-          "closingCta": "Empezar sin comisión"
+          "primaryCta": "Abrir mi tienda",
+          "closingCta": "Abrir mi tienda sin comisión"
         }
       },
       "benchmark": {
@@ -1517,18 +1530,14 @@
       },
       "marketLinks": {
         "label": "También en Miyagi Sánchez:",
-        "mx": "Marketplace México",
+        "mx": "México",
         "us": "Estados Unidos",
         "en": "English"
       },
       "marketplaceBonus": {
-        "title": "Y además, apareces en el marketplace",
-        "body": "Tus productos también se publican en el marketplace de Miyagi Sánchez: una vitrina más para que te encuentren, sin costo.",
-        "ctaLabel": "Explora el marketplace"
-      },
-      "buyerLink": {
-        "question": "¿Vienes a comprar?",
-        "label": "Explora el marketplace"
+        "title": "Tus productos también aparecen en el Vecindario de Miyagi Sánchez.",
+        "body": "Una vitrina más para que te encuentren, sin costo extra.",
+        "ctaLabel": "Ver el Vecindario"
       }
     },
     "creadores": {
@@ -2782,7 +2791,7 @@
       "heroTitle": "Vende en Estados Unidos. Quédate con la venta completa.",
       "heroLead": "Abre tu tienda, publica lo que vendes y cobra en USD directo a tu propia cuenta de Stripe. La plataforma se queda con 0% de la venta.",
       "trustLine": "Compruébalo tú: copia el prompt y pídele a Claude, Gemini o ChatGPT que lea miyagisanchez.com y te diga si la oferta se sostiene.",
-      "primaryCta": "Empieza gratis",
+      "primaryCta": "Abrir mi tienda",
       "secondaryCta": "Cómo funciona",
       "heroStats": [
         {
@@ -3179,28 +3188,28 @@
     "page": {
       "eyebrow": "Acerca de",
       "title": "¿Qué es miyagisanchez.com y por qué vender aquí?",
-      "lead": "Un marketplace nativo para agentes, hecho para México. No nos creas: pregúntale a tu propia IA.",
-      "primaryCtaLabel": "Empieza gratis",
-      "secondaryCtaLabel": "Para vendedores",
+      "lead": "Tu propia tienda en línea, armada contigo y sin comisión por venta. No nos creas: pregúntale a tu propia IA.",
+      "primaryCtaLabel": "Abrir mi tienda",
+      "secondaryCtaLabel": "Ver precios",
       "stubBadge": "Próximamente",
       "pricingLinkLabel": "Ver todos los precios",
       "langToggleLabel": "English",
       "metaTitle": "Acerca de miyagisanchez.com — qué es y por qué vender aquí",
-      "metaDescription": "Qué es miyagisanchez.com, por qué vender, cómo empezar y cuánto cuesta. Marketplace nativo para agentes, hecho para México. 0% de comisión.",
+      "metaDescription": "Miyagi Sánchez es tu propia tienda en línea, armada contigo, sin comisión por venta. Qué incluye, cómo empezar y cuánto cuesta.",
       "contactPrompt": "¿Dudas? Escríbenos a"
     },
     "sections": {
       "what_is": {
         "heading": "¿Qué es miyagisanchez.com?",
-        "lead": "Un mercado para México donde cualquiera puede vender — pensado para que tu propio asistente de IA lo entienda, lo recorra y lo configure por ti.",
+        "lead": "Tu tienda con tu dirección, tus cobros y tu catálogo — y tu propio asistente de IA para entenderla, recorrerla y operarla contigo.",
         "body": [
-          "miyagisanchez.com es un mercado multi-vendedor entre particulares (P2P) para México. Cada persona o negocio abre su tienda, publica lo que vende y llega a compradores por varios canales, sin costo de entrada.",
-          "Está construido sobre Medusa (el motor de comercio) y es nativo para agentes: cumple los estándares abiertos UCP y MCP, así que un asistente de IA puede explorar el catálogo, negociar y comprar sin necesidad de un navegador."
+          "Miyagi Sánchez es tu propia tienda en línea, armada contigo, sin comisión por venta.",
+          "Tú describes tu negocio y la tienda se arma contigo: tu dirección, tus fotos, tus formas de cobro y tu catálogo listo para compartir por WhatsApp e Instagram. El dinero llega directo a tu cuenta.", "Tus productos también aparecen en el Vecindario de Miyagi Sánchez: una vitrina más para que te encuentren, sin costo extra.", "Está construida sobre Medusa (el motor de comercio) y cumple los estándares abiertos UCP y MCP, así que un asistente de IA puede leer tu tienda, recomendarla y ayudarte a operarla sin necesidad de un navegador."
         ],
         "points": [
           {
-            "title": "Multi-vendedor",
-            "body": "Muchas tiendas independientes en una sola plataforma.",
+            "title": "Tu propia tienda",
+            "body": "Con tu dirección, tu marca y el dinero directo a tu cuenta.",
             "icon": "iconoir-shop-four-tiles"
           },
           {
@@ -3209,28 +3218,28 @@
             "icon": "iconoir-map-pin"
           },
           {
-            "title": "Nativo para agentes",
-            "body": "Tu IA puede leernos y operar por ti vía UCP y MCP.",
+            "title": "Hecha para la IA",
+            "body": "Tu IA puede leer tu tienda y operarla por ti vía UCP y MCP.",
             "icon": "iconoir-sparks"
           }
         ]
       },
       "why_sell": {
         "heading": "¿Por qué vender aquí?",
-        "lead": "Sin comisiones, en todos los canales, y con tu propio asistente de IA haciendo el trabajo pesado.",
+        "lead": "Sin comisiones, en todos tus canales, y con tu propio asistente de IA haciendo el trabajo pesado.",
         "body": [
-          "Vender es gratis: cobramos 0% de comisión por venta. Te quedas con lo que vendes.",
-          "Tu catálogo vive una sola vez y aparece en muchos lugares: el marketplace, tu propio dominio de marca, un widget que pegas en cualquier sitio, y una API/agente para compras programáticas."
+          "Cobramos 0% de comisión por venta: te quedas con lo que vendes. Empiezas sin pagar y sin tarjeta, y los precios de los planes son públicos.",
+          "Tu catálogo vive una sola vez y aparece en muchos lugares: tu tienda, tu propio dominio de marca, un widget que pegas en cualquier sitio, el Vecindario de Miyagi Sánchez, y una API/agente para compras programáticas."
         ],
         "points": [
           {
             "title": "0% de comisión",
-            "body": "No cobramos por venta. Publicar y vender es gratis.",
+            "body": "No cobramos por venta: lo que vendes es tuyo.",
             "icon": "iconoir-hand-cash"
           },
           {
             "title": "Multicanal",
-            "body": "Marketplace, dominio propio, widget embebible y API/agentes — un solo catálogo.",
+            "body": "Tu tienda, dominio propio, widget embebible, Vecindario y API/agentes — un solo catálogo.",
             "icon": "iconoir-share-android"
           },
           {
@@ -3272,14 +3281,14 @@
         "lead": "Tú y tu agente hacen el trabajo creativo; nosotros corremos rieles delgados.",
         "body": [
           "Los asistentes de IA de los vendedores hacen gran parte del trabajo: catalogar, redactar, fijar precios y mantener la tienda. Nosotros aportamos los rieles.",
-          "Construimos sobre primitivas de Medusa y reutilizamos antes de reconstruir, con superficies para agentes (UCP/MCP) en lugar de herramientas a la medida. Eso mantiene bajo nuestro costo de infraestructura — y por eso vender puede ser gratis."
+          "Construimos sobre primitivas de Medusa y reutilizamos antes de reconstruir, con superficies para agentes (UCP/MCP) en lugar de herramientas a la medida. Eso mantiene bajo nuestro costo de infraestructura — y por eso podemos cobrar 0% de comisión por venta."
         ]
       },
       "pricing": {
         "heading": "Precios",
         "lead": "Abrir tu tienda no cuesta: empiezas con {trialLength} del Plan Negocio gratis, sin tarjeta y con 0% de comisión. Después hay dos planes, el Plan Tienda y el Plan Negocio, y todos los precios, con IVA incluido, son públicos en miyagisanchez.com/mx/precios.",
         "body": [
-          "Plan Tienda: {tiendaFrom} ({tiendaYearly} en un solo pago, o {tiendaMonthly}). Tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, el marketplace, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».",
+          "Plan Tienda: {tiendaFrom} ({tiendaYearly} en un solo pago, o {tiendaMonthly}). Tu tienda y su URL en miyagisanchez.com/mx/s/tu-tienda, tu subdominio, 0% de comisión, todos los métodos de pago, tu lugar en el Vecindario, ofertas y mensajes, agentes de IA (UCP/MCP), la IA que arma tu tienda y respuestas de chat cada mes, con un pequeño enlace «Tienda impulsada por Miyagi Sánchez».",
           "Plan Negocio: {negocioMonthly}, o {negocioYearly} (también a meses sin intereses). Suma dominio propio, sincronización con Mercado Libre, tu tienda sin el enlace de la plataforma, más respuestas de chat y más fotos al mes, y el chequeo mensual. Toda tienda nueva empieza con {trialLength} gratis (el dominio propio se activa al contratar).",
           "Cuando terminan tus {trialLength} gratis eliges un plan; si no, tu tienda se pausa sin borrar nada y vuelve en cuanto pagas. Las tiendas que ya existían antes de los planes de pago siguen en el Plan Gratis.",
           "Servicio aparte: migración con consultor, {migrationPrice}.",
@@ -3319,10 +3328,10 @@
       },
       "philosophy": {
         "heading": "Filosofía",
-        "lead": "Llevar las mejores prácticas del ecommerce a todos, gratis y al más alto nivel.",
+        "lead": "Llevar las mejores prácticas del ecommerce a todos, al más alto nivel y sin comisiones.",
         "body": [
           "Creemos que el asistente de IA es el canal de distribución y el motor de onboarding. En lugar de pedirte que confíes en nosotros, te decimos que le preguntes a tu propio Claude, Gemini o ChatGPT sobre miyagisanchez.com: tu agente nos lee, lo explica en tus términos y, si tiene sentido, prepara tu tienda.",
-          "Nosotros ponemos los rieles; tú te enfocas en lo creativo y la estrategia. La misión es democratizar las mejores prácticas del comercio — confianza, negociación de ofertas y compra con IA — para que cualquiera venda con la calidad de los grandes, sin costo."
+          "Nosotros ponemos los rieles; tú te enfocas en lo creativo y la estrategia. La misión es democratizar las mejores prácticas del comercio — confianza, negociación de ofertas y compra con IA — para que cualquiera venda con la calidad de los grandes, sin comisiones."
         ]
       }
     }

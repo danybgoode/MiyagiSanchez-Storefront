@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import {
   ABOUT_CTA_HREF,
-  ABOUT_SELLERS_HREF,
+  ABOUT_PRICING_HREF,
   aboutCopy,
   type AboutLocale,
   type AboutPageCopy,
@@ -78,7 +78,7 @@ export function AboutPage({
             {page.primaryCtaLabel}
             <i className="iconoir-arrow-right" aria-hidden="true" />
           </Link>
-          <Link href={ABOUT_SELLERS_HREF} className="btn btn-secondary btn-lg" prefetch={false}>
+          <Link href={ABOUT_PRICING_HREF} className="btn btn-secondary btn-lg" prefetch={false}>
             {page.secondaryCtaLabel}
           </Link>
         </div>
@@ -192,7 +192,7 @@ function ClosingCta({ page }: { page: AboutPageCopy }) {
         {page.primaryCtaLabel}
         <i className="iconoir-arrow-right" aria-hidden="true" />
       </Link>
-      <Link href={ABOUT_SELLERS_HREF} className="btn btn-secondary btn-lg" prefetch={false}>
+      <Link href={ABOUT_PRICING_HREF} className="btn btn-secondary btn-lg" prefetch={false}>
         {page.secondaryCtaLabel}
       </Link>
       {/* The ADDRESS is not a dictionary key: it is a FACT about the platform and

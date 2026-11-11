@@ -21,21 +21,21 @@
     "operational_flow": "El usuario solicita la devolución de un producto directamente a través de su asistente de IA. La IA usa los webhooks de pedidos de UCP para disparar el evento de autorización de devolución en el backend de ecommerce. El sistema genera una etiqueta de envío de devolución automática y registra los parámetros del reembolso en la base de datos sin intervención humana."
   },
   {
-    "domain": "Marketplace P2P (general / estilo Vinted, México)",
+    "domain": "Compraventa entre particulares (general / estilo Vinted, México)",
     "target_user": "Compradores y arrendatarios C2C",
-    "primary_pain_point": "Baja retención en la app móvil y fricción para usuarios que navegan publicaciones P2P fragmentadas entre regiones.",
+    "primary_pain_point": "Baja retención en la app móvil y fricción para usuarios que navegan publicaciones fragmentadas entre regiones.",
     "ucp_mechanism": "Red de liquidez abierta y sourcing headless con Medusa",
     "operational_flow": "El usuario pide un artículo de segunda mano muy específico dentro de Gemini. La IA consulta la base de datos de Medusa expuesta vía metadatos UCP. La publicación se muestra en línea dentro de la app activa del usuario. La compra se resuelve vía tokens de pago universales, enrutando el pedido directo al inventario del vendedor."
   },
   {
-    "domain": "Marketplace P2P (negociación de precio)",
+    "domain": "Compraventa entre particulares (negociación de precio)",
     "target_user": "Vendedores individuales C2C",
     "primary_pain_point": "Alta fatiga operativa para vendedores casuales que gestionan regateo manual y repetitivo ('¿Cuánto lo menos?') por apps de chat.",
     "ucp_mechanism": "Model Context Protocol (MCP) y negociación Agent-to-Agent (A2A)",
     "operational_flow": "El agente de IA del comprador envía una oferta de precio más bajo al marketplace. La IA del backend de Medusa evalúa la oferta contra restricciones programáticas del vendedor (p. ej. antigüedad de la publicación, límites de descuento predefinidos). Si es válida, el sistema actualiza automáticamente el precio de la transacción y procesa un checkout automatizado inmediato."
   },
   {
-    "domain": "Marketplace P2P (confianza y seguridad — México)",
+    "domain": "Compraventa entre particulares (confianza y seguridad — México)",
     "target_user": "Confianza del ecosistema C2C",
     "primary_pain_point": "Alta prevalencia de fraude de identidad, cuentas fantasma y estafas de pago ('salvo buen cobro') en el mercado secundario mexicano.",
     "ucp_mechanism": "Credenciales de identidad verificables y lógica de escrow",
@@ -43,7 +43,7 @@
   },
   {
     "domain": "Automotriz (autos usados — México)",
-    "target_user": "Comerciantes P2P de alto valor",
+    "target_user": "Comerciantes de alto valor",
     "primary_pain_point": "Vendedores saturados de consultas de bajo interés; compradores paralizados por la falta de verificación del historial vehicular (REPUVE) y el miedo a la seguridad física.",
     "ucp_mechanism": "Pre-validación asíncrona y depósitos en escrow",
     "operational_flow": "El agente del comprador consulta publicaciones de autos. Medusa entrega metadatos UCP con verificaciones criptográficas de bases de datos gubernamentales (REPUVE, validación de factura original). El agente del comprador bloquea automáticamente un depósito de garantía reembolsable en el escrow de Medusa vía checkout UCP para asegurar un horario de inspección física del vehículo."

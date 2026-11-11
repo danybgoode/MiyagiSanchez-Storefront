@@ -2,7 +2,7 @@
  * UCP (Universal Commerce Protocol) — shared types and response builder.
  *
  * Every AI agent use case in ucp-use-cases.json maps to fields here:
- *  - P2P discovery      → catalog search + actions.make_offer
+ *  - Offer discovery    → catalog search + actions.make_offer
  *  - Embedded checkout  → actions.buy_now + checkout_urls
  *  - Escrow/trust       → trust.escrow_mode + trust signals
  *  - REPUVE (cars)      → trust.repuve_checked + metadata.repuve

@@ -88,7 +88,7 @@ test.describe('about-content · single bilingual source', () => {
         expect(value.trim(), `ABOUT_PAGE.${locale}.${key}`).not.toBe('')
       }
     }
-    expect(ABOUT_CTA_HREF).toBe('/sell?from=acerca')
+    expect(ABOUT_CTA_HREF).toBe('/')
   })
 
   test('getAboutSection throws on an unknown id', () => {

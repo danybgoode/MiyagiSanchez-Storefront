@@ -193,3 +193,53 @@ test.describe('Agent-readability surface — OG/social-preview sweep (Story 1.2)
     expect(ogImage).toContain('/acerca/opengraph-image')
   })
 })
+
+
+/**
+ * own-shop-positioning S1.1 — the company definition, on every surface an AI reads first.
+ *
+ * Promoters sell «tu propia tienda, armada contigo, sin comisión por venta»; the site used to call Miyagi Sánchez a
+ * «marketplace nativo» and a «P2P» market, so a merchant who asked their own AI read the opposite of what they were
+ * told. Plain no-JS fetches, like the rest of this file, and literals on purpose: this asserts what a crawler READS,
+ * not what a locale key happens to hold.
+ */
+const OWN_SHOP_DEFINITION_ES = 'Miyagi Sánchez es tu propia tienda en línea, armada contigo, sin comisión por venta.'
+const OWN_SHOP_DEFINITION_EN = 'Miyagi Sánchez is your own online shop, built with you, with no commission on sales.'
+/** Identity wording that must not come back. «marketplace» alone is fine (the Vecindario is a benefit). */
+const RETIRED_IDENTITY = /\bP2P\b|marketplace nativo|agent-native marketplace|peer-to-peer/i
+
+test.describe('Own-shop positioning — the definition on every agent surface', () => {
+  for (const path of ['/acerca', '/agent', '/llms.txt', '/api/ucp/manifest', '/.well-known/ucp-agent-profile.json']) {
+    test(`${path} never calls Miyagi Sánchez a P2P or «marketplace nativo»`, async ({ request }) => {
+      const res = await request.get(path)
+      expect(res.ok(), path).toBeTruthy()
+      expect(await res.text(), path).not.toMatch(RETIRED_IDENTITY)
+    })
+  }
+
+  test('/acerca leads with the own-shop definition and the CTA reads «Abrir mi tienda»', async ({ request }) => {
+    const html = await (await request.get('/acerca')).text()
+    expect(html).toContain(OWN_SHOP_DEFINITION_ES)
+    const cta = html.match(/<a[^>]*data-testid="acerca-primary-cta"[^>]*>([\s\S]*?)<\/a>/)
+    expect(cta, 'the primary CTA must render').toBeTruthy()
+    expect(cta![0]).toMatch(/href="\/"/)
+    expect(cta![1]).toContain('Abrir mi tienda')
+    expect(html).not.toContain('Empieza gratis')
+  })
+
+  test('/llms.txt and the manifest carry the same definition (es + en)', async ({ request }) => {
+    const llms = await (await request.get('/llms.txt')).text()
+    expect(llms).toContain(OWN_SHOP_DEFINITION_EN)
+    expect(llms).toContain(OWN_SHOP_DEFINITION_ES)
+
+    const manifest = await (await request.get('/api/ucp/manifest')).json()
+    expect(manifest.about.summary.es).toBe(OWN_SHOP_DEFINITION_ES)
+    expect(manifest.about.summary.en).toBe(OWN_SHOP_DEFINITION_EN)
+  })
+
+  test('/agent states the definition and describes the shop, not a multi-seller marketplace', async ({ request }) => {
+    const html = await (await request.get('/agent')).text()
+    expect(html).toContain('Tu propia tienda en línea')
+    expect(html).not.toMatch(/marketplace multi-vendedor|C2C/)
+  })
+})

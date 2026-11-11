@@ -13,9 +13,9 @@ import { test, expect } from '@playwright/test'
 test.describe('nav entry points (desktop, anonymous)', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('the signed-out "Publicar gratis" CTA leads to the shop builder at /', async ({ page }) => {
+  test('the signed-out "Abrir mi tienda" CTA leads to the shop builder at /', async ({ page }) => {
     await page.goto('/mx')
-    const cta = page.getByRole('link', { name: 'Publicar gratis' }).first()
+    const cta = page.getByRole('link', { name: 'Abrir mi tienda' }).first()
     await expect(cta).toBeVisible()
     await expect(cta).toHaveAttribute('href', '/')
   })

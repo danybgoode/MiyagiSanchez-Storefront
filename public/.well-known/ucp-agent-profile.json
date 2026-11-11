@@ -32,6 +32,6 @@
   "agent": {
     "name": "Miyagi Sánchez — Platform Migrations Connector",
     "url": "https://miyagisanchez.com",
-    "description": "Reads a merchant's own product catalog (read-only) to help them migrate it into miyagisanchez.com, a Mexican P2P marketplace. Used only when a merchant explicitly starts a migration from their own shop domain. Declares no checkout, cart, or payment capability — this agent never transacts."
+    "description": "Reads a merchant's own product catalog (read-only) to help them migrate it into their own shop on miyagisanchez.com (Miyagi Sánchez: your own online shop, built with you, with no commission on sales). Used only when a merchant explicitly starts a migration from their own shop domain. Declares no checkout, cart, or payment capability — this agent never transacts."
   }
 }

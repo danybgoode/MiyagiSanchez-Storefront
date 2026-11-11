@@ -15,7 +15,6 @@ import type { PromoterSettings } from '@/lib/promoter'
 import type { PromoterSku } from '@/lib/promoter-skus'
 import type { PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
-import { marketBasePath } from '@/lib/markets'
 import type { SellerAcquisitionPageConfig, LandingCallout } from './SellerAcquisitionSections'
 
 type QueryParams = Record<string, string | string[] | undefined | null>
@@ -78,9 +77,12 @@ export function buildAnchorPageConfig(
     marketplaceBonus: {
       title: page.marketplaceBonus.title,
       body: page.marketplaceBonus.body,
-      cta: { label: page.marketplaceBonus.ctaLabel, href: marketBasePath('mx'), testId: 'vende-marketplace-bonus' },
+      // own-shop-positioning D3: the single Vecindario-benefit line. The marketplace is a benefit of the shop, not the
+      // way in, so the old «¿Vienes a comprar?» hero line is gone; a buyer finds the Vecindario in the footer.
+      cta: { label: page.marketplaceBonus.ctaLabel, href: '/vecindario', testId: 'vende-marketplace-bonus' },
     },
-    buyerLink: { question: page.buyerLink.question, label: page.buyerLink.label, href: marketBasePath('mx') },
+    // D4 — a self-serve page reads the agent line only: no promoter stands behind a visitor who arrived alone.
+    support: buildSupportBlock(copy, 'agent'),
     // pricing-page D10 — a link to /mx/precios in the sections, never the hero (prompt-to-shop owns it).
     pricingCallout: {
       title: copy.shared.pricingCallout.title,
@@ -490,6 +492,24 @@ export function buildUsMarketPageConfig(
   }
 }
 
+/**
+ * The D4 support block. `promoter` (a business-type page a promoter sends) names the promoter on their own WhatsApp and
+ * the merchant's AI agent; `agent` (a self-serve page) names the agent only. There is no platform phone number and no
+ * promised hours anywhere in it.
+ */
+function buildSupportBlock(copy: SellerAcquisitionCopy, mode: 'promoter' | 'agent'): SellerAcquisitionPageConfig['support'] {
+  const support = copy.shared.support
+  const agent = { icon: 'iconoir-sparks', title: support.agent.title, body: support.agent.body }
+  if (mode === 'agent') {
+    return { title: support.title, lead: support.agentLead, items: [agent] }
+  }
+  return {
+    title: support.title,
+    lead: support.promoterLead,
+    items: [{ icon: 'iconoir-chat-bubble', title: support.promoter.title, body: support.promoter.body }, agent],
+  }
+}
+
 function baseConfig(
   copy: SellerAcquisitionCopy,
   page: AnchorCopy | CreatorCopy | LocalBusinessCopy | ServicesCopy | AutosCopy,
@@ -535,6 +555,7 @@ function baseConfig(
       href: sellerPersonaCtaHref(personaId, query),
       testId: `${personaId}-closing-cta`,
     },
+    support: buildSupportBlock(copy, 'agent'),
   }
 }
 

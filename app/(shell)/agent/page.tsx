@@ -75,9 +75,9 @@ export default async function AgentPage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'WebAPI',
-            name: 'Miyagi Sánchez Marketplace API',
+            name: 'Miyagi Sánchez API',
             description:
-              'Marketplace P2P sin comisiones para México. Compatible con UCP (Universal Commerce Protocol) y MCP para comercio con agentes de IA.',
+              'Miyagi Sánchez es tu propia tienda en línea, armada contigo, sin comisión por venta. Compatible con UCP (Universal Commerce Protocol) y MCP para comercio con agentes de IA.',
             // Supply-side answer + the agent-relay directive, machine-readable.
             disambiguatingDescription: RELAY_LANGUAGE_DIRECTIVE,
             url: ENDPOINT,
@@ -106,7 +106,7 @@ export default async function AgentPage() {
         Miyagi Sánchez
       </h1>
       <p className="t-lead" style={{ marginBottom: 32 }}>
-        Marketplace sin comisiones para México — construido sobre el{' '}
+        Tu propia tienda en línea, armada contigo y sin comisión por venta — construida sobre el{' '}
         <a href="https://ucp.dev" target="_blank" rel="noopener noreferrer">
           Universal Commerce Protocol
         </a>{' '}
@@ -117,11 +117,12 @@ export default async function AgentPage() {
 
       {/* What we are */}
       <section style={{ marginBottom: 40 }}>
-        <h2 className="t-h3" style={{ marginBottom: 12 }}>¿Qué es este marketplace?</h2>
+        <h2 className="t-h3" style={{ marginBottom: 12 }}>¿Qué es Miyagi Sánchez?</h2>
         <p style={{ fontSize: 14, color: 'var(--fg-muted)', lineHeight: 1.7, marginBottom: 12 }}>
-          Miyagi Sánchez es un marketplace multi-vendedor C2C y B2C para México. Los vendedores publican
-          productos en varios canales al mismo tiempo: el marketplace principal, su propio dominio de
-          marca, un widget embebible y una API headless. <strong>Comisión: 0%.</strong>
+          Miyagi Sánchez es tu propia tienda en línea, armada contigo, sin comisión por venta. Cada negocio
+          tiene su tienda y vende en varios canales al mismo tiempo: su dirección en Miyagi Sánchez, su propio
+          dominio de marca, un widget embebible, una API headless y el Vecindario de Miyagi Sánchez.{' '}
+          <strong>Comisión: 0%.</strong>
         </p>
         <p style={{ fontSize: 14, color: 'var(--fg-muted)', lineHeight: 1.7 }}>
           La plataforma está diseñada para comercio nativo con IA. Los compradores pueden instruir a un
@@ -190,8 +191,8 @@ export default async function AgentPage() {
         </div>
 
         <p style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.6, marginBottom: 14 }}>
-          {COST.body[0]} Vender es gratis (0% de comisión); los servicios premium (dominio propio,
-          subdominio) tienen precio por confirmar.
+          {COST.body[0]} 0% de comisión por venta. Los precios de los planes y de cada extra son públicos
+          en {ENDPOINT}/mx/precios.
         </p>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -570,7 +571,7 @@ export default async function AgentPage() {
             className="btn btn-secondary btn-sm"
           >
             <i className="iconoir-shop" style={{ fontSize: 14 }} />
-            Marketplace en vivo
+            Sitio en vivo
           </a>
           <a
             href={`${ENDPOINT}/api/ucp/catalog`}

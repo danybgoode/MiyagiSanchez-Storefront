@@ -53,7 +53,7 @@ export function aboutAgentLinks(base: string) {
     about: `${base}/acerca`,
     sellers: `${base}${ABOUT_SELLERS_HREF}`, // /vende — the #6 seller-acquisition funnel
     agent: `${base}/agent`,
-    onboarding: `${base}${ABOUT_CTA_HREF}`, // /sell?from=acerca
+    onboarding: `${base}${ABOUT_CTA_HREF}`, // / — the shop builder
     manifest: `${base}/api/ucp/manifest`,
     pricing: `${base}/mx/precios`,
   }
@@ -172,6 +172,6 @@ Full price list: ${links.pricing}
 
 ## Resumen (es)
 ${whatIsEs.body[0]} ${whySellEs.body[0]}
-Vender es gratis (0% de comisión). Empieza en ${links.onboarding} o pregúntale a tu propia IA: «¿qué es miyagisanchez.com y por qué vendería ahí?».
+0% de comisión por venta. Abre tu tienda en ${links.onboarding} o pregúntale a tu propia IA: «¿qué es miyagisanchez.com y por qué vendería ahí?».
 `
 }
