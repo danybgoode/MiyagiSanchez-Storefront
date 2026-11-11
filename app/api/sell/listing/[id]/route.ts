@@ -65,10 +65,31 @@ async function syncFreeEventRow(
     .eq('shop_id', context.shop.id)
     .select('id')
   if (error || !data || data.length === 0) {
-    console.error('[sell/listing] free event row not updated:', slug, error)
+    console.error('[sell/listing] free event row not updated:', error?.message ?? 'no row matched')
     return { ok: false, error: 'Se guardó el anuncio, pero no se pudo actualizar el evento. Inténtalo de nuevo.' }
   }
   return { ok: true }
+}
+
+// A free Evento's RSVP row needs a COMPLETE block (date, time, venue). Clearing one of them in an edit is
+// refused BEFORE any write, so the listing never drifts from its registration page (codex review #491).
+async function freeEventBlockRefusal(
+  productId: string,
+  body: { title?: string; attrs?: Record<string, unknown>; state?: string | null },
+): Promise<string | null> {
+  if (body.attrs === undefined) return null
+  const { data: row } = await db
+    .from('marketplace_listings')
+    .select('title, state, metadata')
+    .eq('medusa_product_id', productId)
+    .maybeSingle()
+  if (!rsvpEventSlug((row?.metadata ?? null) as Record<string, unknown> | null)) return null
+  const patch = rsvpEventSyncPatch({
+    title: body.title ?? (row?.title as string),
+    attrs: body.attrs,
+    state: body.state !== undefined ? body.state : (row?.state as string | null),
+  })
+  return patch ? null : 'Un evento gratis necesita fecha, hora y recinto. Complétalos para guardar.'
 }
 
 // ── PUT — edit listing fields ─────────────────────────────────────────────────
@@ -210,6 +231,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const clerkJwt = await getToken()
   if (!clerkJwt) return NextResponse.json({ error: 'Error de autenticación.' }, { status: 401 })
+  const freeEventRefusal = await freeEventBlockRefusal(id, body)
+  if (freeEventRefusal) return NextResponse.json({ error: freeEventRefusal, field: 'attrs' }, { status: 422 })
 
   // Personalization field definitions → sanitised and stored on the Medusa
   // product metadata (the backend update path merges arbitrary metadata).

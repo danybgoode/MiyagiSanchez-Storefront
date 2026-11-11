@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
   if (rsvpDraft) {
     const shopMirror = await ensureSupabaseShopMirror(sellerForMirror!, userId).catch(() => null)
     if (!shopMirror?.id || !sellerId) {
-      console.error('[sell/create] free event: no shop mirror for', sellerId)
+      console.error('[sell/create] free event: no shop mirror')
       return NextResponse.json({ error: 'No se pudo crear el evento. Inténtalo de nuevo.' }, { status: 500 })
     }
     const slug = await uniqueEventSlug(rsvpDraft.title)
@@ -290,7 +290,7 @@ export async function POST(req: NextRequest) {
       .select('id, slug')
       .single()
     if (eventError || !eventRow) {
-      console.error('[sell/create] free event row failed:', eventError)
+      console.error('[sell/create] free event row failed:', eventError?.message ?? 'no row returned')
       return NextResponse.json({ error: 'No se pudo crear el evento. Inténtalo de nuevo.' }, { status: 500 })
     }
     rsvpEvent = { id: eventRow.id as string, slug: eventRow.slug as string }

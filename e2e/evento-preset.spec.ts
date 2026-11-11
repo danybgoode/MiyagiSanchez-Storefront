@@ -233,3 +233,14 @@ test.describe('evento · the event block uses design tokens', () => {
     expect(attrs).toContain('border-[var(--info)] bg-[var(--info-soft)]')
   })
 })
+
+test.describe('a free Evento edit keeps a complete block (codex review #491)', () => {
+  test('the PUT refuses an incomplete date/time/venue BEFORE it writes to Medusa', () => {
+    const src = readFileSync(join(import.meta.dirname, '..', 'app/api/sell/listing/[id]/route.ts'), 'utf8')
+    const put = src.slice(src.indexOf('export async function PUT'))
+    const refusal = put.indexOf('await freeEventBlockRefusal(id, body)')
+    const firstWrite = put.indexOf('medusaFetch(')
+    expect(refusal).toBeGreaterThan(0)
+    expect(refusal).toBeLessThan(firstWrite)
+  })
+})
