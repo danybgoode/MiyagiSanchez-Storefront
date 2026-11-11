@@ -5656,6 +5656,20 @@
       "paidNoPromoter": "Pagaste {monto} el {fecha}.",
       "ended": "Tu Plan Negocio terminó el {fecha}. Puedes renovarlo desde tu panel.",
       "issuedBy": "Este recibo lo emitió {promotor} ({codigo}) para registrar lo que le pagaste en persona. Si la cantidad o el plan no coinciden con lo que pagaste, escríbenos."
+    },
+    "report": {
+      "title": "Reportar",
+      "lead": "¿Un comercio te pidió algo que no encuentras, o algo falló? Cuéntanos en un minuto.",
+      "kind": "Qué es",
+      "feature": "Algo que piden",
+      "bug": "Algo que falló",
+      "message": "Qué pasó",
+      "placeholder": "Ej.: la señora de la panadería quiere cobrar con tarjeta en el mostrador",
+      "button": "Enviar reporte",
+      "busy": "Enviando…",
+      "done": "Gracias, lo recibimos.",
+      "error": "No se pudo enviar. Intenta de nuevo.",
+      "tooShort": "Cuéntanos un poco más (mínimo 5 letras)."
     }
   }
 }

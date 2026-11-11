@@ -14,8 +14,8 @@
 export const FEEDBACK_CATEGORIES = ['feature', 'mcp-tool', 'bug'] as const
 export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number]
 
-/** Full author-kind domain (schema-level) — see file header re: 'agent'. */
-export const FEEDBACK_AUTHOR_KINDS = ['seller', 'partner', 'agent'] as const
+/** Full author-kind domain (schema-level) — 'promoter' is minted by /api/promoter/report — see file header re: 'agent'. */
+export const FEEDBACK_AUTHOR_KINDS = ['seller', 'partner', 'agent', 'promoter'] as const
 export type FeedbackAuthorKind = (typeof FEEDBACK_AUTHOR_KINDS)[number]
 
 const MESSAGE_MIN_LEN = 5
@@ -54,4 +54,41 @@ export function validateFeedbackInput(args: Record<string, unknown> | undefined)
   }
 
   return { ok: true, category: category as FeedbackCategory, message, toolName }
+}
+
+/** A promoter's field report may only be one of these two (the form offers no 'mcp-tool'). */
+export const PROMOTER_REPORT_CATEGORIES = ['feature', 'bug'] as const
+export type PromoterReportCategory = (typeof PROMOTER_REPORT_CATEGORIES)[number]
+
+export type PromoterReportValidation =
+  | { ok: true; category: PromoterReportCategory; message: string }
+  | { ok: false; error: string }
+
+/** Validates a promoter's «Reportar» body. Reuses the message bounds of `send_feedback`, narrows the category. */
+export function validatePromoterReport(body: Record<string, unknown> | null | undefined): PromoterReportValidation {
+  const category = typeof body?.category === 'string' ? body.category : ''
+  if (!PROMOTER_REPORT_CATEGORIES.includes(category as PromoterReportCategory)) {
+    return { ok: false, error: `category debe ser una de: ${PROMOTER_REPORT_CATEGORIES.join(', ')}.` }
+  }
+  const checked = validateFeedbackInput({ category, message: body?.message })
+  if (!checked.ok) return checked
+  return { ok: true, category: category as PromoterReportCategory, message: checked.message }
+}
+
+/**
+ * The row a promoter's report becomes. The author is the PROMOTER the session resolved, never anything the body says;
+ * the label is their name and code so /admin/feedback reads «Ana (PRM-X)», the same shape a partner's has.
+ */
+export function promoterFeedbackRow(
+  promoter: { id: string; code: string; name: string | null },
+  report: { category: PromoterReportCategory; message: string },
+) {
+  return {
+    author_kind: 'promoter' as const,
+    author_id: promoter.id,
+    author_label: promoter.name ? `${promoter.name} (${promoter.code})` : promoter.code,
+    category: report.category,
+    tool_name: null,
+    message: report.message,
+  }
 }

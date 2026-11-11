@@ -7,6 +7,7 @@ import type { SellsToday } from '@/lib/promoter-panel'
 import CobraStep from './CobraStep'
 import EntregaStep from './EntregaStep'
 import NegocioStep from './NegocioStep'
+import ReportStep from './ReportStep'
 import type { Dictionary } from '@/lib/dictionary'
 
 type Bound = { code: string; name: string | null } | null
@@ -68,6 +69,7 @@ export default function PromoterCloseClient({
       {shop && <ProductosStep copy={copy} shop={shop} sellsToday={choices.sellsToday} mainCategory={choices.mainCategory} />}
       {shop && <CobraStep copy={copy} shop={shop} transferEnabled={transferEnabled} packageRates={packageRates} />}
       {shop && <EntregaStep copy={copy} shop={shop} previewEnabled={previewEnabled} relationshipId={relationshipId} />}
+      <ReportStep copy={copy} />
     </div>
   )
 }
