@@ -12,19 +12,7 @@ import type { LedgerOffer } from '@/lib/transaction-ledger'
 import { returnsWindowLabel } from '@/lib/trust-signals'
 import { marketCodeForCurrency, resolveMarketPresentation } from '@/lib/market-presentation'
 import { getDictionary } from '@/lib/dictionary'
-import { getShop } from '@/lib/listings'
-import { publicShopPaymentAvailability, shopAcceptsAnyPayment } from '@/lib/public-shop-commerce'
-
-/** Whether the shop accepts any checkout payment method; `false` when unreadable (no button, as before). */
-async function shopTakesAnyPayment(slug: string | null): Promise<boolean> {
-  if (!slug) return false
-  try {
-    const shop = await getShop(slug)
-    return shop ? shopAcceptsAnyPayment(publicShopPaymentAvailability(shop.metadata)) : false
-  } catch {
-    return false
-  }
-}
+import { resolveConversationCheckout } from '@/lib/conversation-checkout'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
@@ -111,14 +99,9 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const stripeSettings = getShopStripe(shopRaw?.metadata ?? null)
   const sellerHasStripe = !!(stripeSettings.charges_enabled && stripeSettings.account_id && stripeSettings.enabled !== false)
   const sellerHasMp = sellerHasMpConnected(shopRaw?.metadata ?? null)
-  const checkoutProvider = sellerHasMp ? 'mercadopago' : sellerHasStripe ? 'stripe' : null
-  // Can the buyer pay at all? Card/MP above pre-select a provider; a shop that only
-  // takes bank transfer (or DiMo) still sells — the checkout page lets the buyer
-  // choose. Read from the MEDUSA seller, which is what the PDP and checkout trust
-  // (shop settings live in two stores; the Supabase mirror can lag). Before this,
-  // a transfer-only shop's accepted offer showed «sin pagos en línea» and no way to
-  // pay (reported live 2026-11-11).
-  const checkoutAvailable = !!checkoutProvider || await shopTakesAnyPayment(shopRaw?.slug ?? null)
+  // How the buyer pays an accepted offer — shared with the refresh endpoint, which
+  // REPLACES this payload moments after mount (see lib/conversation-checkout.ts).
+  const checkout = await resolveConversationCheckout(shopRaw)
 
   // ── Trust capsule (C.5) — the slim <TrustSignals> shown at the negotiation entry.
   // Derived server-side from the shop the page already loaded: verification, an online
@@ -140,8 +123,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
   const initialConversation: ConvParam = {
     ...(conv as unknown as ConvParam),
     marketplace_offers: offerWithCurrency as ConvParam['marketplace_offers'],
-    checkout_provider: checkoutProvider,
-    checkout_available: checkoutAvailable,
+    ...checkout,
   }
 
   // ── Transaction ledger (C.1/C.2) — seed the durable card for the first render ──

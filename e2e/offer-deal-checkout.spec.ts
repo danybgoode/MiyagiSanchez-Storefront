@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { agreedDealDisplay } from '../lib/pdp-viewer-state'
 import { shopAcceptsAnyPayment } from '../lib/public-shop-commerce'
+import { resolveConversationCheckout } from '../lib/conversation-checkout'
 
 /**
  * An ACCEPTED offer, after the seller says yes (reported live 2026-11-11, miel-verduras:
@@ -59,13 +60,52 @@ test.describe('offer · any payment method can pay an accepted offer from the co
     }
   })
 
-  test('the conversation offers «Comprar» whenever the shop takes ANY payment', () => {
-    const page = readFileSync(path.join(ROOT, 'app/(shell)/messages/[id]/page.tsx'), 'utf8')
+  // Behaviour, not text: the helper both conversation producers use, with the Medusa read injected.
+  const transferOnly = { settings: { checkout: { bank_transfer: { configured: true } } } }
+  const medusa = (metadata: Record<string, unknown> | null) => ({ sellerMetadata: async () => metadata })
+
+  test('🚨 a transfer-only shop can be paid — no provider is forced, checkout lets the buyer choose', async () => {
+    expect(await resolveConversationCheckout({ slug: 'miel-verduras', metadata: {} }, medusa(transferOnly)))
+      .toEqual({ checkout_provider: null, checkout_available: true })
+  })
+
+  test('a shop with NO payment method shows no button (the negation)', async () => {
+    expect(await resolveConversationCheckout({ slug: 'miel-verduras', metadata: {} }, medusa({ settings: {} })))
+      .toEqual({ checkout_provider: null, checkout_available: false })
+  })
+
+  test('an unreadable or missing Medusa shop fails closed', async () => {
+    const throwing = { sellerMetadata: async () => { throw new Error('down') } }
+    expect((await resolveConversationCheckout({ slug: 'x', metadata: {} }, throwing)).checkout_available).toBe(false)
+    expect((await resolveConversationCheckout({ slug: 'x', metadata: {} }, medusa(null))).checkout_available).toBe(false)
+    expect((await resolveConversationCheckout({ slug: null, metadata: {} }, medusa(transferOnly))).checkout_available).toBe(false)
+    expect((await resolveConversationCheckout(null, medusa(transferOnly))).checkout_available).toBe(false)
+  })
+
+  test('a card rail is still pre-selected, without a Medusa read', async () => {
+    let asked = false
+    const got = await resolveConversationCheckout(
+      { slug: 'x', metadata: { settings: { mercadopago: { connected: true } } } },
+      { sellerMetadata: async () => { asked = true; return null } },
+    )
+    expect(got).toEqual({ checkout_provider: 'mercadopago', checkout_available: true })
+    expect(asked).toBe(false)
+  })
+
+  test('🚨 BOTH conversation producers use the shared helper — the refresh replaced a field set in only one', () => {
+    // Fresh-review catch on PR 496: the first render set `checkout_available`, the
+    // refresh endpoint did not, and the client swaps in the refresh payload moments
+    // after mount. Sweep the population: every file that emits `checkout_provider`
+    // must get it (with `checkout_available`) from `resolveConversationCheckout`.
+    const producers = ['app/(shell)/messages/[id]/page.tsx', 'app/api/conversations/[id]/route.ts']
+    for (const file of producers) {
+      const source = readFileSync(path.join(ROOT, file), 'utf8')
+      expect(source, file).toContain('const checkout = await resolveConversationCheckout(shopRaw)')
+      expect(source, file).toContain('...checkout')
+      expect(source, `${file}: no hand-built provider beside the helper`).not.toMatch(/checkout_provider\s*:/)
+    }
     const client = readFileSync(path.join(ROOT, 'app/(shell)/messages/[id]/ConversationClient.tsx'), 'utf8')
-    expect(page).toContain('const checkoutAvailable = !!checkoutProvider || await shopTakesAnyPayment(')
-    expect(page).toContain('checkout_available: checkoutAvailable,')
     expect(client).toContain('{listing && (checkoutProvider || checkoutAvailable) ? (')
-    // No provider forced for a transfer-only shop — the checkout page lets the buyer choose.
     expect(client).toContain('provider={checkoutProvider ?? undefined}')
   })
 })
