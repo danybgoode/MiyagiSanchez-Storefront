@@ -354,7 +354,13 @@ export async function POST(req: NextRequest) {
   const productData = await productRes.json().catch(() => ({}))
   if (!productRes.ok || !productData.product_id) {
     console.error('[sell/create] product creation failed:', productData)
-    if (rsvpEvent) await db.from('marketplace_events').delete().eq('id', rsvpEvent.id)
+    if (rsvpEvent) {
+      // Report a failed cleanup instead of ignoring it, so an orphan event can be found and removed.
+      const { data: removed, error: removeError } = await db.from('marketplace_events').delete().eq('id', rsvpEvent.id).select('id')
+      if (removeError || !removed?.length) {
+        console.error('[sell/create] orphan free event not removed:', rsvpEvent.id, removeError?.message ?? 'no row matched')
+      }
+    }
     // Surface the backend's own es-MX refusal (422 cross-market/flag-off, 423,
     // 503 channel-unaddressable — product-publication.ts) instead of a generic
     // 500, same as the listing PUT/PATCH proxy does. Any other status (a real

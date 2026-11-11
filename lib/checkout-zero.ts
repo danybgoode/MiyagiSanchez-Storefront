@@ -24,9 +24,16 @@ export const CART_TOTAL_UNVERIFIED_MESSAGE = 'No pudimos confirmar el total del 
 
 export type ZeroTotalDecision = 'refuse' | 'allow' | 'unknown'
 
-export function zeroTotalDecision(input: { subtotal: unknown }): ZeroTotalDecision {
+export function zeroTotalDecision(input: { subtotal: unknown; lineUnitPrices?: unknown[] }): ZeroTotalDecision {
   if (typeof input.subtotal !== 'number' || !Number.isFinite(input.subtotal)) return 'unknown'
-  return input.subtotal <= 0 ? 'refuse' : 'allow'
+  if (input.subtotal <= 0) return 'refuse'
+  // Per LINE, not just the total: a free Evento added next to any paid item must not ride the paid total
+  // past its RSVP capacity (codex review #491). A line whose price we cannot read is unknown, not fine.
+  for (const price of input.lineUnitPrices ?? []) {
+    if (typeof price !== 'number' || !Number.isFinite(price)) return 'unknown'
+    if (price <= 0) return 'refuse'
+  }
+  return 'allow'
 }
 
 /** The refusal message the call site must throw for a decision, or null when checkout may proceed. */

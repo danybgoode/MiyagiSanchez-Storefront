@@ -509,11 +509,17 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
   // priced, and start-checkout has no zero-total refusal of its own.
   {
     let subtotal: unknown
+    let lineUnitPrices: unknown[] | undefined
     try {
-      const totalsRes = await medusaFetch(`/store/carts/${cartId}?fields=subtotal,total`, { headers: authHeaders })
-      if (totalsRes.ok) subtotal = ((await totalsRes.json()) as { cart?: { subtotal?: unknown } }).cart?.subtotal
+      const totalsRes = await medusaFetch(`/store/carts/${cartId}?fields=subtotal,total,items.unit_price`, { headers: authHeaders })
+      if (totalsRes.ok) {
+        const totalsCart = ((await totalsRes.json()) as { cart?: { subtotal?: unknown; items?: Array<{ unit_price?: unknown }> } }).cart
+        subtotal = totalsCart?.subtotal
+        // No items array = we could not see the lines: leave it unknown rather than assume they are fine.
+        lineUnitPrices = Array.isArray(totalsCart?.items) ? totalsCart.items.map((i) => i?.unit_price) : [undefined]
+      }
     } catch { /* unknown, handled below */ }
-    const decision = zeroTotalDecision({ subtotal })
+    const decision = zeroTotalDecision({ subtotal, lineUnitPrices })
     if (decision === 'unknown') console.warn('[startCheckout] cart subtotal unreadable; refusing checkout', { cartId })
     const refusal = zeroTotalRefusal(decision)
     if (refusal) throw new Error(refusal)

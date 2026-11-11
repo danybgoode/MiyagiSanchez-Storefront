@@ -121,7 +121,8 @@ test.describe('evento · a free Evento is also an RSVP event', () => {
     expect(insertAt).toBeLessThan(productAt)
     expect(route).toContain('rsvp_event_slug: rsvpEvent.slug')
     expect(route).toContain('quantity: freeEvent ? undefined : createQuantityForBackend(body.listing)')
-    expect(route).toMatch(/if \(rsvpEvent\) await db\.from\('marketplace_events'\)\.delete\(\)\.eq\('id', rsvpEvent\.id\)/)
+    expect(route).toMatch(/await db\.from\('marketplace_events'\)\.delete\(\)\.eq\('id', rsvpEvent\.id\)\.select\('id'\)/)
+    expect(route).toContain('orphan free event not removed')
   })
 
   test('the PDP renders the existing registration panel for a listing with a resolvable slug, replacing the price with Gratis', () => {
@@ -330,7 +331,17 @@ test.describe('a crafted /api/checkout/start cannot buy a $0 cart (review #491)'
     // codex security review #491: a crafted `support: {}` must not skip the guard.
     expect(zeroTotalDecision({ subtotal: 0, exempt: { support: true } } as unknown as { subtotal: unknown })).toBe('refuse')
     const cart = readFileSync(join(import.meta.dirname, '..', 'lib/cart.ts'), 'utf8')
-    expect(cart).toContain('zeroTotalDecision({ subtotal })')
+    expect(cart).toContain('zeroTotalDecision({ subtotal, lineUnitPrices })')
+    // codex review #491: a $0 line next to a paid line is refused; an unreadable line is unknown.
+    expect(zeroTotalDecision({ subtotal: 15000, lineUnitPrices: [15000, 0] })).toBe('refuse')
+    expect(zeroTotalDecision({ subtotal: 15000, lineUnitPrices: [15000, undefined] })).toBe('unknown')
+    expect(zeroTotalDecision({ subtotal: 15000, lineUnitPrices: [15000] })).toBe('allow')
+  })
+
+  test('an impossible calendar date or hour is refused, never rolled over (codex review #491)', () => {
+    expect(eventStartsAt({ event_date: '2026-02-31', event_time: '20:00' })).toBeNull()
+    expect(eventStartsAt({ event_date: '2026-12-01', event_time: '24:30' })).toBeNull()
+    expect(eventStartsAt({ event_date: '2026-12-01', event_time: '20:00' })).not.toBeNull()
     expect(ZERO_TOTAL_CHECKOUT_MESSAGE).toMatch(/precio/)
     // fail CLOSED: an unreadable subtotal is refused with a retryable message, never waved through
     expect(zeroTotalRefusal('unknown')).toBe('No pudimos confirmar el total del carrito. Intenta de nuevo.')

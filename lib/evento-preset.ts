@@ -133,6 +133,9 @@ export function eventStartsAt(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
   const wall = new Date(`${date}T${time}:00Z`).getTime() // the wall clock read as if it were UTC
   if (Number.isNaN(wall)) return null
+  // `Date` rolls an impossible day over (2026-02-31 → 2026-03-03) and an hour like 24:30 into the next
+  // day; read the parts back and refuse anything that moved (codex review #491).
+  if (new Date(wall).toISOString().slice(0, 16) !== `${date}T${time}`) return null
   const zone = eventTimeZoneForState(state)
   // Two passes: the offset at the guessed instant can differ from the offset at the true one right at a
   // DST change.
