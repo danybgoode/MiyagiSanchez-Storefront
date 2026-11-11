@@ -11,6 +11,7 @@ import { db } from './supabase'
 import { formatOfferAmount } from './offers'
 import { getShopStripe } from './stripe'
 import { sellerHasMpConnected } from './mercadopago-connect'
+import { freeEventPriceRefusal } from './evento-preset'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const INTERNAL_SECRET = process.env.MEDUSA_INTERNAL_SECRET ?? ''
@@ -104,6 +105,36 @@ export async function shopOwnsProduct(shopId: string, productId: string): Promis
     .eq('medusa_product_id', productId)
     .maybeSingle()
   return data ? { listing_type: data.listing_type as string } : null
+}
+
+/**
+ * The mirror metadata of the given products, keyed by product id — THE one read behind every
+ * "a free Evento stays free" check outside the edit PUT (MCP update_listing / apply_price, the profit
+ * apply-price route, catalog bulk). Scoped by product id. Returns null when the read FAILED: the caller
+ * must refuse a price move then (unknown is not "not an Evento").
+ */
+export async function loadMirrorMetadata(productIds: string[]): Promise<Map<string, Record<string, unknown> | null> | null> {
+  const out = new Map<string, Record<string, unknown> | null>()
+  if (productIds.length === 0) return out
+  const { data, error } = await db
+    .from('marketplace_listings')
+    .select('medusa_product_id, metadata')
+    .in('medusa_product_id', productIds)
+  if (error) return null
+  for (const r of (data ?? []) as Array<{ medusa_product_id: string; metadata: Record<string, unknown> | null }>) {
+    out.set(r.medusa_product_id, r.metadata ?? null)
+  }
+  return out
+}
+
+export const FREE_EVENT_PRICE_UNVERIFIED_MESSAGE = 'No se pudo verificar si este anuncio es un evento gratis. Intenta de nuevo.'
+
+/** Refusal message for moving ONE product's price to `nextPriceCents`, or null when allowed. */
+export async function freeEventPriceBlock(productId: string, nextPriceCents: number | null | undefined): Promise<string | null> {
+  if (nextPriceCents === undefined) return null
+  const meta = await loadMirrorMetadata([productId])
+  if (!meta) return FREE_EVENT_PRICE_UNVERIFIED_MESSAGE
+  return freeEventPriceRefusal(meta.get(productId) ?? null, nextPriceCents)
 }
 
 export interface SellerProductPatch {

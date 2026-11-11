@@ -2,11 +2,11 @@ import Link from 'next/link'
 import { getDictionary, normalizeLocale, type Locale } from '@/lib/dictionary'
 import {
   eventLanguageHref,
-  eventRegistrationIsOpen,
   getEventBySlug,
   getEventStats,
   publicEventUrl,
 } from '@/lib/events'
+import { eventPublicStatus } from '@/lib/event-status'
 import EventRegistrationClient from './EventRegistrationClient'
 
 export const dynamic = 'force-dynamic'
@@ -67,13 +67,7 @@ export default async function EventPage({
   if (!event) return <StateMessage text={ui.notFound} locale={locale} />
 
   const stats = await getEventStats(event)
-  const status = event.status === 'cancelled'
-    ? 'cancelled'
-    : stats.full
-      ? 'full'
-      : eventRegistrationIsOpen(event)
-        ? 'open'
-        : 'ended'
+  const status = eventPublicStatus(event, stats)
 
   return (
     <EventRegistrationClient

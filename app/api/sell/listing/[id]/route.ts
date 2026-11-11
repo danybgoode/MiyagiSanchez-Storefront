@@ -8,6 +8,9 @@ import { isShortlinkSegmentTaken } from '@/lib/shortlink-server'
 import { isEnabled } from '@/lib/flags'
 import { normalizeExcerpt, type Excerpt } from '@/lib/excerpt'
 import { setListingStatus, deleteListing } from '@/lib/listing-status'
+import { resolveEventSeller } from '@/lib/events-seller'
+import { freeEventPatchRefusal, rsvpEventSlug, rsvpEventSyncPatch } from '@/lib/evento-preset'
+import { FREE_EVENT_PRICE_UNVERIFIED_MESSAGE } from '@/lib/seller-products'
 import { isMlSyncEntitled, reconcileMlToggle } from '@/lib/ml-channel-toggle'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
@@ -23,6 +26,71 @@ function medusaFetch(path: string, clerkJwt: string, options?: RequestInit) {
       ...(options?.headers ?? {}),
     },
   })
+}
+
+// A free Evento is a listing PLUS a `marketplace_events` row (linked by metadata.rsvp_event_slug). Editing
+// the listing's title/date/time/venue must update that row in the same save, or the registration page and
+// the listing diverge. The slug comes from the listing's stored metadata and the row is matched on the
+// AUTHENTICATED seller's own shop — a slug is never trusted on its own, and the update is `.select()`ed back
+// because supabase-js reports no error for an UPDATE that matched nothing.
+async function syncFreeEventRow(
+  productId: string,
+  body: { title?: string; attrs?: Record<string, unknown>; state?: string | null },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (body.title === undefined && body.attrs === undefined) return { ok: true }
+  const { data: row } = await db
+    .from('marketplace_listings')
+    .select('title, state, metadata')
+    .eq('medusa_product_id', productId)
+    .maybeSingle()
+  const slug = rsvpEventSlug((row?.metadata ?? null) as Record<string, unknown> | null)
+  if (!slug) return { ok: true } // not a free Evento
+  // Without attrs the date/venue did not change; the row still needs a complete patch, so only a title
+  // edit is carried alone.
+  const context = await resolveEventSeller()
+  if (!context) return { ok: false, error: 'No se pudo actualizar el evento. Inténtalo de nuevo.' }
+  const patch = body.attrs !== undefined
+    ? rsvpEventSyncPatch({
+        title: body.title ?? (row?.title as string),
+        attrs: body.attrs,
+        state: body.state !== undefined ? body.state : (row?.state as string | null),
+      })
+    : body.title !== undefined
+      ? { title: body.title.trim().slice(0, 100) }
+      : null
+  if (!patch) return { ok: true } // incomplete event block: leave the row as it is
+  const { data, error } = await db
+    .from('marketplace_events')
+    .update(patch)
+    .eq('slug', slug)
+    .eq('shop_id', context.shop.id)
+    .select('id')
+  if (error || !data || data.length === 0) {
+    console.error('[sell/listing] free event row not updated:', error?.message ?? 'no row matched')
+    return { ok: false, error: 'Se guardó el anuncio, pero no se pudo actualizar el evento. Inténtalo de nuevo.' }
+  }
+  return { ok: true }
+}
+
+// A free Evento's RSVP row needs a COMPLETE block (date, time, venue). Clearing one of them in an edit is
+// refused BEFORE any write, so the listing never drifts from its registration page (codex review #491).
+async function freeEventBlockRefusal(
+  productId: string,
+  body: { title?: string; attrs?: Record<string, unknown>; state?: string | null },
+): Promise<string | null> {
+  if (body.attrs === undefined) return null
+  const { data: row } = await db
+    .from('marketplace_listings')
+    .select('title, state, metadata')
+    .eq('medusa_product_id', productId)
+    .maybeSingle()
+  if (!rsvpEventSlug((row?.metadata ?? null) as Record<string, unknown> | null)) return null
+  const patch = rsvpEventSyncPatch({
+    title: body.title ?? (row?.title as string),
+    attrs: body.attrs,
+    state: body.state !== undefined ? body.state : (row?.state as string | null),
+  })
+  return patch ? null : 'Un evento gratis necesita fecha, hora y recinto. Complétalos para guardar.'
 }
 
 // ── PUT — edit listing fields ─────────────────────────────────────────────────
@@ -80,6 +148,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     // (product-publication.ts's `planPublicationChange`) — this proxy validates
     // nothing extra, it forwards the field and the backend's 422/423/503 verbatim.
     publish_to_market?: 'mx' | null
+    // The edit form also sends the listing's `state` (Mexican state display name); read here only to
+    // pick a free Evento's time zone.
+    state?: string | null
   }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Datos inválidos.' }, { status: 400 }) }
 
@@ -161,6 +232,28 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const clerkJwt = await getToken()
   if (!clerkJwt) return NextResponse.json({ error: 'Error de autenticación.' }, { status: 401 })
+  // A free Evento stays free: refuse a price move BEFORE any write (otherwise the PDP would show a
+  // registration form AND a buy button charging the new price, with untracked seats).
+  if (body.price_cents !== undefined || body.variant_prices !== undefined) {
+    const { data: priceRow, error: priceRowError } = await db
+      .from('marketplace_listings')
+      .select('metadata')
+      .eq('medusa_product_id', id)
+      .maybeSingle()
+    // A failed read is NOT «not an event»: refuse the price change rather than let it through unchecked
+    // (same «could not verify» pattern as freeEventPriceBlock in lib/seller-products.ts).
+    if (priceRowError) {
+      console.error('[sell/listing] free-event price check could not read the listing:', priceRowError.message)
+      return NextResponse.json({ error: FREE_EVENT_PRICE_UNVERIFIED_MESSAGE, field: 'price' }, { status: 503 })
+    }
+    const priceRefusal = freeEventPatchRefusal(
+      (priceRow?.metadata ?? null) as Record<string, unknown> | null,
+      { price_cents: body.price_cents, variant_prices: body.variant_prices },
+    )
+    if (priceRefusal) return NextResponse.json({ error: priceRefusal, field: 'price' }, { status: 422 })
+  }
+  const freeEventRefusal = await freeEventBlockRefusal(id, body)
+  if (freeEventRefusal) return NextResponse.json({ error: freeEventRefusal, field: 'attrs' }, { status: 422 })
 
   // Personalization field definitions → sanitised and stored on the Medusa
   // product metadata (the backend update path merges arbitrary metadata).
@@ -291,6 +384,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     } catch { /* best-effort — keep the current mirror price */ }
   }
 
+  // A free Evento's registration row must follow its listing: same title, start and venue.
+  const eventSync = await syncFreeEventRow(id, body)
+
   await db
     .from('marketplace_listings')
     .update({
@@ -302,6 +398,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       updated_at: new Date().toISOString(),
     })
     .eq('medusa_product_id', id)
+
+  if (!eventSync.ok) return NextResponse.json({ error: eventSync.error }, { status: 500 })
 
   // Reconcile the live ML listing right after a successful ml_enabled toggle
   // write (catalog-management S2 · 2.2) — mirrors the pause/delete cascade.

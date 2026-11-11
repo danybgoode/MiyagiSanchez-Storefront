@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { catalogStatusToToken, publicationStateToToken } from '@/lib/status-badge'
+import { rsvpEventSlug } from '@/lib/evento-preset'
 import BulkActionBar from './BulkActionBar'
 import BulkDiffPreview from './BulkDiffPreview'
 import { usePendingListingDelete } from '@/components/seller/PendingListingDeleteProvider'
@@ -60,6 +61,8 @@ export interface CatalogListing {
   /** Published to the country marketplace (S3.3) — the other separate fact. */
   in_marketplace_channel?: boolean
   images: Array<{ url: string; alt?: string | null }>
+  /** Product metadata — read only for `rsvp_event_slug` (a free Evento's roster link). */
+  metadata?: Record<string, unknown> | null
   created_at: string
 }
 
@@ -156,6 +159,7 @@ export default function CatalogTable({
   profitFlagEnabled = false,
   marginRowsByChannel = [],
   ownedShopOnlyEnabled = false,
+  eventRosterBySlug = {},
 }: {
   listings: CatalogListing[]
   /** catalog.inventory_channels_enabled (catalog-management S2 · 2.2) — fail-safe OFF: no toggle UI renders while OFF. */
@@ -178,6 +182,8 @@ export default function CatalogTable({
    * before Sprint 3 — no "Mercado" column, no publish/unpublish action.
    */
   ownedShopOnlyEnabled?: boolean
+  /** RSVP event slug → its roster page; a listing carrying `metadata.rsvp_event_slug` shows «Registros». */
+  eventRosterBySlug?: Record<string, string>
 }) {
   const fmt = useSellerFormat()
   // The listing's OWN currency. "Precio a convenir" is authored here rather than
@@ -569,6 +575,14 @@ export default function CatalogTable({
                     </div>
                     <span className="font-medium truncate max-w-[240px]">{listing.title}</span>
                   </Link>
+                  {(() => {
+                    const rosterHref = eventRosterBySlug[rsvpEventSlug(listing.metadata) ?? '']
+                    return rosterHref ? (
+                      <Link href={rosterHref} data-testid="event-roster-link" className="inline-block mt-1 text-xs text-[var(--color-accent)] underline">
+                        Registros y entrada
+                      </Link>
+                    ) : null
+                  })()}
                 </td>
                 <td className="hidden p-3 text-[var(--color-muted)] md:table-cell">{listing.sku ?? '—'}</td>
                 <td className="hidden p-3 font-semibold whitespace-nowrap md:table-cell">

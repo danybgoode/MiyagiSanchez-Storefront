@@ -23,6 +23,7 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://miyagisanchez.com
 const CODE_TTL_MS = 15 * 60 * 1000
 
 export { isValidEmail }
+export { eventPublicStatus } from '@/lib/event-status'
 
 // mschz-full-coverage (07, Sprint 1, US-1.3) — the public/shareable event URL is
 // now the short branded form (mschz.org/e/…); the passthrough (US-1.1) 301s it

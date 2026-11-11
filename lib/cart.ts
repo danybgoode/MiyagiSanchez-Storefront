@@ -8,6 +8,7 @@
  *   const { redirect_url } = await startCheckout({ items: [...], sellerId, provider, buyerEmail })
  */
 
+import { zeroTotalDecision, zeroTotalRefusal } from './checkout-zero'
 import type { PersonalizationPayload } from './personalization'
 import { DEFAULT_MARKET, type MarketCode } from './markets'
 import { PROCESS_MARKET_ENV, resolveRegionIdForMarket } from './market-medusa'
@@ -500,6 +501,28 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
     if (!itemRes.ok) {
       throw new Error(await responseMessage(itemRes, 'Failed to add item to cart'))
     }
+  }
+
+  // 3b. Refuse a $0 cart BEFORE start-checkout (see lib/checkout-zero.ts). The cart's own subtotal is the
+  // authority — what the listing price field says does not matter, only what Medusa would charge. If the
+  // read fails we FAIL CLOSED (retryable message, logged): an unreadable subtotal is not proof the cart is
+  // priced, and start-checkout has no zero-total refusal of its own.
+  {
+    let subtotal: unknown
+    let lineUnitPrices: unknown[] | undefined
+    try {
+      const totalsRes = await medusaFetch(`/store/carts/${cartId}?fields=subtotal,total,items.unit_price`, { headers: authHeaders })
+      if (totalsRes.ok) {
+        const totalsCart = ((await totalsRes.json()) as { cart?: { subtotal?: unknown; items?: Array<{ unit_price?: unknown }> } }).cart
+        subtotal = totalsCart?.subtotal
+        // No items array = we could not see the lines: leave it unknown rather than assume they are fine.
+        lineUnitPrices = Array.isArray(totalsCart?.items) ? totalsCart.items.map((i) => i?.unit_price) : [undefined]
+      }
+    } catch { /* unknown, handled below */ }
+    const decision = zeroTotalDecision({ subtotal, lineUnitPrices })
+    if (decision === 'unknown') console.warn('[startCheckout] cart subtotal unreadable; refusing checkout', { cartId })
+    const refusal = zeroTotalRefusal(decision)
+    if (refusal) throw new Error(refusal)
   }
 
   // 4. Call start-checkout to create the external payment session + get redirect URL

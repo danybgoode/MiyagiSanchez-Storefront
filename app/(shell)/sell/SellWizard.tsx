@@ -14,6 +14,7 @@ import { createPublishToMarket } from '@/lib/publication-state'
 import { DEFAULT_MARKET, MARKETS, type MarketCode } from '@/lib/markets'
 import { resolveSellerSignupMarket } from '@/lib/seller-signup-market'
 import { seatsForWrite } from '@/lib/event-seats'
+import { eventoErrors as validateEvento, parseEventoPriceCents } from '@/lib/evento-preset'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -621,6 +622,7 @@ function StepListing({
   title, setTitle,
   category, setCategory,
   listingType, setListingType,
+  evento, setEvento,
   deliveryMode, setDeliveryMode,
   arrangedOnlyEnabled,
   ownedShopOnly, setOwnedShopOnly,
@@ -650,6 +652,7 @@ function StepListing({
   title: string; setTitle: (v: string) => void
   category: string; setCategory: (v: string) => void
   listingType: ListingType; setListingType: (v: ListingType) => void
+  evento: boolean; setEvento: (v: boolean) => void
   deliveryMode: 'carrier' | 'arranged'; setDeliveryMode: (v: 'carrier' | 'arranged') => void
   arrangedOnlyEnabled: boolean
   /** "Solo mi tienda" — owned-shop-operating-channel epic, S3.1. */
@@ -763,24 +766,41 @@ function StepListing({
           {([
             { key: 'product',      label: '📦 Producto',     hint: 'Artículo físico' },
             { key: 'service',      label: '🔧 Servicio',     hint: 'Clases, reparaciones…' },
+            { key: 'evento',       label: '🎟️ Evento',       hint: 'Obra, taller, concierto… gratis o de pago' },
             { key: 'rental',       label: '🔑 Renta',        hint: 'Alquiler por tiempo' },
             { key: 'digital',      label: '💻 Digital',      hint: 'PDF, ZIP, MP3, video, plantillas…' },
             { key: 'subscription', label: '🔔 Suscripción',  hint: 'Contenido mensual / acceso recurrente' },
-          ] as const).map(t => (
+          ] as const).map(t => {
+            const isEventoChoice = t.key === 'evento'
+            const active = isEventoChoice ? evento : listingType === t.key && !evento
+            return (
             <button
               key={t.key}
               type="button"
-              onClick={() => setListingType(t.key)}
+              data-testid={`listing-type-${t.key}`}
+              onClick={() => {
+                if (isEventoChoice) {
+                  // The preset: a service with the event block. Preselect the Servicios category so the
+                  // merchant is not asked to pick one for something they just named.
+                  setEvento(true)
+                  setListingType('service')
+                  if (!category) setCategory('servicios')
+                } else {
+                  setEvento(false)
+                  setListingType(t.key)
+                }
+              }}
               title={t.hint}
               className={`border rounded-[var(--r-md)] py-2.5 text-sm transition-all ${
-                listingType === t.key
+                active
                   ? 'border-[var(--color-accent)] bg-[var(--accent-soft)] text-[var(--color-accent)] font-semibold'
                   : 'border-[var(--color-border)] text-[var(--color-text)] hover:border-[var(--color-accent)]'
               }`}
             >
               {t.label}
             </button>
-          ))}
+            )
+          })}
         </div>
         {listingType === 'digital' && (
           <p className="text-xs text-[var(--color-muted)] mt-1.5">
@@ -1045,6 +1065,8 @@ function StepListing({
           seats={seats}
           setSeats={setSeats}
           seatsError={errors.seats}
+          evento={evento}
+          eventoErrors={errors}
         />
       )}
 
@@ -1123,7 +1145,12 @@ function StepListing({
             <FieldError msg={errors.price} />
           </div>
         </div>
-        <label className="flex min-h-11 items-center gap-2 mt-2 cursor-pointer select-none">
+        {evento && (
+          <p className="text-xs text-[var(--color-muted)] mt-1">
+            Pon $0 si el evento es gratis: la gente se registra y recibe su boleto por correo.
+          </p>
+        )}
+        {!evento && <label className="flex min-h-11 items-center gap-2 mt-2 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={priceOnRequest}
@@ -1135,7 +1162,7 @@ function StepListing({
           />
           <span className="text-sm text-[var(--color-text)]">Precio a consultar</span>
           <span className="text-xs text-[var(--color-muted)]">(el comprador te contacta)</span>
-        </label>
+        </label>}
       </div>
 
       {/* Description */}
@@ -1280,6 +1307,7 @@ export default function SellWizard({
   arrangedOnlyEnabled = false,
   ownedShopOnlyEnabled = false,
   signupMarket,
+  initialEvento = false,
 }: {
   existingShop: ExistingShop | null
   /** Arranged-only delivery (epic, S1.2) — gates the "Entrega" toggle's visibility. */
@@ -1292,6 +1320,8 @@ export default function SellWizard({
    * backend is the authority. Undefined ⇒ the documented MX legacy default.
    */
   signupMarket?: string
+  /** `/sell?tipo=evento` — start with the Evento preset chosen (merchant-panel-gaps S2.1, D7). */
+  initialEvento?: boolean
 }) {
   const hasShopStep = existingShop === null
   const listingMarket = existingShop?.market ?? resolveSellerSignupMarket(signupMarket) ?? DEFAULT_MARKET
@@ -1321,8 +1351,11 @@ export default function SellWizard({
   // Step 2 — listing
   const [photos, setPhotos] = useState<UploadedPhoto[]>([])
   const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('')
-  const [listingType, setListingType] = useState<ListingType>('product')
+  // «Evento» (S2.1, D5) is a PRESET over the service type, never a type of its own: it requires the event
+  // block + seats and allows a price of $0. Everything downstream still sees `listing_type: 'service'`.
+  const [evento, setEvento] = useState(initialEvento)
+  const [category, setCategory] = useState(initialEvento ? 'servicios' : '')
+  const [listingType, setListingType] = useState<ListingType>(initialEvento ? 'service' : 'product')
   // Arranged-only delivery (epic, S1.2) — 'carrier' (default) or 'arranged'.
   const [deliveryMode, setDeliveryMode] = useState<'carrier' | 'arranged'>('carrier')
   // "Solo mi tienda" (owned-shop-operating-channel epic, S3.1) — unchecked by
@@ -1427,10 +1460,13 @@ export default function SellWizard({
     if (title.trim().length < 5) errs.title = 'El título debe tener al menos 5 caracteres.'
     if (title.trim().length > 100) errs.title = 'El título no puede superar los 100 caracteres.'
     if (!category) errs.category = 'Selecciona una categoría para tu anuncio.'
-    if (listingType !== 'subscription' && !priceOnRequest && !priceRaw.trim()) {
+    if (evento) {
+      // The Evento preset: date, time, venue and seats are required, and $0 is a valid (free) price.
+      Object.assign(errs, validateEvento({ attrs, seatsRaw: seats, priceRaw }))
+    } else if (listingType !== 'subscription' && !priceOnRequest && !priceRaw.trim()) {
       errs.price = 'Ingresa un precio o marca "Precio a consultar".'
     }
-    if (listingType !== 'subscription' && !priceOnRequest && priceRaw) {
+    if (!evento && listingType !== 'subscription' && !priceOnRequest && priceRaw) {
       const cents = parsePriceCents(priceRaw)
       if (!cents || cents <= 0) errs.price = 'El precio debe ser mayor a $0.'
     }
@@ -1460,7 +1496,7 @@ export default function SellWizard({
     setSubmitError(null)
 
     try {
-      const priceCents = priceOnRequest ? null : parsePriceCents(priceRaw)
+      const priceCents = priceOnRequest && !evento ? null : evento ? parseEventoPriceCents(priceRaw) : parsePriceCents(priceRaw)
       const readyPhotos = photos.filter(p => p.status === 'done' && p.remoteUrl)
         .map(p => ({ url: p.remoteUrl!, alt: title.trim() }))
 
@@ -1545,6 +1581,8 @@ export default function SellWizard({
     setTitle('')
     setCategory('')
     setListingType('product')
+    setEvento(false)
+    setSeats('')
     setCondition('good')
     setOwnedShopOnly(false)
     setAttrs({})
@@ -1603,6 +1641,7 @@ export default function SellWizard({
             title={title} setTitle={setTitle}
             category={category} setCategory={setCategory}
             listingType={listingType} setListingType={setListingType}
+            evento={evento} setEvento={(v) => { setEvento(v); if (v) setPriceOnRequest(false) }}
             deliveryMode={deliveryMode} setDeliveryMode={setDeliveryMode}
             arrangedOnlyEnabled={arrangedOnlyEnabled}
             ownedShopOnly={ownedShopOnly} setOwnedShopOnly={setOwnedShopOnly}

@@ -1,3 +1,4 @@
+import { rsvpEventSlug } from '@/lib/evento-preset'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
@@ -252,6 +253,7 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
           listing_type: listing.listing_type,
           category: medusaCategory,
           available_quantity: availableQuantity,
+          rsvp_event_slug: rsvpEventSlug(listing.metadata),
           manage_inventory: initialManageInventory,
           allow_backorder: initialAllowBackorder,
           dispatch_estimate: initialDispatchEstimate,

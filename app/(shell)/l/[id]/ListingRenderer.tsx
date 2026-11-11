@@ -37,6 +37,10 @@ import ServiceHero from './ServiceHero'
 import AutoHero from './AutoHero'
 import InmuebleHero from './InmuebleHero'
 import EventHero from './EventHero'
+import EventRegistrationPanel from '@/app/(shell)/e/[slug]/EventRegistrationPanel'
+import { getEventBySlug, getEventStats } from '@/lib/events'
+import { eventPublicStatus } from '@/lib/event-status'
+import { freeEventPriceLabel, rsvpEventShownOnListing, rsvpEventSlug } from '@/lib/evento-preset'
 import EventBuyBox from './EventBuyBox'
 import { eventHeroModel } from '@/lib/event-hero'
 import { serviceHeroModel } from '@/lib/service-hero'
@@ -376,10 +380,21 @@ export async function ListingPage({
   const activeDeal = requestContext.activeDeal ?? null
   const agreedDealCents = activeDeal?.status === 'accepted_unpaid' && activeDeal.dealPriceCents ? activeDeal.dealPriceCents : null
   const activeDealCurrency = activeDeal?.currency ?? listing.currency
+  // A free Evento (merchant-panel-gaps S2.1, D6) registers on the existing RSVP system instead of
+  // taking a payment: its slug rides the listing's metadata, and the registration panel replaces the
+  // buy box. Absent or unresolvable slug = an ordinary listing, rendered exactly as before.
+  const rsvpSlug = rsvpEventSlug(listing.metadata)
+  const linkedEvent = rsvpSlug ? await getEventBySlug(rsvpSlug) : null
+  // «Gratis» + the registration form follow the PRICE ($0) and the event's OWNER, not the bare slug.
+  const rsvpEvent = rsvpEventShownOnListing(listing, linkedEvent) ? linkedEvent : null
+  const rsvpStats = rsvpEvent ? await getEventStats(rsvpEvent) : null
   const effectivePrice = agreedDealCents
     ? formatCents(agreedDealCents, activeDealCurrency)
+    : rsvpEvent ? freeEventPriceLabel(presentation.language)
     : listing.price_cents ? formatCents(listing.price_cents, listing.currency) : buyerCopy['l.id.page.46ee2987']
-  const showBuyerActions = isClaimed && !isOwnListing
+  // A free Evento's only action is the RSVP panel: hide the whole buy/offer/cart cascade, or a buyer meets a
+  // «Comprar» that startCheckout then refuses (codex review #491).
+  const showBuyerActions = isClaimed && !isOwnListing && !rsvpEvent
   // Inventory modes (catalog-management epic, Sprint 2 · Story 2.1) — a
   // "sobre pedido" (backorder) listing never blocks the buy box even at
   // qty 0 (Medusa's own reserveInventoryStep/completeCartWorkflow already
@@ -1161,6 +1176,21 @@ export async function ListingPage({
             boleto" link points at the order surface that renders the QR. The
             lower event block is suppressed for `eventLed` (no duplicate). ─────── */}
         {eventLed && eventDetails && <EventHero eventDetails={eventDetails} />}
+
+        {/* ── Free Evento (S2.1, D6): the existing RSVP registration — verify the email, get the
+            QR ticket — in place of a buy box. Same component /e/[slug] renders. ───────────── */}
+        {rsvpEvent && rsvpStats && (
+          <div data-testid="pdp-rsvp-registration" style={{ marginBottom: 20 }}>
+            <EventRegistrationPanel
+              slug={rsvpEvent.slug}
+              locale={presentation.language}
+              ui={(await getDictionary(presentation.language)).events.public}
+              status={eventPublicStatus(rsvpEvent, rsvpStats)}
+              registeredCount={rsvpStats.registrations}
+              capacityRemaining={rsvpStats.capacity_remaining}
+            />
+          </div>
+        )}
 
         {/* ── Reorder by intent (S1.2): on MOBILE the specs slot + description sit
             ABOVE the payment/methods box and seller card (identify → trust → cost →

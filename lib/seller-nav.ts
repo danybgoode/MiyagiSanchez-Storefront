@@ -171,7 +171,6 @@ export const SELLER_NAV: SellerNavGroup[] = [
       { key: 'promociones', label: 'Cupones', href: '/shop/manage/promotions', icon: 'iconoir-percentage-circle' },
       { key: 'suscripciones', label: 'Suscripciones', href: '/shop/manage/subscriptions', icon: 'iconoir-refresh-double' },
       { key: 'contenido', label: 'Contenido', href: '/shop/manage/content', icon: 'iconoir-book' },
-      { key: 'eventos', label: 'Eventos', href: '/shop/manage/eventos', icon: 'iconoir-calendar' },
       { key: 'sorteos', label: 'Sorteos', href: '/shop/manage/sweepstakes', icon: 'iconoir-gift' },
       { key: 'analitica', label: 'Analíticas', href: '/shop/manage/analytics', icon: 'iconoir-graph-up' },
       // Gated on ops.profit_enabled: the page itself still notFound()s while the
@@ -198,6 +197,19 @@ export const SELLER_NAV: SellerNavGroup[] = [
       { key: 'ajustes', label: 'Configuración', href: '/shop/manage/settings', icon: 'iconoir-settings' },
     ],
   },
+]
+
+/**
+ * Pages that are real seller routes but deliberately NOT in the rail (merchant-panel-gaps S2.1, D7).
+ *
+ * «Eventos» left the rail because a merchant now creates an event from the same wizard as everything
+ * else (`/sell?tipo=evento`); what remains of `/shop/manage/eventos` is the per-event roster and
+ * check-in, reached from the event listing's row in the catalog. So the page still has a canonical
+ * breadcrumb label (kept here, never retyped per page) and the rail still highlights the section it
+ * is reached from (`parentHref`) instead of falling back to Resumen.
+ */
+export const SELLER_UNLISTED_SECTIONS: ReadonlyArray<{ key: string; label: string; href: string; parentHref: string }> = [
+  { key: 'eventos', label: 'Eventos', href: '/shop/manage/eventos', parentHref: '/shop/manage/catalogo' },
 ]
 
 /**
@@ -278,16 +290,18 @@ function hrefPath(href: string): string {
 export function activeSellerNavHref(pathname: string): string | null {
   if (!pathname) return null
   let best: { href: string; len: number } | null = null
-  for (const group of SELLER_NAV) {
-    for (const entry of group.entries) {
-      const base = hrefPath(entry.href)
-      const matches = pathname === base || pathname.startsWith(base + '/')
-      if (!matches) continue
-      // Strict `>` keeps the first-declared entry on an equal-length tie.
-      if (!best || base.length > best.len) best = { href: entry.href, len: base.length }
-    }
+  const consider = (href: string, base: string) => {
+    const matches = pathname === base || pathname.startsWith(base + '/')
+    if (!matches) return
+    // Strict `>` keeps the first-declared entry on an equal-length tie.
+    if (!best || base.length > best.len) best = { href, len: base.length }
   }
-  return best?.href ?? null
+  for (const group of SELLER_NAV) {
+    for (const entry of group.entries) consider(entry.href, hrefPath(entry.href))
+  }
+  // An unlisted page highlights the rail entry it is reached from.
+  for (const section of SELLER_UNLISTED_SECTIONS) consider(section.parentHref, section.href)
+  return (best as { href: string } | null)?.href ?? null
 }
 
 /** One crumb in a seller breadcrumb trail. `href: null` = the current page (not a link). */
@@ -322,9 +336,15 @@ function activeSellerNavEntry(pathname: string): SellerNavEntry | null {
  */
 export function sellerBreadcrumbTrail(pathname: string, extra: SellerCrumb[] = []): SellerCrumb[] {
   const trail: SellerCrumb[] = [{ label: 'Resumen', href: DASHBOARD_HREF }]
+  // An unlisted page (its own canonical label) wins when it is the deeper match.
+  const unlisted = SELLER_UNLISTED_SECTIONS
+    .filter((section) => pathname === section.href || pathname.startsWith(section.href + '/'))
+    .sort((a, b) => b.href.length - a.href.length)[0]
   const entry = activeSellerNavEntry(pathname)
-  // Skip the Resumen entry itself (it'd just duplicate the home crumb).
-  if (entry && hrefPath(entry.href) !== DASHBOARD_HREF) {
+  if (unlisted) {
+    trail.push({ label: unlisted.label, href: unlisted.href })
+  } else if (entry && hrefPath(entry.href) !== DASHBOARD_HREF) {
+    // Skip the Resumen entry itself (it'd just duplicate the home crumb).
     trail.push({ label: entry.label, href: hrefPath(entry.href) })
   }
   trail.push(...extra)

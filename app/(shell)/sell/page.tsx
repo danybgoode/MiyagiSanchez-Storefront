@@ -11,6 +11,7 @@ import { isEnabled } from '@/lib/flags'
 import { resolveSellerSignupMarket } from '@/lib/seller-signup-market'
 import { SELLER_LOCALE_COOKIE, resolveSellerLocale, sellerCopyBoundaryNeeded } from '@/lib/seller-locale'
 import { sellerLandingRedirectPath } from '@/lib/seller-acquisition'
+import { isEventoTipo } from '@/lib/evento-preset'
 
 // The file import (Onboarding 0, Sprint 2), offered to signed-in users who don't have a shop yet. Since
 // prompt-to-shop S3.3 it is the "I already have a catalog" door next to the describe box, named the way the box
@@ -133,6 +134,7 @@ export default async function SellPage({
           arrangedOnlyEnabled={arrangedOnlyEnabled}
           ownedShopOnlyEnabled={ownedShopOnlyEnabled}
           signupMarket={signupMarket}
+          initialEvento={isEventoTipo(params.tipo)}
         />
       </div>
     </div>
