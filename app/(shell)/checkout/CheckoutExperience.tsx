@@ -152,6 +152,8 @@ export default function CheckoutExperience({
   const cpLookupRef = useRef<AbortController | null>(null)
 
   const [shippingRates, setShippingRates] = useState<ShippingRate[]>([])
+  // Bumped when the backend refuses the picked quote: clears the selection and re-runs the quote effect once.
+  const [rateRefreshKey, setRateRefreshKey] = useState(0)
   const [selectedShippingRateId, setSelectedShippingRateId] = useState<string | null>(null)
   const [shippingRatesLoading, setShippingRatesLoading] = useState(false)
   const [shippingRatesError, setShippingRatesError] = useState<string | null>(null)
@@ -396,7 +398,7 @@ export default function CheckoutExperience({
       }
     }, 450)
     return () => { cancelled = true; controller.abort(); window.clearTimeout(timeout) }
-  }, [needsShippingRate, addressReady, listingId, items, address])
+  }, [needsShippingRate, addressReady, listingId, items, address, rateRefreshKey])
 
   // ── Loading / error states ─────────────────────────────────────────────────
   if (optionsError) {
@@ -849,6 +851,7 @@ export default function CheckoutExperience({
             pickupAppointment={isPickupDelivery && pickupDate && pickupWindow ? { date: pickupDate, window: pickupWindow } : undefined}
             shippingAddress={selectedDelivery?.requires_address ? address : undefined}
             shippingQuote={isCoordCheckout ? undefined : (needsShippingRate ? selectedShippingQuote : undefined)}
+            onShippingQuoteInvalid={() => { setSelectedShippingRateId(null); setShippingRates([]); setRateRefreshKey(k => k + 1) }}
             originDomain={originDomain}
             rental={rental}
             market={market}

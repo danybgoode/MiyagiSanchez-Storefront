@@ -15,6 +15,7 @@
  * passthrough) since callers read both `redirect_url` and `cart_id`.
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { CheckoutStartError } from '@/lib/checkout-error'
 import { auth } from '@clerk/nextjs/server'
 import { startCheckout, type StartCheckoutParams } from '@/lib/cart'
 
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
     // (e.g. BuyButton/CheckoutPayButton both check for 'SELLER_NOT_CONNECTED').
     const message = err instanceof Error ? err.message : 'No se pudo iniciar el pago.'
     console.error('[checkout/start] failed:', err)
-    return NextResponse.json({ error: message }, { status: 400 })
+    const code = err instanceof CheckoutStartError ? err.code : null
+    return NextResponse.json({ error: message, ...(code ? { code } : {}) }, { status: 400 })
   }
 }

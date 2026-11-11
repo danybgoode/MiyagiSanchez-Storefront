@@ -9,6 +9,7 @@
  */
 
 import { zeroTotalDecision, zeroTotalRefusal } from './checkout-zero'
+import { CheckoutStartError } from './checkout-error'
 import type { PersonalizationPayload } from './personalization'
 import { DEFAULT_MARKET, type MarketCode } from './markets'
 import { PROCESS_MARKET_ENV, resolveRegionIdForMarket } from './market-medusa'
@@ -563,7 +564,8 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
     }),
   })
   if (!checkoutRes.ok) {
-    throw new Error(await responseMessage(checkoutRes, 'Failed to start checkout'))
+    const failure = await checkoutRes.json().catch(() => null) as { message?: string; error?: string; code?: string } | null
+    throw new CheckoutStartError(failure?.message ?? failure?.error ?? 'Failed to start checkout', failure?.code ?? null)
   }
 
   const result: StartCheckoutResult = await checkoutRes.json()
