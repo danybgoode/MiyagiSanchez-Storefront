@@ -285,12 +285,14 @@ test.describe('«Gratis» follows the price and the owner, not the link (review 
 })
 
 test.describe('a crafted /api/checkout/start cannot buy a $0 cart (review #491)', () => {
-  test('zeroTotalDecision refuses 0, allows priced and exempt carts, and reports unreadable as unknown', () => {
-    expect(zeroTotalDecision({ subtotal: 0, exempt: {} })).toBe('refuse')
-    expect(zeroTotalDecision({ subtotal: 15000, exempt: {} })).toBe('allow')
-    expect(zeroTotalDecision({ subtotal: undefined, exempt: {} })).toBe('unknown')
-    expect(zeroTotalDecision({ subtotal: 0, exempt: { offer: true } })).toBe('allow')
-    expect(zeroTotalDecision({ subtotal: 0, exempt: { support: true } })).toBe('allow')
+  test('zeroTotalDecision refuses 0, allows priced carts, reports unreadable as unknown, and takes no caller exemptions', () => {
+    expect(zeroTotalDecision({ subtotal: 0 })).toBe('refuse')
+    expect(zeroTotalDecision({ subtotal: 15000 })).toBe('allow')
+    expect(zeroTotalDecision({ subtotal: undefined })).toBe('unknown')
+    // codex security review #491: a crafted `support: {}` must not skip the guard.
+    expect(zeroTotalDecision({ subtotal: 0, exempt: { support: true } } as unknown as { subtotal: unknown })).toBe('refuse')
+    const cart = readFileSync(join(import.meta.dirname, '..', 'lib/cart.ts'), 'utf8')
+    expect(cart).toContain('zeroTotalDecision({ subtotal })')
     expect(ZERO_TOTAL_CHECKOUT_MESSAGE).toMatch(/precio/)
   })
   test('startCheckout asks it after the lines are added and BEFORE start-checkout', () => {

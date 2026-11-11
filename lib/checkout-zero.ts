@@ -9,19 +9,17 @@
  * Three states, never two: a subtotal we could not read is UNKNOWN — it is neither «zero» nor «fine», and
  * is reported to the caller instead of being collapsed into either.
  *
- * Exempt on purpose, because their price is not the listing's: an accepted offer / coupon (negotiated),
- * the guest support widget and rentals (priced server-side).
+ * NO exemptions, and nothing read from the request body: an earlier version exempted offers, coupons, the
+ * support widget and rentals by caller-supplied flags, and `support: {}` in a crafted body skipped the guard
+ * (codex security review #491). None of those has a legitimate $0 SUBTOTAL — offers, support and rentals price
+ * their lines above 0, and a coupon is a discount, which Medusa's `subtotal` is computed before — so the
+ * cart's own subtotal decides alone.
  */
 export const ZERO_TOTAL_CHECKOUT_MESSAGE = 'Este anuncio no tiene un precio para cobrar. Si es un evento gratis, regístrate desde su página.'
 
 export type ZeroTotalDecision = 'refuse' | 'allow' | 'unknown'
 
-export function zeroTotalDecision(input: {
-  subtotal: unknown
-  exempt: { offer?: boolean; coupon?: boolean; support?: boolean; rental?: boolean }
-}): ZeroTotalDecision {
-  const { offer, coupon, support, rental } = input.exempt
-  if (offer || coupon || support || rental) return 'allow'
+export function zeroTotalDecision(input: { subtotal: unknown }): ZeroTotalDecision {
   if (typeof input.subtotal !== 'number' || !Number.isFinite(input.subtotal)) return 'unknown'
   return input.subtotal <= 0 ? 'refuse' : 'allow'
 }

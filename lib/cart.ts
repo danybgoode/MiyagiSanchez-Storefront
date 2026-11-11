@@ -513,10 +513,7 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
       const totalsRes = await medusaFetch(`/store/carts/${cartId}?fields=subtotal,total`, { headers: authHeaders })
       if (totalsRes.ok) subtotal = ((await totalsRes.json()) as { cart?: { subtotal?: unknown } }).cart?.subtotal
     } catch { /* unknown, handled below */ }
-    const decision = zeroTotalDecision({
-      subtotal,
-      exempt: { offer: !!(offerId || offerAmountCents), coupon: !!couponCode, support: !!support, rental: !!rental },
-    })
+    const decision = zeroTotalDecision({ subtotal })
     if (decision === 'refuse') throw new Error(ZERO_TOTAL_CHECKOUT_MESSAGE)
     if (decision === 'unknown') console.warn('[startCheckout] cart subtotal unreadable; zero-total guard skipped', { cartId })
   }
