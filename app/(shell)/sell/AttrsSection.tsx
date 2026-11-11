@@ -10,6 +10,7 @@ import {
   type AttrField,
 } from '@/lib/listing-attributes'
 import { InspectionReportField } from './InspectionReportField'
+import { SEATS_HINT, SEATS_LABEL, hasEventBlock } from '@/lib/event-seats'
 
 export type Attrs = Record<string, string | number | boolean>
 
@@ -72,13 +73,42 @@ function FieldGrid({ fields, attrs, setAttr }: {
   )
 }
 
-export function AttrsSection({ category, listingType, attrs, setAttr }: {
+export function AttrsSection({ category, listingType, attrs, setAttr, seats, setSeats, seatsError, seatsHint }: {
   category: string; listingType: ListingType; attrs: Attrs; setAttr: (k: string, v: string) => void
+  /** «Lugares disponibles» (merchant-panel-gaps S1.1) — rendered inside the event block once it is filled. */
+  seats?: string; setSeats?: (v: string) => void
+  /** A refused seat count, shown next to the field (a silent refusal looked like a dead button). */
+  seatsError?: string
+  /** Overrides the default hint — the EDIT form's blank means «unchanged», not «untracked». */
+  seatsHint?: string
 }) {
   const eventBlock = (
     <div className="space-y-3 border border-purple-200 bg-purple-50/60 rounded-[var(--r-md)] p-4">
       <p className="text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide">Detalles del evento</p>
       <FieldGrid fields={EVENT_FIELDS} attrs={attrs} setAttr={setAttr} />
+      {setSeats && hasEventBlock(attrs) && (
+        <div>
+          <label htmlFor="event-seats" className="block text-xs font-medium text-[var(--color-text)] mb-1">{SEATS_LABEL}</label>
+          <input
+            id="event-seats"
+            data-testid="event-seats"
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            value={seats ?? ''}
+            onChange={e => setSeats(e.target.value)}
+            // No silent rewrite: «-3» or «2.5» reach seatsForWrite and are refused, never saved as 3 or 25 (codex review #490).
+            aria-invalid={seatsError ? true : undefined}
+            aria-describedby={seatsError ? 'event-seats-error' : undefined}
+            className={`w-32 ${inputClass} ${seatsError ? 'border-[var(--danger)]' : ''}`}
+          />
+          {seatsError && (
+            <p id="event-seats-error" data-testid="event-seats-error" role="alert" className="text-[var(--danger)] text-xs mt-1">{seatsError}</p>
+          )}
+          <p className="text-xs text-[var(--color-muted)] mt-1">{seatsHint ?? SEATS_HINT}</p>
+        </div>
+      )}
       <p className="text-xs text-[var(--color-muted)]">
         Opcional. Úsalo cuando este servicio o archivo digital sea una entrada, taller, clase o experiencia con fecha.
       </p>

@@ -6,6 +6,7 @@ import { ensureSupabaseShopMirror, syncSupabaseListingMirror, type MedusaSellerF
 import { notifyShopCreated, retryShopCreatedWelcome } from '@/lib/shop-created-welcome'
 import { resolveSellerSignupMarket } from '@/lib/seller-signup-market'
 import { sellerListingCurrency } from '@/lib/seller-listing-currency'
+import { createQuantityForBackend, hasEventBlock, isEventCapableType, SEATS_NEGATIVE_MESSAGE } from '@/lib/event-seats'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -93,6 +94,11 @@ export async function POST(req: NextRequest) {
   if (titleClean.length < 5) return NextResponse.json({ error: 'El título debe tener al menos 5 caracteres.', field: 'title' }, { status: 422 })
   if (titleClean.length > 100) return NextResponse.json({ error: 'El título no puede superar los 100 caracteres.', field: 'title' }, { status: 422 })
   if (!body.listing.category) return NextResponse.json({ error: 'Selecciona una categoría.', field: 'category' }, { status: 422 })
+  // Seats on an event: a negative or fractional count is refused before any shop or product is written.
+  if (isEventCapableType(body.listing.listing_type) && hasEventBlock(body.listing.attrs)
+    && body.listing.quantity != null && (!Number.isInteger(body.listing.quantity) || body.listing.quantity < 0)) {
+    return NextResponse.json({ error: SEATS_NEGATIVE_MESSAGE, field: 'quantity' }, { status: 422 })
+  }
 
   const isSubscription = body.listing.listing_type === 'subscription'
   const hasMultiTier = isSubscription && Array.isArray(body.listing.subscription_tiers) && (body.listing.subscription_tiers?.length ?? 0) > 0
@@ -283,7 +289,9 @@ export async function POST(req: NextRequest) {
       state: body.listing.state || null,
       municipio: body.listing.municipio || null,
       location: [body.listing.municipio?.trim(), body.listing.state?.trim()].filter(Boolean).join(', ') || null,
-      quantity: body.listing.listing_type === 'product' ? Math.max(1, Math.floor(body.listing.quantity ?? 1)) : 1,
+      // Products: at least 1. An event: its seats, or nothing — a defaulted 1 would make an
+      // untracked event a one-seat event (lib/event-seats.ts).
+      quantity: createQuantityForBackend(body.listing),
       weight_grams: body.listing.weight_grams ?? null,
       attrs: body.listing.attrs ?? {},
       images: body.listing.images ?? [],

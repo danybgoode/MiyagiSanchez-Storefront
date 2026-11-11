@@ -17,6 +17,7 @@ import type { PriceGrid } from '@/lib/price-grid'
 import { EXCERPT_MAX_CHARS } from '@/lib/excerpt'
 import { deriveInventoryMode, type InventoryMode } from '@/lib/inventory-mode'
 import { PROCESSING_LABELS } from '@/lib/trust-inputs'
+import { SEATS_EDIT_HINT, seatsForWrite } from '@/lib/event-seats'
 
 interface ShortlinkInfo {
   shopSlug: string
@@ -216,6 +217,12 @@ export default function EditForm({
       && parseCostPesosToCents(mlPriceRaw) === null) {
       errs.ml_price = 'El precio de Mercado Libre debe ser de $0 o más.'
     }
+    // A refused seat count blocks the save with a visible field error — it used to be dropped
+    // silently and the rest of the form saved as if the merchant had not typed it (review #490).
+    if (!isProduct) {
+      const seatsCheck = seatsForWrite({ listingType: initial.listing_type, attrs, seatsRaw: quantityRaw })
+      if (!seatsCheck.ok) errs.seats = seatsCheck.error
+    }
     if (shortStatus === 'taken' || shortStatus === 'invalid') {
       errs.short_slug = 'Corrige el enlace corto antes de guardar.'
     }
@@ -246,6 +253,16 @@ export default function EditForm({
       if (isProduct && !hideFlatQuantity && quantityRaw.trim() !== '') {
         const nextQuantity = Math.max(0, parseInt(quantityRaw) || 0)
         if (nextQuantity !== (initial.available_quantity ?? null)) body.quantity = nextQuantity
+      }
+      // An event's «Lugares disponibles» (merchant-panel-gaps S1.1): sent only when changed, so an
+      // unrelated save never touches seats — and a first-time value turns tracking on server-side.
+      if (!isProduct) {
+        // Blank = «unchanged» on EDIT (create: blank = untracked); 0 stops the sale. See SEATS_EDIT_HINT.
+        const seatsResult = seatsForWrite({ listingType: initial.listing_type, attrs, seatsRaw: quantityRaw })
+        if (seatsResult.ok && seatsResult.quantity !== undefined
+          && seatsResult.quantity !== (initial.available_quantity ?? null)) {
+          body.quantity = seatsResult.quantity
+        }
       }
       // Inventory mode + dispatch estimate — catalog-management S2 · 2.1.
       // Flag-gated at the selector UI level (only 'tracked' is offered while
@@ -401,6 +418,10 @@ export default function EditForm({
           listingType={initial.listing_type as ListingType}
           attrs={attrs}
           setAttr={setAttr}
+          seats={quantityRaw}
+          setSeats={setQuantityRaw}
+          seatsError={fieldErrors.seats}
+          seatsHint={SEATS_EDIT_HINT}
         />
       )}
 
