@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   EVENTS_EMPTY_REDIRECT, EVENTO_TIPO, FREE_EVENT_PRICE_LABEL, NEW_EVENT_HREF,
-  buildRsvpEventDraft, eventStartsAt, eventoErrors, isEventoTipo, isFreeEventListing,
+  buildRsvpEventDraft, eventStartsAt, eventTimeZoneForState, rsvpEventSyncPatch, eventoErrors, isEventoTipo, isFreeEventListing,
   parseEventoPriceCents, rsvpEventSlug,
 } from '../lib/evento-preset'
 import { eventPublicStatus } from '../lib/event-status'
@@ -133,6 +133,60 @@ test.describe('evento · a free Evento is also an RSVP event', () => {
     expect(eventPublicStatus(future, { full: true }, now)).toBe('full')
     expect(eventPublicStatus({ ...future, status: 'cancelled' }, { full: true }, now)).toBe('cancelled')
     expect(eventPublicStatus({ ...future, starts_at: '2026-11-01T00:00:00Z' }, { full: false }, now)).toBe('ended')
+  })
+})
+
+test.describe('evento · the event start resolves the own-state wall clock', () => {
+  const at = (state: string | null | undefined, date = '2026-12-01') =>
+    eventStartsAt({ event_date: date, event_time: '20:30' }, state)
+
+  test('Mexico City is the fallback: unknown, blank or unlisted state', () => {
+    expect(at(undefined)).toBe('2026-12-02T02:30:00.000Z')
+    expect(at(null)).toBe('2026-12-02T02:30:00.000Z')
+    expect(at('Jalisco')).toBe('2026-12-02T02:30:00.000Z')
+    expect(at('Narnia')).toBe('2026-12-02T02:30:00.000Z')
+    expect(eventTimeZoneForState('')).toBe('America/Mexico_City')
+  })
+
+  test('Quintana Roo is UTC-5, Sonora UTC-7, Baja California UTC-8 in winter and UTC-7 in summer', () => {
+    expect(at('Quintana Roo')).toBe('2026-12-02T01:30:00.000Z')
+    expect(at('Sonora')).toBe('2026-12-02T03:30:00.000Z')
+    expect(at('Baja California')).toBe('2026-12-02T04:30:00.000Z')
+    expect(at('Baja California', '2026-07-01')).toBe('2026-07-02T03:30:00.000Z')
+    // Mexico City has no DST: summer is still UTC-6
+    expect(at('Ciudad de México', '2026-07-01')).toBe('2026-07-02T02:30:00.000Z')
+  })
+
+  test('accents and case do not matter', () => {
+    expect(at('QUINTANA ROO')).toBe(at('Quintana Roo'))
+    expect(eventTimeZoneForState('Baja California Sur')).toBe('America/Mazatlan')
+  })
+
+  test('the RSVP draft carries the state through', () => {
+    const r = buildRsvpEventDraft({ title: 'Fiesta', quantity: 5, attrs: FULL, state: 'Quintana Roo' })
+    expect(r.ok && r.draft.starts_at).toBe('2026-12-02T01:30:00.000Z')
+  })
+})
+
+test.describe('evento · editing a free Evento updates its RSVP row (same save)', () => {
+  test('the sync patch is title + start + venue + address, never capacity', () => {
+    const patch = rsvpEventSyncPatch({ title: ' Nuevo nombre ', attrs: { ...FULL, venue_address: 'Calle 2' }, state: 'Sonora' })
+    expect(patch).toEqual({
+      title: 'Nuevo nombre', starts_at: '2026-12-02T03:30:00.000Z', venue_name: 'Teatro Pequeño', venue_address: 'Calle 2',
+    })
+    expect(patch).not.toHaveProperty('capacity')
+    expect(rsvpEventSyncPatch({ title: 'X', attrs: { event_date: '2026-12-01' } })).toBeNull()
+  })
+
+  test('the PUT route updates the row scoped to the authenticated seller shop, and checks a row came back', () => {
+    const route = read('app/api/sell/listing/[id]/route.ts')
+    expect(route).toContain('rsvpEventSlug(')
+    expect(route).toContain('resolveEventSeller()')
+    expect(route).toMatch(/\.from\('marketplace_events'\)\s*\n\s*\.update\(patch\)\s*\n\s*\.eq\('slug', slug\)\s*\n\s*\.eq\('shop_id', context\.shop\.id\)\s*\n\s*\.select\('id'\)/)
+    expect(route).toContain('data.length === 0')
+    expect(route).toContain('syncFreeEventRow(id, body)')
+    // the create route passes the state too, so create and edit agree on the instant
+    expect(read('app/api/sell/create/route.ts')).toContain('state: body.listing.state,')
   })
 })
 

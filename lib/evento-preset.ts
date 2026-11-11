@@ -72,17 +72,67 @@ export function isFreeEventListing(listing: {
   return listing.listing_type === 'service' && listing.price_cents === 0 && hasEventBlock(listing.attrs)
 }
 
+/** The zone Mexico City keeps; also the fallback when a state is unknown or unlisted. */
+export const DEFAULT_EVENT_TIME_ZONE = 'America/Mexico_City'
+
 /**
- * `event_date` + `event_time` → the instant the RSVP row stores. The wall clock is Mexico City, which has
- * had no daylight-saving time since 2022 (a fixed UTC-6), so the offset is a constant rather than a
- * timezone lookup. Null when either part is missing or malformed.
+ * States whose wall clock is NOT Mexico City's. Everything else (the great majority) keeps
+ * America/Mexico_City, so only the exceptions are listed — and as IANA zone NAMES, never offsets: the
+ * offsets (and Baja California's daylight-saving rule) come from `Intl`, which knows the tz database.
+ * Border municipalities of Chihuahua/Coahuila/Nuevo León/Tamaulipas that follow US DST are a
+ * municipality-level exception a state cannot express; they fall back to Mexico City.
  */
-export function eventStartsAt(attrs: Record<string, unknown> | null | undefined): string | null {
+const STATE_TIME_ZONES: Record<string, string> = {
+  'quintana roo': 'America/Cancun', // UTC-5, no DST
+  sonora: 'America/Hermosillo', // UTC-7, no DST
+  sinaloa: 'America/Mazatlan', // UTC-7
+  nayarit: 'America/Mazatlan', // UTC-7
+  'baja california sur': 'America/Mazatlan', // UTC-7
+  'baja california': 'America/Tijuana', // UTC-8, US-style DST (UTC-7 in summer)
+}
+
+function stateKey(state: string): string {
+  return state.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+}
+
+/** The IANA time zone for a Mexican state's display name; Mexico City when unknown, blank or unlisted. */
+export function eventTimeZoneForState(state: string | null | undefined): string {
+  if (typeof state !== 'string' || !state.trim()) return DEFAULT_EVENT_TIME_ZONE
+  return STATE_TIME_ZONES[stateKey(state)] ?? DEFAULT_EVENT_TIME_ZONE
+}
+
+/** Offset (ms, east positive) of `timeZone` at the instant `utcMs`, read from Intl. */
+function zoneOffsetMs(utcMs: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(utcMs))
+  const n = (t: string) => Number(parts.find(p => p.type === t)?.value)
+  const asUtc = Date.UTC(n('year'), n('month') - 1, n('day'), n('hour'), n('minute'), n('second'))
+  return asUtc - Math.floor(utcMs / 1000) * 1000
+}
+
+/**
+ * `event_date` + `event_time` → the instant the RSVP row stores. The wall clock is that of the listing's
+ * `state` (see `eventTimeZoneForState`), falling back to Mexico City when the state is unknown. Resolved
+ * with Intl time-zone math, so daylight-saving zones (Baja California) are right on either side of a
+ * change. Null when either part is missing or malformed.
+ */
+export function eventStartsAt(
+  attrs: Record<string, unknown> | null | undefined,
+  state?: string | null,
+): string | null {
   const date = typeof attrs?.event_date === 'string' ? attrs.event_date.trim() : ''
   const time = typeof attrs?.event_time === 'string' ? attrs.event_time.trim() : ''
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
-  const d = new Date(`${date}T${time}:00-06:00`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+  const wall = new Date(`${date}T${time}:00Z`).getTime() // the wall clock read as if it were UTC
+  if (Number.isNaN(wall)) return null
+  const zone = eventTimeZoneForState(state)
+  // Two passes: the offset at the guessed instant can differ from the offset at the true one right at a
+  // DST change.
+  let utc = wall - zoneOffsetMs(wall, zone)
+  utc = wall - zoneOffsetMs(utc, zone)
+  return new Date(utc).toISOString()
 }
 
 export interface RsvpEventDraft {
@@ -104,9 +154,11 @@ export function buildRsvpEventDraft(listing: {
   description?: string | null
   quantity?: number | null
   attrs?: Record<string, unknown> | null
+  /** The listing's `state` display name — picks the wall-clock time zone. */
+  state?: string | null
 }): RsvpEventDraftResult {
   const attrs = listing.attrs ?? {}
-  const startsAt = eventStartsAt(attrs)
+  const startsAt = eventStartsAt(attrs, listing.state)
   if (!startsAt) return { ok: false, field: 'event_date', error: 'Un evento gratis necesita fecha y hora.' }
   const venue = typeof attrs.venue_name === 'string' ? attrs.venue_name.trim() : ''
   if (!venue) return { ok: false, field: 'venue_name', error: 'Un evento gratis necesita el lugar.' }
@@ -133,6 +185,22 @@ export function buildRsvpEventDraft(listing: {
 export function rsvpEventSlug(metadata: Record<string, unknown> | null | undefined): string | null {
   const v = metadata?.rsvp_event_slug
   return typeof v === 'string' && v.trim() ? v.trim() : null
+}
+
+/**
+ * What a listing edit changes on its linked RSVP row: title, start, venue and address — never the
+ * capacity (seats of a free Evento are edited in the roster) or status. Null when the edit does not
+ * describe a complete event (the row is then left as it is rather than half-rewritten).
+ */
+export function rsvpEventSyncPatch(listing: {
+  title: string
+  attrs?: Record<string, unknown> | null
+  state?: string | null
+}): Pick<RsvpEventDraft, 'title' | 'starts_at' | 'venue_name' | 'venue_address'> | null {
+  const built = buildRsvpEventDraft({ title: listing.title, attrs: listing.attrs, state: listing.state, quantity: 1 })
+  if (!built.ok) return null
+  const { title, starts_at, venue_name, venue_address } = built.draft
+  return { title, starts_at, venue_name, venue_address }
 }
 
 /** Where «Nuevo evento» sends a merchant (D7). */

@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
       description: body.listing.description,
       quantity: body.listing.quantity,
       attrs: body.listing.attrs,
+      state: body.listing.state,
     })
     if (!built.ok) return NextResponse.json({ error: built.error, field: built.field }, { status: 422 })
     rsvpDraft = built.draft
