@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { isLikelyShopSlug } from '@/lib/route-shape'
-import { ListingPage, generateListingMetadata } from '../../../../../l/[id]/page'
+import { ShopScopedListingPage, generateShopScopedListingMetadata } from '../../../../../l/[id]/page'
 
 /**
  * The shop-scoped PDP on the platform host: `/mx/s/<slug>/l/<id>`.
@@ -26,16 +26,16 @@ async function scopeFrom(params: Props['params']) {
 export async function generateMetadata({ params }: Props) {
   const { slug, id } = await scopeFrom(params)
   if (!isLikelyShopSlug(slug)) return { title: 'Anuncio no encontrado' }
-  return generateListingMetadata(
+  return generateShopScopedListingMetadata(
     { params: Promise.resolve({ id }), market: 'mx', marketBasePath: '/mx' },
     { shopSlug: slug },
   )
 }
 
-export default async function ShopScopedListingPage({ params }: Props) {
+export default async function MexicoShopScopedListingPage({ params }: Props) {
   const { slug, id } = await scopeFrom(params)
   if (!isLikelyShopSlug(slug)) notFound()
-  return ListingPage(
+  return ShopScopedListingPage(
     { params: Promise.resolve({ id }), market: 'mx', marketBasePath: '/mx' },
     { shopSlug: slug },
   )

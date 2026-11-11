@@ -31,16 +31,35 @@ async function channelFor(scope?: ShopScope): Promise<Pick<ListingRequestContext
   return requestChannel()
 }
 
-export async function generateListingMetadata(args: MetadataArgs, scope?: ShopScope) {
+// NOT a second parameter on the exports below: Next calls `generateMetadata(props,
+// parent)`, so an extra parameter receives `parent` and fails the build's route
+// type check. The shop-scoped route calls its own named entry points instead.
+async function listingMetadata(args: MetadataArgs, scope?: ShopScope) {
   return renderListingMetadata({
     ...args,
     requestContext: { mode: 'dynamic', ...(await channelFor(scope)) },
   })
 }
 
+export function generateListingMetadata(args: MetadataArgs) {
+  return listingMetadata(args)
+}
+
+export function generateShopScopedListingMetadata(args: MetadataArgs, scope: ShopScope) {
+  return listingMetadata(args, scope)
+}
+
 export const generateMetadata = generateListingMetadata
 
-export async function ListingPage(args: PageArgs, scope?: ShopScope) {
+export function ListingPage(args: PageArgs) {
+  return listingPage(args)
+}
+
+export function ShopScopedListingPage(args: PageArgs, scope: ShopScope) {
+  return listingPage(args, scope)
+}
+
+async function listingPage(args: PageArgs, scope?: ShopScope) {
   const [{ id }, channel, user] = await Promise.all([
     args.params,
     channelFor(scope),
