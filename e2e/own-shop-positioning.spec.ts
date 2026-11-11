@@ -37,7 +37,7 @@ const AGENT_LINE = 'Tu agente de IA'
 const PROMOTER_LEAD = 'Tu promotor te arma la tienda y te atiende por su WhatsApp; entre visitas, tu agente de IA responde.'
 
 function stripTags(html: string): string {
-  return html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+  return html.replace(/<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 }
 
 function block(html: string, testId: string): string {
