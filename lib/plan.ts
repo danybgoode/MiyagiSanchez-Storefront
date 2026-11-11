@@ -84,9 +84,11 @@ export const NEGOCIO_GRANT_PAYMENTS_KEPT = 24
 export type NegocioTrial = {
   started_at: string
   expires_at: string
+  /** Set once «te quedan 15 días» was claimed for sending (plan-tienda S3.2, D8). */
+  notified_15d_at?: string
   /** Set once «te quedan 5 días» was claimed for sending (S2.3, D10). */
   notified_5d_at?: string
-  /** Set once «ya estás en Gratis» was claimed for sending (S2.3, D10). */
+  /** Set once the end notice («ya estás en Plan Gratis», or «tu tienda está en pausa») was claimed for sending. */
   notified_end_at?: string
 }
 
@@ -206,6 +208,7 @@ export function readNegocioTrial(metadata: unknown): NegocioTrial | null {
   return {
     started_at: t.started_at,
     expires_at: t.expires_at,
+    ...(isIso(t.notified_15d_at) ? { notified_15d_at: t.notified_15d_at } : {}),
     ...(isIso(t.notified_5d_at) ? { notified_5d_at: t.notified_5d_at } : {}),
     ...(isIso(t.notified_end_at) ? { notified_end_at: t.notified_end_at } : {}),
   }

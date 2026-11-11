@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   if (result.status !== 401) {
     const purged = await purgeAnsweredEmails()
     console.info('[shop-chat] purge', JSON.stringify({ purged }))
-    // The same daily run sends the Negocio trial's two notices (plans-gratis-negocio D10), each once per shop.
+    // The same daily run sends the free months' notices (15 and 5 days, and the end; plan-tienda D8), each once per shop.
     const notices = await runTrialNotices(trialNoticeDeps())
     console.info('[negocio-trial] notices', JSON.stringify(notices))
   }

@@ -54,6 +54,7 @@ import { releaseCustomDomainForShop } from '@/lib/domain-lapse-server'
 import { accrueTiendaPaymentShare, recordNegocioPaymentShares } from '@/lib/promoter-renewal-server'
 import { runOneTimeSteps } from '@/lib/plan-one-time-steps'
 import { paymentInstant } from '@/lib/promoter-packages'
+import { restorePlanPausedShop } from '@/lib/plan-restore-server'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const MEDUSA_PUB_KEY = process.env.MEDUSA_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -65,16 +66,26 @@ const STATUS_PATCHES = { negocio: setNegocioSubscriptionStatus, tienda: setTiend
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /**
- * D10 HOOK POINT — sprint 3 (S3.4, "a payment brings the shop back") fills this in; in sprint 2 it does nothing.
+ * D10 — a payment brings a shop paused for lack of a plan back (plan-tienda S3.4).
  *
  * Called after a plan payment or subscription activation has been RECORDED (a grant written, or the Medusa
- * subscription created), for both plans. Sprint 3: when the shop holds `metadata.plan_pause`, set the seller
- * `active` (reason `plan_paid`) through `POST /internal/sellers/:id/status`, then clear the claim — validate, claim,
- * apply, each write conditional and read back. No `plan_pause`, no restore: an admin pause is never lifted here.
- * It must never throw into the payment path that called it (the payment already landed).
+ * subscription created or back to live), for both plans. When the shop holds `metadata.plan_pause`, the seller is set
+ * `active` (reason `plan_paid`) through `POST /internal/sellers/:id/status` — the Backend relinks the catalog from its
+ * ledger — and the claim is cleared afterwards (`lib/plan-restore.ts`). No `plan_pause`, no restore: an admin pause is
+ * never lifted here. A replay finds no claim and restores nothing twice. It never throws into the payment path that
+ * called it (the payment already landed); a failed restore alerts on Telegram for hand repair.
+ *
+ * It returns nothing, so it can never turn a plan step into `retry` (PR 485's outcome model). ALERT, not retry, on
+ * purpose: a Stripe retry would not even reach this hook on the one-time path (the replayed grant returns `done`
+ * before it), and on the subscription path it would repeat the ✅ alert and D19 for a fault that is the Backend's,
+ * not the payment's. The `plan_pause` claim is kept on a failed restore, so the person the alert reaches (or a later
+ * payment) still knows the pause is the plan's and can finish it from /admin/tenants.
  */
 async function afterPlanPaid(input: { plan: PaidPlan; shopId: string; paymentRef: string }): Promise<void> {
-  void input
+  const outcome = await restorePlanPausedShop(input.shopId)
+  if (outcome === 'restored' || outcome === 'restored_partly') {
+    tg.alert(`✅ Tienda reactivada tras pagar ${PLAN_DISPLAY_NAMES[input.plan]}\nShop: ${input.shopId}\nPago: ${input.paymentRef}`)
+  }
 }
 
 /** D19: Plan Negocio is now active on this shop; a live monthly Plan Tienda is set to end with its paid period. */
@@ -177,13 +188,21 @@ const PLAN_PAYMENT_DB: PlanPaymentDeps = {
 
 /** Write the paid months onto the shop's Negocio grant. Every dated Negocio grant goes through here (the yearly
  *  payment, a promoter package by card or by transfer), so this is the one place the Tienda shift is written. */
-export function applyNegocioPayment(input: PlanPaymentInput): Promise<PlanPaymentOutcome> {
-  return applyPlanPayment('negocio', input, PLAN_PAYMENT_DB)
+export async function applyNegocioPayment(input: PlanPaymentInput): Promise<PlanPaymentOutcome> {
+  const outcome = await applyPlanPayment('negocio', input, PLAN_PAYMENT_DB)
+  // A promoter package (by card or by an approved transfer) is a Plan Negocio payment too (D10): restore a shop the
+  // plan job paused. Only on a grant actually written, so a replay restores nothing.
+  // On a REPLAY too (verifier S4): a process that died between the grant write and the restore would otherwise skip
+  // the restore on every later delivery. With no `plan_pause` it is a single read and nothing else.
+  if (outcome === 'written' || outcome === 'replay') await afterPlanPaid({ plan: 'negocio', shopId: input.shopId, paymentRef: input.paymentId })
+  return outcome
 }
 
 /** Write the paid months onto the shop's Tienda grant (the yearly Plan Tienda payment). */
-export function applyTiendaPayment(input: PlanPaymentInput): Promise<PlanPaymentOutcome> {
-  return applyPlanPayment('tienda', input, PLAN_PAYMENT_DB)
+export async function applyTiendaPayment(input: PlanPaymentInput): Promise<PlanPaymentOutcome> {
+  const outcome = await applyPlanPayment('tienda', input, PLAN_PAYMENT_DB)
+  if (outcome === 'written' || outcome === 'replay') await afterPlanPaid({ plan: 'tienda', shopId: input.shopId, paymentRef: input.paymentId })
+  return outcome
 }
 
 export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session, plan: PaidPlan, completedAt?: number): Promise<PlanWebhookOutcome> {
@@ -239,8 +258,11 @@ export async function handlePlanOneTimeComplete(session: Stripe.Checkout.Session
       )
       if (grant !== 'written') return
       if (plan === 'negocio') await cancelTiendaUnderNegocio(shopId, session.metadata?.seller_clerk_id)
-      await afterPlanPaid({ plan, shopId, paymentRef: session.id })
     },
+    // D10, on EVERY delivery whose grant is counted — the one that wrote it and every replay (verifier S4): a
+    // delivery that died between the grant and the restore would otherwise never restore the shop. Idempotent: with
+    // no `plan_pause` it is one read. The ✅ alert and D19 stay in `firstTime`.
+    restore: () => afterPlanPaid({ plan, shopId, paymentRef: session.id }),
   })
   return outcome
 }
@@ -261,6 +283,11 @@ function syncDeps(retrieved?: RetrievedPlanSubscription): PlanStatusSyncDeps {
  */
 export async function handlePlanSubscriptionEvent(subscriptionId: string, opts: { deleted: boolean }): Promise<PlanWebhookOutcome> {
   const out = await syncPlanSubscriptionStatus(subscriptionId, syncDeps())
+  // A plan moved back to live by any subscription event (a card updated, a pause lifted) restores a shop the plan
+  // job paused meanwhile, exactly as a paid invoice does (verifier S4). No claim, no call.
+  if (out.outcome === 'patched' && out.shopId && (out.status === 'active' || out.status === 'trialing')) {
+    await afterPlanPaid({ plan: out.plan, shopId: out.shopId, paymentRef: subscriptionId })
+  }
   // The domain release runs only after the PATCH landed, so a retried delivery reaches it once the status is in.
   if (out.outcome !== 'patched' || !opts.deleted || out.plan !== 'negocio') return syncWebhookOutcome(out)
   try {
@@ -279,6 +306,11 @@ export async function handlePlanSubscriptionEvent(subscriptionId: string, opts: 
  */
 export async function handlePlanInvoicePaid(invoice: Stripe.Invoice, subscription: RetrievedPlanSubscription): Promise<PlanWebhookOutcome> {
   const out = await syncPlanSubscriptionStatus(subscription.id, syncDeps(subscription))
+  // A monthly plan that came back to live by paying (D21: `unpaid` ends the plan, a paid invoice brings it back) is a
+  // subscription activation for D10: restore a shop the plan job paused meanwhile. No claim, no call.
+  if (out.outcome === 'patched' && out.shopId && (out.status === 'active' || out.status === 'trialing')) {
+    await afterPlanPaid({ plan: out.plan, shopId: out.shopId, paymentRef: invoice.id ?? subscription.id })
+  }
   // The $0 invoice that opens a free period is not a payment: no renewal share for a promoter.
   if ((invoice.amount_paid ?? 0) <= 0) return syncWebhookOutcome(out)
   // Every paid invoice may earn a promoter a share, only once the status landed: for Negocio the year-2 renewal (D13)

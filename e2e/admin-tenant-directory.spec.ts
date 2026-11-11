@@ -49,6 +49,14 @@ test.describe('admin tenant-directory · complete mirror reads', () => {
 })
 
 test.describe('admin tenant-directory · shapeTenantRow', () => {
+  test('the plan marks: the legacy marker in three states and the pause job\'s claim (plan-tienda S3)', () => {
+    const shape = (metadata: unknown) => shapeTenantRow({ ...base, metadata }, { paywallEnabled: false, listingCount: 0 })
+    expect(shape({})).toMatchObject({ planLegacy: 'absent', pausedForPlan: false })
+    expect(shape({ plan_legacy: { marked_at: '2026-11-12T00:00:00Z' } }).planLegacy).toBe('marked')
+    expect(shape({ plan_legacy: 'x' }).planLegacy).toBe('unreadable')
+    expect(shape({ plan_pause: { paused_at: '2027-02-09T00:00:00Z' } }).pausedForPlan).toBe(true)
+    expect(shape({ plan_pause: null }).pausedForPlan).toBe(false)
+  })
   test('canonical Medusa ownership overrides stale mirror claim state', () => {
     const row = shapeTenantRow(base, {
       paywallEnabled: false, listingCount: 0,

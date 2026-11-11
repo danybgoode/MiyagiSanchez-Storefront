@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@clerk/nextjs/server'
 import { resolveMyPlan } from '@/lib/plan-server'
 import { readPlanLegacyState } from '@/lib/plan'
+import { hasPlanPause } from '@/lib/plan-pause'
 import { negocioPageView } from '@/lib/negocio-page'
 import { Banner } from '@/components/feedback/Banner'
 import NegocioBuyButtons from './NegocioBuyButtons'
@@ -29,7 +30,11 @@ export default async function TuSuscripcionPage({ searchParams }: { searchParams
   // The legacy marker decides only what the trial view says happens at its end (Plan Gratis, or choose a plan). A
   // damaged marker counts as legacy, exactly as `derivePlan` reads it.
   const legacy = mine !== 'unavailable' && readPlanLegacyState(mine.shop.metadata) !== 'absent'
-  const view = negocioPageView(mine === 'unavailable' ? { plan: 'gratis', reason: 'unavailable', endsAt: null } : mine.plan, new Date(), { legacy })
+  // Paused by the plan job (plan-tienda S3.3): the page says so and how to come back. This page and both checkout
+  // routes read only Supabase, the Backend's /internal routes and Stripe, never the portal write gate, so a paused
+  // owner reaches all of them (S3.4).
+  const planPaused = mine !== 'unavailable' && hasPlanPause(mine.shop.metadata)
+  const view = negocioPageView(mine === 'unavailable' ? { plan: 'gratis', reason: 'unavailable', endsAt: null } : mine.plan, new Date(), { legacy, planPaused })
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 grid gap-4" data-testid="negocio-page">

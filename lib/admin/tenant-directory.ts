@@ -27,6 +27,8 @@ import {
   type DomainEntitlementReason,
 } from '@/lib/domain-entitlement'
 import { marketVisibility } from '@/lib/market-visibility'
+import { readPlanLegacyState, type PlanLegacyState } from '@/lib/plan'
+import { hasPlanPause } from '@/lib/plan-pause'
 import type { MarketCode } from '@/lib/markets'
 import type { PublicSellerMarket } from '@/lib/owned-market'
 import type { SellerStatus } from '@/lib/seller-status'
@@ -95,6 +97,13 @@ export type TenantRow = {
    *                   merchant has no email", which is a confident falsehood.
    */
   registrationEmail: string | null | 'unavailable'
+  /**
+   * The plan marks on the mirror row (plan-tienda-three-free-months): the legacy marker (`readPlanLegacyState`) and
+   * the pause job's claim (`hasPlanPause`). NOT the plan itself: that needs the shop's two subscription reads, and a
+   * plan guessed from the metadata alone would show a paying monthly merchant as unpaid.
+   */
+  planLegacy: PlanLegacyState
+  pausedForPlan: boolean
 }
 
 /** The raw `marketplace_shops` row fields the shaper reads. */
@@ -223,6 +232,8 @@ export function shapeTenantRow(
     // it, which is not the same as Medusa saying there is no such seller.
     status: ctx.status ?? 'unavailable',
     registrationEmail: ctx.registrationEmail === undefined ? 'unavailable' : ctx.registrationEmail,
+    planLegacy: readPlanLegacyState(raw.metadata),
+    pausedForPlan: hasPlanPause(raw.metadata),
   }
 }
 

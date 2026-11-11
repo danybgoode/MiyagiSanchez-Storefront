@@ -257,9 +257,31 @@ export type NegocioPageOptions = {
    * pass it tells a legacy merchant to pick a plan (they still can), never a new merchant that they keep Plan Gratis.
    */
   legacy?: boolean
+  /**
+   * The shop holds `plan_pause` (`hasPlanPause`, lib/plan-pause.ts): the plan job paused it because its free months
+   * ended with no plan (plan-tienda S3.3). The page then says so plainly, and how to bring it back. Only the plan's
+   * own record is read: an admin pause is not this, and the page does not guess at it.
+   */
+  planPaused?: boolean
 }
 
+/** What «Tu suscripción» says about a shop paused for lack of a plan (plan-tienda S3.4). */
+export const PLAN_PAUSED_HEADLINE = 'Tu tienda está en pausa porque no tiene un plan.'
+export const PLAN_PAUSED_NOTICE =
+  'No se borró nada: tus productos, tu dirección y tus ventas están guardados. Elige el Plan Tienda o el Plan Negocio aquí abajo y tu tienda vuelve a estar en línea en cuanto recibamos tu pago.'
+/** Paid, but the restore has not landed yet (or failed and a person is on it). */
+export const PLAN_PAUSED_PAID_NOTICE =
+  'Recibimos tu pago y tu tienda se está reabriendo. Si en unos minutos sigue en pausa, escríbenos y la reactivamos.'
+
 export function negocioPageView(plan: PlanState, now: Date = new Date(), opts: NegocioPageOptions = {}): NegocioPageView {
+  const base = negocioPlanView(plan, now, opts)
+  // A plan we could not read says only that: never "paused" or "reopening" over a guess.
+  if (!opts.planPaused || plan.reason === 'unavailable') return base
+  if (plan.plan === 'unpaid') return { ...base, headline: PLAN_PAUSED_HEADLINE, notice: PLAN_PAUSED_NOTICE }
+  return { ...base, notice: PLAN_PAUSED_PAID_NOTICE }
+}
+
+function negocioPlanView(plan: PlanState, now: Date, opts: NegocioPageOptions): NegocioPageView {
   const view = (v: Omit<NegocioPageView, 'buttons' | 'manage' | 'managePlan' | 'notice' | 'afterTrial' | 'pauses'> & Partial<NegocioPageView>): NegocioPageView => ({
     notice: null,
     manage: false,

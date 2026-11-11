@@ -1,5 +1,5 @@
 /**
- * The I/O shell for the trial's emails (plans-gratis-negocio S2.3). Reads owned shops with a trial, resolves each
+ * The I/O shell for the free months' notices (plans-gratis-negocio S2.3; plan-tienda S3.2). Reads owned shops with a trial, resolves each
  * plan (uncached: a daily job, and a paid shop must not get the reminder), claims through `merge_shop_metadata` with
  * an `equals` guard on the exact trial read, and sends through `dispatchToSeller` (the merchant's own channel switches).
  *
@@ -9,11 +9,30 @@ import 'server-only'
 import { db } from '@/lib/supabase'
 import { dispatchToSeller } from '@/lib/notifications/dispatch'
 import { sendNegocioTrialNotice } from '@/lib/email'
-import { NEGOCIO_TRIAL_KEY, readNegocioTrial } from '@/lib/plan'
+import { NEGOCIO_TRIAL_KEY, readNegocioTrial, readPlanLegacyState } from '@/lib/plan'
+import { claimMarket, hasPlanPause, rawPlanPause, type PlanPauseMarket } from '@/lib/plan-pause'
+import { readShopMarket } from '@/lib/plan-pause-server'
+import { noticeVariantFor } from '@/lib/negocio-trial-notices'
 import { resolvePlan } from '@/lib/plan-server'
 import type { TrialNoticeDeps, TrialShop } from '@/lib/negocio-trial-notices'
 
 const BATCH = 1000
+
+/**
+ * The market, read only for a NEW shop (a legacy shop's wording does not depend on it, so it costs no read). A paused
+ * shop's comes from its claim: the public seller read hides a paused seller.
+ */
+async function marketFor(slug: string, metadata: unknown): Promise<PlanPauseMarket> {
+  if (readPlanLegacyState(metadata) !== 'absent') return 'unknown'
+  if (hasPlanPause(metadata)) return claimMarket(metadata)
+  return readShopMarket(slug, metadata)
+}
+
+/** The claim's `paused_at`, when it is a string; anything else is null (the decision then counts from the end). */
+function pausedAtOf(metadata: unknown): string | null {
+  const raw = rawPlanPause(metadata) as { paused_at?: unknown } | null
+  return raw && typeof raw === 'object' && typeof raw.paused_at === 'string' ? raw.paused_at : null
+}
 
 export function trialNoticeDeps(): TrialNoticeDeps {
   return {
@@ -26,17 +45,25 @@ export function trialNoticeDeps(): TrialNoticeDeps {
         .order('created_at', { ascending: true })
         .limit(BATCH)
       if (error || !Array.isArray(data)) return null
-      return (data as Array<{ id: string; slug: string; name: string | null; clerk_user_id: string; metadata: Record<string, unknown> | null }>)
+      const rows = (data as Array<{ id: string; slug: string; name: string | null; clerk_user_id: string; metadata: Record<string, unknown> | null }>)
         .map((r) => ({ row: r, trial: readNegocioTrial(r.metadata) }))
         .filter((x) => x.trial !== null)
-        .map(({ row, trial }) => ({
+      const shops: TrialShop[] = []
+      for (const { row, trial } of rows) shops.push({
           id: row.id,
           slug: row.slug,
           name: row.name,
           clerk_user_id: row.clerk_user_id,
           trial: trial!,
           rawTrial: row.metadata?.[NEGOCIO_TRIAL_KEY] ?? null,
-        }))
+          facts: {
+            legacy: readPlanLegacyState(row.metadata),
+            planPaused: hasPlanPause(row.metadata),
+            pausedAt: pausedAtOf(row.metadata),
+            market: await marketFor(row.slug, row.metadata),
+          },
+        })
+      return shops
     },
     readPlan: async (shop: TrialShop) => {
       const { data } = await db.from('marketplace_shops').select('metadata').eq('id', shop.id).maybeSingle()
@@ -69,7 +96,7 @@ export function trialNoticeDeps(): TrialNoticeDeps {
       await dispatchToSeller(shop.clerk_user_id, {
         group: 'onboarding',
         email: async (to) => {
-          const r = await sendNegocioTrialNotice({ to, shopName: shop.name ?? shop.slug, notice, endsAt: shop.trial.expires_at, shopId: shop.id })
+          const r = await sendNegocioTrialNotice({ to, shopName: shop.name ?? shop.slug, notice, variant: noticeVariantFor(shop.facts.legacy), endsAt: shop.trial.expires_at, shopId: shop.id })
           if (!r.ok) emailFailed = r.reason
         },
       })

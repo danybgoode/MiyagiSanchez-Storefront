@@ -40,7 +40,7 @@ export default async function SellerManageLayout({ children }: { children: React
   if (seller) await retryShopCreatedWelcome(seller).catch((error) => {
     console.error('[shop/manage] shop welcome retry failed:', seller.id, error)
   })
-  // The 30-day Negocio trial starts the first time the OWNER opens their panel (plans-gratis-negocio D4) — so a
+  // The Negocio trial (`NEGOCIO_TRIAL_DAYS`) starts the first time the OWNER opens their panel (plans-gratis-negocio D4) — so a
   // promoter's unclaimed shop never spends it before the merchant claims it. Stamped once, guarded in the UPDATE;
   // a failure only delays the trial to the next visit, so it never blocks the panel.
   if (seller) {

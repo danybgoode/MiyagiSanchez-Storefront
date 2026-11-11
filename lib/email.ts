@@ -15,7 +15,9 @@ import { formatRentalBookingLines, type RentalBookingLike } from '@/lib/rental-b
 import { NUDGE_COPY, NUDGE_STEP_COPY } from '@/lib/prompt-to-shop/copy'
 import type { NudgeDay, NudgeStep } from '@/lib/prompt-to-shop/nudges'
 import { CHECKIN_COPY } from '@/lib/business-plan/copy'
-import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN } from '@/lib/negocio-pricing'
+import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN, NEGOCIO_TRIAL_DAYS } from '@/lib/negocio-pricing'
+import { TIENDA_PRICE_MONTHLY_MXN, TIENDA_PRICE_YEARLY_MXN } from '@/lib/tienda-pricing'
+import { formatPesos, trialLengthLabel, yearlyAsMonthly } from '@/lib/pricing-catalog'
 import { PLAN_ALLOWANCES } from '@/lib/plan-allowances'
 import type { CheckinMessage } from '@/lib/business-plan/checkin'
 import {
@@ -497,7 +499,8 @@ export async function sendShopCreatedWelcome(ctx: {
     p('• Tus agentes de IA pueden ayudarte a gestionar tu tienda de principio a fin: configurarla, publicar productos, responder ofertas y revisar pedidos.<br>• Otros agentes pueden descubrir tus productos y mostrárselos a quienes buscan comprar.<br>• Agregar anuncios de tus productos o servicios.<br>• Configurar pagos y entregas desde tu panel.<br>• Administrar pedidos, ofertas y mensajes en un solo lugar.<br>• Compartir el enlace de tu tienda con tus clientes.'),
     cta('Preparar mi tienda', `${SITE}/shop/manage`),
     p(`Tu tienda: <a href="${shopUrl}">${esc(shopUrl)}</a>`),
-    p('Abrir una tienda básica es gratis. Si necesitas ayuda, responde a este correo.'),
+    // A shop opened now starts with the free months, then needs a plan (plan-tienda S3.2): «es gratis» is no longer true.
+    p(`Tu tienda empieza con ${trialLengthLabel(NEGOCIO_TRIAL_DAYS, 'es')} gratis del Plan Negocio, sin tarjeta. Si necesitas ayuda, responde a este correo.`),
   ].join(''), undefined, undefined, 'es', `shop-created/${ctx.sellerId}`)
 }
 
@@ -555,37 +558,73 @@ export async function sendBusinessCheckin(ctx: { to: string; shopName: string; r
 }
 
 /**
- * The Negocio trial's two notices (plans-gratis-negocio S2.3, D10): five days left, and «ya estás en Gratis». Prices
- * and allowances come from their one modules, never typed here.
+ * The free months' notices (plans-gratis-negocio S2.3; three of them since plan-tienda S3.2, README D8): 15 days left,
+ * 5 days left, and the end. Each has two variants, chosen by the legacy marker (`noticeVariantFor`,
+ * lib/negocio-trial-notices.ts): a LEGACY shop falls to Plan Gratis at the end, as it was promised; a new shop must
+ * choose Plan Tienda or Plan Negocio, or it is paused with nothing deleted. A shop whose marker cannot be read gets
+ * the legacy wording — never a pause message that may be false. Prices and allowances come from their one modules,
+ * never typed here.
  */
 export async function sendNegocioTrialNotice(ctx: {
   to: string
   shopName: string
   shopId: string
-  notice: 'five_days' | 'ended'
+  notice: 'fifteen_days' | 'five_days' | 'ended'
+  variant: 'legacy' | 'pause'
   endsAt: string
 }): Promise<EmailSendResult> {
   const shopName = plainLine(ctx.shopName) || 'Tu tienda'
-  const pesos = (n: number) => `$${n.toLocaleString('en-US')}`
-  const prices = `El Plan Negocio cuesta ${pesos(NEGOCIO_PRICE_MONTHLY_MXN)} al mes, o ${pesos(NEGOCIO_PRICE_YEARLY_MXN)} al año, que puedes pagar a meses sin intereses.`
+  const pesos = formatPesos
+  const negocioPrices = `El Plan Negocio cuesta ${pesos(NEGOCIO_PRICE_MONTHLY_MXN)} al mes, o ${pesos(NEGOCIO_PRICE_YEARLY_MXN)} al año, que puedes pagar a meses sin intereses.`
+  const bothPrices =
+    `El Plan Tienda cuesta desde ${pesos(yearlyAsMonthly(TIENDA_PRICE_YEARLY_MXN))} al mes (${pesos(TIENDA_PRICE_YEARLY_MXN)} por un año en un pago, o ${pesos(TIENDA_PRICE_MONTHLY_MXN)} mes a mes). ` +
+    `El Plan Negocio cuesta ${pesos(NEGOCIO_PRICE_MONTHLY_MXN)} al mes, o ${pesos(NEGOCIO_PRICE_YEARLY_MXN)} al año. IVA incluido.`
   const endDate = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' }).format(new Date(ctx.endsAt))
   const href = `${SITE}/shop/manage/negocio`
-  if (ctx.notice === 'five_days') {
-    return sendWithResult(ctx.to, `${shopName}: te quedan 5 días del Plan Negocio`, [
-      h1('Tu prueba del Plan Negocio termina pronto'),
-      p(esc('Este mes tu tienda ha tenido el Plan Negocio: Mercado Libre sincronizado, muchas más respuestas del chat y tu revisión del mes. Al contratarlo también puedes conectar tu propio dominio.')),
-      p(esc(`El ${endDate} tu tienda pasa sola al Plan Gratis. Sigue abierta, con todos tus productos y tu subdominio; no tienes que hacer nada.`)),
-      p(esc(prices)),
-      cta('Quedarme con el Plan Negocio', href),
-    ].join(''), undefined, undefined, 'es', `negocio-trial/${ctx.shopId}/five_days`)
+  // The days actually left, never the nominal 15 or 5: a run that missed a day must not say a number that is false.
+  const left = Math.max(1, Math.ceil((Date.parse(ctx.endsAt) - Date.now()) / 86_400_000))
+  const leftText = left === 1 ? 'te queda 1 día' : `te quedan ${left} días`
+  // The legacy keys are the ones sent before plan-tienda; a new shop's notices have their own, so the two can never
+  // be mistaken for one another by the idempotency layer.
+  const key = `negocio-trial/${ctx.shopId}/${ctx.notice}${ctx.variant === 'pause' ? '_pause' : ''}`
+
+  if (ctx.notice !== 'ended') {
+    if (ctx.variant === 'legacy') {
+      return sendWithResult(ctx.to, `${shopName}: ${leftText} del Plan Negocio`, [
+        h1('Tu prueba del Plan Negocio termina pronto'),
+        p(esc('Durante tu prueba, tu tienda ha tenido el Plan Negocio: Mercado Libre sincronizado, muchas más respuestas del chat y tu revisión del mes. Al contratarlo también puedes conectar tu propio dominio.')),
+        p(esc(`El ${endDate} tu tienda pasa sola al Plan Gratis. Sigue abierta, con todos tus productos y tu subdominio; no tienes que hacer nada.`)),
+        p(esc(negocioPrices)),
+        cta('Quedarme con el Plan Negocio', href),
+      ].join(''), undefined, undefined, 'es', key)
+    }
+    return sendWithResult(ctx.to, `${shopName}: ${leftText} gratis`, [
+      h1('Tus meses gratis terminan pronto'),
+      p(esc('Durante tus meses gratis, tu tienda ha tenido el Plan Negocio: Mercado Libre sincronizado, muchas más respuestas del chat y tu revisión del mes.')),
+      p(esc(`Terminan el ${endDate}. Para que tu tienda siga en línea, elige con qué plan sigues: el Plan Tienda o el Plan Negocio.`)),
+      p(esc(bothPrices)),
+      p(esc('Si no eliges ninguno, tu tienda se pausa: no se borra nada, tus productos, tu dirección y tus ventas se quedan guardados, y vuelve a estar en línea en cuanto pagas.')),
+      cta('Elegir mi plan', href),
+    ].join(''), undefined, undefined, 'es', key)
   }
-  return sendWithResult(ctx.to, `${shopName} sigue abierta, ahora en el Plan Gratis`, [
-    h1('Terminó tu prueba del Plan Negocio'),
-    p(esc('Tu tienda sigue abierta en el Plan Gratis: tus productos y tu subdominio siguen igual, y puedes seguir vendiendo sin pagar nada.')),
-    p(esc(`Lo que cambia: el chat de tu tienda responde hasta ${PLAN_ALLOWANCES.gratis.chatAnswersPerMonth} preguntas al mes, la sincronización con Mercado Libre y la revisión del mes quedan en pausa, y aparece un pequeño enlace «Tienda impulsada por Miyagi Sánchez» al pie de tu tienda. Todo vuelve al contratar el Plan Negocio.`)),
-    p(esc(prices)),
-    cta('Volver al Plan Negocio', href),
-  ].join(''), undefined, undefined, 'es', `negocio-trial/${ctx.shopId}/ended`)
+
+  if (ctx.variant === 'legacy') {
+    return sendWithResult(ctx.to, `${shopName} sigue abierta, ahora en el Plan Gratis`, [
+      h1('Terminó tu prueba del Plan Negocio'),
+      p(esc('Tu tienda sigue abierta en el Plan Gratis: tus productos y tu subdominio siguen igual, y puedes seguir vendiendo sin pagar nada.')),
+      p(esc(`Lo que cambia: el chat de tu tienda responde hasta ${PLAN_ALLOWANCES.gratis.chatAnswersPerMonth} preguntas al mes, la sincronización con Mercado Libre y la revisión del mes quedan en pausa, y aparece un pequeño enlace «Tienda impulsada por Miyagi Sánchez» al pie de tu tienda. Todo vuelve al contratar el Plan Negocio.`)),
+      p(esc(negocioPrices)),
+      cta('Volver al Plan Negocio', href),
+    ].join(''), undefined, undefined, 'es', key)
+  }
+  return sendWithResult(ctx.to, `${shopName} está en pausa`, [
+    h1('Tu tienda está en pausa'),
+    p(esc('Tu tienda ya no tiene un plan, así que la pusimos en pausa: por ahora no se muestra en Miyagi Sánchez ni recibe pedidos.')),
+    p(esc('No se borró nada. Tus productos, tu dirección y tus ventas están guardados.')),
+    p(esc('Para volver a abrirla, elige el Plan Tienda o el Plan Negocio en «Tu suscripción». En cuanto recibamos tu pago, tu tienda vuelve a estar en línea.')),
+    p(esc(bothPrices)),
+    cta('Volver a abrir mi tienda', href),
+  ].join(''), undefined, undefined, 'es', key)
 }
 
 /**
@@ -623,11 +662,11 @@ export async function sendAccountWelcome(ctx: { to: string; clerkUserId: string 
   return sendWithResult(ctx.to, 'Bienvenido a Miyagi Sánchez / Welcome', [
     h1('Bienvenido a Miyagi Sánchez'),
     p('Tu cuenta ya está lista. Puedes explorar tiendas y productos, guardar lo que te interese y hablar con quienes venden cuando encuentres algo para ti.'),
-    p('Si tienes un negocio, también puedes crear una tienda o reclamar una ficha pública disponible desde su página. Tener una tienda básica es gratis.'),
+    p(`Si tienes un negocio, también puedes crear una tienda o reclamar una ficha pública disponible desde su página. Una tienda nueva empieza con ${trialLengthLabel(NEGOCIO_TRIAL_DAYS, 'es')} gratis, sin tarjeta.`),
     divider(),
     h1('Welcome to Miyagi Sánchez'),
     p('Your account is ready. Explore shops and products, save what interests you, and contact sellers when you find something you like.'),
-    p('If you run a business, you can also create a shop or claim an available public listing from its page. A basic shop is free.'),
+    p(`If you run a business, you can also create a shop or claim an available public listing from its page. A new shop starts with ${trialLengthLabel(NEGOCIO_TRIAL_DAYS, 'en')} free, no card.`),
     cta('Explorar / Explore', SITE),
     p('¿Dudas? Responde a este correo. Questions? Just reply.'),
   ].join(''), undefined, undefined, 'es', `account-welcome/${ctx.clerkUserId}`)

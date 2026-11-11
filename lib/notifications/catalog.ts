@@ -115,7 +115,7 @@ export const COMMUNICATION_CATALOG: readonly CommunicationEntry[] = [
     sender: 'sendBusinessCheckin', origin: 'lib/business-plan/checkin-server.ts', group: 'onboarding',
   },
   {
-    key: 'shop.negocio_trial_notice', trigger: 'Cinco días antes de que termine la prueba de Negocio de una tienda, y al terminar si no se pagó (una vez cada una).',
+    key: 'shop.negocio_trial_notice', trigger: 'Quince y cinco días antes de que terminen los meses gratis del Plan Negocio de una tienda, y al terminar si no se pagó: una tienda de antes pasa al Plan Gratis; una tienda nueva queda en pausa, sin borrar nada, hasta que pague un plan (una vez cada uno).',
     from: 'platform', to: 'seller', channels: ['email'], domain: 'cuentas',
     sender: 'sendNegocioTrialNotice', origin: 'lib/negocio-trial-notices-server.ts', group: 'onboarding',
   },

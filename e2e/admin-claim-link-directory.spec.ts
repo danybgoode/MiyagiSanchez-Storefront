@@ -12,7 +12,7 @@ const base: TenantRow = {
   entitlementReason: 'flag_off', entitled: true, subscriptionUnchecked: false,
   listingCount: 5, operatingMarketCode: 'mx', operatingMarketLabel: 'México',
   marketplacePublicationLabel: 'Publicada', createdAt: '2026-01-01T00:00:00.000Z',
-  status: 'active', registrationEmail: null,
+  status: 'active', registrationEmail: null, planLegacy: 'absent', pausedForPlan: false,
 }
 
 test('an active unclaimed seller with a market is ready even before shop verification', () => {

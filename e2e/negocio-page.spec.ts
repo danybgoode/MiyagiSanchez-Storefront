@@ -198,6 +198,6 @@ test('«Tu suscripción» never prints a plan for one that could not be read (PR
   // legacy marker the way derivePlan does.
   const page = readFileSync('app/(shell)/shop/manage/negocio/page.tsx', 'utf8')
   expect(page).toContain("view.tone === 'unknown' ? (\n          <Banner variant=\"warning\">{view.headline}</Banner>")
-  expect(page).toContain("negocioPageView(mine === 'unavailable' ? { plan: 'gratis', reason: 'unavailable', endsAt: null } : mine.plan, new Date(), { legacy })")
+  expect(page).toContain("negocioPageView(mine === 'unavailable' ? { plan: 'gratis', reason: 'unavailable', endsAt: null } : mine.plan, new Date(), { legacy, planPaused })")
   expect(page).toContain("readPlanLegacyState(mine.shop.metadata) !== 'absent'")
 })

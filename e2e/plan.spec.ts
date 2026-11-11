@@ -53,6 +53,7 @@ import {
   readNegocioTrial,
 } from '../lib/plan'
 import { NEGOCIO_TRIAL_DAYS } from '../lib/negocio-pricing'
+import { trialLengthLabel } from '../lib/pricing-catalog'
 import { parseArgs } from '../scripts/backfill-negocio-trial'
 
 const NOW = new Date('2026-11-10T12:00:00Z')
@@ -146,10 +147,33 @@ test.describe('parsing — a corrupt value never grants', () => {
   })
 })
 
-test.describe('the trial — once, 30 days', () => {
+test.describe('the trial — once, three months', () => {
   test('lasts exactly NEGOCIO_TRIAL_DAYS', () => {
     const t = buildNegocioTrial(NOW)
     expect(Date.parse(t.expires_at) - Date.parse(t.started_at)).toBe(NEGOCIO_TRIAL_DAYS * DAY)
+  })
+
+  test('a new trial is ninety days, which the pages read as «3 meses» (plan-tienda D7)', () => {
+    expect(NEGOCIO_TRIAL_DAYS).toBe(90)
+    const t = buildNegocioTrial(NOW)
+    expect(Date.parse(t.expires_at) - Date.parse(t.started_at)).toBe(90 * DAY)
+    expect(trialLengthLabel(NEGOCIO_TRIAL_DAYS, 'es')).toBe('3 meses')
+    expect(trialLengthLabel(NEGOCIO_TRIAL_DAYS, 'en')).toBe('3 months')
+  })
+
+  test('a trial stamped before the change keeps its own end: the stored expires_at decides, never the constant (D7)', () => {
+    // One of the 18 live trials: stamped 30 days long, ending 2026-12-05.
+    const old = { started_at: '2026-11-05T02:18:22.000Z', expires_at: '2026-12-05T02:18:22.000Z' }
+    const meta = { [NEGOCIO_TRIAL_KEY]: old }
+    const facts = { hasActiveSubscription: false, hasActiveTiendaSubscription: false }
+    const before = derivePlanFromMetadata(meta, facts, new Date('2026-12-04T12:00:00Z'))
+    expect(before).toEqual({ plan: 'trial', reason: 'trial', endsAt: old.expires_at })
+    // The day after its own end it is over, although a 90-day trial from the same start would still be running.
+    const after = derivePlanFromMetadata(meta, facts, new Date('2026-12-06T12:00:00Z'))
+    expect(after.plan).not.toBe('trial')
+    expect(readNegocioTrial(meta)?.expires_at).toBe(old.expires_at)
+    // And it is never stamped again.
+    expect(canStartTrial(meta)).toBe(false)
   })
 
   test('a shop with no trial and no grant may start one', () => {
