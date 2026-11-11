@@ -92,7 +92,7 @@ import { recordAgentConfigChange, recordAgentOfferAction, recordAgentListingActi
 import { listShopOffers, respondToOffer } from '@/lib/offer-respond'
 import { listShopOrdersViaInternal } from '@/lib/agent-orders'
 import { mcpEventFields, mcpUpdateQuantity, isEventCapableType } from '@/lib/event-seats'
-import { listShopListings, shopOwnsProduct, patchSellerProductViaInternal, createSellerProductViaInternal, createSellerCollectionViaInternal, listingActivationBlock, deleteSellerProductViaInternal, applySellerPriceViaInternal, renameSellerCollectionViaInternal, deleteSellerCollectionViaInternal, reorderSellerCollectionsViaInternal, patchSellerSlugViaInternal, type SellerProductPatch } from '@/lib/seller-products'
+import { listShopListings, shopOwnsProduct, patchSellerProductViaInternal, createSellerProductViaInternal, createSellerCollectionViaInternal, listingActivationBlock, deleteSellerProductViaInternal, applySellerPriceViaInternal, freeEventPriceBlock, renameSellerCollectionViaInternal, deleteSellerCollectionViaInternal, reorderSellerCollectionsViaInternal, patchSellerSlugViaInternal, type SellerProductPatch } from '@/lib/seller-products'
 import { validateSlug, buildSlugAliasHistory } from '@/lib/slug'
 import { SLUG_REDIRECT_TAG } from '@/lib/slug-redirect'
 import { resolvePrefs, audienceTelegramInUse, EVENT_GROUPS, CHANNELS, type PrefRow } from '@/lib/notifications/preferences'
@@ -3849,6 +3849,11 @@ async function handleUpdateListing(args: Record<string, unknown>, authHeader?: s
   }
   if (typeof args.description === 'string') { patch.description = args.description; fields.push('description') }
   if (typeof args.price_mxn === 'number') { patch.price_cents = Math.round(args.price_mxn * 100); fields.push('price') }
+  // A free Evento stays free, whichever door the price comes through (same rule as the edit PUT).
+  if (patch.price_cents !== undefined) {
+    const priceRefusal = await freeEventPriceBlock(productId, patch.price_cents)
+    if (priceRefusal) return { isError: true, content: [{ type: 'text', text: priceRefusal }] }
+  }
   // The type comes from the owner-scoped, uncached mirror (`owned`) — NOT the public getListing() read,
   // which is published-only, market-scoped and cached, so it wrongly refused a seller's own draft, paused,
   // own-shop-only or US event (and fired a view-count). See mcpUpdateQuantity for the rules.
@@ -4139,6 +4144,10 @@ async function handleApplyPrice(args: Record<string, unknown>, authHeader?: stri
   }
   const owned = await shopOwnsProduct(shop.id, productId)
   if (!owned) return { isError: true, content: [{ type: 'text', text: 'Ese anuncio no pertenece a tu tienda.' }] }
+
+  // Applying a price > 0 to a free Evento would move it off $0 — refused like every other price door.
+  const priceRefusal = await freeEventPriceBlock(productId, newPriceCents as number)
+  if (priceRefusal) return { isError: true, content: [{ type: 'text', text: priceRefusal }] }
 
   const result = await applySellerPriceViaInternal(shop.slug, {
     product_id: productId,

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import {
   EVENTS_EMPTY_REDIRECT, EVENTO_TIPO, FREE_EVENT_PRICE_LABEL, NEW_EVENT_HREF, freeEventPriceLabel,
   buildRsvpEventDraft, eventStartsAt, eventTimeZoneForState, rsvpEventSyncPatch, eventoErrors, isEventoTipo, isFreeEventListing,
-  parseEventoPriceCents, rsvpEventSlug, rsvpEventShownOnListing, freeEventPriceRefusal, FREE_EVENT_PRICE_LOCKED_MESSAGE,
+  parseEventoPriceCents, rsvpEventSlug, rsvpEventShownOnListing, freeEventPriceRefusal, freeEventPatchRefusal, FREE_EVENT_PRICE_LOCKED_MESSAGE,
 } from '../lib/evento-preset'
 import { ZERO_TOTAL_CHECKOUT_MESSAGE, zeroTotalDecision } from '../lib/checkout-zero'
 import { eventPublicStatus } from '../lib/event-status'
@@ -276,6 +276,33 @@ test.describe('«Gratis» follows the price and the owner, not the link (review 
     const body = put.slice(put.indexOf('export async function PUT'))
     expect(body.indexOf('freeEventPriceRefusal(')).toBeGreaterThan(0)
     expect(body.indexOf('freeEventPriceRefusal(')).toBeLessThan(body.indexOf('medusaFetch('))
+  })
+  test('a bulk price patch on a free Evento is refused row by row; $0 and unrelated patches pass', () => {
+    const meta = { rsvp_event_slug: 'taller-abc' }
+    expect(freeEventPatchRefusal(meta, { price_cents: 15000 })).toBe(FREE_EVENT_PRICE_LOCKED_MESSAGE)
+    expect(freeEventPatchRefusal(meta, { variant_prices: { 'Talla:M': 9000 } })).toBe(FREE_EVENT_PRICE_LOCKED_MESSAGE)
+    expect(freeEventPatchRefusal(meta, { price_cents: 0 })).toBeNull()
+    expect(freeEventPatchRefusal(meta, {})).toBeNull()
+    expect(freeEventPatchRefusal({}, { price_cents: 15000 })).toBeNull()
+    expect(freeEventPatchRefusal(null, null)).toBeNull()
+  })
+  test('every other price door refuses a free Evento before it writes', () => {
+    const mcp = read('app/api/ucp/mcp/route.ts')
+    const upd = mcp.slice(mcp.indexOf('async function handleUpdateListing'))
+    expect(upd.indexOf('freeEventPriceBlock(')).toBeGreaterThan(0)
+    expect(upd.indexOf('freeEventPriceBlock(')).toBeLessThan(upd.indexOf('patchSellerProductViaInternal('))
+    const apply = mcp.slice(mcp.indexOf('async function handleApplyPrice'))
+    expect(apply.indexOf('freeEventPriceBlock(')).toBeGreaterThan(0)
+    expect(apply.indexOf('freeEventPriceBlock(')).toBeLessThan(apply.indexOf('applySellerPriceViaInternal('))
+    const route = read('app/api/sell/profit/apply-price/route.ts')
+    expect(route.indexOf('freeEventPriceBlock(')).toBeGreaterThan(0)
+    expect(route.indexOf('freeEventPriceBlock(')).toBeLessThan(route.indexOf('fetch('))
+    const bulk = read('lib/catalog-bulk.ts')
+    // both the seller and the agent apply paths split off the refused rows before any write
+    expect(bulk.match(/splitFreeEventPriceRefusals\(claimed\)/g)?.length).toBe(2)
+    expect(bulk.indexOf('splitFreeEventPriceRefusals(claimed)')).toBeLessThan(bulk.indexOf("batch.action.type === 'pause_activate'"))
+    const agentApply = bulk.slice(bulk.indexOf('export async function applyBulkBatchAsAgent'))
+    expect(agentApply.indexOf('splitFreeEventPriceRefusals(claimed)')).toBeLessThan(agentApply.indexOf("internalFetch('/internal/seller-products/bulk-apply'"))
   })
   test('the edit form locks the price of a free Evento and never writes null over it', () => {
     const edit = read('app/(shell)/sell/edit/[id]/EditForm.tsx')

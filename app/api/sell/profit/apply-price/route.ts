@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
+import { freeEventPriceBlock } from '@/lib/seller-products'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -29,6 +30,10 @@ export async function POST(req: NextRequest) {
 
   const clerkJwt = await getToken()
   if (!clerkJwt) return NextResponse.json({ error: 'Error de autenticación.' }, { status: 401 })
+
+  // A free Evento stays free: refuse before the backend writes the price.
+  const priceRefusal = await freeEventPriceBlock(body.product_id, body.new_price_cents as number)
+  if (priceRefusal) return NextResponse.json({ error: priceRefusal, field: 'price' }, { status: 422 })
 
   const res = await fetch(`${MEDUSA_BASE}/store/sellers/me/profit/apply-price`, {
     method: 'POST',

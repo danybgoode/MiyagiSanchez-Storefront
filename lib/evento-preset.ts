@@ -223,6 +223,24 @@ export function freeEventPriceRefusal(
 }
 
 /**
+ * The same rule for a patch-shaped write (catalog bulk rows): a patch that sets `price_cents`
+ * (or any per-variant price) away from $0 on a free Evento is refused. A patch with no price key
+ * (pause, category, ...) passes.
+ */
+export function freeEventPatchRefusal(
+  metadata: Record<string, unknown> | null | undefined,
+  patch: { price_cents?: number | null; variant_prices?: Record<string, number> | null } | null | undefined,
+): string | null {
+  if (!patch) return null
+  if (patch.price_cents !== undefined) return freeEventPriceRefusal(metadata, patch.price_cents)
+  const variantPrices = patch.variant_prices
+  if (variantPrices && Object.values(variantPrices).some((v) => v !== 0)) {
+    return freeEventPriceRefusal(metadata, Number.NaN)
+  }
+  return null
+}
+
+/**
  * What a listing edit changes on its linked RSVP row: title, start, venue and address — never the
  * capacity (seats of a free Evento are edited in the roster) or status. Null when the edit does not
  * describe a complete event (the row is then left as it is rather than half-rewritten).

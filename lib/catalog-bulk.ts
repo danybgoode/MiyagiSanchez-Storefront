@@ -10,6 +10,8 @@
 import 'server-only'
 import { db } from '@/lib/supabase'
 import { isEnabled } from '@/lib/flags'
+import { loadMirrorMetadata, FREE_EVENT_PRICE_UNVERIFIED_MESSAGE } from '@/lib/seller-products'
+import { freeEventPatchRefusal } from '@/lib/evento-preset'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -223,6 +225,35 @@ async function claimPendingItems(batchId: string): Promise<StoredBatchItem[]> {
 }
 
 /**
+ * A free Evento stays free in a bulk too: split the claimed rows into those that may be applied and
+ * those whose price move is refused (reason attached). Only the affected rows are refused — the rest of
+ * the batch proceeds. One metadata read for the whole batch, scoped by product id; if that read fails,
+ * price rows are refused as unverifiable (never waved through).
+ */
+async function splitFreeEventPriceRefusals(
+  pending: StoredBatchItem[],
+): Promise<{ allowed: StoredBatchItem[]; refused: Array<{ item: StoredBatchItem; error: string }> }> {
+  const touchesPrice = (item: StoredBatchItem) => {
+    const patch = (item.patch ?? null) as { price_cents?: number | null; variant_prices?: Record<string, number> | null } | null
+    return patch !== null && (patch.price_cents !== undefined || patch.variant_prices != null)
+  }
+  const priceRows = pending.filter(touchesPrice)
+  if (priceRows.length === 0) return { allowed: pending, refused: [] }
+  const meta = await loadMirrorMetadata(priceRows.map((i) => i.product_id))
+  const allowed: StoredBatchItem[] = []
+  const refused: Array<{ item: StoredBatchItem; error: string }> = []
+  for (const item of pending) {
+    if (!touchesPrice(item)) { allowed.push(item); continue }
+    const error = meta
+      ? freeEventPatchRefusal(meta.get(item.product_id) ?? null, item.patch as { price_cents?: number | null })
+      : FREE_EVENT_PRICE_UNVERIFIED_MESSAGE
+    if (error) refused.push({ item, error })
+    else allowed.push(item)
+  }
+  return { allowed, refused }
+}
+
+/**
  * Apply a staged batch. Idempotent: an item already `applied` (or currently
  * being applied by a concurrent request) is skipped, never re-executed —
  * `claimPendingItems()` is what makes that atomic, not a plain filter over an
@@ -258,9 +289,9 @@ export async function applyBulkBatch(
   const { batch, items } = found
 
   const alreadySettled = items.filter((i) => i.status === 'applied' || i.status === 'failed').length
-  const pending = await claimPendingItems(batchId)
+  const claimed = await claimPendingItems(batchId)
 
-  if (pending.length === 0) {
+  if (claimed.length === 0) {
     return { ok: true, applied: 0, failed: 0, skipped: alreadySettled }
   }
 
@@ -271,6 +302,13 @@ export async function applyBulkBatch(
 
   const actionType = batch.action.type
   const actorType = ctx.actorType ?? 'seller'
+
+  // A free Evento keeps its $0 price: refuse just those rows (reported as failed with the reason).
+  const { allowed: pending, refused } = await splitFreeEventPriceRefusals(claimed)
+  for (const r of refused) {
+    await recordItemResult(batchId, r.item, false, ctx.userId, actorType, actionType, r.error)
+    failed++
+  }
 
   if (batch.action.type === 'pause_activate') {
     const target = batch.action.status
@@ -324,7 +362,7 @@ export async function applyBulkBatch(
       if (result.ok) applied++
       else failed++
     }
-  } else {
+  } else if (pending.length > 0) {
     const res = await medusaFetch('/store/sellers/me/products/bulk-apply', ctx.clerkJwt, {
       method: 'POST',
       body: JSON.stringify({ items: pending.map((i) => ({ id: i.product_id, patch: i.patch })) }),
@@ -514,28 +552,37 @@ export async function applyBulkBatchAsAgent(
   if (unsupported) return { ok: false, status: 422, error: unsupported }
 
   const alreadySettled = items.filter((i) => i.status === 'applied' || i.status === 'failed').length
-  const pending = await claimPendingItems(batchId)
+  const claimed = await claimPendingItems(batchId)
 
-  if (pending.length === 0) {
+  if (claimed.length === 0) {
     return { ok: true, applied: 0, failed: 0, skipped: alreadySettled }
   }
 
   await db.from('catalog_bulk_batches').update({ status: 'applying', updated_at: new Date().toISOString() }).eq('id', batchId)
 
-  const res = await internalFetch('/internal/seller-products/bulk-apply', {
-    seller_slug: shop.slug,
-    items: pending.map((i) => ({ id: i.product_id, patch: i.patch })),
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    await db.from('catalog_bulk_batches').update({ status: 'partially_failed', updated_at: new Date().toISOString() }).eq('id', batchId)
-    return { ok: false, status: res.status, error: body.message ?? 'Error al aplicar el lote.' }
-  }
-
-  const { results } = await res.json() as { results: Array<{ id: string; ok: boolean; error?: string }> }
-  const byId = new Map(results.map((r) => [r.id, r]))
   let applied = 0
   let failed = 0
+  // A free Evento keeps its $0 price: refuse just those rows (reported as failed with the reason).
+  const { allowed: pending, refused } = await splitFreeEventPriceRefusals(claimed)
+  for (const r of refused) {
+    await recordItemResult(batchId, r.item, false, shop.id, 'agent', batch.action.type, r.error)
+    failed++
+  }
+
+  let results: Array<{ id: string; ok: boolean; error?: string }> = []
+  if (pending.length > 0) {
+    const res = await internalFetch('/internal/seller-products/bulk-apply', {
+      seller_slug: shop.slug,
+      items: pending.map((i) => ({ id: i.product_id, patch: i.patch })),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      await db.from('catalog_bulk_batches').update({ status: 'partially_failed', updated_at: new Date().toISOString() }).eq('id', batchId)
+      return { ok: false, status: res.status, error: body.message ?? 'Error al aplicar el lote.' }
+    }
+    results = ((await res.json()) as { results: typeof results }).results
+  }
+  const byId = new Map(results.map((r) => [r.id, r]))
   for (const item of pending) {
     const r = byId.get(item.product_id)
     const ok = r?.ok ?? false
