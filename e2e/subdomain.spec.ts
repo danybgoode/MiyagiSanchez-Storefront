@@ -73,6 +73,13 @@ test.describe('subdomain · redirects never leak the container port (reported li
     expect(url.port).toBe('')
   })
 
+  test('the helper refuses a path that would leave our host (open-redirect guard)', () => {
+    expect(() => publicHostRedirectUrl(ROOT_DOMAIN, '//evil.example/x')).toThrow()
+    expect(() => publicHostRedirectUrl(ROOT_DOMAIN, 'evil.example')).toThrow()
+    // The negation: an ordinary path is fine.
+    expect(publicHostRedirectUrl(ROOT_DOMAIN, '/').href).toBe('https://miyagisanchez.com/')
+  })
+
   test('the middleware builds subdomain redirects with the helper, not a nextUrl clone', () => {
     const source = readFileSync(path.join(import.meta.dirname, '..', 'middleware.ts'), 'utf8')
     expect(source).not.toMatch(/\.host\s*=/)

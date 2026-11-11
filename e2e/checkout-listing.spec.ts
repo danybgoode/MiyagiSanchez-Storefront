@@ -34,7 +34,7 @@ function deps(over: {
     calls,
     deps: {
       marketplace: async (id: string) => { calls.push(`marketplace:${id}`); return over.marketplace ?? null },
-      mirrorShopSlug: async (id: string) => { calls.push(`mirror:${id}`); return over.slug === undefined ? 'miel-verduras' : over.slug },
+      ownerShopSlug: async (id: string) => { calls.push(`owner:${id}`); return over.slug === undefined ? 'miel-verduras' : over.slug },
       owned: async (slug: string, id: string) => { calls.push(`owned:${slug}:${id}`); return over.owned === undefined ? owned() : over.owned },
     },
   }
@@ -52,12 +52,12 @@ test.describe('checkout listing · marketplace first, shop second', () => {
     const { deps: d, calls } = deps()
     const got = await resolveCheckoutListing('prod_A', 'mx', d)
     expect(got).toEqual({ kind: 'owned', listing: owned(), shopSlug: 'miel-verduras' })
-    expect(calls).toEqual(['marketplace:prod_A', 'mirror:prod_A', 'owned:miel-verduras:prod_A'])
+    expect(calls).toEqual(['marketplace:prod_A', 'owner:prod_A', 'owned:miel-verduras:prod_A'])
   })
 })
 
 test.describe('checkout listing · every refusal fails closed', () => {
-  test('no mirror row → absent, and the owned read is never asked', async () => {
+  test('no admitted owner → absent, and the owned read is never asked', async () => {
     const { deps: d, calls } = deps({ slug: null })
     expect(await resolveCheckoutListing('prod_A', 'mx', d)).toEqual({ kind: 'absent' })
     expect(calls).not.toContain('owned:miel-verduras:prod_A')

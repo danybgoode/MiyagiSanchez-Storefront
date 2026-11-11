@@ -670,6 +670,20 @@ test.describe('population guard · a shop page shows the shop\'s OWN catalog, an
     })
   }
 
+  test('with the catalog no longer market-filtered, the SHOP-market 404 is the market boundary', () => {
+    // Fresh-review catch on PR 494: the rewrite above dropped the only pin on these
+    // lines. Now that a shop page reads its own catalog, the shop's operating market
+    // is the one thing keeping /us/s/<mx-shop> and /mx/s/<us-shop> apart.
+    const MARKET_404 = 'if (market && readPublicSellerMarket(shop)?.market_code !== market) notFound()'
+    for (const file of [
+      ['app', '(shell)', 's', '[slug]', 'ShopRenderer.tsx'],
+      ['app', '(shell)', 's', '[slug]', 'c', '[collection]', 'page.tsx'],
+    ]) {
+      const stripped = stripComments(readFileSync(join(ROOT, ...file), 'utf8'))
+      expect(stripped, file.join('/')).toContain(MARKET_404)
+    }
+  })
+
   test('no surface reads a marketplace-filtered single-shop catalog any more', () => {
     const stripped = stripComments(readFileSync(join(ROOT, 'lib', 'listings.ts'), 'utf8'))
     expect(topLevelBlocks(stripped).some((block) => block.name === 'getMarketplaceShopListings')).toBe(false)

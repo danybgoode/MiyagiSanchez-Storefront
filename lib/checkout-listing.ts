@@ -10,14 +10,16 @@
  *
  * The fallback is the shop-scoped read the shop's own PDP uses
  * (`getOwnedShopListing`), which proves the product is published AND owned by
- * that seller. The seller is found through the Supabase listings mirror — the
- * same lookup middleware already uses to route `/mx/l/<id>` — because the
- * marketplace read is not allowed to say who owns a product it does not carry.
+ * that seller. The owning seller comes from Medusa's checkout admission, which
+ * names it only alongside an admission (`readAdmittedOwnerSlug`) — Medusa owns the
+ * seller ↔ product edge, and the marketplace read is not allowed to say who owns a
+ * product it does not carry. (A first draft read the Supabase listings mirror; the
+ * cross-family review rejected that as commerce data outside Medusa.)
  *
  * This decides DISPLAY and the back link only. It admits nothing on its own:
  * the cart admission seam stays the money gate, and every amount is still
- * re-derived server-side downstream. A mirror row naming the wrong shop fails
- * closed — the owned read refuses a product that shop does not own.
+ * re-derived server-side downstream. An owner the owned read disagrees with fails
+ * closed — it refuses a product that shop does not own.
  *
  * Pure seam + injected I/O (AGENTS: "inject dependencies for I/O"), so both
  * branches and every refusal are testable without Medusa or Supabase.
@@ -34,8 +36,8 @@ export type CheckoutListingShape = {
 export type CheckoutListingDeps<L extends CheckoutListingShape> = {
   /** The marketplace PDP read (`getListing`). `null` = not in this marketplace. */
   readonly marketplace: (id: string, market: MarketCode) => Promise<L | null>
-  /** The owning shop's slug from the listings mirror, or `null` when there is no active row. */
-  readonly mirrorShopSlug: (id: string) => Promise<string | null>
+  /** The owning shop's slug from Medusa's checkout admission, or `null` (refused/outage/absent). */
+  readonly ownerShopSlug: (id: string, market: MarketCode) => Promise<string | null>
   /** The shop-scoped read (`getOwnedShopListing`): published AND owned by `slug`, else `null`. */
   readonly owned: (slug: string, id: string) => Promise<L | null>
 }
@@ -77,7 +79,7 @@ export async function resolveCheckoutListing<L extends CheckoutListingShape>(
   // non-goal: nothing US), and only `/mx` has a shop-scoped PDP to send the buyer back to.
   if (market !== OWNED_CHECKOUT_MARKET) return { kind: 'absent' }
 
-  const shopSlug = await deps.mirrorShopSlug(id)
+  const shopSlug = await deps.ownerShopSlug(id, market)
   if (!shopSlug) return { kind: 'absent' }
 
   const owned = acceptOwnedListing(await deps.owned(shopSlug, id), { id, shopSlug, market })

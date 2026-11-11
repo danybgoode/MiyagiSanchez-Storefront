@@ -19,7 +19,7 @@ import { formatPresentationCurrency, resolveMarketPresentation } from '@/lib/mar
 import { browseUrlFor, listingUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 import CheckoutExperience from './CheckoutExperience'
-import type { CheckoutProvider } from '@/lib/cart'
+import { admittedOwnerShopSlug, type CheckoutProvider } from '@/lib/cart'
 import { getDictionary } from '@/lib/dictionary'
 import { DEFAULT_MARKET, isMarketCode } from '@/lib/markets'
 
@@ -49,24 +49,6 @@ async function resolvePublicListingId(listingId: string) {
     .maybeSingle()
 
   return data?.medusa_product_id ?? listingId
-}
-
-/**
- * The owning shop's slug from the listings mirror — the lookup middleware uses to
- * route `/mx/l/<id>`. A read error is treated as "no row" (the page 404s, exactly
- * as it did before this fallback existed); it never admits anything.
- */
-async function mirrorShopSlugFor(productId: string): Promise<string | null> {
-  const { data, error } = await db
-    .from('marketplace_listings')
-    .select('marketplace_shops!inner(slug)')
-    .eq('medusa_product_id', productId)
-    .eq('status', 'active')
-    .maybeSingle()
-  if (error || !data) return null
-  const relation = (data as { marketplace_shops?: unknown }).marketplace_shops
-  const shop = (Array.isArray(relation) ? relation[0] : relation) as { slug?: unknown } | undefined
-  return typeof shop?.slug === 'string' ? shop.slug : null
 }
 
 async function getAcceptedOfferPrice(offerId: string | undefined, listingId: string, buyerUserId: string) {
@@ -139,7 +121,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   // seam is still the money gate. See lib/checkout-listing.ts.
   const resolved = await resolveCheckoutListing(listingId, market, {
     marketplace: (id, m) => getListing(id, m),
-    mirrorShopSlug: mirrorShopSlugFor,
+    ownerShopSlug: admittedOwnerShopSlug,
     owned: (slug, id) => getOwnedShopListing(slug, id),
   })
   if (resolved.kind === 'absent') notFound()

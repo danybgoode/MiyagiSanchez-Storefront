@@ -26,6 +26,7 @@ import { badgeHref } from '@/lib/plan'
 import TrustSignals from '@/app/components/TrustSignals'
 import { deriveShopTrustInputs } from '@/lib/trust-inputs'
 import { shopUrlFor } from '@/lib/market-url'
+import { readPublicSellerMarket } from '@/lib/owned-market'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 import type { Metadata } from 'next'
 import ShopChat from '@/components/shop-chat/ShopChat'
@@ -72,8 +73,11 @@ export default async function EmbedShopPage({
   // Carry the embed key through for attribution where present.
   // The shop-scoped PDP (<shop>/l/<id>), not the marketplace PDP: it also serves
   // «Solo mi tienda» products, which the marketplace PDP 404s (see `ShopBases`).
+  // The shop's OWN market: a US shop's products live under /us (its shop-scoped
+  // URL there forwards to /us/l/<id>), never under the default /mx.
+  const embedMarket = readPublicSellerMarket(shop)?.market_code ?? 'mx'
   const listingHref = (id: string) =>
-    `${shopUrlFor(SITE_ORIGIN, shop.slug)}/l/${id}?channel=embed${key ? `&ref_key=${encodeURIComponent(key)}` : ''}`
+    `${shopUrlFor(SITE_ORIGIN, shop.slug, embedMarket)}/l/${id}?channel=embed${key ? `&ref_key=${encodeURIComponent(key)}` : ''}`
 
   return (
     <ChannelLayout

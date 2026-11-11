@@ -66,6 +66,12 @@ export function shopSlugFromHost(host: string | null | undefined): string | null
  * `miel-verduras`). A fresh URL has no port to inherit.
  */
 export function publicHostRedirectUrl(host: string, pathname: string): URL {
+  // A protocol-relative `//elsewhere` path would resolve to ANOTHER host — an open
+  // redirect. Today's callers pass constants or shape-checked segments; this keeps
+  // the helper safe for the next one.
+  if (!pathname.startsWith('/') || pathname.startsWith('//')) {
+    throw new Error(`publicHostRedirectUrl: not a same-host path: ${pathname}`)
+  }
   return new URL(pathname, `https://${host}`)
 }
 

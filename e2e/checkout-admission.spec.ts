@@ -4,6 +4,7 @@ import {
   checkoutAdmissionMessage,
   classifyCheckoutAdmission,
   isOperatingChannelAdmitted,
+  readAdmittedOwnerSlug,
 } from '../lib/checkout-admission'
 import { resolveCheckoutLines, type CheckoutAdmissionDeps } from '../lib/cart'
 
@@ -380,5 +381,30 @@ test.describe('resolveCheckoutLines · every downstream proof still fires under 
         deps(false, fetchImpl),
       ),
     ).rejects.toThrow('does not belong to product prod_mx')
+  })
+})
+
+test.describe('owning shop · named only by a full admission (2026-11-11)', () => {
+  // The checkout PAGE renders a «Solo mi tienda» product through its owning shop.
+  // Medusa names the owner beside an admission; the storefront trusts that name
+  // ONLY when the same payload is a complete admission proof for this product.
+  const withSeller = (productId: string, slug: unknown) => ({ ...admissionOk(productId), seller: { slug } })
+
+  test('an admission that names its shop → that slug', () => {
+    expect(readAdmittedOwnerSlug(200, withSeller('prod_A', 'miel-verduras'), 'mx', 'prod_A')).toBe('miel-verduras')
+  })
+
+  test('no owner from anything short of an admission', () => {
+    // An older backend that does not send the field.
+    expect(readAdmittedOwnerSlug(200, admissionOk('prod_A'), 'mx', 'prod_A')).toBeNull()
+    // A proof for ANOTHER product, or another market, names nobody.
+    expect(readAdmittedOwnerSlug(200, withSeller('prod_B', 'miel-verduras'), 'mx', 'prod_A')).toBeNull()
+    expect(readAdmittedOwnerSlug(200, { ...withSeller('prod_A', 'miel-verduras'), market_code: 'us' }, 'mx', 'prod_A')).toBeNull()
+    // A refusal or an outage carrying a seller is still not an owner.
+    expect(readAdmittedOwnerSlug(404, withSeller('prod_A', 'miel-verduras'), 'mx', 'prod_A')).toBeNull()
+    expect(readAdmittedOwnerSlug(503, withSeller('prod_A', 'miel-verduras'), 'mx', 'prod_A')).toBeNull()
+    // A malformed slug is not a shop (it becomes a URL segment downstream).
+    expect(readAdmittedOwnerSlug(200, withSeller('prod_A', '../x'), 'mx', 'prod_A')).toBeNull()
+    expect(readAdmittedOwnerSlug(200, withSeller('prod_A', 42), 'mx', 'prod_A')).toBeNull()
   })
 })

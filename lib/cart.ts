@@ -18,6 +18,7 @@ import {
   buildCheckoutAdmissionPath,
   checkoutAdmissionMessage,
   classifyCheckoutAdmission,
+  readAdmittedOwnerSlug,
 } from './checkout-admission'
 import { readEventDetails } from './event-listing'
 import {
@@ -181,6 +182,24 @@ async function admitCheckoutLine(
   )
   if (outcome.kind !== 'admitted') {
     throw new Error(checkoutAdmissionMessage(outcome, productId))
+  }
+}
+
+/**
+ * Which shop owns a product, as Medusa's checkout admission states it — for the
+ * checkout PAGE's «Solo mi tienda» fallback (`lib/checkout-listing.ts`). It admits
+ * nothing: `startCheckout` re-runs the full admission gate on every line. `null` on
+ * any refusal, outage or missing field; the page then 404s, as it did before.
+ */
+export async function admittedOwnerShopSlug(productId: string, market: MarketCode): Promise<string | null> {
+  const decision = planMarketCatalogRead(market)
+  if (isMarketUnavailable(decision)) return null
+  try {
+    const res = await medusaFetch(buildCheckoutAdmissionPath(productId, decision.query), { cache: 'no-store' })
+    const payload = await res.json().catch(() => null)
+    return readAdmittedOwnerSlug(res.status, payload, decision.market.code, productId)
+  } catch {
+    return null
   }
 }
 

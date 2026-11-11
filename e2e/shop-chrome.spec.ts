@@ -383,6 +383,17 @@ test.describe('chrome · every shop product link opens a page that exists (repor
     expect(SHOP_SCOPED_PDP_MARKET_BASE).toBe('/mx')
   })
 
+  test('the shop-scoped PDP admits only THIS shop\'s product in THIS market — page and metadata', () => {
+    // Fresh-review catch on PR 494: without a market check, /mx/s/<us-shop>/l/<id>
+    // rendered a US product as a self-canonical Mexico page. The predicate is the
+    // checkout fallback's `acceptOwnedListing` (unit-tested in checkout-listing.spec);
+    // this pins that BOTH render paths apply it.
+    const source = readFileSync(path.join(ROOT, 'app/(shell)/l/[id]/ListingRenderer.tsx'), 'utf8')
+    const guards = source.match(/acceptOwnedListing\(listing, \{ id, shopSlug: channelSlug[^}]*market \}\)/g) ?? []
+    expect(guards.length, 'metadata + page body each check id/shop/market').toBe(2)
+    expect(source).toContain('await isShopPreviewPrivateBySlug(channelSlug')
+  })
+
   test('on an owned host the product lives at /l/<id>', () => {
     expect(shopListingBase({ onOwnedHost: true, marketBasePath: '/mx', shopSlug: 'x' })).toBe('')
     expect(listingHref({ listingBase: '' }, 'prod_1')).toBe('/l/prod_1')

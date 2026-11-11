@@ -17,7 +17,8 @@ import { getActiveCustomDomain } from '@/lib/custom-domain'
 import { checkoutHopHref, signInHopHref } from '@/lib/checkout-hop'
 import { publicShopPaymentAvailability } from '@/lib/public-shop-commerce'
 import { isShopClaimed } from '@/lib/claim'
-import { assertShopNotPreviewPrivate } from '@/lib/preview-access'
+import { assertShopNotPreviewPrivate, isShopPreviewPrivateBySlug } from '@/lib/preview-access'
+import { acceptOwnedListing } from '@/lib/checkout-listing'
 import BuyButton from '@/app/components/BuyButton'
 import PersonalizationBuyBox from '@/app/components/PersonalizationBuyBox'
 import { getCustomFields } from '@/lib/personalization'
@@ -114,6 +115,14 @@ export async function generateListingMetadata({
     : await getListing(id, market)
   if (!listing) return { title: 'Anuncio no encontrado' }
   if (channelSlug && requestContext.platformShopScoped && marketBasePath) {
+    // Same admission as the page body: this shop's product, in THIS market, and
+    // not a preview-private shop (the title must not leak before the body 404s).
+    if (
+      !acceptOwnedListing(listing, { id, shopSlug: channelSlug, market })
+      || await isShopPreviewPrivateBySlug(channelSlug, listing.shop?.clerk_user_id ?? null)
+    ) {
+      return { title: 'Anuncio no encontrado' }
+    }
     // One page per product for search: a product the marketplace also carries is
     // canonical at `/mx/l/<id>`; a «Solo mi tienda» product has no marketplace
     // page, so the shop-scoped URL IS its canonical.
@@ -264,6 +273,15 @@ export async function ListingPage({
   // leaking a different seller's listing under this brand.
   const onChannel = !!channelSlug
   if (onChannel && listing.shop?.slug !== channelSlug) notFound()
+  // The platform's shop-scoped PDP is a MARKET route (`/mx/s/<slug>/l/<id>`): a
+  // shop operating in another market 404s here, exactly as its shop home does
+  // (ShopRenderer's market check). Same predicate as the checkout fallback.
+  if (
+    requestContext.platformShopScoped
+    && !acceptOwnedListing(listing, { id, shopSlug: channelSlug ?? '', market })
+  ) {
+    notFound()
+  }
   // On the shop's own domain (subdomain / custom domain) vs. the platform's
   // shop-scoped PDP — both read through the shop channel, only one is its host.
   const onOwnedHost = onChannel && !requestContext.platformShopScoped
