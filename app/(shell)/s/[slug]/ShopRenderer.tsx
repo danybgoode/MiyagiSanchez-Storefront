@@ -2,8 +2,7 @@ import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
 import { notFound, permanentRedirect } from 'next/navigation'
 import {
   getShop,
-  getShopListings,
-  getMarketplaceShopListings,
+  readShopListings,
   getShopCollections,
   formatPrice,
 } from '@/lib/listings'
@@ -33,7 +32,7 @@ import { readPublicWall } from '@/lib/wall/public'
 import { resolvePublicWallShop } from '@/lib/wall/store'
 import { normalizeSections } from '@/lib/shop-presentation/sections'
 import { resolveSectionAvailability } from '@/lib/shop-presentation/availability'
-import { trustChips, railOccupiesTrack, railPanels } from '@/lib/shop-presentation/chrome'
+import { listingHref, railOccupiesTrack, railPanels, shopListingBase, trustChips } from '@/lib/shop-presentation/chrome'
 import { sectionPath } from '@/lib/shop-presentation/sections'
 import { resolveTheme } from '@/lib/shop-presentation/theme'
 import ShopChat from '@/components/shop-chat/ShopChat'
@@ -159,18 +158,25 @@ export async function ShopPage({
   const channelValue = requestContext.channel
   const onChannelHost = channelValue === 'custom' || channelValue === 'subdomain'
   const navBasePath = onChannelHost ? '' : `${marketBasePath}/s/${shop.slug}`
+  // Where product cards point — see `ShopBases`. On the Mexico marketplace this is
+  // the shop-scoped PDP, which (unlike `/mx/l`) also serves «Solo mi tienda» products.
+  const productLinkBase = shopListingBase({
+    onOwnedHost: onChannelHost,
+    marketBasePath,
+    shopSlug: shop.slug,
+  })
 
   // The Wall's shop is the SUPABASE mirror row, not the Medusa seller `shop`
   // above — their ids live in different systems and only the slug is shared.
   // A seller with no mirror row yet simply has no Wall (known-absent).
   const [listingRead, allCollections, wallShop] = await Promise.all([
-    market
-      ? getMarketplaceShopListings(shop.slug, market)
-      : getShopListings(shop.slug).then((listings) => ({
-          listings,
-          market_code: null,
-          market_unavailable: null,
-        })),
+    // The shop's OWN catalog on every channel — the same read `/tienda` uses. This
+    // used to be the marketplace-filtered read under `/mx`, so a «Solo mi tienda»
+    // product showed on `/mx/s/<slug>/tienda` while the shop's home said «Esta
+    // tienda aún no tiene anuncios» (reported live 2026-11-11, `miel-verduras`).
+    // The shop page is the merchant's own shop, not marketplace discovery; the
+    // marketplace grid and search keep their own channel filter.
+    readShopListings(shop.slug),
     getShopCollections(shop.slug, market),
     resolvePublicWallShop(shop.slug),
   ])
@@ -179,16 +185,19 @@ export async function ShopPage({
         shopId: wallShop.id,
         shopSlug: wallShop.slug,
         basePath: navBasePath,
-        // The PDP is not shop-scoped on the marketplace — `/mx/l/<id>`, never
-        // `/mx/s/<slug>/l/<id>`. On an owned host both are ''.
-        listingBase: onChannelHost ? '' : marketBasePath,
+        listingBase: productLinkBase,
         locale: resolveMarketPresentation(presentationMarket).htmlLang,
       })
     : { entries: [], hasMore: false, total: 0 }
 
-  // A refused/mismatched catalog is unavailable, not an empty successful shop.
-  // Rendering the latter would cache and index a confident falsehood.
-  if (listingRead.market_unavailable) notFound()
+  // An unreadable catalog is UNAVAILABLE, not an empty shop. Rendering «no
+  // listings» would cache and index a confident falsehood, and a 404 would be
+  // cached too — throwing keeps the last good render (ISR serves it stale) and
+  // lets the next request retry. A PARTIAL read (a later page failed) still has
+  // real products, so it renders them, as every other `getShopListings` surface does.
+  if (!listingRead.complete && listingRead.listings.length === 0) {
+    throw new Error(`[shop] catalog read unavailable for ${shop.slug}`)
+  }
   const listings = listingRead.listings
   const publishedCollectionHandles = new Set(listings.flatMap((listing) => listing.collections ?? []))
   const collections = market
@@ -438,7 +447,7 @@ export async function ShopPage({
                     imageUrl: listing.images?.[0]?.url ?? null,
                     listing_type: listing.listing_type ?? 'product',
                     paymentMethods: { stripe: sellerHasStripe, mp: sellerHasMp, spei: hasBankTransfer },
-                    href: `${marketBasePath}/l/${listing.id}`,
+                    href: listingHref({ listingBase: productLinkBase }, listing.id),
                     formattedPrice: formatPrice(listing, resolveMarketPresentation(presentationMarket).htmlLang),
                     status: listing.status,
                     hasExcerpt: hasExcerpt(listing.metadata),

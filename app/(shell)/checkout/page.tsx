@@ -4,7 +4,9 @@ import { redirect, notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { currentUser } from '@clerk/nextjs/server'
-import { getListing, getPriceGrid } from '@/lib/listings'
+import { getListing, getOwnedShopListing, getOwnedShopPriceGrid, getPriceGrid } from '@/lib/listings'
+import { resolveOwnedPriceGridForPdp } from '@/lib/owned-market'
+import { resolveCheckoutListing, shopScopedListingPath } from '@/lib/checkout-listing'
 import { unitPriceCentsFor } from '@/lib/price-grid'
 import { isShopClaimed } from '@/lib/claim'
 import { db } from '@/lib/supabase'
@@ -17,7 +19,7 @@ import { formatPresentationCurrency, resolveMarketPresentation } from '@/lib/mar
 import { browseUrlFor, listingUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 import CheckoutExperience from './CheckoutExperience'
-import type { CheckoutProvider } from '@/lib/cart'
+import { admittedOwnerShopSlug, type CheckoutProvider } from '@/lib/cart'
 import { getDictionary } from '@/lib/dictionary'
 import { DEFAULT_MARKET, isMarketCode } from '@/lib/markets'
 
@@ -114,13 +116,26 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   const user = await currentUser()
   if (!user) redirect(`/sign-in?redirect_url=${encodeURIComponent(`/checkout?listingId=${listingId}&market=${market}${offerId ? `&offerId=${offerId}` : ''}${params.provider ? `&provider=${params.provider}` : ''}${params.qty ? `&qty=${params.qty}` : ''}${variantId ? `&variantId=${variantId}` : ''}${params.origin ? `&origin=${encodeURIComponent(params.origin)}` : ''}${checkIn ? `&checkIn=${checkIn}` : ''}${checkOut ? `&checkOut=${checkOut}` : ''}`)}`)
 
-  const listing = await getListing(listingId, market)
-  if (!listing) notFound()
+  // The marketplace listing, or — for a «Solo mi tienda» product the marketplace
+  // does not carry — the shop's own. Display + back link only; the cart admission
+  // seam is still the money gate. See lib/checkout-listing.ts.
+  const resolved = await resolveCheckoutListing(listingId, market, {
+    marketplace: (id, m) => getListing(id, m),
+    ownerShopSlug: admittedOwnerShopSlug,
+    owned: (slug, id) => getOwnedShopListing(slug, id),
+  })
+  if (resolved.kind === 'absent') notFound()
+  const listing = resolved.listing
+  const ownedShopSlug = resolved.kind === 'owned' ? resolved.shopSlug : null
   const presentation = resolveMarketPresentation(listing.shop?.market_code ?? 'mx')
   const buyerCopy = (await getDictionary(presentation.language)).buyerCopy
   const formatCents = (cents: number, currency: string) =>
     formatPresentationCurrency(presentation, cents, currency, { maximumFractionDigits: 0 })
-  const listingPath = new URL(listingUrlFor(marketOrigin, listing.id)).pathname
+  // An owned-only product has no `/mx/l` page; on the platform its PDP is the
+  // shop-scoped one. A tenant host serves it at `/l/<id>` as before.
+  const listingPath = ownedShopSlug && !onTenantChannel
+    ? shopScopedListingPath(ownedShopSlug, listing.id)
+    : new URL(listingUrlFor(marketOrigin, listing.id)).pathname
 
   // Last-line money-path guard: /checkout is directly URL-reachable (the deep-link
   // target of checkoutHopHref/signInHopHref), so an unclaimed (gem) shop must be
@@ -201,7 +216,10 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   // price — a silent fallback here would show/charge less than the buyer's
   // actual chosen combination (cross-agent review catch, 2026-07-05).
   if (isConfiguratorCheckout) {
-    const priceGrid = await getPriceGrid(listing.id)
+    // Same grid the PDP showed: the shop's own grid for an owned-only product.
+    const priceGrid = ownedShopSlug
+      ? resolveOwnedPriceGridForPdp(await getOwnedShopPriceGrid(ownedShopSlug, listing.id), listing.shop?.market_code)
+      : await getPriceGrid(listing.id)
     const resolved = priceGrid ? unitPriceCentsFor(priceGrid, variantId!, quantity) : null
     if (resolved == null) redirect(`${listingPath}?checkout=unavailable`)
     amountCents = resolved

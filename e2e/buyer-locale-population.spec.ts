@@ -22,7 +22,9 @@ test.describe('buyer locale population · generated, never hand-counted', () => 
     // → 99: the share kit's catalog page (share-kit S1.2) — its four channel routes (/mx, /s, /us, owned host; the body counts as a rich renderer), the owned-host
     // `/catalogo` root joining DIRECT_BUYER_DIRS beside `/tienda`.
     // → 101: its print page (share-kit S2.2), /mx and the /us 404 mirror.
-    expect(population.direct.length).toBe(101)
+    // → 103: the shop-scoped PDP (2026-11-11, «Solo mi tienda» products 404'd on
+    // /mx/l) — /mx/s/<slug>/l/<id> and its /us redirect mirror.
+    expect(population.direct.length).toBe(103)
     expect(population.direct).toContain('app/(shell)/mx/l/page.tsx')
     expect(population.direct).toContain('app/(shell)/checkout/CheckoutExperience.tsx')
     expect(population.direct).toContain('app/(shell)/s/[slug]/tienda/page.tsx')

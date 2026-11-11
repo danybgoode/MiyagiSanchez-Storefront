@@ -27,7 +27,7 @@ const PROGRAM_SURFACES = {
     'shopUrlFor(SITE_ORIGIN, shop.slug)',
   ],
   'app/(shell)/embed/s/[slug]/page.tsx': [
-    'listingUrlFor(SITE_ORIGIN, id)',
+    'shopUrlFor(SITE_ORIGIN, shop.slug, embedMarket)',
   ],
   'app/(shell)/partner/page.tsx': [
     'shopUrlFor(SITE_ORIGIN, g.shop.slug)',
@@ -71,12 +71,21 @@ test.describe('platform program public catalog URLs', () => {
     }
   })
 
-  test('the embed handoff preserves attribution on the canonical platform PDP', () => {
+  test('the embed handoff preserves attribution on the shop-scoped platform PDP', () => {
+    // The shop's own PDP (`/mx/s/<slug>/l/<id>`), not `/mx/l/<id>`: an embed shows
+    // the shop's own catalog, and a «Solo mi tienda» product has no marketplace
+    // PDP — it 404'd there (reported live 2026-11-11).
     const file = 'app/(shell)/embed/s/[slug]/page.tsx'
     const source = readFileSync(path.join(ROOT, file), 'utf8')
 
     expect(source).toContain(
-      "`${listingUrlFor(SITE_ORIGIN, id)}?channel=embed${key ? `&ref_key=${encodeURIComponent(key)}` : ''}`",
+      "`${shopUrlFor(SITE_ORIGIN, shop.slug, embedMarket)}/l/${id}?channel=embed${key ? `&ref_key=${encodeURIComponent(key)}` : ''}`",
     )
+    // The shop's OWN market, never the default: a US shop's embed must not send
+    // buyers to a /mx URL that 404s it.
+    expect(source).toContain(
+      "const embedMarket = readPublicSellerMarket(shop)?.market_code ?? 'mx'",
+    )
+    expect(source).not.toContain('listingUrlFor(SITE_ORIGIN, id)')
   })
 })

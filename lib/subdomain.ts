@@ -11,6 +11,7 @@
  */
 
 import { RESERVED_SLUGS, validateSlug } from '@/lib/slug'
+import { isLikelyListingId } from '@/lib/route-shape'
 
 export const ROOT_DOMAIN = 'miyagisanchez.com'
 
@@ -52,4 +53,36 @@ export function shopSlugFromHost(host: string | null | undefined): string | null
   if (isReservedSubdomain(label)) return null      // www / clerk / accounts / api / …
   if (!validateSlug(label).valid) return null      // must be a well-formed slug
   return label
+}
+
+/**
+ * An absolute `https://<host><pathname>` redirect target on OUR public hosts.
+ *
+ * Built fresh — never by setting `.host` on a clone of `req.nextUrl`. The WHATWG
+ * URL `host` setter KEEPS the existing port when the new value has none, and in
+ * production `req.nextUrl` carries the container's internal port, so the clone
+ * produced `https://miyagisanchez.com:8080/mx/s/<slug>` — an SSL error for every
+ * buyer opening an unentitled shop subdomain (reported live 2026-11-11,
+ * `miel-verduras`). A fresh URL has no port to inherit.
+ */
+export function publicHostRedirectUrl(host: string, pathname: string): URL {
+  // A protocol-relative `//elsewhere` path would resolve to ANOTHER host — an open
+  // redirect. Today's callers pass constants or shape-checked segments; this keeps
+  // the helper safe for the next one.
+  if (!pathname.startsWith('/') || pathname.startsWith('//')) {
+    throw new Error(`publicHostRedirectUrl: not a same-host path: ${pathname}`)
+  }
+  return new URL(pathname, `https://${host}`)
+}
+
+/**
+ * Where an UNENTITLED subdomain request lands on the apex. A product link
+ * (`/l/<id>`) keeps pointing at that product — the shop-scoped PDP, which serves
+ * owned-shop-only products too — instead of dropping the buyer on the shop home.
+ * Everything else goes to the shop home, as before.
+ */
+export function unentitledSubdomainPath(slug: string, pathname: string): string {
+  const product = /^\/l\/([^/]+)\/?$/.exec(pathname)
+  if (product && isLikelyListingId(product[1])) return `/mx/s/${slug}/l/${product[1]}`
+  return `/mx/s/${slug}`
 }

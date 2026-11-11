@@ -30,8 +30,14 @@ test.describe('checkout tenant-aware fallback URLs', () => {
     expect(CHECKOUT_PAGE).toContain(
       'const browsePath = new URL(browseUrlFor(marketOrigin)).pathname',
     )
+    // A marketplace product's back link is channel-aware as before. A «Solo mi
+    // tienda» product has no `/mx/l` page, so on the PLATFORM it goes back to the
+    // shop-scoped PDP; on a tenant host it keeps the native `/l/<id>`.
     expect(CHECKOUT_PAGE).toContain(
-      'const listingPath = new URL(listingUrlFor(marketOrigin, listing.id)).pathname',
+      ': new URL(listingUrlFor(marketOrigin, listing.id)).pathname',
+    )
+    expect(CHECKOUT_PAGE).toMatch(
+      /const listingPath = ownedShopSlug && !onTenantChannel\s*\?\s*shopScopedListingPath\(ownedShopSlug, listing\.id\)/,
     )
 
     // The query-string `origin` is a checkout return hint, not a trusted source

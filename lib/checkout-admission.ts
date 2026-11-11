@@ -37,6 +37,7 @@
  */
 import { readMarketFilterState } from './market-catalog'
 import type { MarketCode } from './markets'
+import { isLikelyShopSlug } from './route-shape'
 
 /** The backend route. Named once here so no call site hand-builds the path. */
 export const CHECKOUT_ADMISSION_PATH = '/store/checkout-admission'
@@ -170,4 +171,26 @@ export function checkoutAdmissionMessage(
         'Vuelve a intentarlo en unos minutos.'
       )
   }
+}
+
+/**
+ * The OWNING shop's slug from an admission answer — or `null`.
+ *
+ * The checkout page renders a «Solo mi tienda» product through its shop's own
+ * channel, so it needs the owner. Medusa owns the seller ↔ product edge, and the
+ * admission route echoes it (`seller.slug`) ONLY alongside an admission. Trusted
+ * only when the same payload is a full admission proof for this exact product and
+ * market (`classifyCheckoutAdmission` → `admitted`); anything else — a refusal, an
+ * outage, an older backend that does not send the field, a malformed slug — is
+ * `null`, and the page 404s exactly as it did before (reported live 2026-11-11).
+ */
+export function readAdmittedOwnerSlug(
+  status: number,
+  payload: unknown,
+  market: MarketCode,
+  productId: string,
+): string | null {
+  if (classifyCheckoutAdmission(status, payload, market, productId).kind !== 'admitted') return null
+  const slug = record(record(payload)?.seller)?.slug
+  return typeof slug === 'string' && isLikelyShopSlug(slug) ? slug : null
 }

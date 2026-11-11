@@ -638,47 +638,55 @@ test.describe('population guard · D10 agent surfaces are market-scoped', () => 
   }
 })
 
-test.describe('population guard · marketplace shop routes do not use owner inventory', () => {
-  test('the marketplace shop reader filters through the market catalog seam', () => {
+test.describe('population guard · a shop page shows the shop\'s OWN catalog, and says when it cannot', () => {
+  // 🚨 CONTRACT CHANGED 2026-11-11. This block used to pin the opposite: the
+  // `/mx/s/<slug>` home and its collections read the MARKETPLACE-filtered
+  // catalog. Reported live (miel-verduras, a promoter training): a «Solo mi
+  // tienda» product was listed on `/tienda` (owner inventory) while the shop home
+  // said «Esta tienda aún no tiene anuncios», and every card for it 404'd on
+  // `/mx/l`. A shop page is the merchant's own shop; its products open on the
+  // shop-scoped PDP `/mx/s/<slug>/l/<id>`. The marketplace grid and search keep
+  // their own channel filter — that seam is unchanged and guarded above.
+  const SHOP_PAGES = [
+    { file: ['app', '(shell)', 's', '[slug]', 'ShopRenderer.tsx'], block: 'ShopPage' },
+    { file: ['app', '(shell)', '_shop-collection', 'CollectionPage.tsx'], block: 'CollectionPage' },
+  ]
+
+  for (const page of SHOP_PAGES) {
+    test(`${page.block} reads the shop's own catalog on every channel`, () => {
+      const stripped = stripComments(readFileSync(join(ROOT, ...page.file), 'utf8'))
+      const body = topLevelBlocks(stripped).find((block) => block.name === page.block)?.body
+      expect(body, `${page.block} no longer exists — re-point this guard`).toBeTruthy()
+      expect(body).toContain('readShopListings(shop.slug)')
+      expect(body).not.toContain('getMarketplaceShopListings')
+    })
+
+    test(`${page.block} treats an unreadable catalog as unavailable, never as an empty shop`, () => {
+      // Three states, not two: "could not read" must not render «sin anuncios».
+      // The negation is allowed: a PARTIAL read (some products) still renders.
+      const stripped = stripComments(readFileSync(join(ROOT, ...page.file), 'utf8'))
+      const body = topLevelBlocks(stripped).find((block) => block.name === page.block)?.body
+      expect(body).toMatch(/if \(!listingRead\.complete && listingRead\.listings\.length === 0\) \{\s*throw new Error/)
+    })
+  }
+
+  test('with the catalog no longer market-filtered, the SHOP-market 404 is the market boundary', () => {
+    // Fresh-review catch on PR 494: the rewrite above dropped the only pin on these
+    // lines. Now that a shop page reads its own catalog, the shop's operating market
+    // is the one thing keeping /us/s/<mx-shop> and /mx/s/<us-shop> apart.
+    const MARKET_404 = 'if (market && readPublicSellerMarket(shop)?.market_code !== market) notFound()'
+    for (const file of [
+      ['app', '(shell)', 's', '[slug]', 'ShopRenderer.tsx'],
+      ['app', '(shell)', 's', '[slug]', 'c', '[collection]', 'page.tsx'],
+    ]) {
+      const stripped = stripComments(readFileSync(join(ROOT, ...file), 'utf8'))
+      expect(stripped, file.join('/')).toContain(MARKET_404)
+    }
+  })
+
+  test('no surface reads a marketplace-filtered single-shop catalog any more', () => {
     const stripped = stripComments(readFileSync(join(ROOT, 'lib', 'listings.ts'), 'utf8'))
-    const body = topLevelBlocks(stripped).find((block) => block.name === 'getMarketplaceShopListings')?.body
-    expect(body, 'getMarketplaceShopListings must remain a distinct market-scoped seam').toBeTruthy()
-    expect(body).toContain('planMarketCatalogRead')
-    expect(body).toContain('marketCatalogFetch')
-    expect(body).toContain('takeMarketScopedField')
-    expect(body).toContain('seller_slug')
-    expect(body).not.toContain('ownershipScopedFetch')
-  })
-
-  test('marketplace shop reads preserve unavailable as a third state, never empty success', () => {
-    const stripped = stripComments(readFileSync(join(ROOT, 'lib', 'listings.ts'), 'utf8'))
-    const body = topLevelBlocks(stripped).find((block) => block.name === 'getMarketplaceShopListings')?.body
-    expect(body, 'getMarketplaceShopListings must remain a distinct market-scoped seam').toBeTruthy()
-    expect(body).toContain('marketMetaUnavailable')
-    expect(body).toContain('marketMetaFor')
-    expect(body).not.toMatch(/return\s+\[\]/)
-  })
-
-  test('shop home selects owner inventory only when no country market was supplied and surfaces refusal', () => {
-    const stripped = stripComments(readFileSync(join(ROOT, 'app', '(shell)', 's', '[slug]', 'ShopRenderer.tsx'), 'utf8'))
-    const body = topLevelBlocks(stripped).find((block) => block.name === 'ShopPage')?.body
-    expect(body, 'ShopPage no longer exists — re-point this guard').toBeTruthy()
-    expect(body).toContain('readPublicSellerMarket')
-    expect(body).toContain('getMarketplaceShopListings')
-    expect(body).toContain('market_unavailable')
-    expect(body).toContain('notFound()')
-  })
-
-  test('marketplace collection pages surface catalog refusal instead of claiming an empty collection', () => {
-    const stripped = stripComments(readFileSync(
-      join(ROOT, 'app', '(shell)', '_shop-collection', 'CollectionPage.tsx'),
-      'utf8',
-    ))
-    const body = topLevelBlocks(stripped).find((block) => block.name === 'CollectionPage')?.body
-    expect(body, 'CollectionPage no longer exists — re-point this guard').toBeTruthy()
-    expect(body).toContain('getMarketplaceShopListings')
-    expect(body).toContain('market_unavailable')
-    expect(body).toContain('notFound()')
+    expect(topLevelBlocks(stripped).some((block) => block.name === 'getMarketplaceShopListings')).toBe(false)
   })
 
   test('Mexico shop wrappers pass the market separately from the URL prefix', () => {

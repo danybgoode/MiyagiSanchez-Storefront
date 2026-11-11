@@ -22,7 +22,7 @@ export default function ShopIndexGrid({
 }: {
   listings: Listing[]
   shop: { id?: string | null; slug: string; name: string }
-  /** `ShopPresentationContext.listingBase` — NOT the shop base (see the comment on `href` below). */
+  /** `ShopPresentationContext.listingBase` — from `shopListingBase` (see `ShopBases`). */
   listingBase: string
   accent: string
   payments: { stripe: boolean; mercadopago: boolean; bankTransfer: boolean }
@@ -46,9 +46,8 @@ export default function ShopIndexGrid({
             imageUrl: listing.images?.[0]?.url ?? null,
             listing_type: listing.listing_type ?? 'product',
             paymentMethods: { stripe: payments.stripe, mp: payments.mercadopago, spei: payments.bankTransfer },
-            // NOT `ctx.basePath` — that is the SHOP base, and a product is
-            // not shop-scoped on the marketplace. This exact line 404'd
-            // every product on /mx/s/<slug>/tienda. See `ShopBases`.
+            // `listingBase`, never `ctx.basePath`: which PDP a product opens is
+            // decided once, in `shopListingBase`. See `ShopBases`.
             href: listingHref({ listingBase }, listing.id),
             formattedPrice: formatPrice(listing, htmlLang),
             status: listing.status,

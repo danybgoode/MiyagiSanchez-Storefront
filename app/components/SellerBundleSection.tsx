@@ -20,12 +20,17 @@ export default function SellerBundleSection({
   sellerName,
   items,
   bundleTiers = [],
-  marketBasePath = '',
+  listingBase = '',
 }: {
   sellerName: string
   items: CartItem[]
   bundleTiers?: BundleTier[]
-  marketBasePath?: string
+  /**
+   * Where these sibling products open — `shopListingBase`'s answer, NOT the
+   * market base: the items are the shop's OWN catalog, which includes «Solo mi
+   * tienda» products that `/mx/l` 404s. See `ShopBases`.
+   */
+  listingBase?: string
 }) {
   const formatters = useBuyerFormatters()
   const router = useRouter()
@@ -74,7 +79,7 @@ export default function SellerBundleSection({
           const inBundle = cartItems.some(cartItem => cartItem.productId === item.productId)
           return (
             <div key={item.productId} style={{ minWidth: 0 }}>
-              <Link href={`${marketBasePath}/l/${item.productId}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+              <Link href={`${listingBase}/l/${item.productId}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
                 <div style={{ aspectRatio: '1 / 1', borderRadius: 8, overflow: 'hidden', background: 'var(--bg-sunk)', marginBottom: 7 }}>
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
