@@ -281,6 +281,8 @@ export interface CheckoutShippingQuote {
   currency: string
   deliveryEstimate?: number | null
   deliveryLabel?: string | null
+  /** Issued by the backend's /store/envia/rates; passed through UNCHANGED — the backend refuses a quote without a valid one. */
+  signature?: string | null
 }
 
 export interface StartCheckoutParams {
@@ -555,6 +557,7 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
           currency: shippingQuote.currency,
           delivery_estimate: shippingQuote.deliveryEstimate ?? null,
           delivery_label: shippingQuote.deliveryLabel ?? null,
+          ...(shippingQuote.signature ? { signature: shippingQuote.signature } : {}),
         },
       } : {}),
     }),

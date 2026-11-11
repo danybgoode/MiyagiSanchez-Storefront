@@ -29,6 +29,7 @@ type ShippingRate = {
   currency: string
   deliveryEstimate: number | null
   deliveryLabel: string | null
+  signature?: string | null
 }
 
 type PostalLookupResult = {
@@ -240,6 +241,7 @@ export default function CheckoutExperience({
         currency: selectedShippingRate.currency,
         deliveryEstimate: selectedShippingRate.deliveryEstimate,
         deliveryLabel: selectedShippingRate.deliveryLabel,
+        signature: selectedShippingRate.signature ?? null,
       }
     : undefined
   const totalCents = computeCheckoutTotal({

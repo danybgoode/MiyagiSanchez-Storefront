@@ -33,6 +33,7 @@ export interface BackendShippingRate {
   currency: string
   deliveryEstimate?: number | null
   deliveryLabel?: string | null
+  signature?: string | null
 }
 
 export type ShippingRateSource =
@@ -378,6 +379,7 @@ export function resolveUcpFulfillmentSelection(input: {
           currency: rate.currency,
           deliveryEstimate: rate.deliveryEstimate ?? null,
           deliveryLabel: rate.deliveryLabel ?? null,
+          signature: rate.signature ?? null,
         },
       },
     }

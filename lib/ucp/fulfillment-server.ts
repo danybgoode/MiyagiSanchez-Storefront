@@ -107,6 +107,7 @@ function readRate(value: unknown): BackendShippingRate | null {
     currency: rate.currency,
     deliveryEstimate: typeof rate.deliveryEstimate === 'number' ? rate.deliveryEstimate : null,
     deliveryLabel: typeof rate.deliveryLabel === 'string' ? rate.deliveryLabel : null,
+    signature: typeof rate.signature === 'string' ? rate.signature : null,
   }
 }
 
