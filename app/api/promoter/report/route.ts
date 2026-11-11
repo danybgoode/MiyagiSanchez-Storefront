@@ -12,6 +12,7 @@ import { isEnabled } from '@/lib/flags'
 import { getPromoterByClerkId } from '@/lib/promoter'
 import { promoterFeedbackRow, validatePromoterReport } from '@/lib/feedback'
 import { tg } from '@/lib/telegram'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,15 @@ export async function POST(req: NextRequest) {
 
   const promoter = await getPromoterByClerkId(user.id)
   if (!promoter) return NextResponse.json({ ok: false, error: 'Vincula tu código de promotor primero.' }, { status: 403 })
+
+  // Per promoter, not per IP: one field promoter on shared mobile data must not be blocked by another's reports.
+  const rl = await checkRateLimit('relationship', `promoter-report:${promoter.id}`)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, error: 'Has enviado muchos reportes en poco tiempo. Intenta de nuevo en unos minutos.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } },
+    )
+  }
 
   let body: Record<string, unknown> | null = null
   try { body = await req.json() } catch { /* empty body → validation says why */ }
@@ -37,6 +47,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'No se pudo enviar. Intenta de nuevo.' }, { status: 500 })
   }
 
-  await tg.feedbackFiled(row.author_label, row.author_kind, row.category, null, row.message)
+  // The report is saved: a Telegram rejection must never turn it into an error the promoter retries (duplicate rows).
+  try {
+    await tg.feedbackFiled(row.author_label, row.author_kind, row.category, null, row.message)
+  } catch (err) {
+    console.error('[promoter/report] telegram notify failed:', err instanceof Error ? err.message : err)
+  }
   return NextResponse.json({ ok: true })
 }

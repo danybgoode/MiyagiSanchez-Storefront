@@ -56,4 +56,30 @@ test.describe('promoter field reports (D9)', () => {
     expect(sql).toContain('platform_feedback_author_kind_check')
     expect(sql).toContain("CHECK (author_kind IN ('seller', 'partner', 'agent', 'promoter'))")
   })
+
+  test('a Telegram rejection after the insert never turns a saved report into an error', () => {
+    const route = read('app/api/promoter/report/route.ts')
+    const at = route.indexOf('await tg.feedbackFiled')
+    expect(at).toBeGreaterThan(-1)
+    expect(route.lastIndexOf('try {', at)).toBeGreaterThan(route.indexOf(".insert(row)"))
+    const after = route.slice(at)
+    expect(after.indexOf('} catch')).toBeGreaterThan(-1)
+    expect(after.slice(0, after.indexOf("ok: true"))).not.toMatch(/throw/)
+    expect(after).toContain("NextResponse.json({ ok: true })")
+  })
+
+  test('reports are rate-limited per promoter, before the body is read, with a plain 429', () => {
+    const route = read('app/api/promoter/report/route.ts')
+    expect(route).toMatch(/checkRateLimit\('relationship', `promoter-report:\$\{promoter\.id\}`\)/)
+    expect(route).toContain('status: 429')
+    expect(route).toContain('Has enviado muchos reportes')
+    expect(route.indexOf('checkRateLimit(')).toBeLessThan(route.indexOf('req.json()'))
+    expect(route.indexOf('checkRateLimit(')).toBeGreaterThan(route.indexOf('getPromoterByClerkId'))
+  })
+
+  test('the Telegram alert for a promoter report has its own title, the others keep theirs', () => {
+    const tgSrc = read('lib/telegram.ts')
+    expect(tgSrc).toContain("authorKind === 'promoter' ? 'Reporte de promotor' : 'Feedback de agente'")
+    expect(tgSrc).toContain('<b>${title}</b>')
+  })
 })

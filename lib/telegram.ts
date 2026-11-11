@@ -251,8 +251,9 @@ export const tg = {
 
   /** send_feedback MCP tool filed a report (miyagi-partners-mcp S3). */
   feedbackFiled(authorLabel: string, authorKind: string, category: string, toolName: string | null, message: string) {
+    const title = authorKind === 'promoter' ? 'Reporte de promotor' : 'Feedback de agente'
     return tgNotify(
-      `🗣️ <b>Feedback de agente</b>\n${esc(authorLabel)} (${esc(authorKind)}) · ${esc(category)}` +
+      `🗣️ <b>${title}</b>\n${esc(authorLabel)} (${esc(authorKind)}) · ${esc(category)}` +
       (toolName ? ` · herramienta: <code>${esc(toolName)}</code>` : '') +
       `\n${esc(message)}`,
     )

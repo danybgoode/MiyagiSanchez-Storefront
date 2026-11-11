@@ -22,7 +22,7 @@ test.describe('Comparte moved into Canales (D8)', () => {
     for (const tile of ['CatalogLinkTile', 'CatalogPdfTile', 'MetaFeedTile']) expect(section).toMatch(new RegExp(`<${tile}[\\s/>]`))
     expect(read(`${MANAGE}/canal-propio/page.tsx`)).toMatch(/<ShareToolsSection[\s/>]/)
     // the Meta feed keeps its claimed-shop condition
-    expect(read(`${MANAGE}/canal-propio/page.tsx`)).toContain('const metaFeed = model?.shop.claimed')
+    expect(read(`${MANAGE}/canal-propio/page.tsx`)).toContain('metaFeed = model?.shop.claimed')
   })
 
   test('the agent panel is not part of the share surface, and only Agentes and /sell/setup import it', () => {
@@ -36,5 +36,26 @@ test.describe('Comparte moved into Canales (D8)', () => {
     for (const f of ['lib/business-plan/engine.ts', 'lib/setup-guide.ts']) {
       expect(read(f), f).not.toContain('/shop/manage/comparte')
     }
+  })
+
+  test('a failing share-tools fetch cannot take the Canales page down', () => {
+    const page = read(`${MANAGE}/canal-propio/page.tsx`)
+    const start = page.indexOf('let productCount = 0')
+    const tryAt = page.indexOf('try {', start)
+    const fetchAt = page.indexOf('Promise.all([getShopListings', start)
+    const catchAt = page.indexOf('} catch (err)', fetchAt)
+    // the fetch sits inside a try whose catch logs and falls back to empty
+    expect(start).toBeGreaterThan(-1)
+    expect(tryAt).toBeGreaterThan(start)
+    expect(fetchAt).toBeGreaterThan(tryAt)
+    expect(catchAt).toBeGreaterThan(fetchAt)
+    const handler = page.slice(catchAt, page.indexOf('return (', catchAt))
+    expect(handler).toContain('console.error')
+    expect(handler).toMatch(/productCount = 0/)
+    expect(handler).toMatch(/metaFeed = null/)
+    expect(handler).not.toMatch(/throw|redirect/)
+    // only that fetch is wrapped: the settings reads stay outside the try
+    expect(page.indexOf('resolveDomainEntitlement(shop.metadata')).toBeLessThan(tryAt)
+    expect(page.indexOf('getSubdomainSubscription(user.id)')).toBeLessThan(tryAt)
   })
 })
