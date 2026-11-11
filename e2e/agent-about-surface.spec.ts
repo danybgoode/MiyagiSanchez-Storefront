@@ -59,7 +59,7 @@ test.describe('about surface · pure payloads', () => {
     expect(r.name).toBe('about_miyagi')
     expect(r.description).toContain(RELAY_PHRASE)
     expect(r.structured.relay_language).toBe(RELAY_LANGUAGE_DIRECTIVE)
-    expect(r.structured.sections.length).toBe(7)
+    expect(r.structured.sections.length).toBe(8)
     for (const s of r.structured.sections) {
       expect(s.es.heading.trim(), `${s.id}.es`).not.toBe('')
       expect(s.en.heading.trim(), `${s.id}.en`).not.toBe('')

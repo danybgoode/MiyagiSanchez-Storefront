@@ -49,7 +49,9 @@ export default async function PlatformShell({
   const sellerLanding = sellerLandingPath(market)
   return (
     <>
-      {/* ── Sticky header ── */}
+      {/* ── Sticky header ──
+          own-shop-positioning D3: the marketplace (Vecindario, Anuncios) lives in the FOOTER, not here — the
+          header sells the merchant's own shop. The search box stays: it is how a buyer who arrived looks for a thing. */}
       <div
         style={{
           position: 'sticky',
@@ -157,15 +159,6 @@ export default async function PlatformShell({
                 </Link>
               </AuthShow>
 
-              <Link
-                href="/vecindario"
-                className="icon-btn"
-                title={copy.neighborhood}
-                aria-label={copy.neighborhood}
-              >
-                <i className="iconoir-community" style={{ fontSize: 22 }} />
-              </Link>
-
               {/* Cart */}
               <CartButton label={copy.cart} />
 
@@ -256,13 +249,6 @@ export default async function PlatformShell({
 
               {/* Right nav */}
               <nav style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Link
-                  href="/vecindario"
-                  style={{ fontSize: 13, color: 'var(--fg-muted)', textDecoration: 'none' }}
-                  className="hover:text-[var(--fg)]"
-                >
-                  {copy.neighborhood}
-                </Link>
                 <AuthShow when="signed-in">
                   <Link
                     href="/messages"

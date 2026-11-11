@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test'
  * Navigation & Settings Reorg — Sprint 4 (entry-point wiring · api gate).
  *
  * 4.1 — the signed-out seller pitch and the publish action are distinct surfaces:
- *   - signed-out CTAs ("Publicar gratis" header, "Vende gratis" footer) → / (the shop builder)
+ *   - signed-out CTAs ("Abrir mi tienda" in the header and the footer) → / (the shop builder)
  *     (epic #6's acquisition landing).
  *   - the publish affordance (bottom-bar ⊕ FAB, signed-in "Publicar") stays /sell.
  * 4.2 — Vecindario left the tab bar in S1, so the Inicio feed carries an entry to it,
@@ -21,12 +21,12 @@ test.describe('nav entry points · the seller landing vs /sell + Vecindario', ()
 
     // The two named signed-out pitch CTAs render and sit inside an anchor to the root, the
     // seller landing since root-shop-builder-home.
-    expect(html).toMatch(/href="\/"[^>]*>\s*Publicar gratis/)
-    expect(html).toMatch(/href="\/"[^>]*>\s*Vende gratis/)
+    expect(html).toMatch(/href="\/"[^>]*>\s*Abrir mi tienda/)
+    expect(html.match(/href="\/"[^>]*>\s*Abrir mi tienda/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
 
     // Regression guard: neither pitch CTA is wired to the publish flow any more.
-    expect(html).not.toMatch(/href="\/sell"[^>]*>\s*Publicar gratis/)
-    expect(html).not.toMatch(/href="\/sell"[^>]*>\s*Vende gratis/)
+    expect(html).not.toMatch(/href="\/sell"[^>]*>\s*Abrir mi tienda/)
+    expect(html).not.toMatch(/Publicar gratis|Vende gratis/)
   })
 
   test('the publish affordance (⊕ FAB) still resolves to /sell', async ({ request }) => {

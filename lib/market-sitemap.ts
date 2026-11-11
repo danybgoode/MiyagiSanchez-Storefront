@@ -3,6 +3,8 @@
  * cutover can prove canonical population without importing Next's request-only
  * headers module into the deterministic API test project.
  */
+import { NEW_BUSINESS_TYPE_SLUGS, businessTypePath } from './business-types'
+
 export const PLATFORM_SITEMAP_ENTRIES = [
   // `/` is the Mexico shop builder since root-shop-builder-home: the most important page, and
   // it changes weekly like the landing it replaced. `/mx/vende` is a 308 now, so it is not
@@ -19,6 +21,8 @@ export const PLATFORM_SITEMAP_ENTRIES = [
   { path: '/mx/vende/negocios', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/mx/vende/servicios', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/mx/vende/autos', changeFrequency: 'weekly', priority: 0.8 },
+  // own-shop-positioning S3.1 — the eight business-type pages a promoter sends (`autos`/`servicios` are above).
+  ...NEW_BUSINESS_TYPE_SLUGS.map((slug) => ({ path: businessTypePath(slug), changeFrequency: 'weekly', priority: 0.8 }) as const),
   { path: '/mx/vende/migracion', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/mx/precios', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/mx/vende/migracion/shopify', changeFrequency: 'weekly', priority: 0.7 },

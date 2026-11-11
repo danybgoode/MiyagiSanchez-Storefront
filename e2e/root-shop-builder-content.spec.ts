@@ -75,13 +75,13 @@ test.describe('the root leads with the shop, not the marketplace', () => {
     expect(copy.anchor.metadata.description).not.toMatch(/compradores en el marketplace/)
   })
 
-  test('the marketplace is a bonus and one tap away for a buyer', () => {
-    expect(anchor.marketplaceBonus?.cta.href).toBe('/mx')
-    expect(anchor.buyerLink).toEqual({
-      question: '¿Vienes a comprar?',
-      label: 'Explora el marketplace',
-      href: '/mx',
-    })
+  test('the Vecindario is a benefit — one line, no buyer line in the hero (own-shop-positioning D3)', () => {
+    // The «¿Vienes a comprar? Explora el marketplace» hero line is gone: the marketplace left the main navigation, so
+    // a merchant landing on `/` is not told to go shopping. What remains is ONE benefit line near the end.
+    expect(anchor.marketplaceBonus?.cta.href).toBe('/vecindario')
+    expect(anchor.marketplaceBonus?.title).toBe('Tus productos también aparecen en el Vecindario de Miyagi Sánchez.')
+    expect('buyerLink' in anchor).toBe(false)
+    expect(JSON.stringify(copy.anchor)).not.toMatch(/Explora el marketplace|Vienes a comprar/)
   })
 
   test('section order: what you get → how → price → … → marketplace last', () => {
@@ -95,12 +95,13 @@ test.describe('the root leads with the shop, not the marketplace', () => {
       expect(i, `${needle} must be rendered by AnchorSections`).toBeGreaterThan(-1)
       return i
     }
-    // The buyer link lives in the hero (above everything here), not in this list.
-    const hero = sections.slice(sections.indexOf('function LandingHero'))
-    expect(hero.indexOf('<BuyerLink'), 'the buyer link must render inside the hero').toBeGreaterThan(-1)
+    // The hero no longer carries a buyer line (own-shop-positioning D3).
+    const hero = sections.slice(sections.indexOf('function LandingHero'), sections.indexOf('function TrustLine'))
+    expect(hero, 'the hero must not render a buyer link').not.toContain('BuyerLink')
     const order = [
       at('<ProofSection'),
       at('<StepsSection'),
+      at('<FeatureStoriesSection'),
       at('callout={config.pricingCallout}'),
       at('<BenchmarkSection'),
       at('<PersonaRouterSection'),
@@ -114,6 +115,5 @@ test.describe('the root leads with the shop, not the marketplace', () => {
     const creators = buildCreatorPageConfig(copy, {})
     expect(creators.sectionOrder).toBeUndefined()
     expect(creators.marketplaceBonus).toBeUndefined()
-    expect(creators.buyerLink).toBeUndefined()
   })
 })

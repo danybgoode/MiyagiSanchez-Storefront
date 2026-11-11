@@ -1297,6 +1297,19 @@
       "trustPrompt": "what is miyagisanchez.com?",
       "copyPrompt": "Copy prompt",
       "copiedPrompt": "Prompt copied",
+      "support": {
+        "title": "There is always someone with you",
+        "promoterLead": "Your promoter builds the shop with you and answers on their own WhatsApp; between visits, your AI agent answers.",
+        "agentLead": "Your AI agent answers whenever you need it.",
+        "promoter": {
+          "title": "Your promoter",
+          "body": "They build the shop with you and answer on their own WhatsApp, from the first visit."
+        },
+        "agent": {
+          "title": "Your AI agent",
+          "body": "Connect your own Claude, ChatGPT or Gemini to your shop. Ask it how your plan is going, what offers you have, or what you would pay on another platform, and have it change a price or publish a product."
+        }
+      },
       "selfCheck": {
         "title": "Check it yourself",
         "body": "Copy the prompt and paste it into your AI so it evaluates the offer for you."
@@ -1366,7 +1379,7 @@
       "heroTitle": "Describe your business. In seconds you have your online shop, ready to take payments and share — no commission.",
       "heroLead": "Your shop at your own address, payments straight to your account and your catalog ready for WhatsApp and Instagram. And you also appear in the marketplace.",
       "trustLine": "Do not take our word for it: ask Claude, Gemini, or ChatGPT what miyagisanchez.com is.",
-      "primaryCta": "Start free",
+      "primaryCta": "Open my shop",
       "secondaryCta": "View World Cup page",
       "heroStats": [
         {
@@ -1525,7 +1538,7 @@
           }
         ]
       },
-      "closingTitle": "Start free and leave it if you do not like it.",
+      "closingTitle": "Open your shop and leave it if you do not like it.",
       "closingBody": "No contract, no hidden commission, and no need to rebuild your business. Upload a first offer and try it.",
       "closingCta": "Open my shop",
       "variants": {
@@ -1653,18 +1666,14 @@
       },
       "marketLinks": {
         "label": "Also on Miyagi Sánchez:",
-        "mx": "Mexico marketplace",
+        "mx": "Mexico",
         "us": "United States",
         "en": "English"
       },
       "marketplaceBonus": {
-        "title": "And you also appear in the marketplace",
-        "body": "Your products are also published in the Miyagi Sánchez marketplace: one more shop window, at no cost.",
-        "ctaLabel": "Explore the marketplace"
-      },
-      "buyerLink": {
-        "question": "Here to shop?",
-        "label": "Explore the marketplace"
+        "title": "Your products also appear in the Miyagi Sánchez Vecindario.",
+        "body": "One more shop window for people to find you, at no extra cost.",
+        "ctaLabel": "See the Vecindario"
       }
     },
     "creadores": {
@@ -3179,28 +3188,28 @@
     "page": {
       "eyebrow": "About",
       "title": "What miyagisanchez.com is — and why sell here",
-      "lead": "An agent-native marketplace for Mexico. Don’t take our word for it — ask your own AI.",
-      "primaryCtaLabel": "Start free",
-      "secondaryCtaLabel": "For sellers",
+      "lead": "Your own online shop, built with you, with no commission on sales. Don’t take our word for it — ask your own AI.",
+      "primaryCtaLabel": "Open my shop",
+      "secondaryCtaLabel": "See prices",
       "stubBadge": "Coming soon",
       "pricingLinkLabel": "See every price",
       "langToggleLabel": "Español",
       "metaTitle": "About miyagisanchez.com — what it is and why sell here",
-      "metaDescription": "What miyagisanchez.com is, why sell, how to start, and what it costs. An agent-native marketplace for Mexico. 0% commission.",
+      "metaDescription": "Miyagi Sánchez is your own online shop, built with you, with no commission on sales. What it includes, how to start, and what it costs.",
       "contactPrompt": "Questions? Write to us at"
     },
     "sections": {
       "what_is": {
         "heading": "What is miyagisanchez.com?",
-        "lead": "A marketplace for Mexico where anyone can sell — built so your own AI assistant can understand it, browse it, and set it up for you.",
+        "lead": "Your shop with your own address, your own payments and your own catalog — and your own AI assistant to understand it, browse it, and run it with you.",
         "body": [
-          "miyagisanchez.com is a multi-seller, peer-to-peer (P2P) marketplace for Mexico. Any person or business opens a shop, lists what they sell, and reaches buyers across several channels, with no cost to start.",
-          "It is built on Medusa (the commerce engine) and is agent-native: it follows the open UCP and MCP standards, so an AI assistant can browse the catalog, negotiate, and buy without needing a browser."
+          "Miyagi Sánchez is your own online shop, built with you, with no commission on sales.",
+          "You describe your business and the shop is built with you: your address, your photos, your ways of getting paid, and a catalog ready to share on WhatsApp and Instagram. The money goes straight to your account.", "Your products also appear in the Miyagi Sánchez Vecindario (neighborhood): one more window for people to find you, at no extra cost.", "It is built on Medusa (the commerce engine) and follows the open UCP and MCP standards, so an AI assistant can read your shop, recommend it, and help you run it without needing a browser."
         ],
         "points": [
           {
-            "title": "Multi-seller",
-            "body": "Many independent shops on a single platform.",
+            "title": "Your own shop",
+            "body": "With your own address, your brand, and the money going straight to your account.",
             "icon": "iconoir-shop-four-tiles"
           },
           {
@@ -3209,28 +3218,28 @@
             "icon": "iconoir-map-pin"
           },
           {
-            "title": "Agent-native",
-            "body": "Your AI can read us and act on your behalf via UCP and MCP.",
+            "title": "Made for AI",
+            "body": "Your AI can read your shop and act on your behalf via UCP and MCP.",
             "icon": "iconoir-sparks"
           }
         ]
       },
       "why_sell": {
         "heading": "Why sell here?",
-        "lead": "No commission, on every channel, with your own AI assistant doing the heavy lifting.",
+        "lead": "No commission, on every one of your channels, with your own AI assistant doing the heavy lifting.",
         "body": [
-          "Selling is free: we charge 0% commission per sale. You keep what you sell.",
-          "Your catalog lives once and appears in many places: the marketplace, your own branded domain, a widget you paste on any site, and an API/agent for programmatic purchases."
+          "We charge 0% commission per sale: you keep what you sell. You start without paying and without a card, and the plan prices are public.",
+          "Your catalog lives once and appears in many places: your shop, your own branded domain, a widget you paste on any site, the Miyagi Sánchez Vecindario, and an API/agent for programmatic purchases."
         ],
         "points": [
           {
             "title": "0% commission",
-            "body": "We don’t charge per sale. Listing and selling are free.",
+            "body": "We don’t charge per sale: what you sell is yours.",
             "icon": "iconoir-hand-cash"
           },
           {
             "title": "Multi-channel",
-            "body": "Marketplace, own domain, embeddable widget, and API/agents — one catalog.",
+            "body": "Your shop, own domain, embeddable widget, Vecindario, and API/agents — one catalog.",
             "icon": "iconoir-share-android"
           },
           {
@@ -3242,6 +3251,45 @@
             "title": "Express migration",
             "body": "Import your catalog from a file, pasted text, or JSON; the AI structures it for you.",
             "icon": "iconoir-cloud-upload"
+          }
+        ]
+      },
+      "features": {
+        "heading": "What your shop already does",
+        "lead": "Six things that come with your shop and that almost nobody sees at first glance.",
+        "body": [
+          "All of this is already in your shop; each story points to the page where you use it."
+        ],
+        "points": [
+          {
+            "title": "One inventory for every counter",
+            "body": "You upload your products once. From there they feed your shop at your own address, the catalog link for WhatsApp, a PDF to send or print, the Meta catalog for Instagram and Facebook, the Miyagi Sánchez Vecindario, Mercado Libre (with the Negocio plan), and the counter at your store, to take payment in person from your phone. One catalog, no copying and pasting into each one. Where: miyagisanchez.com/shop/manage/canal-propio.",
+            "icon": "iconoir-share-android"
+          },
+          {
+            "title": "What you earn, not just what you sell",
+            "body": "Your plan gathers your business numbers and tells you where each one came from; what it could not read, it says so instead of showing a zero. Analytics shows how your shop is moving. And Profit subtracts what each product costs you, so you see your real margin and not just the total sold. Where: miyagisanchez.com/shop/manage/plan, miyagisanchez.com/shop/manage/analytics.",
+            "icon": "iconoir-stats-report"
+          },
+          {
+            "title": "Haggle without losing your afternoon",
+            "body": "Buyers send you offers and counteroffers from the product page, without leaving for a chat. You answer when you can, or set rules: accept good offers automatically, counter at a percentage you choose, and turn down the ones that do not work for you. You can also require buyers to have a certain level of trust before they can offer. Where: miyagisanchez.com/shop/manage/offers.",
+            "icon": "iconoir-hand-cash"
+          },
+          {
+            "title": "AI that works for your shop",
+            "body": "Your shop’s chat answers buyers using what you published (shipping, payments, returns, and your products with their price); if it does not know, it leaves the message in your Questions instead of making something up. Import turns a file, pasted text or a JSON into products, and you review them before anything is created. And you can connect your own Claude, ChatGPT or Gemini to your shop with your personal address, in settings: ask it to publish a product, change a price, answer an offer, tell you how your plan is going, or what you would pay on another platform. Where: miyagisanchez.com/shop/manage/import, miyagisanchez.com/shop/manage/settings.",
+            "icon": "iconoir-sparks"
+          },
+          {
+            "title": "A giveaway for Buen Fin and Christmas",
+            "body": "Set up a giveaway from your shop for Buen Fin or Christmas. Each participant confirms their email with a code, you run the draw when it ends, and the shop emails the winner. No separate tool to pay for. Where: miyagisanchez.com/shop/manage/sweepstakes.",
+            "icon": "iconoir-gift"
+          },
+          {
+            "title": "Put your business online",
+            "body": "If today your business only exists on Google Maps or in a WhatsApp group, start with one sentence: describe what you sell and in seconds you see your shop with a name, text and sample products. You do not need an account to look. If you like it, it is yours, with your own address and your money straight to your account.",
+            "icon": "iconoir-map-pin"
           }
         ]
       },
@@ -3272,14 +3320,14 @@
         "lead": "You and your agent do the creative work; we run thin rails.",
         "body": [
           "Sellers’ AI assistants do much of the work: cataloging, copywriting, pricing, and maintaining the shop. We provide the rails.",
-          "We build on Medusa primitives and reuse before rebuilding, with agent surfaces (UCP/MCP) instead of bespoke tooling. That keeps our infrastructure cost low — and that is why selling can be free."
+          "We build on Medusa primitives and reuse before rebuilding, with agent surfaces (UCP/MCP) instead of bespoke tooling. That keeps our infrastructure cost low — and that is why we can charge 0% commission per sale."
         ]
       },
       "pricing": {
         "heading": "Pricing",
         "lead": "Opening your shop costs nothing: you start with {trialLength} of the Negocio plan free, with no card and 0% commission. After that there are two plans, the Tienda plan and the Negocio plan, and every price, IVA (VAT) included, is public at miyagisanchez.com/mx/precios.",
         "body": [
-          "Tienda plan: {tiendaFrom} ({tiendaYearly} in one payment, or {tiendaMonthly}). Your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, the marketplace, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.",
+          "Tienda plan: {tiendaFrom} ({tiendaYearly} in one payment, or {tiendaMonthly}). Your shop and its URL at miyagisanchez.com/mx/s/your-shop, your subdomain, 0% commission, every payment method, your place in the Vecindario, offers and messages, AI agents (UCP/MCP), the AI that builds your shop and chat answers every month, with a small «Shop powered by Miyagi Sánchez» link.",
           "Negocio plan: {negocioMonthly}, or {negocioYearly} (interest-free installments available). It adds your own domain, Mercado Libre sync, your shop without the platform link, more chat answers and more photos a month, and the monthly check-in. Every new shop starts with {trialLength} free (the custom domain turns on when you sign up).",
           "When your {trialLength} free end you choose a plan; if you don't, your shop is paused with nothing deleted and comes back as soon as you pay. Shops that existed before the paid plans stay on the Free plan.",
           "A separate service: assisted migration, {migrationPrice}.",
@@ -3319,10 +3367,10 @@
       },
       "philosophy": {
         "heading": "Philosophy",
-        "lead": "Bring ecommerce best practices to everyone — free, and at the highest level.",
+        "lead": "Bring ecommerce best practices to everyone — at the highest level and with no commission.",
         "body": [
           "We believe the AI assistant is the distribution channel and the onboarding engine. Instead of asking you to trust us, we tell you to ask your own Claude, Gemini, or ChatGPT about miyagisanchez.com: your agent reads us, explains it in your terms, and — if it makes sense — sets up your shop.",
-          "We provide the rails; you focus on the creative and the strategy. The mission is to democratize commerce best practices — trust, offer negotiation, and AI-native shopping — so anyone can sell at the quality of the giants, at no cost."
+          "We provide the rails; you focus on the creative and the strategy. The mission is to democratize commerce best practices — trust, offer negotiation, and AI-native shopping — so anyone can sell at the quality of the giants, with no commission."
         ]
       }
     }

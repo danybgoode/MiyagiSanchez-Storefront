@@ -198,10 +198,10 @@ const FREE_ITEMS: FreeItem[] = [
   {
     id: 'marketplace',
     icon: 'iconoir-search',
-    title: { es: 'Aparecer en el marketplace', en: 'Appearing in the marketplace' },
+    title: { es: 'Aparecer en el Vecindario', en: 'Appearing in the Vecindario' },
     body: {
-      es: 'Tus productos salen en la búsqueda de Miyagi Sánchez.',
-      en: 'Your products show up in Miyagi Sánchez search.',
+      es: 'Tus productos también salen en el Vecindario y en la búsqueda de Miyagi Sánchez.',
+      en: 'Your products also show up in the Miyagi Sánchez Vecindario and search.',
     },
   },
   {
@@ -245,7 +245,7 @@ export function tiendaIncludes(): Localized[] {
     { es: 'Tu subdominio (tu-tienda.miyagisanchez.com)', en: 'Your subdomain (your-shop.miyagisanchez.com)' },
     { es: '0% de comisión de la plataforma', en: '0% platform commission' },
     { es: 'Todos los métodos de pago', en: 'Every payment method' },
-    { es: 'El marketplace, ofertas y mensajes', en: 'The marketplace, offers and messages' },
+    { es: 'El Vecindario, ofertas y mensajes', en: 'The Vecindario, offers and messages' },
     { es: 'Agentes de IA (UCP/MCP)', en: 'AI agents (UCP/MCP)' },
     { es: 'La IA que arma tu tienda', en: 'The AI that builds your shop' },
     { es: `${tienda.chatAnswersPerMonth.toLocaleString('en-US')} respuestas al mes en el chat de tu tienda`, en: `${tienda.chatAnswersPerMonth.toLocaleString('en-US')} chat answers a month in your shop` },
