@@ -1044,6 +1044,7 @@ function StepListing({
           setAttr={setAttr}
           seats={seats}
           setSeats={setSeats}
+          seatsError={errors.seats}
         />
       )}
 
@@ -1446,7 +1447,12 @@ export default function SellWizard({
     if (!seatsResult.ok) errs.seats = seatsResult.error
     setListingErrors(errs)
     if (Object.keys(errs).length > 0) {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      // A bad seat count is the only error that is far from the top: bring the field into view.
+      if (errs.seats && Object.keys(errs).length === 1) {
+        requestAnimationFrame(() => document.getElementById('event-seats')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
       return
     }
 

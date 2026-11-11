@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  SEATS_HINT, SEATS_LABEL, createQuantityForBackend, hasEventBlock, mcpEventFields, seatsForWrite,
+  SEATS_EDIT_HINT, SEATS_HINT, SEATS_LABEL, SEATS_NEGATIVE_MESSAGE, CAPACITY_EVENT_ONLY_MESSAGE,
+  createQuantityForBackend, hasEventBlock, mcpEventFields, mcpUpdateQuantity, seatsForWrite,
 } from '../lib/event-seats'
 import { clampTicketQuantity, ticketQuantityCap } from '../lib/ticket-quantity'
 
@@ -99,7 +100,7 @@ test.describe('event seats · the number the buyer cap reads', () => {
 test.describe('the importer never invents seats (merchant-panel-gaps S1, orchestrator review)', () => {
   test('a service row with an event block is created without a quantity; a product row keeps its stock', async () => {
     const { buildCreateBody } = await import('../lib/seller-product-create')
-    const base = { title: 'Taller', category: 'servicios', price: 100 } as any
+    const base = { title: 'Taller', category: 'servicios', price: 100 } as unknown as Parameters<typeof buildCreateBody>[0]
     const service = buildCreateBody({ ...base, listing_type: 'service', attrs: { event_date: '2026-12-01', venue_name: 'Foro' } }, [])
     expect(service.quantity).toBeUndefined()
     const product = buildCreateBody({ ...base, listing_type: 'product', quantity: 3 }, [])
@@ -116,12 +117,45 @@ test.describe('seats are refused, never rewritten (codex review #490)', () => {
     }
   })
 
-  test('MCP update_listing refuses `capacity` unless the listing is an event', () => {
+  test('MCP update_listing: capacity on a product is refused; quantity on an event is refused, not clamped', () => {
+    expect(mcpUpdateQuantity({ listingType: 'product', quantity: undefined, capacity: 5 }))
+      .toEqual({ ok: false, error: CAPACITY_EVENT_ONLY_MESSAGE })
+    // The bug: -3 on an event was clamped to 0 = silently sold out.
+    expect(mcpUpdateQuantity({ listingType: 'service', quantity: -3, capacity: undefined }))
+      .toEqual({ ok: false, error: SEATS_NEGATIVE_MESSAGE })
+    expect(mcpUpdateQuantity({ listingType: 'digital', quantity: 2.5, capacity: undefined }).ok).toBe(false)
+    expect(mcpUpdateQuantity({ listingType: 'service', quantity: undefined, capacity: -1 }).ok).toBe(false)
+    expect(mcpUpdateQuantity({ listingType: 'service', quantity: 12, capacity: undefined })).toEqual({ ok: true, quantity: 12 })
+    expect(mcpUpdateQuantity({ listingType: 'service', quantity: undefined, capacity: 0 })).toEqual({ ok: true, quantity: 0 })
+    // Products keep today's clamp.
+    expect(mcpUpdateQuantity({ listingType: 'product', quantity: -3, capacity: undefined })).toEqual({ ok: true, quantity: 0 })
+    expect(mcpUpdateQuantity({ listingType: 'product', quantity: 4.9, capacity: undefined })).toEqual({ ok: true, quantity: 4 })
+  })
+
+  test('MCP update_listing decides from the owner-scoped mirror, not the public cached read', () => {
     const src = readFileSync(join(import.meta.dirname, '..', 'app/api/ucp/mcp/route.ts'), 'utf8')
-    const block = src.slice(src.indexOf("if (typeof args.capacity === 'number')"))
-    const guard = block.indexOf('readEventDetails(current)')
-    const write = block.indexOf('patch.quantity = args.capacity')
-    expect(guard).toBeGreaterThan(0)
-    expect(guard).toBeLessThan(write)
+    const block = src.slice(src.indexOf('const q = mcpUpdateQuantity('), src.indexOf('const q = mcpUpdateQuantity(') + 400)
+    expect(block).toContain('owned.listing_type')
+    expect(src).not.toMatch(/getListing\(productId\)/)
+  })
+
+  test('the event block is a STRING date or venue, same as the backend (a number is not an event)', () => {
+    expect(hasEventBlock({ event_date: 20261201 })).toBe(false)
+    expect(hasEventBlock({ venue_name: 5 })).toBe(false)
+    expect(hasEventBlock({ event_date: '2026-12-01' })).toBe(true)
+    expect(hasEventBlock({ venue_name: '  ' })).toBe(false)
+  })
+
+  test('a refused seat count is shown at the field (create) and blocks the save (edit); edit blank = unchanged', () => {
+    const root = join(import.meta.dirname, '..')
+    const attrs = readFileSync(join(root, 'app/(shell)/sell/AttrsSection.tsx'), 'utf8')
+    const wizard = readFileSync(join(root, 'app/(shell)/sell/SellWizard.tsx'), 'utf8')
+    const edit = readFileSync(join(root, 'app/(shell)/sell/edit/[id]/EditForm.tsx'), 'utf8')
+    expect(attrs).toContain('data-testid="event-seats-error"')
+    expect(wizard).toContain('seatsError={errors.seats}')
+    expect(edit).toContain('seatsError={fieldErrors.seats}')
+    expect(edit).toMatch(/if \(!seatsCheck\.ok\) errs\.seats = seatsCheck\.error/)
+    expect(SEATS_EDIT_HINT).toBe('Déjalo vacío para no cambiarlo; pon 0 para cerrar la venta.')
+    expect(edit).toContain('seatsHint={SEATS_EDIT_HINT}')
   })
 })

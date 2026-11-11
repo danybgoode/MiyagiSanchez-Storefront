@@ -18,13 +18,22 @@
 
 export const SEATS_LABEL = 'Lugares disponibles'
 export const SEATS_HINT = 'Cuántos lugares quedan. Al llenarse, se marca como agotado.'
+/**
+ * EDIT semantics (decided, review #490): a BLANK seats field on an edit means «unchanged» — it
+ * sends nothing, so an unrelated save never touches stock. (On CREATE a blank means «untracked».)
+ * To stop selling, the merchant sets 0.
+ */
+export const SEATS_EDIT_HINT = 'Déjalo vacío para no cambiarlo; pon 0 para cerrar la venta.'
 export const SEATS_NEGATIVE_MESSAGE = 'Los lugares disponibles deben ser un número de 0 o más.'
 
+// The backend has the SAME predicate (`hasEventBlock`, apps/backend src/api/store/_utils/inventory.ts):
+// STRINGS only, a non-blank `event_date` or `venue_name`. A numeric value is NOT an event block there,
+// so it must not be one here — otherwise the storefront sends seats the backend then refuses (review #490).
 function filled(v: unknown): boolean {
-  return typeof v === 'string' ? v.trim().length > 0 : typeof v === 'number'
+  return typeof v === 'string' && v.trim().length > 0
 }
 
-/** True when the attrs carry the event block (a date or a venue). */
+/** True when the attrs carry the event block (a string date or venue). Mirrors the backend's `hasEventBlock`. */
 export function hasEventBlock(attrs: Record<string, unknown> | null | undefined): boolean {
   if (!attrs || typeof attrs !== 'object') return false
   return filled(attrs.event_date) || filled(attrs.venue_name)
@@ -123,3 +132,40 @@ export function mcpEventFields(args: Record<string, unknown>): McpEventFields {
 export const CAPACITY_EVENT_ONLY_MESSAGE =
   '`capacity` es sólo para eventos (un servicio o archivo digital con fecha o recinto). Para el stock de un producto usa `quantity`.'
 
+
+export type McpUpdateQuantity =
+  | { ok: true; quantity: number | undefined }
+  | { ok: false; error: string }
+
+/**
+ * MCP `update_listing` `quantity` / `capacity` → the one `quantity` to write. Pure, so the rules are tested
+ * rather than read out of the route.
+ *  - `listingType` is the OWNER-SCOPED mirror's type (never the public, published-only getListing()).
+ *  - On a service/digital listing (a possible event) `quantity` IS its seats: refused when negative or
+ *    fractional, never clamped to 0 (which would silently sell the event out).
+ *  - On a product, `quantity` keeps today's clamp; `capacity` is refused (it would become stock).
+ *  - Whether a service/digital listing really carries the event block is the BACKEND's call (its own
+ *    `hasEventBlock`), which 422s a non-event with a plain message surfaced verbatim.
+ */
+export function mcpUpdateQuantity(input: {
+  listingType: string | null | undefined
+  quantity: unknown
+  capacity: unknown
+}): McpUpdateQuantity {
+  const eventCapable = isEventCapableType(input.listingType)
+  let quantity: number | undefined
+  if (typeof input.quantity === 'number') {
+    if (eventCapable) {
+      if (!Number.isInteger(input.quantity) || input.quantity < 0) return { ok: false, error: SEATS_NEGATIVE_MESSAGE }
+      quantity = input.quantity
+    } else {
+      quantity = Math.max(0, Math.floor(input.quantity))
+    }
+  }
+  if (typeof input.capacity === 'number') {
+    if (!Number.isInteger(input.capacity) || input.capacity < 0) return { ok: false, error: SEATS_NEGATIVE_MESSAGE }
+    if (!eventCapable) return { ok: false, error: CAPACITY_EVENT_ONLY_MESSAGE }
+    quantity = input.capacity
+  }
+  return { ok: true, quantity }
+}

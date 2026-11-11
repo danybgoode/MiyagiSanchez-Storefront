@@ -91,9 +91,7 @@ import { applyStoreConfig } from '@/lib/apply-config-manifest'
 import { recordAgentConfigChange, recordAgentOfferAction, recordAgentListingAction, recordAgentListingCreate } from '@/lib/agent-audit'
 import { listShopOffers, respondToOffer } from '@/lib/offer-respond'
 import { listShopOrdersViaInternal } from '@/lib/agent-orders'
-import { mcpEventFields, isEventCapableType, SEATS_NEGATIVE_MESSAGE, CAPACITY_EVENT_ONLY_MESSAGE } from '@/lib/event-seats'
-import { getListing } from '@/lib/listings'
-import { readEventDetails } from '@/lib/event-listing'
+import { mcpEventFields, mcpUpdateQuantity, isEventCapableType } from '@/lib/event-seats'
 import { listShopListings, shopOwnsProduct, patchSellerProductViaInternal, createSellerProductViaInternal, createSellerCollectionViaInternal, listingActivationBlock, deleteSellerProductViaInternal, applySellerPriceViaInternal, renameSellerCollectionViaInternal, deleteSellerCollectionViaInternal, reorderSellerCollectionsViaInternal, patchSellerSlugViaInternal, type SellerProductPatch } from '@/lib/seller-products'
 import { validateSlug, buildSlugAliasHistory } from '@/lib/slug'
 import { SLUG_REDIRECT_TAG } from '@/lib/slug-redirect'
@@ -3851,20 +3849,13 @@ async function handleUpdateListing(args: Record<string, unknown>, authHeader?: s
   }
   if (typeof args.description === 'string') { patch.description = args.description; fields.push('description') }
   if (typeof args.price_mxn === 'number') { patch.price_cents = Math.round(args.price_mxn * 100); fields.push('price') }
-  if (typeof args.quantity === 'number') { patch.quantity = Math.max(0, Math.floor(args.quantity)); fields.push('quantity') }
-  // `capacity` = an event's «Lugares disponibles»: the same write as quantity, refused when negative
-  // rather than clamped to 0 (a typo must not silently sell the event out).
-  if (typeof args.capacity === 'number') {
-    if (!Number.isInteger(args.capacity) || args.capacity < 0) {
-      return { isError: true, content: [{ type: 'text', text: SEATS_NEGATIVE_MESSAGE }] }
-    }
-    // Event-only: on a product, `capacity` would silently become its stock (codex review #490).
-    const current = await getListing(productId)
-    if (!current || !readEventDetails(current)) {
-      return { isError: true, content: [{ type: 'text', text: CAPACITY_EVENT_ONLY_MESSAGE }] }
-    }
-    patch.quantity = args.capacity
-    if (!fields.includes('quantity')) fields.push('quantity')
+  // The type comes from the owner-scoped, uncached mirror (`owned`) — NOT the public getListing() read,
+  // which is published-only, market-scoped and cached, so it wrongly refused a seller's own draft, paused,
+  // own-shop-only or US event (and fired a view-count). See mcpUpdateQuantity for the rules.
+  if (typeof args.quantity === 'number' || typeof args.capacity === 'number') {
+    const q = mcpUpdateQuantity({ listingType: owned.listing_type, quantity: args.quantity, capacity: args.capacity })
+    if (!q.ok) return { isError: true, content: [{ type: 'text', text: q.error }] }
+    if (q.quantity !== undefined) { patch.quantity = q.quantity; fields.push('quantity') }
   }
   if (Array.isArray(args.collection_names)) {
     const requestedNames = args.collection_names.filter((n): n is string => typeof n === 'string')

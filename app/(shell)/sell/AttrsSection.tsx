@@ -73,10 +73,14 @@ function FieldGrid({ fields, attrs, setAttr }: {
   )
 }
 
-export function AttrsSection({ category, listingType, attrs, setAttr, seats, setSeats }: {
+export function AttrsSection({ category, listingType, attrs, setAttr, seats, setSeats, seatsError, seatsHint }: {
   category: string; listingType: ListingType; attrs: Attrs; setAttr: (k: string, v: string) => void
   /** «Lugares disponibles» (merchant-panel-gaps S1.1) — rendered inside the event block once it is filled. */
   seats?: string; setSeats?: (v: string) => void
+  /** A refused seat count, shown next to the field (a silent refusal looked like a dead button). */
+  seatsError?: string
+  /** Overrides the default hint — the EDIT form's blank means «unchanged», not «untracked». */
+  seatsHint?: string
 }) {
   const eventBlock = (
     <div className="space-y-3 border border-purple-200 bg-purple-50/60 rounded-[var(--r-md)] p-4">
@@ -95,9 +99,14 @@ export function AttrsSection({ category, listingType, attrs, setAttr, seats, set
             value={seats ?? ''}
             onChange={e => setSeats(e.target.value)}
             // No silent rewrite: «-3» or «2.5» reach seatsForWrite and are refused, never saved as 3 or 25 (codex review #490).
-            className={`w-32 ${inputClass}`}
+            aria-invalid={seatsError ? true : undefined}
+            aria-describedby={seatsError ? 'event-seats-error' : undefined}
+            className={`w-32 ${inputClass} ${seatsError ? 'border-[var(--danger)]' : ''}`}
           />
-          <p className="text-xs text-[var(--color-muted)] mt-1">{SEATS_HINT}</p>
+          {seatsError && (
+            <p id="event-seats-error" data-testid="event-seats-error" role="alert" className="text-[var(--danger)] text-xs mt-1">{seatsError}</p>
+          )}
+          <p className="text-xs text-[var(--color-muted)] mt-1">{seatsHint ?? SEATS_HINT}</p>
         </div>
       )}
       <p className="text-xs text-[var(--color-muted)]">
