@@ -93,7 +93,8 @@ export function AttrsSection({ category, listingType, attrs, setAttr, seats, set
             step={1}
             inputMode="numeric"
             value={seats ?? ''}
-            onChange={e => setSeats(e.target.value.replace(/[^0-9]/g, ''))}
+            onChange={e => setSeats(e.target.value)}
+            // No silent rewrite: «-3» or «2.5» reach seatsForWrite and are refused, never saved as 3 or 25 (codex review #490).
             className={`w-32 ${inputClass}`}
           />
           <p className="text-xs text-[var(--color-muted)] mt-1">{SEATS_HINT}</p>

@@ -91,7 +91,9 @@ import { applyStoreConfig } from '@/lib/apply-config-manifest'
 import { recordAgentConfigChange, recordAgentOfferAction, recordAgentListingAction, recordAgentListingCreate } from '@/lib/agent-audit'
 import { listShopOffers, respondToOffer } from '@/lib/offer-respond'
 import { listShopOrdersViaInternal } from '@/lib/agent-orders'
-import { mcpEventFields, isEventCapableType, SEATS_NEGATIVE_MESSAGE } from '@/lib/event-seats'
+import { mcpEventFields, isEventCapableType, SEATS_NEGATIVE_MESSAGE, CAPACITY_EVENT_ONLY_MESSAGE } from '@/lib/event-seats'
+import { getListing } from '@/lib/listings'
+import { readEventDetails } from '@/lib/event-listing'
 import { listShopListings, shopOwnsProduct, patchSellerProductViaInternal, createSellerProductViaInternal, createSellerCollectionViaInternal, listingActivationBlock, deleteSellerProductViaInternal, applySellerPriceViaInternal, renameSellerCollectionViaInternal, deleteSellerCollectionViaInternal, reorderSellerCollectionsViaInternal, patchSellerSlugViaInternal, type SellerProductPatch } from '@/lib/seller-products'
 import { validateSlug, buildSlugAliasHistory } from '@/lib/slug'
 import { SLUG_REDIRECT_TAG } from '@/lib/slug-redirect'
@@ -3855,6 +3857,11 @@ async function handleUpdateListing(args: Record<string, unknown>, authHeader?: s
   if (typeof args.capacity === 'number') {
     if (!Number.isInteger(args.capacity) || args.capacity < 0) {
       return { isError: true, content: [{ type: 'text', text: SEATS_NEGATIVE_MESSAGE }] }
+    }
+    // Event-only: on a product, `capacity` would silently become its stock (codex review #490).
+    const current = await getListing(productId)
+    if (!current || !readEventDetails(current)) {
+      return { isError: true, content: [{ type: 'text', text: CAPACITY_EVENT_ONLY_MESSAGE }] }
     }
     patch.quantity = args.capacity
     if (!fields.includes('quantity')) fields.push('quantity')

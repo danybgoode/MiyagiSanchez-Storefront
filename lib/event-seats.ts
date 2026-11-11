@@ -118,3 +118,8 @@ export function mcpEventFields(args: Record<string, unknown>): McpEventFields {
   }
   return { ok: true, attrs, quantity: args.capacity }
 }
+
+/** MCP `update_listing.capacity` on a listing that is not an event (codex review #490). */
+export const CAPACITY_EVENT_ONLY_MESSAGE =
+  '`capacity` es sólo para eventos (un servicio o archivo digital con fecha o recinto). Para el stock de un producto usa `quantity`.'
+

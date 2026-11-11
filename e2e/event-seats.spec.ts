@@ -106,3 +106,22 @@ test.describe('the importer never invents seats (merchant-panel-gaps S1, orchest
     expect(product.quantity).toBe(3)
   })
 })
+
+test.describe('seats are refused, never rewritten (codex review #490)', () => {
+  test('the seats input keeps what was typed; «-3» and «2.5» are refused by seatsForWrite', () => {
+    const src = readFileSync(join(import.meta.dirname, '..', 'app/(shell)/sell/AttrsSection.tsx'), 'utf8')
+    expect(src).toMatch(/onChange=\{e => setSeats\(e\.target\.value\)\}/)
+    for (const raw of ['-3', '2.5']) {
+      expect(seatsForWrite({ listingType: 'service', attrs: { event_date: '2026-12-01' }, seatsRaw: raw }).ok).toBe(false)
+    }
+  })
+
+  test('MCP update_listing refuses `capacity` unless the listing is an event', () => {
+    const src = readFileSync(join(import.meta.dirname, '..', 'app/api/ucp/mcp/route.ts'), 'utf8')
+    const block = src.slice(src.indexOf("if (typeof args.capacity === 'number')"))
+    const guard = block.indexOf('readEventDetails(current)')
+    const write = block.indexOf('patch.quantity = args.capacity')
+    expect(guard).toBeGreaterThan(0)
+    expect(guard).toBeLessThan(write)
+  })
+})
