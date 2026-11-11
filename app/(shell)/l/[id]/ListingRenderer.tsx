@@ -40,7 +40,7 @@ import EventHero from './EventHero'
 import EventRegistrationPanel from '@/app/(shell)/e/[slug]/EventRegistrationPanel'
 import { getEventBySlug, getEventStats } from '@/lib/events'
 import { eventPublicStatus } from '@/lib/event-status'
-import { FREE_EVENT_PRICE_LABEL, rsvpEventShownOnListing, rsvpEventSlug } from '@/lib/evento-preset'
+import { freeEventPriceLabel, rsvpEventShownOnListing, rsvpEventSlug } from '@/lib/evento-preset'
 import EventBuyBox from './EventBuyBox'
 import { eventHeroModel } from '@/lib/event-hero'
 import { serviceHeroModel } from '@/lib/service-hero'
@@ -390,7 +390,7 @@ export async function ListingPage({
   const rsvpStats = rsvpEvent ? await getEventStats(rsvpEvent) : null
   const effectivePrice = agreedDealCents
     ? formatCents(agreedDealCents, activeDealCurrency)
-    : rsvpEvent ? FREE_EVENT_PRICE_LABEL
+    : rsvpEvent ? freeEventPriceLabel(presentation.language)
     : listing.price_cents ? formatCents(listing.price_cents, listing.currency) : buyerCopy['l.id.page.46ee2987']
   const showBuyerActions = isClaimed && !isOwnListing
   // Inventory modes (catalog-management epic, Sprint 2 · Story 2.1) — a

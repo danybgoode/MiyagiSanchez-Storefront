@@ -245,3 +245,7 @@ export const EVENTS_EMPTY_REDIRECT = '/shop/manage/catalogo'
 
 /** The price line of a free Evento's PDP (its listing carries a price of 0, which would read «a convenir»). */
 export const FREE_EVENT_PRICE_LABEL = 'Gratis'
+/** The same label in the shopper's language (codex review #491: English shoppers saw «Gratis»). */
+export function freeEventPriceLabel(language: string | null | undefined): string {
+  return language === 'en' ? 'Free' : FREE_EVENT_PRICE_LABEL
+}

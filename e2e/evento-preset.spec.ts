@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  EVENTS_EMPTY_REDIRECT, EVENTO_TIPO, FREE_EVENT_PRICE_LABEL, NEW_EVENT_HREF,
+  EVENTS_EMPTY_REDIRECT, EVENTO_TIPO, FREE_EVENT_PRICE_LABEL, NEW_EVENT_HREF, freeEventPriceLabel,
   buildRsvpEventDraft, eventStartsAt, eventTimeZoneForState, rsvpEventSyncPatch, eventoErrors, isEventoTipo, isFreeEventListing,
   parseEventoPriceCents, rsvpEventSlug, rsvpEventShownOnListing, freeEventPriceRefusal, FREE_EVENT_PRICE_LOCKED_MESSAGE,
 } from '../lib/evento-preset'
@@ -104,6 +104,8 @@ test.describe('evento · a free Evento is also an RSVP event', () => {
     expect(rsvpEventSlug({ slug: 'x' })).toBeNull()
     expect(rsvpEventSlug(null)).toBeNull()
     expect(FREE_EVENT_PRICE_LABEL).toBe('Gratis')
+    expect(freeEventPriceLabel('es')).toBe('Gratis')
+    expect(freeEventPriceLabel('en')).toBe('Free')
   })
 
   test('the create route writes the row BEFORE the product, stores the slug, sends no Medusa seats, and undoes the row on failure', () => {
@@ -121,7 +123,7 @@ test.describe('evento · a free Evento is also an RSVP event', () => {
     const pdp = read('app/(shell)/l/[id]/ListingRenderer.tsx')
     expect(pdp).toContain('<EventRegistrationPanel')
     expect(pdp).toMatch(/\{rsvpEvent && rsvpStats && \(\s*\n\s*<div data-testid="pdp-rsvp-registration"/)
-    expect(pdp).toContain('rsvpEvent ? FREE_EVENT_PRICE_LABEL')
+    expect(pdp).toContain('rsvpEvent ? freeEventPriceLabel(presentation.language)')
     // the page and the PDP share ONE panel and ONE status derivation
     expect(read('app/(shell)/e/[slug]/EventRegistrationClient.tsx')).toContain('<EventRegistrationPanel')
     expect(read('app/(shell)/e/[slug]/page.tsx')).toContain('eventPublicStatus(event, stats)')
