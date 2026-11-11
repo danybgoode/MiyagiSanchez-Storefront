@@ -88,6 +88,20 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
     )
   }
 
+  // Event listings reach their roster + check-in from here (merchant-panel-gaps D7): «Eventos» left the
+  // rail, so the row of a free Evento links to /shop/manage/eventos/<id>, keyed by the slug the listing
+  // carries in `metadata.rsvp_event_slug`.
+  const eventRosterBySlug: Record<string, string> = {}
+  if (shop?.id) {
+    const { data: eventRows } = await db
+      .from('marketplace_events')
+      .select('id, slug')
+      .eq('shop_id', shop.id)
+    for (const row of (eventRows ?? []) as Array<{ id: string; slug: string }>) {
+      eventRosterBySlug[row.slug] = `/shop/manage/eventos/${row.id}`
+    }
+  }
+
   const listings = filterOutDeleted(data.listings ?? [], deletedIds)
   const total = data.count ?? listings.length
   const totalPages = Math.max(1, Math.ceil(total / CATALOG_PAGE_SIZE))
@@ -183,6 +197,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             profitFlagEnabled={profitFlagEnabled}
             marginRowsByChannel={marginRowsByChannel}
             ownedShopOnlyEnabled={ownedShopOnlyEnabled}
+            eventRosterBySlug={eventRosterBySlug}
           />
 
           {totalPages > 1 && (

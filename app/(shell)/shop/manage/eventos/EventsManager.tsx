@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { Dictionary } from '@/lib/dictionary'
 import type { MarketplaceEvent, MarketplaceEventStats } from '@/lib/events-types'
+import { NEW_EVENT_HREF } from '@/lib/evento-preset'
 
 type SellerUi = Dictionary['events']['seller']
 type EventWithStats = MarketplaceEvent & { public_url: string; stats: MarketplaceEventStats }
@@ -136,20 +137,21 @@ export default function EventsManager({
           <h1 className="text-xl sm:text-2xl font-bold">{ui.title}</h1>
           <p className="text-sm text-[var(--color-muted)] mt-1">{ui.subtitle}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => { setForm(emptyForm); setMessage(null); setError(null) }}
-          className="px-4 py-2 rounded-[var(--r-md)] bg-[var(--color-accent)] text-white text-sm font-semibold"
+        {/* A new event starts in the wizard, like every other listing (merchant-panel-gaps D7). */}
+        <Link
+          href={NEW_EVENT_HREF}
+          data-testid="new-event-link"
+          className="px-4 py-2 rounded-[var(--r-md)] bg-[var(--color-accent)] text-white text-sm font-semibold no-underline"
         >
           {ui.newEvent}
-        </button>
+        </Link>
       </div>
 
       {message && <p className="mb-4 text-sm text-green-700">{message}</p>}
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.95fr] gap-6">
-        <form onSubmit={save} className="border border-[var(--color-border)] rounded-[var(--r-md)] p-5">
+      <div className={`grid grid-cols-1 gap-6 ${editing ? 'lg:grid-cols-[1fr_0.95fr]' : ''}`}>
+        {editing && <form onSubmit={save} className="border border-[var(--color-border)] rounded-[var(--r-md)] p-5">
           <h2 className="font-semibold mb-4">{editing ? ui.edit : ui.newEvent}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block text-sm font-medium sm:col-span-2">
@@ -190,7 +192,7 @@ export default function EventsManager({
           <button disabled={saving} className="mt-5 bg-[var(--color-accent)] text-white rounded-[var(--r-md)] px-4 py-2 text-sm font-semibold disabled:opacity-50">
             {saving ? ui.saving : ui.save}
           </button>
-        </form>
+        </form>}
 
         <section className="border border-[var(--color-border)] rounded-[var(--r-md)] p-5">
           <h2 className="font-semibold mb-4">{ui.events}</h2>

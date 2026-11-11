@@ -18,6 +18,7 @@ import { EXCERPT_MAX_CHARS } from '@/lib/excerpt'
 import { deriveInventoryMode, type InventoryMode } from '@/lib/inventory-mode'
 import { PROCESSING_LABELS } from '@/lib/trust-inputs'
 import { SEATS_EDIT_HINT, seatsForWrite } from '@/lib/event-seats'
+import Link from 'next/link'
 
 interface ShortlinkInfo {
   shopSlug: string
@@ -37,6 +38,8 @@ interface EditableFields {
   attrs: Record<string, unknown>
   custom_fields?: unknown
   available_quantity: number | null
+  /** A free Evento's RSVP slug: its seats live in the registration system, not in listing inventory. */
+  rsvp_event_slug?: string | null
   /** Whether the variant tracks finite stock — catalog-management S2 · 2.1. */
   manage_inventory?: boolean
   /** Native Medusa "sobre pedido" flag — catalog-management S2 · 2.1. */
@@ -219,7 +222,7 @@ export default function EditForm({
     }
     // A refused seat count blocks the save with a visible field error — it used to be dropped
     // silently and the rest of the form saved as if the merchant had not typed it (review #490).
-    if (!isProduct) {
+    if (!isProduct && !initial.rsvp_event_slug) {
       const seatsCheck = seatsForWrite({ listingType: initial.listing_type, attrs, seatsRaw: quantityRaw })
       if (!seatsCheck.ok) errs.seats = seatsCheck.error
     }
@@ -256,7 +259,7 @@ export default function EditForm({
       }
       // An event's «Lugares disponibles» (merchant-panel-gaps S1.1): sent only when changed, so an
       // unrelated save never touches seats — and a first-time value turns tracking on server-side.
-      if (!isProduct) {
+      if (!isProduct && !initial.rsvp_event_slug) {
         // Blank = «unchanged» on EDIT (create: blank = untracked); 0 stops the sale. See SEATS_EDIT_HINT.
         const seatsResult = seatsForWrite({ listingType: initial.listing_type, attrs, seatsRaw: quantityRaw })
         if (seatsResult.ok && seatsResult.quantity !== undefined
@@ -419,10 +422,15 @@ export default function EditForm({
           attrs={attrs}
           setAttr={setAttr}
           seats={quantityRaw}
-          setSeats={setQuantityRaw}
+          setSeats={initial.rsvp_event_slug ? undefined : setQuantityRaw}
           seatsError={fieldErrors.seats}
           seatsHint={SEATS_EDIT_HINT}
         />
+      )}
+      {initial.rsvp_event_slug && (
+        <p data-testid="free-event-seats-note" className="text-xs text-[var(--color-muted)]">
+          Los lugares de este evento gratis se cambian en <Link href="/shop/manage/eventos" className="underline">Registros y entrada</Link>.
+        </p>
       )}
 
       {/* Personalization fields — buyer-entered custom inputs (not for subscriptions) */}

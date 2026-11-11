@@ -9,7 +9,7 @@
       "criticality": "high",
       "enforcement": "both",
       "callsites": [
-        "app/(shell)/shop/manage/catalogo/page.tsx:108",
+        "app/(shell)/shop/manage/catalogo/page.tsx:122",
         "app/api/ucp/mcp/route.ts:4258",
         "app/api/ucp/mcp/route.ts:4298",
         "lib/catalog-bulk.ts:252",
@@ -23,9 +23,9 @@
       "criticality": "high",
       "enforcement": "both",
       "callsites": [
-        "app/(shell)/l/[id]/ListingRenderer.tsx:392",
-        "app/(shell)/sell/edit/[id]/page.tsx:191",
-        "app/(shell)/shop/manage/catalogo/page.tsx:102",
+        "app/(shell)/l/[id]/ListingRenderer.tsx:403",
+        "app/(shell)/sell/edit/[id]/page.tsx:192",
+        "app/(shell)/shop/manage/catalogo/page.tsx:116",
         "app/api/ucp/catalog/[id]/route.ts:84",
         "app/api/ucp/catalog/route.ts:118",
         "app/api/ucp/checkout-session/route.ts:622",
@@ -41,8 +41,8 @@
       "criticality": "high",
       "enforcement": "both",
       "callsites": [
-        "app/(shell)/sell/page.tsx:114",
-        "app/(shell)/shop/manage/catalogo/page.tsx:118",
+        "app/(shell)/sell/page.tsx:115",
+        "app/(shell)/shop/manage/catalogo/page.tsx:132",
         "lib/checkout-admission-flag.ts:25"
       ]
     },
@@ -54,7 +54,7 @@
       "enforcement": "both",
       "callsites": [
         "app/(shell)/checkout/page.tsx:217",
-        "app/(shell)/l/[id]/ListingRenderer.tsx:435",
+        "app/(shell)/l/[id]/ListingRenderer.tsx:446",
         "app/api/ucp/checkout-session/route.ts:300"
       ]
     },
@@ -75,7 +75,7 @@
       "criticality": "low",
       "enforcement": "frontend",
       "callsites": [
-        "app/(shell)/l/[id]/ListingRenderer.tsx:166"
+        "app/(shell)/l/[id]/ListingRenderer.tsx:170"
       ]
     },
     {
@@ -109,7 +109,7 @@
       "enforcement": "frontend",
       "callsites": [
         "app/(shell)/checkout/page.tsx:172",
-        "app/(shell)/l/[id]/ListingRenderer.tsx:468",
+        "app/(shell)/l/[id]/ListingRenderer.tsx:479",
         "app/api/ucp/checkout-session/route.ts:331"
       ]
     },
@@ -148,7 +148,7 @@
       "enforcement": "frontend",
       "callsites": [
         "app/(shell)/s/[slug]/convocatoria/page.tsx:64",
-        "app/(shell)/sell/edit/[id]/page.tsx:186",
+        "app/(shell)/sell/edit/[id]/page.tsx:187",
         "app/(shell)/shop/manage/convocatoria/campanas/page.tsx:16",
         "app/(shell)/shop/manage/convocatoria/page.tsx:17",
         "app/(shell)/shop/manage/settings/page.tsx:53",
@@ -296,7 +296,7 @@
       "criticality": "high",
       "enforcement": "both",
       "callsites": [
-        "app/(shell)/sell/edit/[id]/page.tsx:176",
+        "app/(shell)/sell/edit/[id]/page.tsx:177",
         "app/api/sell/ml/predict/route.ts:18",
         "app/api/sell/ml/publish/route.ts:19",
         "app/api/ucp/mcp/route.ts:4107",
@@ -358,7 +358,7 @@
       "criticality": "medium",
       "enforcement": "both",
       "callsites": [
-        "app/(shell)/shop/manage/catalogo/page.tsx:113",
+        "app/(shell)/shop/manage/catalogo/page.tsx:127",
         "app/(shell)/shop/manage/profit/page.tsx:32"
       ]
     },
@@ -397,7 +397,7 @@
       "criticality": "low",
       "enforcement": "frontend",
       "callsites": [
-        "app/(shell)/l/[id]/ListingRenderer.tsx:413"
+        "app/(shell)/l/[id]/ListingRenderer.tsx:424"
       ]
     },
     {
@@ -537,8 +537,8 @@
       "criticality": "high",
       "enforcement": "both",
       "callsites": [
-        "app/(shell)/sell/edit/[id]/page.tsx:195",
-        "app/(shell)/sell/page.tsx:110"
+        "app/(shell)/sell/edit/[id]/page.tsx:196",
+        "app/(shell)/sell/page.tsx:111"
       ]
     },
     {

@@ -6,6 +6,9 @@ import { ensureSupabaseShopMirror, syncSupabaseListingMirror, type MedusaSellerF
 import { notifyShopCreated, retryShopCreatedWelcome } from '@/lib/shop-created-welcome'
 import { resolveSellerSignupMarket } from '@/lib/seller-signup-market'
 import { sellerListingCurrency } from '@/lib/seller-listing-currency'
+import { db } from '@/lib/supabase'
+import { uniqueEventSlug } from '@/lib/events'
+import { buildRsvpEventDraft, isFreeEventListing, type RsvpEventDraft } from '@/lib/evento-preset'
 import { createQuantityForBackend, hasEventBlock, isEventCapableType, SEATS_NEGATIVE_MESSAGE } from '@/lib/event-seats'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
@@ -98,6 +101,21 @@ export async function POST(req: NextRequest) {
   if (isEventCapableType(body.listing.listing_type) && hasEventBlock(body.listing.attrs)
     && body.listing.quantity != null && (!Number.isInteger(body.listing.quantity) || body.listing.quantity < 0)) {
     return NextResponse.json({ error: SEATS_NEGATIVE_MESSAGE, field: 'quantity' }, { status: 422 })
+  }
+
+  // A free Evento (service + event block + $0) is also an RSVP event: validate the row it needs before
+  // any shop or product is written, so a refused request has changed nothing.
+  const freeEvent = isFreeEventListing(body.listing)
+  let rsvpDraft: RsvpEventDraft | null = null
+  if (freeEvent) {
+    const built = buildRsvpEventDraft({
+      title: titleClean,
+      description: body.listing.description,
+      quantity: body.listing.quantity,
+      attrs: body.listing.attrs,
+    })
+    if (!built.ok) return NextResponse.json({ error: built.error, field: built.field }, { status: 422 })
+    rsvpDraft = built.draft
   }
 
   const isSubscription = body.listing.listing_type === 'subscription'
@@ -255,11 +273,34 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Free Evento: the RSVP row goes in FIRST so its slug can ride the listing's metadata, and is removed
+  // again if the product cannot be created (no orphan event with no listing).
+  let rsvpEvent: { id: string; slug: string } | null = null
+  if (rsvpDraft) {
+    const shopMirror = await ensureSupabaseShopMirror(sellerForMirror!, userId).catch(() => null)
+    if (!shopMirror?.id || !sellerId) {
+      console.error('[sell/create] free event: no shop mirror for', sellerId)
+      return NextResponse.json({ error: 'No se pudo crear el evento. Inténtalo de nuevo.' }, { status: 500 })
+    }
+    const slug = await uniqueEventSlug(rsvpDraft.title)
+    const { data: eventRow, error: eventError } = await db
+      .from('marketplace_events')
+      .insert({ ...rsvpDraft, slug, shop_id: shopMirror.id, medusa_seller_id: sellerId, created_by: userId, status: 'active' })
+      .select('id, slug')
+      .single()
+    if (eventError || !eventRow) {
+      console.error('[sell/create] free event row failed:', eventError)
+      return NextResponse.json({ error: 'No se pudo crear el evento. Inténtalo de nuevo.' }, { status: 500 })
+    }
+    rsvpEvent = { id: eventRow.id as string, slug: eventRow.slug as string }
+  }
+
   const metadata: Record<string, unknown> = {
     ...(body.listing.condition ? { condition: body.listing.condition } : {}),
     ...(body.listing.state ? { state: body.listing.state } : {}),
     ...(body.listing.municipio ? { municipio: body.listing.municipio } : {}),
     ...(body.listing.digital_file ? { digital_file: body.listing.digital_file } : {}),
+    ...(rsvpEvent ? { rsvp_event_slug: rsvpEvent.slug } : {}),
     ...(body.listing.repuve?.status ? { repuve: { status: body.listing.repuve.status, folio: body.listing.repuve.folio?.trim().toUpperCase() || null, verified_at: new Date().toISOString() } } : {}),
     ...(isSubscription && !hasMultiTier ? {
       subscription: {
@@ -291,7 +332,8 @@ export async function POST(req: NextRequest) {
       location: [body.listing.municipio?.trim(), body.listing.state?.trim()].filter(Boolean).join(', ') || null,
       // Products: at least 1. An event: its seats, or nothing — a defaulted 1 would make an
       // untracked event a one-seat event (lib/event-seats.ts).
-      quantity: createQuantityForBackend(body.listing),
+      // A free Evento keeps its seats in the RSVP row (capacity), not in Medusa inventory.
+      quantity: freeEvent ? undefined : createQuantityForBackend(body.listing),
       weight_grams: body.listing.weight_grams ?? null,
       attrs: body.listing.attrs ?? {},
       images: body.listing.images ?? [],
@@ -306,6 +348,7 @@ export async function POST(req: NextRequest) {
   const productData = await productRes.json().catch(() => ({}))
   if (!productRes.ok || !productData.product_id) {
     console.error('[sell/create] product creation failed:', productData)
+    if (rsvpEvent) await db.from('marketplace_events').delete().eq('id', rsvpEvent.id)
     // Surface the backend's own es-MX refusal (422 cross-market/flag-off, 423,
     // 503 channel-unaddressable — product-publication.ts) instead of a generic
     // 500, same as the listing PUT/PATCH proxy does. Any other status (a real

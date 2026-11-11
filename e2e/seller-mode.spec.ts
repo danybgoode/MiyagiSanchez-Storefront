@@ -143,7 +143,7 @@ test.describe('seller-mode · SELLER_NAV config', () => {
     expect(SELLER_NAV[0].entries.map(e => e.label)).toEqual(['Resumen', 'Pedidos', 'Ofertas', 'Preguntas', 'Vender en persona', 'Cobrar con un link'])
     expect(SELLER_NAV[1].entries.map(e => e.label)).toEqual(['Anuncios', 'Colecciones', 'Canales', 'Mercado Libre', 'Importar catálogo'])
     expect(SELLER_NAV[2].entries.map(e => e.label)).toEqual([
-      'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas', 'Ganancias', 'Tu plan', 'Tu suscripción',
+      'Cupones', 'Suscripciones', 'Contenido', 'Sorteos', 'Analíticas', 'Ganancias', 'Tu plan', 'Tu suscripción',
     ])
     expect(SELLER_NAV[3].entries.map(e => e.label)).toEqual(['Mi tienda', 'Configuración'])
   })
@@ -179,10 +179,10 @@ test.describe('seller-mode · filterNavByEnabledFlags (R13 flag-safe nav parity)
     const filtered = filterNavByEnabledFlags(SELLER_NAV, new Set<FlagKey>())
     const allLabels = filtered.flatMap(g => g.entries.map(e => e.label))
     expect(allLabels).not.toContain('Ganancias')
-    // Nothing else in Crecer was dropped — the group itself survives (8 of 9 left; «Tu plan» and «Tu suscripción» are not flagged).
+    // Nothing else in Crecer was dropped — the group itself survives (7 of 8 left; «Tu plan» and «Tu suscripción» are not flagged).
     const crecer = filtered.find(g => g.key === 'crecer')
     expect(crecer?.entries.map(e => e.label)).toEqual([
-      'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas', 'Tu plan', 'Tu suscripción',
+      'Cupones', 'Suscripciones', 'Contenido', 'Sorteos', 'Analíticas', 'Tu plan', 'Tu suscripción',
     ])
   })
 
@@ -190,7 +190,7 @@ test.describe('seller-mode · filterNavByEnabledFlags (R13 flag-safe nav parity)
     const filtered = filterNavByEnabledFlags(SELLER_NAV, new Set<FlagKey>(['ops.profit_enabled']))
     const crecer = filtered.find(g => g.key === 'crecer')
     expect(crecer?.entries.map(e => e.label)).toEqual([
-      'Cupones', 'Suscripciones', 'Contenido', 'Eventos', 'Sorteos', 'Analíticas', 'Ganancias', 'Tu plan', 'Tu suscripción',
+      'Cupones', 'Suscripciones', 'Contenido', 'Sorteos', 'Analíticas', 'Ganancias', 'Tu plan', 'Tu suscripción',
     ])
   })
 

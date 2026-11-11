@@ -5,6 +5,7 @@ import { getDictionary, normalizeLocale } from '@/lib/dictionary'
 import { getEventStats, publicEventUrl } from '@/lib/events'
 import { resolveEventSeller } from '@/lib/events-seller'
 import type { MarketplaceEvent } from '@/lib/events-types'
+import { EVENTS_EMPTY_REDIRECT } from '@/lib/evento-preset'
 import EventsManager from './EventsManager'
 
 export const metadata = {
@@ -35,6 +36,10 @@ export default async function EventsManagePage({
     public_url: publicEventUrl(event.slug, locale),
     stats: await getEventStats(event),
   })))
+
+  // «Eventos» is no longer a place to start (D7): a merchant creates an event from the wizard. With no
+  // events there is no roster to show, so this page hands them to the catalog instead of an empty shell.
+  if (initialEvents.length === 0) redirect(EVENTS_EMPTY_REDIRECT)
 
   return (
     <main>

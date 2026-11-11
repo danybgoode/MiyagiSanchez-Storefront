@@ -16,6 +16,9 @@ export type Attrs = Record<string, string | number | boolean>
 
 export type ListingType = 'product' | 'service' | 'rental' | 'digital' | 'subscription'
 
+/** The Evento preset's own errors (its price error shows under the price field). */
+const EVENTO_ERROR_KEYS = ['event_date', 'event_time', 'venue_name', 'seats']
+
 const inputClass =
   'w-full border border-[var(--color-border)] rounded-[var(--r-sm)] px-3 py-2 text-sm bg-[var(--fg-inverse)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent'
 
@@ -73,7 +76,7 @@ function FieldGrid({ fields, attrs, setAttr }: {
   )
 }
 
-export function AttrsSection({ category, listingType, attrs, setAttr, seats, setSeats, seatsError, seatsHint }: {
+export function AttrsSection({ category, listingType, attrs, setAttr, seats, setSeats, seatsError, seatsHint, evento = false, eventoErrors }: {
   category: string; listingType: ListingType; attrs: Attrs; setAttr: (k: string, v: string) => void
   /** «Lugares disponibles» (merchant-panel-gaps S1.1) — rendered inside the event block once it is filled. */
   seats?: string; setSeats?: (v: string) => void
@@ -81,12 +84,15 @@ export function AttrsSection({ category, listingType, attrs, setAttr, seats, set
   seatsError?: string
   /** Overrides the default hint — the EDIT form's blank means «unchanged», not «untracked». */
   seatsHint?: string
+  /** The «Evento» preset: date, time, venue and seats are required, and the seats field is always shown. */
+  evento?: boolean
+  eventoErrors?: Record<string, string>
 }) {
   const eventBlock = (
-    <div className="space-y-3 border border-purple-200 bg-purple-50/60 rounded-[var(--r-md)] p-4">
+    <div className="space-y-3 border border-[var(--info)] bg-[var(--info-soft)] rounded-[var(--r-md)] p-4">
       <p className="text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide">Detalles del evento</p>
       <FieldGrid fields={EVENT_FIELDS} attrs={attrs} setAttr={setAttr} />
-      {setSeats && hasEventBlock(attrs) && (
+      {setSeats && (evento || hasEventBlock(attrs)) && (
         <div>
           <label htmlFor="event-seats" className="block text-xs font-medium text-[var(--color-text)] mb-1">{SEATS_LABEL}</label>
           <input
@@ -109,8 +115,15 @@ export function AttrsSection({ category, listingType, attrs, setAttr, seats, set
           <p className="text-xs text-[var(--color-muted)] mt-1">{seatsHint ?? SEATS_HINT}</p>
         </div>
       )}
+      {evento && eventoErrors && EVENTO_ERROR_KEYS.some(k => eventoErrors[k]) && (
+        <ul data-testid="evento-errors" className="text-xs text-[var(--danger)] space-y-0.5">
+          {Object.entries(eventoErrors).filter(([k]) => EVENTO_ERROR_KEYS.includes(k)).map(([k, msg]) => <li key={k}>{msg}</li>)}
+        </ul>
+      )}
       <p className="text-xs text-[var(--color-muted)]">
-        Opcional. Úsalo cuando este servicio o archivo digital sea una entrada, taller, clase o experiencia con fecha.
+        {evento
+          ? 'Fecha, hora, lugar y lugares disponibles son obligatorios.'
+          : 'Opcional. Úsalo cuando este servicio o archivo digital sea una entrada, taller, clase o experiencia con fecha.'}
       </p>
     </div>
   )
@@ -122,6 +135,8 @@ export function AttrsSection({ category, listingType, attrs, setAttr, seats, set
     </div>
   )
 
+  // The Evento preset is the event block and nothing else, whatever category the merchant picked.
+  if (evento) return eventBlock
   if (listingType === 'digital') return eventBlock
   if (listingType === 'subscription') return null
 
