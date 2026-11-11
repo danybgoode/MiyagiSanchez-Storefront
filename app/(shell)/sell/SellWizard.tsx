@@ -13,6 +13,7 @@ import { SITE_ORIGIN } from '@/lib/market-seo'
 import { createPublishToMarket } from '@/lib/publication-state'
 import { DEFAULT_MARKET, MARKETS, type MarketCode } from '@/lib/markets'
 import { resolveSellerSignupMarket } from '@/lib/seller-signup-market'
+import { seatsForWrite } from '@/lib/event-seats'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -626,6 +627,7 @@ function StepListing({
   ownedShopOnlyEnabled,
   condition, setCondition,
   quantity, setQuantity,
+  seats, setSeats,
   priceRaw, setPriceRaw,
   priceOnRequest, setPriceOnRequest,
   description, setDescription,
@@ -656,6 +658,7 @@ function StepListing({
   ownedShopOnlyEnabled: boolean
   condition: Condition; setCondition: (v: Condition) => void
   quantity: string; setQuantity: (v: string) => void
+  seats: string; setSeats: (v: string) => void
   priceRaw: string; setPriceRaw: (v: string) => void
   priceOnRequest: boolean; setPriceOnRequest: (v: boolean) => void
   description: string; setDescription: (v: string) => void
@@ -1039,6 +1042,8 @@ function StepListing({
           listingType={listingType}
           attrs={attrs}
           setAttr={setAttr}
+          seats={seats}
+          setSeats={setSeats}
         />
       )}
 
@@ -1325,6 +1330,8 @@ export default function SellWizard({
   const [ownedShopOnly, setOwnedShopOnly] = useState(false)
   const [condition, setCondition] = useState<Condition>('good')
   const [quantity, setQuantity] = useState('1')
+  // Event seats («Lugares disponibles») — empty means untracked, exactly as before this field existed.
+  const [seats, setSeats] = useState('')
   const [priceRaw, setPriceRaw] = useState('')
   const [priceOnRequest, setPriceOnRequest] = useState(false)
   const [description, setDescription] = useState('')
@@ -1435,6 +1442,8 @@ export default function SellWizard({
         if (!parsePriceCents(t.price_raw)) { errs.subscription_tiers = `El plan "${t.label || 'sin nombre'}" necesita un precio válido.`; break }
       }
     }
+    const seatsResult = seatsForWrite({ listingType, attrs, seatsRaw: seats })
+    if (!seatsResult.ok) errs.seats = seatsResult.error
     setListingErrors(errs)
     if (Object.keys(errs).length > 0) {
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1459,7 +1468,10 @@ export default function SellWizard({
           price_cents: priceCents,
           currency: listingCurrency,
           condition: listingType === 'product' ? condition : undefined,
-          quantity: listingType === 'product' ? Math.max(1, parseInt(quantity) || 1) : undefined,
+          // Products: units (>= 1). An event with its block filled: «Lugares disponibles».
+          quantity: listingType === 'product'
+            ? Math.max(1, parseInt(quantity) || 1)
+            : seatsResult.ok ? seatsResult.quantity : undefined,
           listing_type: listingType,
           // Arranged-only delivery (epic, S1.2) — backend forces 'arranged' for
           // service/rental regardless of this value. Defense-in-depth: only ever
@@ -1591,6 +1603,7 @@ export default function SellWizard({
             ownedShopOnlyEnabled={ownedShopOnlyEnabled}
             condition={condition} setCondition={setCondition}
             quantity={quantity} setQuantity={setQuantity}
+            seats={seats} setSeats={setSeats}
             priceRaw={priceRaw} setPriceRaw={setPriceRaw}
             priceOnRequest={priceOnRequest} setPriceOnRequest={setPriceOnRequest}
             description={description} setDescription={setDescription}

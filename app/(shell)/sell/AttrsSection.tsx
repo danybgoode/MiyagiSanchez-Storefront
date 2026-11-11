@@ -10,6 +10,7 @@ import {
   type AttrField,
 } from '@/lib/listing-attributes'
 import { InspectionReportField } from './InspectionReportField'
+import { SEATS_HINT, SEATS_LABEL, hasEventBlock } from '@/lib/event-seats'
 
 export type Attrs = Record<string, string | number | boolean>
 
@@ -72,13 +73,32 @@ function FieldGrid({ fields, attrs, setAttr }: {
   )
 }
 
-export function AttrsSection({ category, listingType, attrs, setAttr }: {
+export function AttrsSection({ category, listingType, attrs, setAttr, seats, setSeats }: {
   category: string; listingType: ListingType; attrs: Attrs; setAttr: (k: string, v: string) => void
+  /** «Lugares disponibles» (merchant-panel-gaps S1.1) — rendered inside the event block once it is filled. */
+  seats?: string; setSeats?: (v: string) => void
 }) {
   const eventBlock = (
     <div className="space-y-3 border border-purple-200 bg-purple-50/60 rounded-[var(--r-md)] p-4">
       <p className="text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wide">Detalles del evento</p>
       <FieldGrid fields={EVENT_FIELDS} attrs={attrs} setAttr={setAttr} />
+      {setSeats && hasEventBlock(attrs) && (
+        <div>
+          <label htmlFor="event-seats" className="block text-xs font-medium text-[var(--color-text)] mb-1">{SEATS_LABEL}</label>
+          <input
+            id="event-seats"
+            data-testid="event-seats"
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            value={seats ?? ''}
+            onChange={e => setSeats(e.target.value.replace(/[^0-9]/g, ''))}
+            className={`w-32 ${inputClass}`}
+          />
+          <p className="text-xs text-[var(--color-muted)] mt-1">{SEATS_HINT}</p>
+        </div>
+      )}
       <p className="text-xs text-[var(--color-muted)]">
         Opcional. Úsalo cuando este servicio o archivo digital sea una entrada, taller, clase o experiencia con fecha.
       </p>

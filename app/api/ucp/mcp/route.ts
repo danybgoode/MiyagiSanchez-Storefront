@@ -91,6 +91,7 @@ import { applyStoreConfig } from '@/lib/apply-config-manifest'
 import { recordAgentConfigChange, recordAgentOfferAction, recordAgentListingAction, recordAgentListingCreate } from '@/lib/agent-audit'
 import { listShopOffers, respondToOffer } from '@/lib/offer-respond'
 import { listShopOrdersViaInternal } from '@/lib/agent-orders'
+import { mcpEventFields, isEventCapableType, SEATS_NEGATIVE_MESSAGE } from '@/lib/event-seats'
 import { listShopListings, shopOwnsProduct, patchSellerProductViaInternal, createSellerProductViaInternal, createSellerCollectionViaInternal, listingActivationBlock, deleteSellerProductViaInternal, applySellerPriceViaInternal, renameSellerCollectionViaInternal, deleteSellerCollectionViaInternal, reorderSellerCollectionsViaInternal, patchSellerSlugViaInternal, type SellerProductPatch } from '@/lib/seller-products'
 import { validateSlug, buildSlugAliasHistory } from '@/lib/slug'
 import { SLUG_REDIRECT_TAG } from '@/lib/slug-redirect'
@@ -503,6 +504,13 @@ const TOOLS = [
         listing_type: { type: 'string', enum: [...IMPORT_LISTING_TYPES], description: 'Default product.' },
         condition:    { type: 'string', enum: [...IMPORT_CONDITIONS], description: 'Physical products only.' },
         quantity:     { type: 'number', description: 'Units available. Default 1 (physical products).' },
+        // Events (merchant-panel-gaps S1.1) — a service listing with a date or venue is an event;
+        // `capacity` is its «Lugares disponibles». The listing sells out at that number.
+        event_date:    { type: 'string', description: 'Events only (listing_type=service). Date as YYYY-MM-DD.' },
+        event_time:    { type: 'string', description: 'Events only. Start time as HH:MM (24h).' },
+        venue_name:    { type: 'string', description: 'Events only. Venue name.' },
+        venue_address: { type: 'string', description: 'Events only. Venue address.' },
+        capacity:      { type: 'number', description: 'Events only. Seats available (integer, 0 or more). Needs event_date or venue_name. The listing is marked sold out when they run out. Omit for an untracked event.' },
         state:        { type: 'string', description: 'Mexican state, e.g. "Jalisco".' },
         city:         { type: 'string', description: 'City / municipio / alcaldía.' },
         images:       { type: 'array', items: { type: 'string' }, description: 'Absolute image URLs (http/https). The first is the cover. Max 6.' },
@@ -893,6 +901,7 @@ const TOOLS = [
         description: { type: 'string', description: 'New description' },
         price_mxn:   { type: 'number', description: 'New price in MXN pesos (e.g. 1500 = $1,500)' },
         quantity:    { type: 'number', description: 'New stock quantity (physical products only)' },
+        capacity:    { type: 'number', description: 'New seats available for an EVENT listing (integer, 0 or more). Same field as quantity, named for events. Giving seats to an event that had none starts tracking them.' },
         collection_names: {
           type: 'array', items: { type: 'string' },
           description: 'Full replacement set of collection names (from list_my_collections) this listing should belong to. Omit to leave unchanged; pass [] to clear.',
@@ -2760,6 +2769,13 @@ async function handleCreateListing(args: Record<string, unknown>, authHeader?: s
   const row: CatalogImportRow = staged.row
   const listingType = row.listing_type ?? 'product'
   const isStockable = listingType === 'product'
+  // Event block + seats (merchant-panel-gaps S1.1). Only a service/digital listing can be an event.
+  const eventFields = mcpEventFields(args)
+  if (!eventFields.ok) return { isError: true, content: [{ type: 'text', text: `No se pudo crear el anuncio: ${eventFields.error}` }] }
+  if (Object.keys(eventFields.attrs).length > 0 && !isEventCapableType(listingType)) {
+    return { isError: true, content: [{ type: 'text', text: 'No se pudo crear el anuncio: los datos de evento solo aplican a listing_type=service.' }] }
+  }
+  const listingAttrs = { ...(row.attrs ?? {}), ...eventFields.attrs }
 
   // Pull any remote image URLs into our R2 pipeline (SSRF-guarded, capped,
   // graceful per-image fallback — same path as bulk import).
@@ -2793,11 +2809,14 @@ async function handleCreateListing(args: Record<string, unknown>, authHeader?: s
     state: row.state || null,
     municipio: row.city || null,
     location,
-    quantity: isStockable ? Math.max(1, Math.floor(row.quantity ?? 1)) : 1,
+    // Products: at least 1. An event: its seats, or NOTHING (a defaulted 1 would make it a one-seat event).
+    ...(isStockable
+      ? { quantity: Math.max(1, Math.floor(row.quantity ?? 1)) }
+      : eventFields.quantity !== undefined ? { quantity: eventFields.quantity } : {}),
     weight_grams: row.weight_grams ?? null,
     status,
     images: ingest.images,
-    ...(row.attrs && Object.keys(row.attrs).length > 0 ? { attrs: row.attrs } : {}),
+    ...(Object.keys(listingAttrs).length > 0 ? { attrs: listingAttrs } : {}),
   })
   if (!result.ok || !result.product_id) {
     return { isError: true, content: [{ type: 'text', text: `No se pudo crear el anuncio: ${result.error}` }] }
@@ -3831,6 +3850,15 @@ async function handleUpdateListing(args: Record<string, unknown>, authHeader?: s
   if (typeof args.description === 'string') { patch.description = args.description; fields.push('description') }
   if (typeof args.price_mxn === 'number') { patch.price_cents = Math.round(args.price_mxn * 100); fields.push('price') }
   if (typeof args.quantity === 'number') { patch.quantity = Math.max(0, Math.floor(args.quantity)); fields.push('quantity') }
+  // `capacity` = an event's «Lugares disponibles»: the same write as quantity, refused when negative
+  // rather than clamped to 0 (a typo must not silently sell the event out).
+  if (typeof args.capacity === 'number') {
+    if (!Number.isInteger(args.capacity) || args.capacity < 0) {
+      return { isError: true, content: [{ type: 'text', text: SEATS_NEGATIVE_MESSAGE }] }
+    }
+    patch.quantity = args.capacity
+    if (!fields.includes('quantity')) fields.push('quantity')
+  }
   if (Array.isArray(args.collection_names)) {
     const requestedNames = args.collection_names.filter((n): n is string => typeof n === 'string')
     const shopCollections = await getShopCollections(shop.slug)

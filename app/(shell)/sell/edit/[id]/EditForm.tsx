@@ -17,6 +17,7 @@ import type { PriceGrid } from '@/lib/price-grid'
 import { EXCERPT_MAX_CHARS } from '@/lib/excerpt'
 import { deriveInventoryMode, type InventoryMode } from '@/lib/inventory-mode'
 import { PROCESSING_LABELS } from '@/lib/trust-inputs'
+import { seatsForWrite } from '@/lib/event-seats'
 
 interface ShortlinkInfo {
   shopSlug: string
@@ -247,6 +248,15 @@ export default function EditForm({
         const nextQuantity = Math.max(0, parseInt(quantityRaw) || 0)
         if (nextQuantity !== (initial.available_quantity ?? null)) body.quantity = nextQuantity
       }
+      // An event's «Lugares disponibles» (merchant-panel-gaps S1.1): sent only when changed, so an
+      // unrelated save never touches seats — and a first-time value turns tracking on server-side.
+      if (!isProduct) {
+        const seatsResult = seatsForWrite({ listingType: initial.listing_type, attrs, seatsRaw: quantityRaw })
+        if (seatsResult.ok && seatsResult.quantity !== undefined
+          && seatsResult.quantity !== (initial.available_quantity ?? null)) {
+          body.quantity = seatsResult.quantity
+        }
+      }
       // Inventory mode + dispatch estimate — catalog-management S2 · 2.1.
       // Flag-gated at the selector UI level (only 'tracked' is offered while
       // OFF), but dirty-check by value regardless so a no-op save never sends
@@ -401,6 +411,8 @@ export default function EditForm({
           listingType={initial.listing_type as ListingType}
           attrs={attrs}
           setAttr={setAttr}
+          seats={quantityRaw}
+          setSeats={setQuantityRaw}
         />
       )}
 

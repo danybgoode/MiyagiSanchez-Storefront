@@ -90,7 +90,9 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
       const d = await r.json()
       const ml = d?.listing
       if (ml) {
-        if (listing.listing_type === 'product') {
+        // Products, and an event with seats (service/digital that the backend tracks) — an untracked
+        // service reads `manage_inventory: false`, so it stays null.
+        if (listing.listing_type !== 'subscription') {
           availableQuantity = ml.manage_inventory ? (ml.available_quantity ?? null) : null
         }
         medusaAttrs = (ml.attrs as Record<string, unknown>) ?? {}
