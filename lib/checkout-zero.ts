@@ -7,7 +7,9 @@
  * decision; startCheckout() supplies the cart's own subtotal (read from Medusa after the lines are added).
  *
  * Three states, never two: a subtotal we could not read is UNKNOWN — it is neither «zero» nor «fine», and
- * is reported to the caller instead of being collapsed into either.
+ * is reported to the caller instead of being collapsed into either. The call site then FAILS CLOSED on it
+ * (`zeroTotalRefusal`): an unreadable subtotal is exactly what a flaky read or an attacker-induced error
+ * looks like, and letting it through would reopen the $0-order hole this guard exists to close.
  *
  * NO exemptions, and nothing read from the request body: an earlier version exempted offers, coupons, the
  * support widget and rentals by caller-supplied flags, and `support: {}` in a crafted body skipped the guard
@@ -17,9 +19,19 @@
  */
 export const ZERO_TOTAL_CHECKOUT_MESSAGE = 'Este anuncio no tiene un precio para cobrar. Si es un evento gratis, regístrate desde su página.'
 
+/** Shown when the cart's total could not be read: retryable, and we do NOT proceed to start-checkout. */
+export const CART_TOTAL_UNVERIFIED_MESSAGE = 'No pudimos confirmar el total del carrito. Intenta de nuevo.'
+
 export type ZeroTotalDecision = 'refuse' | 'allow' | 'unknown'
 
 export function zeroTotalDecision(input: { subtotal: unknown }): ZeroTotalDecision {
   if (typeof input.subtotal !== 'number' || !Number.isFinite(input.subtotal)) return 'unknown'
   return input.subtotal <= 0 ? 'refuse' : 'allow'
+}
+
+/** The refusal message the call site must throw for a decision, or null when checkout may proceed. */
+export function zeroTotalRefusal(decision: ZeroTotalDecision): string | null {
+  if (decision === 'refuse') return ZERO_TOTAL_CHECKOUT_MESSAGE
+  if (decision === 'unknown') return CART_TOTAL_UNVERIFIED_MESSAGE
+  return null
 }

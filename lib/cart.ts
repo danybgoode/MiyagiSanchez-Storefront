@@ -8,7 +8,7 @@
  *   const { redirect_url } = await startCheckout({ items: [...], sellerId, provider, buyerEmail })
  */
 
-import { ZERO_TOTAL_CHECKOUT_MESSAGE, zeroTotalDecision } from './checkout-zero'
+import { zeroTotalDecision, zeroTotalRefusal } from './checkout-zero'
 import type { PersonalizationPayload } from './personalization'
 import { DEFAULT_MARKET, type MarketCode } from './markets'
 import { PROCESS_MARKET_ENV, resolveRegionIdForMarket } from './market-medusa'
@@ -505,8 +505,8 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
 
   // 3b. Refuse a $0 cart BEFORE start-checkout (see lib/checkout-zero.ts). The cart's own subtotal is the
   // authority — what the listing price field says does not matter, only what Medusa would charge. If the
-  // read fails the guard says so in the log and lets the backend decide: this is a storefront guard, and the
-  // public Medusa store API is not behind it.
+  // read fails we FAIL CLOSED (retryable message, logged): an unreadable subtotal is not proof the cart is
+  // priced, and start-checkout has no zero-total refusal of its own.
   {
     let subtotal: unknown
     try {
@@ -514,8 +514,9 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
       if (totalsRes.ok) subtotal = ((await totalsRes.json()) as { cart?: { subtotal?: unknown } }).cart?.subtotal
     } catch { /* unknown, handled below */ }
     const decision = zeroTotalDecision({ subtotal })
-    if (decision === 'refuse') throw new Error(ZERO_TOTAL_CHECKOUT_MESSAGE)
-    if (decision === 'unknown') console.warn('[startCheckout] cart subtotal unreadable; zero-total guard skipped', { cartId })
+    if (decision === 'unknown') console.warn('[startCheckout] cart subtotal unreadable; refusing checkout', { cartId })
+    const refusal = zeroTotalRefusal(decision)
+    if (refusal) throw new Error(refusal)
   }
 
   // 4. Call start-checkout to create the external payment session + get redirect URL

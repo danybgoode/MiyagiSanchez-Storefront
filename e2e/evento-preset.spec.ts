@@ -6,7 +6,7 @@ import {
   buildRsvpEventDraft, eventStartsAt, eventTimeZoneForState, rsvpEventSyncPatch, eventoErrors, isEventoTipo, isFreeEventListing,
   parseEventoPriceCents, rsvpEventSlug, rsvpEventShownOnListing, freeEventPriceRefusal, freeEventPatchRefusal, FREE_EVENT_PRICE_LOCKED_MESSAGE,
 } from '../lib/evento-preset'
-import { ZERO_TOTAL_CHECKOUT_MESSAGE, zeroTotalDecision } from '../lib/checkout-zero'
+import { ZERO_TOTAL_CHECKOUT_MESSAGE, CART_TOTAL_UNVERIFIED_MESSAGE, zeroTotalDecision, zeroTotalRefusal } from '../lib/checkout-zero'
 import { eventPublicStatus } from '../lib/event-status'
 import { createQuantityForBackend, seatsForWrite } from '../lib/event-seats'
 import {
@@ -54,6 +54,11 @@ test.describe('evento · wizard preset → payload', () => {
     const none = eventoErrors({ attrs: {}, seatsRaw: '', priceRaw: '' })
     expect(Object.keys(none).sort()).toEqual(['event_date', 'event_time', 'price', 'seats', 'venue_name'])
     expect(eventoErrors({ attrs: FULL, seatsRaw: '0', priceRaw: '10' }).seats).toMatch(/al menos 1/)
+    // seats are never silently capped: above 100,000 is refused out loud
+    expect(eventoErrors({ attrs: FULL, seatsRaw: '100000', priceRaw: '10' })).toEqual({})
+    expect(eventoErrors({ attrs: FULL, seatsRaw: '100001', priceRaw: '10' }).seats).toMatch(/100,000/)
+    expect(buildRsvpEventDraft({ title: 'X', quantity: 100001, attrs: FULL })).toMatchObject({ ok: false, field: 'quantity' })
+    expect(read('app/api/sell/create/route.ts')).toContain('body.listing.quantity > MAX_EVENT_SEATS')
     expect(eventoErrors({ attrs: { ...FULL, event_time: '  ' }, seatsRaw: '3', priceRaw: '10' }).event_time).toBeTruthy()
   })
 
@@ -274,14 +279,20 @@ test.describe('«Gratis» follows the price and the owner, not the link (review 
     expect(FREE_EVENT_PRICE_LOCKED_MESSAGE).toBe('Este evento es gratis: para cobrar entrada, crea un Evento con precio.')
     const put = read('app/api/sell/listing/[id]/route.ts')
     const body = put.slice(put.indexOf('export async function PUT'))
-    expect(body.indexOf('freeEventPriceRefusal(')).toBeGreaterThan(0)
-    expect(body.indexOf('freeEventPriceRefusal(')).toBeLessThan(body.indexOf('medusaFetch('))
+    expect(body.indexOf('freeEventPatchRefusal(')).toBeGreaterThan(0)
+    expect(body.indexOf('freeEventPatchRefusal(')).toBeLessThan(body.indexOf('medusaFetch('))
+    // a FAILED mirror read is «could not verify», not «not an event»: the price change is refused
+    expect(body).toContain('priceRowError')
+    expect(body).toMatch(/if \(priceRowError\) \{[\s\S]{0,250}FREE_EVENT_PRICE_UNVERIFIED_MESSAGE/)
   })
   test('a bulk price patch on a free Evento is refused row by row; $0 and unrelated patches pass', () => {
     const meta = { rsvp_event_slug: 'taller-abc' }
     expect(freeEventPatchRefusal(meta, { price_cents: 15000 })).toBe(FREE_EVENT_PRICE_LOCKED_MESSAGE)
     expect(freeEventPatchRefusal(meta, { variant_prices: { 'Talla:M': 9000 } })).toBe(FREE_EVENT_PRICE_LOCKED_MESSAGE)
     expect(freeEventPatchRefusal(meta, { price_cents: 0 })).toBeNull()
+    // review #491: a zero base price must not hide a per-variant price
+    expect(freeEventPatchRefusal(meta, { price_cents: 0, variant_prices: { default: 15000 } })).toBe(FREE_EVENT_PRICE_LOCKED_MESSAGE)
+    expect(freeEventPatchRefusal(meta, { price_cents: 0, variant_prices: { default: 0 } })).toBeNull()
     expect(freeEventPatchRefusal(meta, {})).toBeNull()
     expect(freeEventPatchRefusal({}, { price_cents: 15000 })).toBeNull()
     expect(freeEventPatchRefusal(null, null)).toBeNull()
@@ -321,6 +332,11 @@ test.describe('a crafted /api/checkout/start cannot buy a $0 cart (review #491)'
     const cart = readFileSync(join(import.meta.dirname, '..', 'lib/cart.ts'), 'utf8')
     expect(cart).toContain('zeroTotalDecision({ subtotal })')
     expect(ZERO_TOTAL_CHECKOUT_MESSAGE).toMatch(/precio/)
+    // fail CLOSED: an unreadable subtotal is refused with a retryable message, never waved through
+    expect(zeroTotalRefusal('unknown')).toBe('No pudimos confirmar el total del carrito. Intenta de nuevo.')
+    expect(zeroTotalRefusal('unknown')).toBe(CART_TOTAL_UNVERIFIED_MESSAGE)
+    expect(zeroTotalRefusal('refuse')).toBe(ZERO_TOTAL_CHECKOUT_MESSAGE)
+    expect(zeroTotalRefusal('allow')).toBeNull()
   })
   test('startCheckout asks it after the lines are added and BEFORE start-checkout', () => {
     const cart = read('lib/cart.ts')
@@ -328,6 +344,8 @@ test.describe('a crafted /api/checkout/start cannot buy a $0 cart (review #491)'
     const guard = fn.indexOf('zeroTotalDecision(')
     expect(guard).toBeGreaterThan(fn.indexOf('/line-items'))
     expect(guard).toBeLessThan(fn.indexOf('/start-checkout'))
-    expect(fn).toContain("if (decision === 'refuse') throw new Error(ZERO_TOTAL_CHECKOUT_MESSAGE)")
+    expect(fn).toContain('const refusal = zeroTotalRefusal(decision)')
+    expect(fn).toContain('if (refusal) throw new Error(refusal)')
+    expect(fn).not.toContain('guard skipped')
   })
 })

@@ -9,7 +9,8 @@ import { isEnabled } from '@/lib/flags'
 import { normalizeExcerpt, type Excerpt } from '@/lib/excerpt'
 import { setListingStatus, deleteListing } from '@/lib/listing-status'
 import { resolveEventSeller } from '@/lib/events-seller'
-import { freeEventPriceRefusal, rsvpEventSlug, rsvpEventSyncPatch } from '@/lib/evento-preset'
+import { freeEventPatchRefusal, rsvpEventSlug, rsvpEventSyncPatch } from '@/lib/evento-preset'
+import { FREE_EVENT_PRICE_UNVERIFIED_MESSAGE } from '@/lib/seller-products'
 import { isMlSyncEntitled, reconcileMlToggle } from '@/lib/ml-channel-toggle'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
@@ -233,13 +234,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!clerkJwt) return NextResponse.json({ error: 'Error de autenticación.' }, { status: 401 })
   // A free Evento stays free: refuse a price move BEFORE any write (otherwise the PDP would show a
   // registration form AND a buy button charging the new price, with untracked seats).
-  if (body.price_cents !== undefined) {
-    const { data: priceRow } = await db
+  if (body.price_cents !== undefined || body.variant_prices !== undefined) {
+    const { data: priceRow, error: priceRowError } = await db
       .from('marketplace_listings')
       .select('metadata')
       .eq('medusa_product_id', id)
       .maybeSingle()
-    const priceRefusal = freeEventPriceRefusal((priceRow?.metadata ?? null) as Record<string, unknown> | null, body.price_cents)
+    // A failed read is NOT «not an event»: refuse the price change rather than let it through unchecked
+    // (same «could not verify» pattern as freeEventPriceBlock in lib/seller-products.ts).
+    if (priceRowError) {
+      console.error('[sell/listing] free-event price check could not read the listing:', priceRowError.message)
+      return NextResponse.json({ error: FREE_EVENT_PRICE_UNVERIFIED_MESSAGE, field: 'price' }, { status: 503 })
+    }
+    const priceRefusal = freeEventPatchRefusal(
+      (priceRow?.metadata ?? null) as Record<string, unknown> | null,
+      { price_cents: body.price_cents, variant_prices: body.variant_prices },
+    )
     if (priceRefusal) return NextResponse.json({ error: priceRefusal, field: 'price' }, { status: 422 })
   }
   const freeEventRefusal = await freeEventBlockRefusal(id, body)

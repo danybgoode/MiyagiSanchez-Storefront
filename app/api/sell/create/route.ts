@@ -8,7 +8,7 @@ import { resolveSellerSignupMarket } from '@/lib/seller-signup-market'
 import { sellerListingCurrency } from '@/lib/seller-listing-currency'
 import { db } from '@/lib/supabase'
 import { uniqueEventSlug } from '@/lib/events'
-import { buildRsvpEventDraft, isFreeEventListing, type RsvpEventDraft } from '@/lib/evento-preset'
+import { buildRsvpEventDraft, isFreeEventListing, MAX_EVENT_SEATS, EVENT_SEATS_TOO_MANY_MESSAGE, type RsvpEventDraft } from '@/lib/evento-preset'
 import { createQuantityForBackend, hasEventBlock, isEventCapableType, SEATS_NEGATIVE_MESSAGE } from '@/lib/event-seats'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
@@ -101,6 +101,11 @@ export async function POST(req: NextRequest) {
   if (isEventCapableType(body.listing.listing_type) && hasEventBlock(body.listing.attrs)
     && body.listing.quantity != null && (!Number.isInteger(body.listing.quantity) || body.listing.quantity < 0)) {
     return NextResponse.json({ error: SEATS_NEGATIVE_MESSAGE, field: 'quantity' }, { status: 422 })
+  }
+  // ...and an absurd one is refused out loud, not capped (the RSVP row used to cap at 100,000 silently).
+  if (isEventCapableType(body.listing.listing_type) && hasEventBlock(body.listing.attrs)
+    && typeof body.listing.quantity === 'number' && body.listing.quantity > MAX_EVENT_SEATS) {
+    return NextResponse.json({ error: EVENT_SEATS_TOO_MANY_MESSAGE, field: 'quantity' }, { status: 422 })
   }
 
   // A free Evento (service + event block + $0) is also an RSVP event: validate the row it needs before

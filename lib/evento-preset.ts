@@ -18,6 +18,10 @@ import { hasEventBlock } from './event-seats'
 /** `/sell?tipo=evento` preselects the Evento preset. */
 export const EVENTO_TIPO = 'evento'
 
+/** Most seats one Evento can hold. Refused above this — never silently capped. */
+export const MAX_EVENT_SEATS = 100000
+export const EVENT_SEATS_TOO_MANY_MESSAGE = 'Un evento puede tener hasta 100,000 lugares. Indica una cantidad menor.'
+
 export function isEventoTipo(value: string | string[] | null | undefined): boolean {
   const v = Array.isArray(value) ? value[0] : value
   return typeof v === 'string' && v.trim().toLowerCase() === EVENTO_TIPO
@@ -53,6 +57,8 @@ export function eventoErrors(input: EventoFormInput): Record<string, string> {
     errs.seats = 'Indica cuántos lugares hay disponibles.'
   } else if (Number.parseInt(seats, 10) < 1) {
     errs.seats = 'Un evento nuevo necesita al menos 1 lugar disponible.'
+  } else if (Number.parseInt(seats, 10) > MAX_EVENT_SEATS) {
+    errs.seats = EVENT_SEATS_TOO_MANY_MESSAGE
   }
   if (parseEventoPriceCents(input.priceRaw) === null) {
     errs.price = 'Ingresa el precio, o $0 si es gratis.'
@@ -167,6 +173,7 @@ export function buildRsvpEventDraft(listing: {
   if (typeof seats !== 'number' || !Number.isInteger(seats) || seats < 1) {
     return { ok: false, field: 'quantity', error: 'Un evento gratis necesita al menos 1 lugar disponible.' }
   }
+  if (seats > MAX_EVENT_SEATS) return { ok: false, field: 'quantity', error: EVENT_SEATS_TOO_MANY_MESSAGE }
   const address = typeof attrs.venue_address === 'string' ? attrs.venue_address.trim() : ''
   return {
     ok: true,
@@ -176,7 +183,7 @@ export function buildRsvpEventDraft(listing: {
       starts_at: startsAt,
       venue_name: venue,
       venue_address: address || null,
-      capacity: Math.min(100000, seats),
+      capacity: seats,
     },
   }
 }
@@ -232,7 +239,10 @@ export function freeEventPatchRefusal(
   patch: { price_cents?: number | null; variant_prices?: Record<string, number> | null } | null | undefined,
 ): string | null {
   if (!patch) return null
-  if (patch.price_cents !== undefined) return freeEventPriceRefusal(metadata, patch.price_cents)
+  // EVERY price field is checked: an early return on `price_cents: 0` let
+  // `{ price_cents: 0, variant_prices: { default: 15000 } }` through.
+  const base = freeEventPriceRefusal(metadata, patch.price_cents)
+  if (base) return base
   const variantPrices = patch.variant_prices
   if (variantPrices && Object.values(variantPrices).some((v) => v !== 0)) {
     return freeEventPriceRefusal(metadata, Number.NaN)
