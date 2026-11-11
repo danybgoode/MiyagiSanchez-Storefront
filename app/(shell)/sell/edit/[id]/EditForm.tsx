@@ -19,6 +19,7 @@ import { deriveInventoryMode, type InventoryMode } from '@/lib/inventory-mode'
 import { PROCESSING_LABELS } from '@/lib/trust-inputs'
 import { SEATS_EDIT_HINT, seatsForWrite } from '@/lib/event-seats'
 import Link from 'next/link'
+import { FREE_EVENT_PRICE_LOCKED_MESSAGE } from '@/lib/evento-preset'
 
 interface ShortlinkInfo {
   shopSlug: string
@@ -117,8 +118,9 @@ export default function EditForm({
   const router = useRouter()
   const [title, setTitle] = useState(initial.title)
   const [description, setDescription] = useState(initial.description ?? '')
+  const initialPriceRaw = initial.price_cents != null ? String(initial.price_cents / 100) : ''
   const [priceRaw, setPriceRaw] = useState(
-    initial.price_cents != null ? String(initial.price_cents / 100) : '',
+    initialPriceRaw,
   )
   const [quantityRaw, setQuantityRaw] = useState(
     initial.available_quantity != null ? String(initial.available_quantity) : '',
@@ -249,7 +251,10 @@ export default function EditForm({
         custom_fields: sanitizeFieldDefs(customFields),
         ...(shortlink ? { short_slug: shortSlug.trim() || null } : {}),
       }
-      if (!priceReadOnly && !hideFlatPrice) {
+      // A free Evento's price is locked at $0 and never sent: parsePesosToCents('0') is null, so every
+      // save used to write price_cents NULL over a free listing. Any other listing sends the price only
+      // when the field actually changed.
+      if (!priceReadOnly && !hideFlatPrice && !initial.rsvp_event_slug && priceRaw.trim() !== initialPriceRaw) {
         const nextPriceCents = priceRaw ? parsePesosToCents(priceRaw) : null
         if (nextPriceCents !== (initial.price_cents ?? null)) body.price_cents = nextPriceCents
       }
@@ -498,12 +503,17 @@ export default function EditForm({
               inputMode="decimal"
               value={priceRaw}
               onChange={e => setPriceRaw(e.target.value)}
+              disabled={!!initial.rsvp_event_slug}
+              data-testid="edit-price-input"
               placeholder="0.00"
               className={`w-full border rounded-[var(--r-sm)] pl-7 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition ${
                 fieldErrors.price ? 'border-red-400' : 'border-[var(--color-border)]'
               }`}
             />
           </div>
+          {initial.rsvp_event_slug && (
+            <p data-testid="free-event-price-note" className="text-xs text-[var(--color-muted)] mt-1">{FREE_EVENT_PRICE_LOCKED_MESSAGE}</p>
+          )}
           {fieldErrors.price && <p className="text-red-600 text-xs mt-1">{fieldErrors.price}</p>}
           {isDigital && <p className="text-xs text-[var(--color-muted)] mt-1">Precio por descarga única.</p>}
         </div>

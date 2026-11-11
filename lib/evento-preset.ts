@@ -188,6 +188,41 @@ export function rsvpEventSlug(metadata: Record<string, unknown> | null | undefin
 }
 
 /**
+ * May the PDP render the RSVP registration (and the «Gratis» label) for this listing + event? ONLY when
+ * the listing is really free ($0 — «Gratis» follows the PRICE, never the link: a free Evento edited to
+ * $150 must show $150 and its buy box, not a free registration) AND the event belongs to the listing's
+ * own seller. `rsvp_event_slug` rides metadata that a seller can PATCH directly on the backend, so the
+ * slug alone must never pull another shop's registration form onto this page (review #491, security).
+ * `listingSellerId` and `event.medusa_seller_id` are both the Medusa seller id (`listing.shop.id`;
+ * the create route writes `medusa_seller_id: sellerId`).
+ */
+export function rsvpEventShownOnListing(
+  listing: { price_cents?: number | null; shop?: { id?: string | null } | null },
+  event: { medusa_seller_id?: string | null } | null | undefined,
+): boolean {
+  if (!event) return false
+  if (listing.price_cents !== 0) return false
+  const sellerId = listing.shop?.id
+  return typeof sellerId === 'string' && sellerId !== '' && event.medusa_seller_id === sellerId
+}
+
+export const FREE_EVENT_PRICE_LOCKED_MESSAGE = 'Este evento es gratis: para cobrar entrada, crea un Evento con precio.'
+
+/**
+ * A listing that carries an RSVP link is free by construction. Moving its price away from $0 (a number,
+ * or null = «precio a consultar») would leave a registration form, a buy button and untracked seats on
+ * one page. Returns the refusal message, or null when the write is fine. `undefined` = price untouched.
+ */
+export function freeEventPriceRefusal(
+  metadata: Record<string, unknown> | null | undefined,
+  nextPriceCents: number | null | undefined,
+): string | null {
+  if (nextPriceCents === undefined) return null
+  if (!rsvpEventSlug(metadata)) return null
+  return nextPriceCents === 0 ? null : FREE_EVENT_PRICE_LOCKED_MESSAGE
+}
+
+/**
  * What a listing edit changes on its linked RSVP row: title, start, venue and address — never the
  * capacity (seats of a free Evento are edited in the roster) or status. Null when the edit does not
  * describe a complete event (the row is then left as it is rather than half-rewritten).

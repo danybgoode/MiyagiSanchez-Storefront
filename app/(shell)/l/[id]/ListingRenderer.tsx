@@ -40,7 +40,7 @@ import EventHero from './EventHero'
 import EventRegistrationPanel from '@/app/(shell)/e/[slug]/EventRegistrationPanel'
 import { getEventBySlug, getEventStats } from '@/lib/events'
 import { eventPublicStatus } from '@/lib/event-status'
-import { FREE_EVENT_PRICE_LABEL, rsvpEventSlug } from '@/lib/evento-preset'
+import { FREE_EVENT_PRICE_LABEL, rsvpEventShownOnListing, rsvpEventSlug } from '@/lib/evento-preset'
 import EventBuyBox from './EventBuyBox'
 import { eventHeroModel } from '@/lib/event-hero'
 import { serviceHeroModel } from '@/lib/service-hero'
@@ -384,7 +384,9 @@ export async function ListingPage({
   // taking a payment: its slug rides the listing's metadata, and the registration panel replaces the
   // buy box. Absent or unresolvable slug = an ordinary listing, rendered exactly as before.
   const rsvpSlug = rsvpEventSlug(listing.metadata)
-  const rsvpEvent = rsvpSlug ? await getEventBySlug(rsvpSlug) : null
+  const linkedEvent = rsvpSlug ? await getEventBySlug(rsvpSlug) : null
+  // «Gratis» + the registration form follow the PRICE ($0) and the event's OWNER, not the bare slug.
+  const rsvpEvent = rsvpEventShownOnListing(listing, linkedEvent) ? linkedEvent : null
   const rsvpStats = rsvpEvent ? await getEventStats(rsvpEvent) : null
   const effectivePrice = agreedDealCents
     ? formatCents(agreedDealCents, activeDealCurrency)

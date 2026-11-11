@@ -4,8 +4,9 @@ import { join } from 'node:path'
 import {
   EVENTS_EMPTY_REDIRECT, EVENTO_TIPO, FREE_EVENT_PRICE_LABEL, NEW_EVENT_HREF,
   buildRsvpEventDraft, eventStartsAt, eventTimeZoneForState, rsvpEventSyncPatch, eventoErrors, isEventoTipo, isFreeEventListing,
-  parseEventoPriceCents, rsvpEventSlug,
+  parseEventoPriceCents, rsvpEventSlug, rsvpEventShownOnListing, freeEventPriceRefusal, FREE_EVENT_PRICE_LOCKED_MESSAGE,
 } from '../lib/evento-preset'
+import { ZERO_TOTAL_CHECKOUT_MESSAGE, zeroTotalDecision } from '../lib/checkout-zero'
 import { eventPublicStatus } from '../lib/event-status'
 import { createQuantityForBackend, seatsForWrite } from '../lib/event-seats'
 import {
@@ -242,5 +243,60 @@ test.describe('a free Evento edit keeps a complete block (codex review #491)', (
     const firstWrite = put.indexOf('medusaFetch(')
     expect(refusal).toBeGreaterThan(0)
     expect(refusal).toBeLessThan(firstWrite)
+  })
+})
+
+test.describe('«Gratis» follows the price and the owner, not the link (review #491)', () => {
+  const event = { medusa_seller_id: 'sel_A' }
+  test('the RSVP panel shows only for a $0 listing whose event is the listing seller\'s own', () => {
+    expect(rsvpEventShownOnListing({ price_cents: 0, shop: { id: 'sel_A' } }, event)).toBe(true)
+    // A free Evento edited to $150: no «Gratis», no registration form — the buy box takes over.
+    expect(rsvpEventShownOnListing({ price_cents: 15000, shop: { id: 'sel_A' } }, event)).toBe(false)
+    expect(rsvpEventShownOnListing({ price_cents: null, shop: { id: 'sel_A' } }, event)).toBe(false)
+    // Another shop's event slug planted via a direct backend PATCH.
+    expect(rsvpEventShownOnListing({ price_cents: 0, shop: { id: 'sel_B' } }, event)).toBe(false)
+    expect(rsvpEventShownOnListing({ price_cents: 0, shop: null }, event)).toBe(false)
+    expect(rsvpEventShownOnListing({ price_cents: 0, shop: { id: 'sel_A' } }, null)).toBe(false)
+  })
+  test('the PDP renders the panel through that predicate', () => {
+    const src = read('app/(shell)/l/[id]/ListingRenderer.tsx')
+    expect(src).toContain('rsvpEventShownOnListing(listing, linkedEvent)')
+  })
+  test('a price move away from $0 on a free Evento is refused before any write; $0 and non-events pass', () => {
+    const meta = { rsvp_event_slug: 'taller-abc' }
+    expect(freeEventPriceRefusal(meta, 15000)).toBe(FREE_EVENT_PRICE_LOCKED_MESSAGE)
+    expect(freeEventPriceRefusal(meta, null)).toBe(FREE_EVENT_PRICE_LOCKED_MESSAGE)
+    expect(freeEventPriceRefusal(meta, 0)).toBeNull()
+    expect(freeEventPriceRefusal(meta, undefined)).toBeNull()
+    expect(freeEventPriceRefusal({}, 15000)).toBeNull()
+    expect(FREE_EVENT_PRICE_LOCKED_MESSAGE).toBe('Este evento es gratis: para cobrar entrada, crea un Evento con precio.')
+    const put = read('app/api/sell/listing/[id]/route.ts')
+    const body = put.slice(put.indexOf('export async function PUT'))
+    expect(body.indexOf('freeEventPriceRefusal(')).toBeGreaterThan(0)
+    expect(body.indexOf('freeEventPriceRefusal(')).toBeLessThan(body.indexOf('medusaFetch('))
+  })
+  test('the edit form locks the price of a free Evento and never writes null over it', () => {
+    const edit = read('app/(shell)/sell/edit/[id]/EditForm.tsx')
+    expect(edit).toContain('disabled={!!initial.rsvp_event_slug}')
+    expect(edit).toMatch(/!initial\.rsvp_event_slug && priceRaw\.trim\(\) !== initialPriceRaw/)
+  })
+})
+
+test.describe('a crafted /api/checkout/start cannot buy a $0 cart (review #491)', () => {
+  test('zeroTotalDecision refuses 0, allows priced and exempt carts, and reports unreadable as unknown', () => {
+    expect(zeroTotalDecision({ subtotal: 0, exempt: {} })).toBe('refuse')
+    expect(zeroTotalDecision({ subtotal: 15000, exempt: {} })).toBe('allow')
+    expect(zeroTotalDecision({ subtotal: undefined, exempt: {} })).toBe('unknown')
+    expect(zeroTotalDecision({ subtotal: 0, exempt: { offer: true } })).toBe('allow')
+    expect(zeroTotalDecision({ subtotal: 0, exempt: { support: true } })).toBe('allow')
+    expect(ZERO_TOTAL_CHECKOUT_MESSAGE).toMatch(/precio/)
+  })
+  test('startCheckout asks it after the lines are added and BEFORE start-checkout', () => {
+    const cart = read('lib/cart.ts')
+    const fn = cart.slice(cart.indexOf('export async function startCheckout'))
+    const guard = fn.indexOf('zeroTotalDecision(')
+    expect(guard).toBeGreaterThan(fn.indexOf('/line-items'))
+    expect(guard).toBeLessThan(fn.indexOf('/start-checkout'))
+    expect(fn).toContain("if (decision === 'refuse') throw new Error(ZERO_TOTAL_CHECKOUT_MESSAGE)")
   })
 })

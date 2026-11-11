@@ -9,7 +9,7 @@ import { isEnabled } from '@/lib/flags'
 import { normalizeExcerpt, type Excerpt } from '@/lib/excerpt'
 import { setListingStatus, deleteListing } from '@/lib/listing-status'
 import { resolveEventSeller } from '@/lib/events-seller'
-import { rsvpEventSlug, rsvpEventSyncPatch } from '@/lib/evento-preset'
+import { freeEventPriceRefusal, rsvpEventSlug, rsvpEventSyncPatch } from '@/lib/evento-preset'
 import { isMlSyncEntitled, reconcileMlToggle } from '@/lib/ml-channel-toggle'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
@@ -231,6 +231,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const clerkJwt = await getToken()
   if (!clerkJwt) return NextResponse.json({ error: 'Error de autenticación.' }, { status: 401 })
+  // A free Evento stays free: refuse a price move BEFORE any write (otherwise the PDP would show a
+  // registration form AND a buy button charging the new price, with untracked seats).
+  if (body.price_cents !== undefined) {
+    const { data: priceRow } = await db
+      .from('marketplace_listings')
+      .select('metadata')
+      .eq('medusa_product_id', id)
+      .maybeSingle()
+    const priceRefusal = freeEventPriceRefusal((priceRow?.metadata ?? null) as Record<string, unknown> | null, body.price_cents)
+    if (priceRefusal) return NextResponse.json({ error: priceRefusal, field: 'price' }, { status: 422 })
+  }
   const freeEventRefusal = await freeEventBlockRefusal(id, body)
   if (freeEventRefusal) return NextResponse.json({ error: freeEventRefusal, field: 'attrs' }, { status: 422 })
 
