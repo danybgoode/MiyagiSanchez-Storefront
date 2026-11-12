@@ -141,6 +141,14 @@ export async function PATCH(
     const stripeSettings = (shopMeta?.settings as Record<string, unknown> | undefined)?.stripe as
       { enabled?: boolean; account_id?: string; charges_enabled?: boolean } | undefined
 
+    // Claim countered → accepted BEFORE any side effect (security lens on PR 497): the seller may decline in the same
+    // instant, and a blind write here used to overwrite that decline with «accepted». The loser gets a 409.
+    const { data: claimed, error: claimError } = await db.from('marketplace_offers')
+      .update({ status: 'accepted' }).eq('id', id).eq('status', 'countered').select('id')
+    if (claimError || !Array.isArray(claimed) || claimed.length === 0) {
+      return NextResponse.json({ error: 'Esta oferta acaba de cambiar. Actualiza la página.' }, { status: 409 })
+    }
+
     let checkoutSessionId: string | null = null
     let checkoutExpires: string | null = null
 
@@ -194,10 +202,9 @@ export async function PATCH(
     }
 
     await db.from('marketplace_offers').update({
-      status: 'accepted',
       checkout_session_id: checkoutSessionId,
       checkout_expires_at: checkoutExpires,
-    }).eq('id', id)
+    }).eq('id', id).eq('status', 'accepted')
 
     const conversationUrl = await getConversationUrl()
 

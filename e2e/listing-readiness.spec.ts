@@ -249,6 +249,9 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     expect(acceptBranch).toContain('offerCollectRefusal(await offerCanProceed({')
     expect(acceptBranch).toContain('if (collectRefusal) {')
     expect(acceptBranch.indexOf('if (collectRefusal) {')).toBeLessThan(acceptBranch.indexOf("status: 'accepted'"))
+    // …and the buyer's accept is a conditional CLAIM from `countered`, before any payment session (security lens, PR 497).
+    expect(acceptBranch).toContain(".update({ status: 'accepted' }).eq('id', id).eq('status', 'countered').select('id')")
+    expect(acceptBranch.indexOf(".eq('status', 'countered')")).toBeLessThan(acceptBranch.indexOf('stripe.checkout.sessions.create'))
     const pdp = read('app/(shell)/l/[id]/ListingRenderer.tsx')
     expect(pdp).toContain('const hasAnyPayment = commerceReadiness.ready && listingPayable')
     expect(pdp).toContain('const offersOpen = hasAnyPayment')
