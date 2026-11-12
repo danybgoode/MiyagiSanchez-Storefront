@@ -239,10 +239,12 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     expect(respond).toContain('if (refusal) return { ok: false, error: refusal.error, httpStatus: refusal.status }')
     // Each seller transition is a conditional CLAIM on the validated status (security lens, PR 497): no blind writes,
     // and accept claims BEFORE creating a payment session.
-    expect(respond).toContain(".update(patch).eq('id', id).eq('status', fromStatus).select('id')")
+    expect(respond).toContain(".update(patch).eq('id', id).eq('status', fromStatus)")
+    expect(respond).toContain("if (opts.unexpired) q = q.gt('expires_at', new Date().toISOString())")
+    expect(respond).toContain("claim({ status: 'accepted' }, { unexpired: true })")
     expect(respond).not.toMatch(/update\(\{\s*status: '(accepted|countered|declined)'[^)]*\}\)\.eq\('id', id\)\s*$/m)
     const acceptAt = respond.indexOf("if (action === 'accept') {")
-    expect(respond.indexOf("claim({ status: 'accepted' })", acceptAt)).toBeLessThan(respond.indexOf('stripe.checkout.sessions.create', acceptAt))
+    expect(respond.indexOf("claim({ status: 'accepted' }", acceptAt)).toBeLessThan(respond.indexOf('stripe.checkout.sessions.create', acceptAt))
     // 🚨 The buyer accepting the SELLER'S counter is an accept too (fresh-review catch, PR 497).
     const buyer = read('app/api/offers/[id]/buyer-respond/route.ts')
     const acceptBranch = buyer.slice(buyer.indexOf("if (action === 'accept-counter') {"))
@@ -250,7 +252,8 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     expect(acceptBranch).toContain('if (collectRefusal) {')
     expect(acceptBranch.indexOf('if (collectRefusal) {')).toBeLessThan(acceptBranch.indexOf("status: 'accepted'"))
     // …and the buyer's accept is a conditional CLAIM from `countered`, before any payment session (security lens, PR 497).
-    expect(acceptBranch).toContain(".update({ status: 'accepted' }).eq('id', id).eq('status', 'countered').select('id')")
+    expect(acceptBranch).toContain(".update({ status: 'accepted' }).eq('id', id).eq('status', 'countered')")
+    expect(acceptBranch).toContain(".gt('counter_expires_at', new Date().toISOString())")
     expect(acceptBranch.indexOf(".eq('status', 'countered')")).toBeLessThan(acceptBranch.indexOf('stripe.checkout.sessions.create'))
     const pdp = read('app/(shell)/l/[id]/ListingRenderer.tsx')
     expect(pdp).toContain('const hasAnyPayment = commerceReadiness.ready && listingPayable')

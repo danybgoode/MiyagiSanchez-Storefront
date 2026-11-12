@@ -211,8 +211,11 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
   // window). Each transition is now a conditional write on the status it was validated against, read back: the loser
   // gets a 409 and runs no side effects.
   const fromStatus = offer.status as string
-  async function claim(patch: Record<string, unknown>): Promise<boolean> {
-    const { data, error } = await db.from('marketplace_offers').update(patch).eq('id', id).eq('status', fromStatus).select('id')
+  async function claim(patch: Record<string, unknown>, opts: { unexpired?: boolean } = {}): Promise<boolean> {
+    let q = db.from('marketplace_offers').update(patch).eq('id', id).eq('status', fromStatus)
+    // Accept/counter answer a PENDING offer: its deadline is part of the claim — the readiness read can outlast it.
+    if (opts.unexpired) q = q.gt('expires_at', new Date().toISOString())
+    const { data, error } = await q.select('id')
     return !error && Array.isArray(data) && data.length > 0
   }
   const lostRace: RespondResult = { ok: false, error: 'Esta oferta acaba de cambiar. Actualiza la página.', httpStatus: 409 }
@@ -262,7 +265,7 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
       counter_amount_cents: counterAmountCents,
       counter_message: counterMessage?.trim() ?? null,
       counter_expires_at: counterExpiresAt,
-    }))) return lostRace
+    }, { unexpired: true }))) return lostRace
 
     const conversationUrl = await getConversationUrl()
     const counteredMsg = buildBuyerMessage('offer_countered', {
@@ -314,7 +317,7 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
   // ── Accept ────────────────────────────────────────────────────────────────────
   if (action === 'accept') {
     // Claim FIRST, so a losing concurrent request never creates a Stripe session; the session is attached below.
-    if (!(await claim({ status: 'accepted' }))) return lostRace
+    if (!(await claim({ status: 'accepted' }, { unexpired: true }))) return lostRace
     cancelSellerReminders()
     const acceptedCents = offer.offer_amount_cents
     const listingUrl = listingUrlFor(origin, listing.id)

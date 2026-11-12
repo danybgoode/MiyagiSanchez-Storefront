@@ -144,7 +144,10 @@ export async function PATCH(
     // Claim countered → accepted BEFORE any side effect (security lens on PR 497): the seller may decline in the same
     // instant, and a blind write here used to overwrite that decline with «accepted». The loser gets a 409.
     const { data: claimed, error: claimError } = await db.from('marketplace_offers')
-      .update({ status: 'accepted' }).eq('id', id).eq('status', 'countered').select('id')
+      .update({ status: 'accepted' }).eq('id', id).eq('status', 'countered')
+      // The deadline is part of the claim (cross-family + security lens): the readiness read above can outlast it.
+      .gt('counter_expires_at', new Date().toISOString())
+      .select('id')
     if (claimError || !Array.isArray(claimed) || claimed.length === 0) {
       return NextResponse.json({ error: 'Esta oferta acaba de cambiar. Actualiza la página.' }, { status: 409 })
     }
