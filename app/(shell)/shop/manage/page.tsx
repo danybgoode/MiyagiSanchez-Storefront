@@ -5,7 +5,7 @@ import { db } from '@/lib/supabase'
 import { ensureSupabaseShopMirror, syncSupabaseListingMirror, type MedusaSellerForMirror } from '@/lib/provisioning'
 import { filterOutDeleted } from '@/lib/listing-lifecycle'
 import ManageDashboard from './ManageDashboard'
-import { ownerShopFacts, shopCatalogOnly } from '@/lib/listing-readiness'
+import { deliveryModeOf, ownerShopFacts, shopCatalogOnly } from '@/lib/listing-readiness'
 import { personalizeSetupSteps } from '@/lib/setup-guide'
 import { guideProductCount, guideStepsFor } from '@/lib/setup-guide-source'
 import { fetchDeletedListingIds, fetchGuideShop } from '@/lib/setup-guide-server'
@@ -30,6 +30,8 @@ interface MedusaListingForManage {
   views: number
   images: Array<{ url: string; alt?: string | null }>
   created_at: string
+  /** The product's metadata — read here only for `delivery_mode` (listing-readiness). */
+  metadata?: Record<string, unknown> | null
 }
 
 function medusaFetch(path: string, clerkJwt: string) {
@@ -147,9 +149,10 @@ export default async function ManagePage() {
 
   // listing-readiness S2.2: live products on a shop that cannot collect — from the MEDUSA seller's own settings, the
   // facts publish and activation check (never the mirror).
+  const modeById = new Map((productsData.listings ?? []).map((l) => [l.id, deliveryModeOf(l.metadata)]))
   const catalogOnly = shopCatalogOnly({
-    payments: ownerShopFacts((seller.metadata ?? null) as Record<string, unknown> | null).payments,
-    listings,
+    shop: ownerShopFacts((seller.metadata ?? null) as Record<string, unknown> | null),
+    listings: listings.map((l) => ({ ...l, delivery_mode: modeById.get(l.id) ?? null })),
   })
 
   return (

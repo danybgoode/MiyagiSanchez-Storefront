@@ -11,7 +11,7 @@
  * never "accepted" on a guess and never "this shop can't take payment" on an outage.
  */
 
-import { canCollect, listingReadiness, publicShopFacts, READINESS_COPY, type DeliveryMode } from './listing-readiness'
+import { listingCanBePaid, publicShopFacts, READINESS_COPY, type DeliveryMode } from './listing-readiness'
 
 export type CollectAnswer = 'yes' | 'no' | 'unavailable'
 
@@ -41,10 +41,10 @@ const defaultDeps: ShopCollectDeps = {
 }
 
 /**
- * Can a checkout for THIS listing finish? (D5, per listing — cross-family review on PR 497.) "The shop takes some
- * payment" is not enough: an arranged-delivery product sells only on a MANUAL method, so a card-only shop accepting an
- * offer on it would leave the buyer an unpayable price. The ONE rule over the public facts; non-product types need only
- * a shop that can collect.
+ * Can a checkout for THIS listing finish? (D5, per listing — cross-family review + fresh review on PR 497.) "The shop
+ * takes some payment" is not enough: an arranged product, a service or a rental is a COORDINATED sale that checkout
+ * takes only on SPEI or cash, so a card-only shop accepting an offer on one would leave the buyer an unpayable price.
+ * The ONE rule over the public facts for products; manual-only for coordinated types; any rail for the rest.
  */
 export async function offerCanProceed(
   input: { slug: string | null | undefined; productId: string | null | undefined; listingType: string | null | undefined },
@@ -54,12 +54,17 @@ export async function offerCanProceed(
   try {
     const metadata = await deps.sellerMetadata(input.slug)
     if (!metadata) return 'unavailable'
-    const facts = publicShopFacts(metadata)
-    if ((input.listingType ?? 'product') !== 'product') return canCollect(facts.payments) ? 'yes' : 'no'
-    if (!input.productId) return 'unavailable'
-    const deliveryMode = await deps.productDeliveryMode(input.slug, input.productId)
-    if (deliveryMode === undefined) return 'unavailable'
-    return listingReadiness({ listingType: 'product', deliveryMode, shop: facts }).mode === 'online' ? 'yes' : 'no'
+    const shop = publicShopFacts(metadata)
+    const listingType = input.listingType ?? 'product'
+    // Only a product's delivery mode changes the answer; read it (fail closed when unreadable).
+    let deliveryMode: DeliveryMode = null
+    if (listingType === 'product') {
+      if (!input.productId) return 'unavailable'
+      const read = await deps.productDeliveryMode(input.slug, input.productId)
+      if (read === undefined) return 'unavailable'
+      deliveryMode = read
+    }
+    return listingCanBePaid({ listingType, deliveryMode, shop }) ? 'yes' : 'no'
   } catch {
     return 'unavailable'
   }

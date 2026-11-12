@@ -234,7 +234,8 @@ export async function POST(req: NextRequest) {
   // buyer made an offer, the seller accepted it, and nobody could pay (miel-verduras, 2026-11-11). The SAME rule as
   // activation and MCP (lib/listing-readiness.ts) over the owner's private facts. A catalog listing goes live only
   // when the merchant chose «Publicar como catálogo» (`publish_as_catalog`); the 422 carries what is missing so the
-  // form can open its readiness panel. Nothing has been written to Medusa yet at this point.
+  // form can open its readiness panel. No PRODUCT has been written yet; on a first listing the seller itself already
+  // exists (created above), so a retry with `publish_as_catalog` takes the existing-seller branch.
   const readinessRefusal = listingNotReadyRefusal(
     listingReadiness({
       listingType: body.listing.listing_type,

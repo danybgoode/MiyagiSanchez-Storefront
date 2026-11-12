@@ -56,6 +56,17 @@ test.describe('readiness · the rule (D1)', () => {
       .toEqual({ mode: 'catalog', missing: ['manual_payment'] })
   })
 
+  test('🚨 an arranged product is a COORDINATED sale: card/MP/DiMo never make it sell, even with shipping (review catch)', () => {
+    // arranged_only_enabled is ON in production: checkout drops carrier shipping and start-checkout refuses every
+    // non-manual rail for it. The old "coexist" fallthrough published/offered it as buyable → a 422 at checkout.
+    const withShipping = { liveShipping: true, localPickup: true }
+    for (const rail of ['stripe', 'mercadopago', 'dimo'] as const) {
+      expect(listingReadiness({ listingType: 'product', deliveryMode: 'arranged', shop: shop({ [rail]: true }, withShipping) }), rail)
+        .toEqual({ mode: 'catalog', missing: ['manual_payment'] })
+    }
+    expect(listingReadiness({ listingType: 'product', deliveryMode: 'arranged', shop: shop({ stripe: true }, null) }).mode).toBe('catalog')
+  })
+
   test('non-product types are never catalog here — they are contact- or flow-capable by design (the negation)', () => {
     for (const listingType of ['service', 'inmueble', 'auto', 'event', 'digital', 'subscription']) {
       expect(listingReadiness({ listingType, deliveryMode: null, shop: shop({}) }).mode, listingType).toBe('online')
@@ -178,19 +189,20 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     // Arranged delivery sells on a MANUAL method — SPEI, or cash at pickup (visible in the public projection)…
     expect(await ask(transfer, 'arranged')).toBe('yes')
     expect(await ask({ settings: { shipping: { local_pickup: true } } }, 'arranged')).toBe('yes')
-    // …and, D1 coexist-permissive (Daniel 2026-07-11), ALSO through ordinary delivery: checkout then offers shipping or
-    // pickup and the card rail. The public view cannot see delivery, so it does not block; the PUBLISH gate verified
-    // delivery with the owner's facts. A card-only shop with an arranged product is therefore still sellable.
-    expect(await ask(cardOnly, 'arranged')).toBe('yes')
+    // 🚨 …and ONLY on those: a card-only shop's arranged product is a coordinated sale checkout refuses (review catch).
+    expect(await ask(cardOnly, 'arranged')).toBe('no')
     expect(await ask(cardOnly, 'carrier')).toBe('yes')
     // The delivery mode is READ per listing: an unreadable product fails closed instead of guessing.
     expect(await offerCanProceed({ slug: 's', productId: 'p', listingType: 'product' },
       { sellerMetadata: async () => transfer, productDeliveryMode: async () => undefined })).toBe('unavailable')
   })
 
-  test('a non-product listing needs only a shop that can collect', async () => {
-    expect(await ask(cardOnly, 'arranged', 'service')).toBe('yes')
-    expect(await ask({ settings: {} }, null, 'service')).toBe('no')
+  test('services and rentals are coordinated (manual only); other non-products need any rail', async () => {
+    expect(await ask(cardOnly, null, 'service')).toBe('no')
+    expect(await ask(transfer, null, 'service')).toBe('yes')
+    expect(await ask(cardOnly, null, 'rental')).toBe('no')
+    expect(await ask(cardOnly, null, 'auto')).toBe('yes')
+    expect(await ask({ settings: {} }, null, 'auto')).toBe('no')
   })
 
   test('anything unreadable FAILS CLOSED (503), never "accepted" and never "cannot collect"', async () => {
@@ -221,7 +233,7 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     expect(acceptBranch).toContain('if (collectRefusal) {')
     expect(acceptBranch.indexOf('if (collectRefusal) {')).toBeLessThan(acceptBranch.indexOf("status: 'accepted'"))
     const pdp = read('app/(shell)/l/[id]/ListingRenderer.tsx')
-    expect(pdp).toContain('const offersOpen = hasAnyPayment && listingReadiness({')
+    expect(pdp).toContain('const offersOpen = hasAnyPayment && listingCanBePaid({')
     // Every MakeOfferButton render site and the island's canOffer are behind offersOpen.
     const sites = pdp.split('<MakeOfferButton').length - 1
     expect(sites).toBe(2)
@@ -258,13 +270,17 @@ test.describe('readiness · guided and visible (S2)', () => {
     expect(isNotReadyAnswer(500, { code: 'LISTING_NOT_READY' })).toBe(false)
   })
 
-  test('the panel state: live products and no way to collect — an empty or early shop is not alarmed', () => {
+  test('the panel state is PER LISTING: a live product nobody can pay for — an empty or early shop is not alarmed', () => {
     const live = [{ listing_type: 'product', status: 'active' }]
-    expect(shopCatalogOnly({ payments: NONE, listings: live })).toBe(true)
-    expect(shopCatalogOnly({ payments: NONE, listings: [] })).toBe(false)
-    expect(shopCatalogOnly({ payments: NONE, listings: [{ listing_type: 'product', status: 'draft' }] })).toBe(false)
-    expect(shopCatalogOnly({ payments: NONE, listings: [{ listing_type: 'service', status: 'active' }] })).toBe(false)
-    expect(shopCatalogOnly({ payments: { ...NONE, bankTransfer: true }, listings: live })).toBe(false)
+    expect(shopCatalogOnly({ shop: shop({}), listings: live })).toBe(true)
+    expect(shopCatalogOnly({ shop: shop({}), listings: [] })).toBe(false)
+    expect(shopCatalogOnly({ shop: shop({}), listings: [{ listing_type: 'product', status: 'draft' }] })).toBe(false)
+    expect(shopCatalogOnly({ shop: shop({}), listings: [{ listing_type: 'service', status: 'active' }] })).toBe(false)
+    expect(shopCatalogOnly({ shop: shop({ bankTransfer: true }), listings: live })).toBe(false)
+    // The review cases: cash-at-pickup sells an arranged product; a card shop's arranged product does not.
+    const arranged = [{ listing_type: 'product', status: 'active', delivery_mode: 'arranged' as const }]
+    expect(shopCatalogOnly({ shop: shop({ cash: true }), listings: arranged })).toBe(false)
+    expect(shopCatalogOnly({ shop: shop({ stripe: true }), listings: arranged })).toBe(true)
   })
 
   test('the form, the panel, the badges and the guide are wired to the same rule', () => {
@@ -277,7 +293,8 @@ test.describe('readiness · guided and visible (S2)', () => {
     expect(read('app/(shell)/shop/manage/page.tsx')).toContain('shopCatalogOnly({')
     const card = read('app/(shell)/shop/manage/SetupGuideCard.tsx')
     expect(card).toContain('const visible = (!dismissed || locked) && loaded && !allDone')
-    expect(read('app/(shell)/shop/manage/catalogo/page.tsx')).toContain('!canCollect(ownerShopFacts(data.seller.metadata ?? null).payments)')
+    expect(read('app/(shell)/shop/manage/catalogo/page.tsx')).toContain('shopFacts={data.seller ? ownerShopFacts(data.seller.metadata ?? null) : null}')
+    expect(read('app/(shell)/shop/manage/catalogo/CatalogTable.tsx')).toContain('deliveryMode: deliveryModeOf(listing.metadata),')
     expect(read('lib/setup-guide.ts')).toContain('pagos: canCollect(ownerShopFacts(')
     // The guide is locked only while its OWN «pagos» is undone — never "finish X" beside a ✓ X.
     expect(read('app/(shell)/shop/manage/ManageDashboard.tsx'))

@@ -51,6 +51,14 @@ export type ListingReadiness =
 
 export type DeliveryMode = 'carrier' | 'arranged' | null | undefined
 
+/** SPEI or cash at pickup — the only rails a COORDINATED sale (arranged product, service, rental) can be paid on. */
+export function hasManualPayment(payments: PaymentFacts): boolean {
+  return payments.bankTransfer || payments.cash
+}
+
+/** Listing types checkout always treats as coordinated (backend `isCoordinatedListing`): manual payment only. */
+export const COORDINATED_TYPES: ReadonlySet<string> = new Set(['service', 'rental'])
+
 /** The shop can take a payment for an ordinary checkout (card, Mercado Pago, transfer or DiMo). Offers need this. */
 export function canCollect(payments: PaymentFacts): boolean {
   return payments.stripe || payments.mercadopago || payments.bankTransfer || payments.dimo
@@ -68,13 +76,15 @@ export function listingReadiness(input: {
 }): ListingReadiness {
   if ((input.listingType ?? 'product') !== 'product') return { mode: 'online' }
   const { payments, delivery } = input.shop
-  const arranged = input.deliveryMode === 'arranged'
-  const hasManual = payments.bankTransfer || payments.cash
-  // Coexist-permissive (Daniel, 2026-07-11): arranged is an ADDITIONAL path, not a replacement.
-  if (arranged && hasManual) return { mode: 'online' }
+  // An arranged product is a COORDINATED sale: with `shipping.arranged_only_enabled` on (production since 2026-09-22)
+  // checkout drops carrier shipping and `start-checkout` refuses every non-manual rail (backend delivery-catalog.ts
+  // `isCoordinatedListing`, start-checkout COORD_MESSAGE). So it sells ONLY on SPEI or cash — no fallthrough to the card
+  // path. The 2026-07-11 "coexist" reading predates the flag; the fresh review + cross-family pass on PR 497 caught it.
+  if (input.deliveryMode === 'arranged') {
+    return hasManualPayment(payments) ? { mode: 'online' } : { mode: 'catalog', missing: ['manual_payment'] }
+  }
   const hasDelivery = delivery === null || delivery.liveShipping || delivery.localPickup
   if (hasDelivery && canCollect(payments)) return { mode: 'online' }
-  if (arranged) return { mode: 'catalog', missing: ['manual_payment'] }
   const missing: ReadinessMissing[] = []
   if (!hasDelivery) missing.push('delivery')
   if (!canCollect(payments)) missing.push('payment')
@@ -197,9 +207,29 @@ export const PAYMENTS_SETTINGS_PATH = '/shop/manage/settings/pagos'
  * just early — no alarm.
  */
 export function shopCatalogOnly(input: {
-  payments: PaymentFacts
-  listings: ReadonlyArray<{ listing_type?: string | null; status?: string | null }>
+  shop: ShopFacts
+  listings: ReadonlyArray<{ listing_type?: string | null; status?: string | null; delivery_mode?: DeliveryMode }>
 }): boolean {
-  if (canCollect(input.payments)) return false
-  return input.listings.some((l) => (l.listing_type ?? 'product') === 'product' && l.status === 'active')
+  // Per LISTING with the one rule (review on PR 497): a cash-at-pickup shop selling an arranged product CAN collect for
+  // it, and a card shop's arranged product cannot — a shop-wide "can collect?" got both wrong.
+  return input.listings.some((l) => l.status === 'active' &&
+    listingReadiness({ listingType: l.listing_type, deliveryMode: l.delivery_mode, shop: input.shop }).mode === 'catalog')
+}
+
+/** Read a listing's delivery mode from its product metadata (`carrier` | `arranged`, anything else = unset). */
+export function deliveryModeOf(metadata: unknown): DeliveryMode {
+  const mode = metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>).delivery_mode : null
+  return mode === 'arranged' || mode === 'carrier' ? mode : null
+}
+
+/**
+ * Can a checkout for THIS listing finish on this shop? — the offer decision (D5), shared by the server gate
+ * (`lib/shop-collect.ts`) and the PDP's «Hacer oferta», so the button never promises what the server refuses.
+ * Products: the one rule. Services/rentals: coordinated, manual only. Other types: any rail.
+ */
+export function listingCanBePaid(input: { listingType: string | null | undefined; deliveryMode: DeliveryMode; shop: ShopFacts }): boolean {
+  const type = input.listingType ?? 'product'
+  if (COORDINATED_TYPES.has(type)) return hasManualPayment(input.shop.payments)
+  if (type !== 'product') return canCollect(input.shop.payments)
+  return listingReadiness({ listingType: 'product', deliveryMode: input.deliveryMode, shop: input.shop }).mode === 'online'
 }

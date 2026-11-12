@@ -22,7 +22,7 @@ import { Toast, useToast } from '@/components/feedback/Toast'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { READINESS_COPY } from '@/lib/listing-readiness'
+import { deliveryModeOf, listingReadiness, READINESS_COPY, type ShopFacts } from '@/lib/listing-readiness'
 import { isNotReadyAnswer } from '@/lib/readiness-view'
 import { catalogStatusToToken, publicationStateToToken } from '@/lib/status-badge'
 import { rsvpEventSlug } from '@/lib/evento-preset'
@@ -164,7 +164,7 @@ export default function CatalogTable({
   marginRowsByChannel = [],
   ownedShopOnlyEnabled = false,
   eventRosterBySlug = {},
-  shopCannotCollect = false,
+  shopFacts = null,
 }: {
   listings: CatalogListing[]
   /** catalog.inventory_channels_enabled (catalog-management S2 · 2.2) — fail-safe OFF: no toggle UI renders while OFF. */
@@ -190,10 +190,10 @@ export default function CatalogTable({
   /** RSVP event slug → its roster page; a listing carrying `metadata.rsvp_event_slug` shows «Registros». */
   eventRosterBySlug?: Record<string, string>
   /**
-   * listing-readiness S2.2: the shop has no way to take a payment (read from the Medusa seller on the server), so its
-   * live products are «Solo catálogo» — seen, but bought by writing to the merchant.
+   * listing-readiness S2.2: the shop's payment/delivery facts (the Medusa seller, read on the server). Each live
+   * product the ONE rule calls catalog shows «Solo catálogo» — seen, but bought by writing to the merchant.
    */
-  shopCannotCollect?: boolean
+  shopFacts?: ShopFacts | null
 }) {
   const fmt = useSellerFormat()
   // The listing's OWN currency. "Precio a convenir" is authored here rather than
@@ -682,7 +682,11 @@ export default function CatalogTable({
                 <td className="p-3">
                   <div className="flex flex-wrap items-center gap-1">
                     <StatusBadge token={catalogStatusToToken(status)}>{meta.label}</StatusBadge>
-                    {shopCannotCollect && status === 'activo' && (listing.listing_type ?? 'product') === 'product' && (
+                    {shopFacts && status === 'activo' && listingReadiness({
+                      listingType: listing.listing_type,
+                      deliveryMode: deliveryModeOf(listing.metadata),
+                      shop: shopFacts,
+                    }).mode === 'catalog' && (
                       <StatusBadge token="warning" title={READINESS_COPY.catalogBadgeHint}>
                         <span data-testid="badge-catalog-only">{READINESS_COPY.catalogBadge}</span>
                       </StatusBadge>

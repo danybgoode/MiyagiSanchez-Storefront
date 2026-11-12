@@ -12,7 +12,7 @@ import { computeSkuMarginsByChannel, type ProfitEvent, type ProfitOrderInfo, typ
 import { SellerBreadcrumb } from '../SellerBreadcrumb'
 import CatalogFilterBar from './CatalogFilterBar'
 import CatalogTable, { type CatalogListing } from './CatalogTable'
-import { canCollect, ownerShopFacts } from '@/lib/listing-readiness'
+import { ownerShopFacts } from '@/lib/listing-readiness'
 
 export const metadata = { title: 'Catálogo — Mi tienda' }
 
@@ -200,7 +200,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             marginRowsByChannel={marginRowsByChannel}
             ownedShopOnlyEnabled={ownedShopOnlyEnabled}
             eventRosterBySlug={eventRosterBySlug}
-            shopCannotCollect={data.seller ? !canCollect(ownerShopFacts(data.seller.metadata ?? null).payments) : false}
+            shopFacts={data.seller ? ownerShopFacts(data.seller.metadata ?? null) : null}
           />
 
           {totalPages > 1 && (

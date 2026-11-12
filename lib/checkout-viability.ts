@@ -14,9 +14,11 @@
  *    method (SPEI or cash) — no carrier/pickup required, since checkout
  *    strips card/instant rails for a coordinated sale (start-checkout's 422
  *    guard already enforces manual-only).
- * Coexist-permissive (Daniel, 2026-07-11): arranged is an ADDITIONAL valid
- * path, not a replacement — a listing satisfying the traditional check stays
- * viable even if its delivery_mode happens to be 'arranged'.
+ * The 2026-07-11 "coexist-permissive" reading (an arranged listing with
+ * shipping + card stays viable) was retired in epic listing-readiness: with
+ * `shipping.arranged_only_enabled` ON in production, checkout only takes a
+ * manual method for an arranged product, so that listing was unbuyable. The rule
+ * now lives in lib/listing-readiness.ts.
  */
 
 import { listingReadiness, readinessMessage } from './listing-readiness'

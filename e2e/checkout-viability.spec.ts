@@ -69,10 +69,20 @@ test.describe('deriveCheckoutViability · arranged path (epic S1.2)', () => {
   })
 })
 
-test.describe('deriveCheckoutViability · coexist-permissive (arranged is additive, not exclusive)', () => {
-  test('an arranged listing that ALSO satisfies the traditional check stays viable', () => {
+test.describe('deriveCheckoutViability · arranged is a coordinated sale (manual only)', () => {
+  // This block used to pin "coexist-permissive" (Daniel 2026-07-11): an arranged listing with shipping + card stayed
+  // viable. That predates `shipping.arranged_only_enabled` (ON in production since 2026-09-22): with it on, checkout drops
+  // carrier shipping for an arranged product and start-checkout refuses every non-manual rail (backend
+  // `isCoordinatedListing`). So that listing published as buyable and every «Comprar» hit a 422 — caught by the fresh
+  // review + cross-family pass on PR 497 (epic listing-readiness).
+  test('an arranged listing with shipping + card but no manual method is NOT viable', () => {
     expect(deriveCheckoutViability({
       ...base, deliveryMode: 'arranged', hasLiveShipping: true, hasStripe: true,
+    })).toMatch(/pago.*manual/)
+  })
+  test('the negation: arranged + a manual method is viable whatever else the shop has', () => {
+    expect(deriveCheckoutViability({
+      ...base, deliveryMode: 'arranged', hasLiveShipping: true, hasStripe: true, hasSpei: true,
     })).toBeNull()
   })
 })
