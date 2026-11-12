@@ -237,6 +237,12 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     // The refusal is ACTED ON, not just computed (fresh review: a computed-and-ignored gate stays green on text).
     expect(create).toContain("if (collectRefusal) {\n    return NextResponse.json({ error: collectRefusal.error")
     expect(respond).toContain('if (refusal) return { ok: false, error: refusal.error, httpStatus: refusal.status }')
+    // Each seller transition is a conditional CLAIM on the validated status (security lens, PR 497): no blind writes,
+    // and accept claims BEFORE creating a payment session.
+    expect(respond).toContain(".update(patch).eq('id', id).eq('status', fromStatus).select('id')")
+    expect(respond).not.toMatch(/update\(\{\s*status: '(accepted|countered|declined)'[^)]*\}\)\.eq\('id', id\)\s*$/m)
+    const acceptAt = respond.indexOf("if (action === 'accept') {")
+    expect(respond.indexOf("claim({ status: 'accepted' })", acceptAt)).toBeLessThan(respond.indexOf('stripe.checkout.sessions.create', acceptAt))
     // 🚨 The buyer accepting the SELLER'S counter is an accept too (fresh-review catch, PR 497).
     const buyer = read('app/api/offers/[id]/buyer-respond/route.ts')
     const acceptBranch = buyer.slice(buyer.indexOf("if (action === 'accept-counter') {"))
@@ -244,7 +250,8 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     expect(acceptBranch).toContain('if (collectRefusal) {')
     expect(acceptBranch.indexOf('if (collectRefusal) {')).toBeLessThan(acceptBranch.indexOf("status: 'accepted'"))
     const pdp = read('app/(shell)/l/[id]/ListingRenderer.tsx')
-    expect(pdp).toContain('const offersOpen = hasAnyPayment && listingCanBePaid({')
+    expect(pdp).toContain('const hasAnyPayment = commerceReadiness.ready && listingPayable')
+    expect(pdp).toContain('const offersOpen = hasAnyPayment')
     // Every MakeOfferButton render site and the island's canOffer are behind offersOpen.
     const sites = pdp.split('<MakeOfferButton').length - 1
     expect(sites).toBe(2)

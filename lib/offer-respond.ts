@@ -205,10 +205,22 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
     ])
   }
 
+  // ── Claim the transition (validate → CLAIM → apply) ──────────────────────────
+  // The status checks above only READ. Two concurrent seller actions (accept + counter) both passed them and both wrote,
+  // leaving an offer accepted after a counter was sent (security lens on PR 497 — the readiness await widened the
+  // window). Each transition is now a conditional write on the status it was validated against, read back: the loser
+  // gets a 409 and runs no side effects.
+  const fromStatus = offer.status as string
+  async function claim(patch: Record<string, unknown>): Promise<boolean> {
+    const { data, error } = await db.from('marketplace_offers').update(patch).eq('id', id).eq('status', fromStatus).select('id')
+    return !error && Array.isArray(data) && data.length > 0
+  }
+  const lostRace: RespondResult = { ok: false, error: 'Esta oferta acaba de cambiar. Actualiza la página.', httpStatus: 409 }
+
   // ── Decline ───────────────────────────────────────────────────────────────────
   if (action === 'decline') {
+    if (!(await claim({ status: 'declined' }))) return lostRace
     cancelSellerReminders()
-    await db.from('marketplace_offers').update({ status: 'declined' }).eq('id', id)
     emitConvEvent('offer_declined', 'system', {}, true).catch(e => console.error('[conv] decline event:', e))
     // Buyer "Ofertas" event — email + push + Telegram, all gated by the buyer's
     // prefs in one place (the standalone notify() push is folded into the seam).
@@ -245,12 +257,12 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
     }
 
     const counterExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    await db.from('marketplace_offers').update({
+    if (!(await claim({
       status: 'countered',
       counter_amount_cents: counterAmountCents,
       counter_message: counterMessage?.trim() ?? null,
       counter_expires_at: counterExpiresAt,
-    }).eq('id', id)
+    }))) return lostRace
 
     const conversationUrl = await getConversationUrl()
     const counteredMsg = buildBuyerMessage('offer_countered', {
@@ -301,6 +313,8 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
 
   // ── Accept ────────────────────────────────────────────────────────────────────
   if (action === 'accept') {
+    // Claim FIRST, so a losing concurrent request never creates a Stripe session; the session is attached below.
+    if (!(await claim({ status: 'accepted' }))) return lostRace
     cancelSellerReminders()
     const acceptedCents = offer.offer_amount_cents
     const listingUrl = listingUrlFor(origin, listing.id)
@@ -346,10 +360,9 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
     }
 
     await db.from('marketplace_offers').update({
-      status: 'accepted',
       checkout_session_id: checkoutSessionId,
       checkout_expires_at: checkoutExpires,
-    }).eq('id', id)
+    }).eq('id', id).eq('status', 'accepted')
 
     emitConvEvent('offer_accepted', 'system', { amount_cents: offer.offer_amount_cents, currency: listing.currency }, true).catch(e => console.error('[conv] accept event:', e))
     const conversationUrl = await getConversationUrl()

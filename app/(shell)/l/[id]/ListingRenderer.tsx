@@ -408,15 +408,18 @@ export async function ListingPage({
     currency: listing.currency,
     sellerPaymentAvailable: sellerHasMp || sellerHasStripe || hasBankTransfer || hasDimo || arrangedCash,
   })
-  const hasAnyPayment = commerceReadiness.ready
-  // listing-readiness D5: a buyer may OPEN an offer only where a checkout could finish. The server refuses too
-  // (app/api/offers, lib/offer-respond.ts); this keeps the button from promising what the server will refuse.
-  // Per LISTING, not per shop (cross-family review, PR 497): an arranged-delivery product sells only on a manual method.
-  const offersOpen = hasAnyPayment && listingCanBePaid({
+  // …and per LISTING (cross-family review, PR 497): an arranged product, a service or a rental is a coordinated sale
+  // checkout takes only on SPEI or cash — a card-only shop must not show «Comprar» for it (start-checkout would 422).
+  const listingPayable = listingCanBePaid({
     listingType: listing.listing_type,
     deliveryMode: deliveryModeOf(listing.metadata),
     shop: pdpShopFacts,
   })
+  const hasAnyPayment = commerceReadiness.ready && listingPayable
+  // listing-readiness D5: a buyer may OPEN an offer only where a checkout could finish. The server refuses too
+  // (app/api/offers, lib/offer-respond.ts); this keeps the button from promising what the server will refuse.
+  // Per LISTING, not per shop (cross-family review, PR 497): an arranged-delivery product sells only on a manual method.
+  const offersOpen = hasAnyPayment
   const fulfillmentMethods = [
     shippingSettings?.local_pickup && {
       icon: 'iconoir-shop',
