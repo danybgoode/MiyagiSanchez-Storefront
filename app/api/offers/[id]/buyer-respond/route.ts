@@ -8,6 +8,7 @@ import { notify } from '@/lib/notify'
 import { dispatchToBuyer } from '@/lib/notifications/dispatch'
 import { buildBuyerMessage } from '@/lib/notifications/buyer-messages'
 import { listingUrlFor } from '@/lib/market-url'
+import { offerCanProceed, offerCollectRefusal } from '@/lib/shop-collect'
 
 interface BuyerRespondBody {
   action: 'accept-counter' | 'withdraw'
@@ -37,8 +38,8 @@ export async function PATCH(
     .select(`
       *,
       marketplace_listings!inner(
-        id, title, price_cents, currency, listing_type, images,
-        marketplace_shops!inner(id, metadata, clerk_user_id)
+        id, medusa_product_id, title, price_cents, currency, listing_type, images,
+        marketplace_shops!inner(id, slug, metadata, clerk_user_id)
       )
     `)
     .eq('id', id)
@@ -79,7 +80,7 @@ export async function PATCH(
   const listing = offer.marketplace_listings as unknown as {
     id: string; title: string; price_cents: number; currency: string
     listing_type: string; images: Array<{ url: string }> | null
-    marketplace_shops: { id: string; metadata: Record<string, unknown> | null; clerk_user_id: string | null }
+    marketplace_shops: { id: string; slug: string | null; metadata: Record<string, unknown> | null; clerk_user_id: string | null }
   }
 
   // ── Withdraw ──────────────────────────────────────────────────────────────
@@ -120,6 +121,18 @@ export async function PATCH(
   if (action === 'accept-counter') {
     if (!canAcceptCounter(offer)) {
       return NextResponse.json({ error: 'La contraoferta ya no está disponible.' }, { status: 409 })
+    }
+
+    // listing-readiness D5: accepting the seller's counter is an ACCEPT — the agreed price must be payable. Covers a
+    // counter made before this gate shipped, and a shop that turned its only payment method off after countering
+    // (fresh-review catch on PR 497). Fails closed; withdraw above is never gated.
+    const collectRefusal = offerCollectRefusal(await offerCanProceed({
+      slug: listing.marketplace_shops.slug,
+      productId: (listing as unknown as { medusa_product_id: string | null }).medusa_product_id,
+      listingType: listing.listing_type,
+    }), 'buyer')
+    if (collectRefusal) {
+      return NextResponse.json({ error: collectRefusal.error, code: collectRefusal.code }, { status: collectRefusal.status })
     }
 
     const acceptedCents = offer.counter_amount_cents!

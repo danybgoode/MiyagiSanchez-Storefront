@@ -73,9 +73,12 @@ export async function readListingReadiness(listingId: string, clerkJwt: string):
     ])
     if (!productRes.ok || !sellerRes.ok) return null
     const product = await productRes.json() as { listing_type?: string; delivery_mode?: 'carrier' | 'arranged' | null }
+    // An older backend does not send these fields: "could not read", not "a carrier product" — otherwise a service or
+    // event draft would get a wrong 422 (fresh-review catch, PR 497). Fail open, per D3.
+    if (typeof product.listing_type !== 'string') return null
     const { seller } = await sellerRes.json() as { seller: Record<string, unknown> }
     return listingReadiness({
-      listingType: product.listing_type ?? 'product',
+      listingType: product.listing_type,
       deliveryMode: product.delivery_mode ?? null,
       shop: ownerShopFacts((seller?.metadata ?? null) as Record<string, unknown> | null),
     })

@@ -211,6 +211,15 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     const respond = read('lib/offer-respond.ts')
     expect(respond).toContain("if (action === 'accept' || action === 'counter') {")
     expect(respond).toContain('offerCollectRefusal(await offerCanProceed({')
+    // The refusal is ACTED ON, not just computed (fresh review: a computed-and-ignored gate stays green on text).
+    expect(create).toContain("if (collectRefusal) {\n    return NextResponse.json({ error: collectRefusal.error")
+    expect(respond).toContain('if (refusal) return { ok: false, error: refusal.error, httpStatus: refusal.status }')
+    // 🚨 The buyer accepting the SELLER'S counter is an accept too (fresh-review catch, PR 497).
+    const buyer = read('app/api/offers/[id]/buyer-respond/route.ts')
+    const acceptBranch = buyer.slice(buyer.indexOf("if (action === 'accept-counter') {"))
+    expect(acceptBranch).toContain('offerCollectRefusal(await offerCanProceed({')
+    expect(acceptBranch).toContain('if (collectRefusal) {')
+    expect(acceptBranch.indexOf('if (collectRefusal) {')).toBeLessThan(acceptBranch.indexOf("status: 'accepted'"))
     const pdp = read('app/(shell)/l/[id]/ListingRenderer.tsx')
     expect(pdp).toContain('const offersOpen = hasAnyPayment && listingReadiness({')
     // Every MakeOfferButton render site and the island's canOffer are behind offersOpen.
@@ -270,5 +279,16 @@ test.describe('readiness · guided and visible (S2)', () => {
     expect(card).toContain('const visible = (!dismissed || locked) && loaded && !allDone')
     expect(read('app/(shell)/shop/manage/catalogo/page.tsx')).toContain('!canCollect(ownerShopFacts(data.seller.metadata ?? null).payments)')
     expect(read('lib/setup-guide.ts')).toContain('pagos: canCollect(ownerShopFacts(')
+    // The guide is locked only while its OWN «pagos» is undone — never "finish X" beside a ✓ X.
+    expect(read('app/(shell)/shop/manage/ManageDashboard.tsx'))
+      .toContain("locked={catalogOnly && setupSteps.some((step) => step.id === 'pagos' && !step.done)}")
+    // Re-activating a catalog listing has the same way out as publishing one.
+    const table = read('app/(shell)/shop/manage/catalogo/CatalogTable.tsx')
+    expect(table).toContain("isNotReadyAnswer(res.status, data) && next === 'active'")
+    expect(table).toContain("onClick: () => handleToggle(listing, 'active', { asCatalog: true })")
+    // A backend without the new fields is "could not read" (fail open), never "a carrier product".
+    expect(read('lib/listing-status.ts')).toContain("if (typeof product.listing_type !== 'string') return null")
+    // The form keeps the server's sentence when the panel cannot render.
+    expect(read('app/(shell)/sell/SellWizard.tsx')).toContain('setSubmitError(data.error ?? null)')
   })
 })

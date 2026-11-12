@@ -24,10 +24,12 @@ export type ShopCollectDeps = {
 
 // Lazy: `lib/listings` pulls in `next/cache`, which keeps this module out of the node test runner if imported on top.
 const defaultDeps: ShopCollectDeps = {
+  // FRESH, not `getShop` (cached 120s): a money decision cannot wait out the cache (fresh-review catch on PR 497).
   sellerMetadata: async (slug) => {
-    const { getShop } = await import('@/lib/listings')
-    const shop = await getShop(slug)
-    return shop ? ((shop.metadata ?? {}) as Record<string, unknown>) : null
+    const { readShopFresh } = await import('@/lib/listings')
+    const read = await readShopFresh(slug)
+    if (read.state === 'unavailable') throw new Error(read.reason)
+    return read.state === 'resolved' ? ((read.shop.metadata ?? {}) as Record<string, unknown>) : null
   },
   productDeliveryMode: async (slug, productId) => {
     const { getOwnedShopListing } = await import('@/lib/listings')

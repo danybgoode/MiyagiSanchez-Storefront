@@ -1571,7 +1571,9 @@ export default function SellWizard({
         // Nobody could pay for it online yet: (re)open «Antes de publicar» with the fix and the catalog choice.
         // Also the first-listing path: the shop was created by this very request, so the panel can now read it.
         setReadinessRefresh((n) => n + 1)
-        setSubmitError(null)
+        // Keep the server's sentence on screen too: if the panel cannot read the shop right now it renders nothing,
+        // and «Publicar» must never look like it did nothing (fresh-review catch, PR 497).
+        setSubmitError(data.error ?? null)
         return
       }
 

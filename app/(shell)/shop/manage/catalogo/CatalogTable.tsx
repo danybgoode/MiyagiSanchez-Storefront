@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { READINESS_COPY } from '@/lib/listing-readiness'
+import { isNotReadyAnswer } from '@/lib/readiness-view'
 import { catalogStatusToToken, publicationStateToToken } from '@/lib/status-badge'
 import { rsvpEventSlug } from '@/lib/evento-preset'
 import BulkActionBar from './BulkActionBar'
@@ -297,7 +298,7 @@ export default function CatalogTable({
       return next
     })
 
-  async function handleToggle(listing: CatalogListing, next: 'active' | 'paused') {
+  async function handleToggle(listing: CatalogListing, next: 'active' | 'paused', opts: { asCatalog?: boolean } = {}) {
     const id = listing.id
     const prevStatus = deriveCatalogStatus(listing)
     markPending(id, true)
@@ -307,12 +308,21 @@ export default function CatalogTable({
       const res = await fetch(`/api/sell/listing/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: next }),
+        body: JSON.stringify(opts.asCatalog ? { status: next, publish_as_catalog: true } : { status: next }),
       })
-      const data = await res.json() as { error?: string }
+      const data = await res.json() as { error?: string; code?: string }
       if (!res.ok) {
         setListings((prev) => prev.map((l) => (l.id === id ? { ...l, status: prevStatus === 'pausado' ? 'paused' : 'active' } : l)))
-        showToast(data.error ?? 'Error al cambiar el estado.', 'error')
+        // listing-readiness: nobody could pay for it online — the way out is the same deliberate choice the
+        // new-listing form offers (fresh-review catch, PR 497: re-activating a catalog listing had no path).
+        if (isNotReadyAnswer(res.status, data) && next === 'active') {
+          showToast(data.error ?? READINESS_COPY.notReadyTitle, 'error', {
+            label: READINESS_COPY.publishAsCatalog,
+            onClick: () => handleToggle(listing, 'active', { asCatalog: true }),
+          })
+        } else {
+          showToast(data.error ?? 'Error al cambiar el estado.', 'error')
+        }
       } else {
         showToast(
           next === 'active' ? 'Anuncio activado.' : 'Anuncio pausado.',

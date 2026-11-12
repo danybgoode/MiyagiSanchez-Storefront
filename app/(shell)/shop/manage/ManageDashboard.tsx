@@ -136,7 +136,8 @@ export default async function ManageDashboard({
       <SetupGuideCard
         steps={setupSteps}
         // While products are live and nobody can pay, the payments step stays on screen (S2.2).
-        locked={catalogOnly}
+        // …and only while the guide's OWN «pagos» step is undone, so it never says "finish X" next to an X already done.
+        locked={catalogOnly && setupSteps.some((step) => step.id === 'pagos' && !step.done)}
         initialDismissed={guideDismissed}
         initialSatisfactionAnswered={guideSatisfactionAnswered}
         shopSlug={shop.slug}
