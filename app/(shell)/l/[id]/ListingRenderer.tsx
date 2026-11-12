@@ -398,11 +398,15 @@ export async function ListingPage({
   ].filter(Boolean) as Array<{ icon: string; label: string; note: string }>
   // Seller offers at least one online/selectable payment path → show the single
   // "Comprar ahora" button (the checkout page is the method chooser).
+  // An arranged product is a coordinated sale: checkout also takes CASH at pickup for it (backend start-checkout manual
+  // rails), so a cash-only shop can sell it — counted per listing via the one rule (cross-family review, PR 497).
+  const pdpShopFacts = publicShopFacts((listing.shop?.metadata ?? null) as Record<string, unknown> | null)
+  const arrangedCash = deliveryModeOf(listing.metadata) === 'arranged' && pdpShopFacts.payments.cash
   const commerceReadiness = resolveCommerceReadiness({
     market,
     priceCents: listing.price_cents,
     currency: listing.currency,
-    sellerPaymentAvailable: sellerHasMp || sellerHasStripe || hasBankTransfer || hasDimo,
+    sellerPaymentAvailable: sellerHasMp || sellerHasStripe || hasBankTransfer || hasDimo || arrangedCash,
   })
   const hasAnyPayment = commerceReadiness.ready
   // listing-readiness D5: a buyer may OPEN an offer only where a checkout could finish. The server refuses too
@@ -411,7 +415,7 @@ export async function ListingPage({
   const offersOpen = hasAnyPayment && listingCanBePaid({
     listingType: listing.listing_type,
     deliveryMode: deliveryModeOf(listing.metadata),
-    shop: publicShopFacts((listing.shop?.metadata ?? null) as Record<string, unknown> | null),
+    shop: pdpShopFacts,
   })
   const fulfillmentMethods = [
     shippingSettings?.local_pickup && {

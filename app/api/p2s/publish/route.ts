@@ -22,13 +22,17 @@ export const dynamic = 'force-dynamic'
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
 
 export async function POST(req: Request) {
-  // «Publicar como catálogo» (listing-readiness D4): the merchant chose to publish products nobody can pay online.
-  const body = (await req.json().catch(() => null)) as { publish_as_catalog?: unknown } | null
-  const publishAsCatalog = body?.publish_as_catalog === true
   const { userId, getToken } = await auth()
   if (!userId) return NextResponse.json({ ok: false, error: 'signed_out', message: PUBLISH_COPY.signedOut }, { status: 401, headers: NO_STORE })
   const clerkJwt = await getToken()
   if (!clerkJwt) return NextResponse.json({ ok: false, error: 'signed_out', message: PUBLISH_COPY.signedOut }, { status: 401, headers: NO_STORE })
+  // «Publicar como catálogo» (listing-readiness D4): the merchant chose to publish products nobody can pay online.
+  // Read AFTER auth (security lens, PR 497) and only a small body: the one flag is all this route accepts.
+  const raw = await req.text().catch(() => '')
+  let publishAsCatalog = false
+  if (raw.length > 0 && raw.length <= 1024) {
+    try { publishAsCatalog = (JSON.parse(raw) as { publish_as_catalog?: unknown } | null)?.publish_as_catalog === true } catch { /* not the flag */ }
+  }
 
   const result = await handlePublish({
     resolveOwner: () => resolvePhotoOwner(userId, clerkJwt),

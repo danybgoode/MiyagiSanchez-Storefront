@@ -162,6 +162,9 @@ test.describe('readiness · publish/activate (S1.2, D4)', () => {
     expect(status).not.toContain('`/store/listings/${listingId}`')
     expect(read('app/api/sell/listing/[id]/route.ts')).toContain('publishAsCatalog: body.publish_as_catalog === true')
     expect(read('app/api/p2s/publish/route.ts')).toContain('{ publishAsCatalog }')
+    // The flag is read only AFTER auth (security lens, PR 497).
+    const p2s = read('app/api/p2s/publish/route.ts')
+    expect(p2s.indexOf('await auth()')).toBeLessThan(p2s.indexOf('await req.text()'))
     expect(read('lib/seller-products.ts')).toContain('listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(shopMeta) })')
   })
 })
@@ -247,6 +250,9 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     expect(sites).toBe(2)
     expect(pdp.match(/offersOpen && (?:activeDeal|\(\n\s*<MakeOfferButton)/g)?.length ?? 0).toBe(2)
     expect(pdp).toContain("listing.listing_type === 'product' && offersOpen,")
+    // A cash-only shop can sell an ARRANGED product (cash at pickup is a manual rail) — the PDP counts it.
+    expect(pdp).toContain("const arrangedCash = deliveryModeOf(listing.metadata) === 'arranged' && pdpShopFacts.payments.cash")
+    expect(pdp).toContain('hasBankTransfer || hasDimo || arrangedCash,')
   })
 })
 
