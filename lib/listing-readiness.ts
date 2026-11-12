@@ -202,6 +202,8 @@ export const READINESS_COPY = {
   bannerTitle: 'Tu tienda aún no puede cobrar',
   bannerBody: 'Tus productos se ven, pero nadie puede pagarlos en línea. Activa una forma de cobro: con tu CLABE toma 2 minutos.',
   // The shop CAN collect, but a coordinated sale (entrega acordada) needs SPEI or cash and the shop has neither.
+  bannerDeliveryTitle: 'Tus productos aún no se pueden comprar en línea',
+  bannerDeliveryBody: 'Falta cómo entregarlos: activa envíos a domicilio o recolección en mano para que tus clientes puedan comprar.',
   bannerManualTitle: 'Algunos productos aún no se pueden pagar',
   bannerManualBody: 'Tus productos con entrega acordada solo se pagan por SPEI o en efectivo al entregar. Activa uno de los dos para venderlos en línea.',
   catalogBadge: 'Solo catálogo',
@@ -223,11 +225,19 @@ export const PAYMENTS_SETTINGS_PATH = '/shop/manage/settings/pagos'
 export function shopCatalogOnly(input: {
   shop: ShopFacts
   listings: ReadonlyArray<{ listing_type?: string | null; status?: string | null; delivery_mode?: DeliveryMode }>
-}): boolean {
+}): ReadinessMissing | null {
   // Per LISTING with the one rule (review on PR 497): a cash-at-pickup shop selling an arranged product CAN collect for
-  // it, and a card shop's arranged product cannot — a shop-wide "can collect?" got both wrong.
-  return input.listings.some((l) => l.status === 'active' &&
-    listingReadiness({ listingType: l.listing_type, deliveryMode: l.delivery_mode, shop: input.shop }).mode === 'catalog')
+  // it, and a card shop's arranged product cannot — a shop-wide "can collect?" got both wrong. Returns WHAT is missing
+  // (the banner names it — cross-family review: a card shop with no delivery was told to turn on SPEI), or `null`.
+  const missing = new Set<ReadinessMissing>()
+  for (const l of input.listings) {
+    if (l.status !== 'active') continue
+    const r = listingReadiness({ listingType: l.listing_type, deliveryMode: l.delivery_mode, shop: input.shop })
+    if (r.mode === 'catalog') r.missing.forEach((m) => missing.add(m))
+  }
+  // The most fundamental gap first: no way to collect at all, then delivery, then a manual method for arranged sales.
+  for (const m of ['payment', 'delivery', 'manual_payment'] as const) if (missing.has(m)) return m
+  return null
 }
 
 /** Read a listing's delivery mode from its product metadata (`carrier` | `arranged`, anything else = unset). */

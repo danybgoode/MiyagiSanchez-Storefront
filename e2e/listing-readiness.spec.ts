@@ -286,15 +286,17 @@ test.describe('readiness · guided and visible (S2)', () => {
 
   test('the panel state is PER LISTING: a live product nobody can pay for — an empty or early shop is not alarmed', () => {
     const live = [{ listing_type: 'product', status: 'active' }]
-    expect(shopCatalogOnly({ shop: shop({}), listings: live })).toBe(true)
-    expect(shopCatalogOnly({ shop: shop({}), listings: [] })).toBe(false)
-    expect(shopCatalogOnly({ shop: shop({}), listings: [{ listing_type: 'product', status: 'draft' }] })).toBe(false)
-    expect(shopCatalogOnly({ shop: shop({}), listings: [{ listing_type: 'service', status: 'active' }] })).toBe(false)
-    expect(shopCatalogOnly({ shop: shop({ bankTransfer: true }), listings: live })).toBe(false)
+    expect(shopCatalogOnly({ shop: shop({}), listings: live })).toBe('payment')
+    expect(shopCatalogOnly({ shop: shop({}), listings: [] })).toBeNull()
+    expect(shopCatalogOnly({ shop: shop({}), listings: [{ listing_type: 'product', status: 'draft' }] })).toBeNull()
+    expect(shopCatalogOnly({ shop: shop({}), listings: [{ listing_type: 'service', status: 'active' }] })).toBeNull()
+    expect(shopCatalogOnly({ shop: shop({ bankTransfer: true }), listings: live })).toBeNull()
+    // The banner names the real gap (cross-family catch): a card shop with no delivery is told about DELIVERY.
+    expect(shopCatalogOnly({ shop: shop({ stripe: true }, { liveShipping: false, localPickup: false }), listings: live })).toBe('delivery')
     // The review cases: cash-at-pickup sells an arranged product; a card shop's arranged product does not.
     const arranged = [{ listing_type: 'product', status: 'active', delivery_mode: 'arranged' as const }]
-    expect(shopCatalogOnly({ shop: shop({ cash: true }), listings: arranged })).toBe(false)
-    expect(shopCatalogOnly({ shop: shop({ stripe: true }), listings: arranged })).toBe(true)
+    expect(shopCatalogOnly({ shop: shop({ cash: true }), listings: arranged })).toBeNull()
+    expect(shopCatalogOnly({ shop: shop({ stripe: true }), listings: arranged })).toBe('manual_payment')
   })
 
   test('the form, the panel, the badges and the guide are wired to the same rule', () => {
@@ -305,7 +307,9 @@ test.describe('readiness · guided and visible (S2)', () => {
     expect(read('app/api/sell/readiness/route.ts')).toContain('listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(metadata) })')
     expect(read('app/(shell)/sell/ReadinessPanel.tsx')).toContain('<CobrosChooser')
     expect(read('app/(shell)/shop/manage/page.tsx')).toContain('shopCatalogOnly({')
-    expect(read('app/(shell)/shop/manage/page.tsx')).toContain("canCollect(shopFacts.payments) ? 'needs_manual' : 'cannot_collect'")
+    expect(read('app/(shell)/shop/manage/ManageDashboard.tsx')).toContain('title={BANNER[catalogReason].title}')
+    // The p2s flag body is read only when it declares itself tiny (security lens) — never buffered blind.
+    expect(read('app/api/p2s/publish/route.ts')).toContain("declared > 0 && declared <= 1024 ? await req.text()")
     // The offer gate reads the delivery mode FRESH (security lens, PR 497) — never the 60s cached owned read.
     const collect = read('lib/shop-collect.ts')
     expect(collect).toContain('await readOwnedShopListingFresh(slug, productId)')

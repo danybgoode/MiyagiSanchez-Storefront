@@ -7,7 +7,14 @@ import PrintEditionCard from './PrintEditionCard'
 import SellerPageHeader from '@/components/seller/SellerPageHeader'
 import SetupGuideCard from './SetupGuideCard'
 import { Banner } from '@/components/feedback/Banner'
-import { PAYMENTS_SETTINGS_PATH, READINESS_COPY } from '@/lib/listing-readiness'
+import { PAYMENTS_SETTINGS_PATH, READINESS_COPY, type ReadinessMissing } from '@/lib/listing-readiness'
+
+/** The readiness banner's words for each missing requirement (listing-readiness S2.2). */
+const BANNER: Record<ReadinessMissing, { title: string; body: string }> = {
+  payment: { title: READINESS_COPY.bannerTitle, body: READINESS_COPY.bannerBody },
+  delivery: { title: READINESS_COPY.bannerDeliveryTitle, body: READINESS_COPY.bannerDeliveryBody },
+  manual_payment: { title: READINESS_COPY.bannerManualTitle, body: READINESS_COPY.bannerManualBody },
+}
 import { pendingSummary as buildPendingSummary } from '@/lib/seller-pending-summary'
 import type { SetupStep } from '@/lib/setup-guide'
 import { shopUrlFor } from '@/lib/market-url'
@@ -50,7 +57,7 @@ export default async function ManageDashboard({
   pendingOrdersCount = 0,
   setupSteps,
   catalogOnly = false,
-  catalogReason = 'cannot_collect',
+  catalogReason = 'payment',
   guideDismissed = false,
   guideSatisfactionAnswered = false,
 }: {
@@ -61,8 +68,8 @@ export default async function ManageDashboard({
   setupSteps: SetupStep[]
   /** Live products and no way to collect (listing-readiness S2.2) — the banner, and a guide that can't be hidden. */
   catalogOnly?: boolean
-  /** Why: nothing to collect with at all, or only SPEI/cash missing for coordinated sales. */
-  catalogReason?: 'cannot_collect' | 'needs_manual'
+  /** What is missing for those products: a way to collect, a way to deliver, or SPEI/cash for coordinated sales. */
+  catalogReason?: ReadinessMissing
   guideDismissed?: boolean
   guideSatisfactionAnswered?: boolean
 }) {
@@ -127,9 +134,9 @@ export default async function ManageDashboard({
       />
 
       {catalogOnly && (
-        <Banner variant="warning" title={catalogReason === 'needs_manual' ? READINESS_COPY.bannerManualTitle : READINESS_COPY.bannerTitle}>
+        <Banner variant="warning" title={BANNER[catalogReason].title}>
           <span data-testid="shop-cannot-collect" data-reason={catalogReason}>
-            {catalogReason === 'needs_manual' ? READINESS_COPY.bannerManualBody : READINESS_COPY.bannerBody}{' '}
+            {BANNER[catalogReason].body}{' '}
             <Link href={PAYMENTS_SETTINGS_PATH} className="font-semibold underline">{READINESS_COPY.fixPayments}</Link>
           </span>
         </Banner>
