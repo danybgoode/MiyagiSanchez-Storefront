@@ -63,6 +63,28 @@ export function canAcceptCounter(offer: Pick<Offer, 'status' | 'counter_expires_
   return offer.status === 'countered' && !isCounterExpired(offer)
 }
 
+/**
+ * Has this deal run out? Each status has ONE clock, and only its own:
+ *   pending → `expires_at` (the seller's time to answer) · countered → `counter_expires_at` (the buyer's time to accept)
+ *   accepted → `checkout_expires_at` (the time to pay; `null` = no deadline — a shop without Stripe sets none).
+ * Reported live 2026-11-12 (miel-verduras): an ACCEPTED offer showed «Trato expirado» because the conversation also
+ * checked the counter's 24h window, which had passed after the buyer accepted. The PDP (lib/active-deal.ts) already
+ * read it this way; the conversation now shares this.
+ */
+export function isDealExpired(
+  offer: { status: OfferStatus | string; expires_at: string | null; counter_expires_at: string | null; checkout_expires_at?: string | null },
+  now: Date = new Date(),
+): boolean {
+  const past = (iso: string | null | undefined) => !!iso && new Date(iso).getTime() < now.getTime()
+  switch (offer.status) {
+    case 'expired': return true
+    case 'pending': return past(offer.expires_at)
+    case 'countered': return past(offer.counter_expires_at)
+    case 'accepted': return past(offer.checkout_expires_at)
+    default: return false
+  }
+}
+
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
 export function formatOfferAmount(cents: number, currency = 'MXN'): string {

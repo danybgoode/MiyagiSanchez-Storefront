@@ -4,6 +4,7 @@ import path from 'node:path'
 import { agreedDealDisplay } from '../lib/pdp-viewer-state'
 import { shopAcceptsAnyPayment } from '../lib/public-shop-commerce'
 import { resolveConversationCheckout } from '../lib/conversation-checkout'
+import { isDealExpired } from '../lib/offers'
 
 /**
  * An ACCEPTED offer, after the seller says yes (reported live 2026-11-11, miel-verduras:
@@ -107,5 +108,32 @@ test.describe('offer · any payment method can pay an accepted offer from the co
     const client = readFileSync(path.join(ROOT, 'app/(shell)/messages/[id]/ConversationClient.tsx'), 'utf8')
     expect(client).toContain('{listing && (checkoutProvider || checkoutAvailable) ? (')
     expect(client).toContain('provider={checkoutProvider ?? undefined}')
+  })
+})
+
+test.describe('offer · a deal expires only by its own clock (reported live 2026-11-12)', () => {
+  const now = new Date('2026-11-12T21:00:00Z')
+  const past = '2026-11-12T20:16:30Z'
+  const future = '2026-11-13T20:06:47Z'
+
+  test('🚨 THE REPORTED BUG: an accepted deal whose counter window passed is NOT expired', () => {
+    // miel-verduras: accepted, no payment deadline (no Stripe), counter_expires_at already behind us.
+    expect(isDealExpired({ status: 'accepted', expires_at: future, counter_expires_at: past, checkout_expires_at: null }, now)).toBe(false)
+  })
+
+  test('each status reads its own clock, and only its own', () => {
+    expect(isDealExpired({ status: 'pending', expires_at: past, counter_expires_at: null }, now)).toBe(true)
+    expect(isDealExpired({ status: 'pending', expires_at: future, counter_expires_at: past }, now)).toBe(false)
+    expect(isDealExpired({ status: 'countered', expires_at: future, counter_expires_at: past }, now)).toBe(true)
+    expect(isDealExpired({ status: 'accepted', expires_at: past, counter_expires_at: past, checkout_expires_at: past }, now)).toBe(true)
+    expect(isDealExpired({ status: 'paid', expires_at: past, counter_expires_at: past, checkout_expires_at: past }, now)).toBe(false)
+    expect(isDealExpired({ status: 'expired', expires_at: future, counter_expires_at: null }, now)).toBe(true)
+  })
+
+  test('both conversation producers select the PRODUCT id — the refresh used to drop it and the link 404d', () => {
+    for (const file of ['app/(shell)/messages/[id]/page.tsx', 'app/api/conversations/[id]/route.ts']) {
+      expect(readFileSync(path.join(ROOT, file), 'utf8'), file).toMatch(/marketplace_listings \( id, medusa_product_id,/)
+    }
+    expect(readFileSync(path.join(ROOT, 'app/(shell)/messages/[id]/ConversationClient.tsx'), 'utf8')).toContain('if (isDealExpired(offer)) {')
   })
 })

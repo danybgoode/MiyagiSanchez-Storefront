@@ -16,12 +16,14 @@ export async function GET(
   if (!user) return NextResponse.json({ error: 'No autenticado.' }, { status: 401 })
 
   // Fetch conversation without offers embed (offers table has no currency column)
+  // `medusa_product_id` below: the header link and the pay button need the PRODUCT id. Without it this refresh fell back
+  // to the mirror's own id and the link 404'd (reported live 2026-11-12) — the first render already selected it.
   const { data: conv } = await db
     .from('marketplace_conversations')
     .select(`
       id, status, buyer_clerk_user_id, seller_clerk_user_id, last_event_at,
       buyer_unread, seller_unread, offer_id, medusa_order_id,
-      marketplace_listings ( id, title, price_cents, currency, images, status, condition, location, listing_type ),
+      marketplace_listings ( id, medusa_product_id, title, price_cents, currency, images, status, condition, location, listing_type ),
       marketplace_shops ( id, name, slug, logo_url, metadata, mp_enabled )
     `)
     .eq('id', id)

@@ -6,7 +6,7 @@ import { BuyerCopyText, useBuyerCopy, useBuyerFormatters } from '@/app/component
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { BUYER_STAMPS, SELLER_STAMPS, type StampKey } from '@/lib/stamps'
-import { timeUntil, offerTurn, type OfferStatus } from '@/lib/offers'
+import { isDealExpired, timeUntil, offerTurn, type OfferStatus } from '@/lib/offers'
 import OfferCheckoutButton from '@/app/components/OfferCheckoutButton'
 import TrustSignals from '@/app/components/TrustSignals'
 import type { CheckoutProvider } from '@/lib/cart'
@@ -422,7 +422,6 @@ function OfferActionBar({
 
   const isExpiredOffer = new Date(offer.expires_at) < new Date()
   const isExpiredCounter = offer.counter_expires_at && new Date(offer.counter_expires_at) < new Date()
-  const isCheckoutExpired = offer.checkout_expires_at && new Date(offer.checkout_expires_at) < new Date()
   const agreedCents = offer.counter_amount_cents ?? offer.offer_amount_cents
 
   if (offer.status === 'paid') {
@@ -443,7 +442,8 @@ function OfferActionBar({
     return <DealStatusBar tone="neutral" title={copy('messages.id.ConversationClient.dd9579c0')} body="Esta negociación ya no está activa." />
   }
 
-  if (offer.status === 'expired' || isExpiredOffer || isExpiredCounter || isCheckoutExpired) {
+  // One clock per status (lib/offers.ts isDealExpired) — an ACCEPTED deal never expires by its old counter window.
+  if (isDealExpired(offer)) {
     return <DealStatusBar tone="danger" title={copy('messages.id.ConversationClient.c06b8c1a')} body="El precio acordado ya no está disponible. Puedes volver al anuncio para iniciar una nueva oferta." />
   }
 
