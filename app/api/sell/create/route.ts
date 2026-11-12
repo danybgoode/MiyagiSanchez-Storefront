@@ -1,3 +1,4 @@
+import { listingNotReadyRefusal, listingReadiness, ownerShopFacts } from '@/lib/listing-readiness'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { tg } from '@/lib/telegram'
@@ -27,6 +28,8 @@ function medusaFetch(path: string, clerkJwt: string, options?: RequestInit) {
 }
 
 interface CreatePayload {
+  /** «Publicar como catálogo»: publish a product nobody can pay for online, on purpose (listing-readiness D4). */
+  publish_as_catalog?: boolean
   createShop?: {
     name: string
     slug?: string
@@ -224,6 +227,27 @@ export async function POST(req: NextRequest) {
   }
   if (body.listing.currency && body.listing.currency.toUpperCase() !== listingCurrency) {
     return NextResponse.json({ error: `La moneda de esta tienda es ${listingCurrency}.`, field: 'currency' }, { status: 422 })
+  }
+
+  // ── Can a buyer pay for this online? (listing-readiness S1.2) ─────────────
+  // The new-listing form was the one door that never asked: a product went live on a shop with no payment method, a
+  // buyer made an offer, the seller accepted it, and nobody could pay (miel-verduras, 2026-11-11). The SAME rule as
+  // activation and MCP (lib/listing-readiness.ts) over the owner's private facts. A catalog listing goes live only
+  // when the merchant chose «Publicar como catálogo» (`publish_as_catalog`); the 422 carries what is missing so the
+  // form can open its readiness panel. Nothing has been written to Medusa yet at this point.
+  const readinessRefusal = listingNotReadyRefusal(
+    listingReadiness({
+      listingType: body.listing.listing_type,
+      deliveryMode: body.listing.delivery_mode ?? null,
+      shop: ownerShopFacts(sellerForMirror?.metadata ?? null),
+    }),
+    body.publish_as_catalog === true,
+  )
+  if (readinessRefusal) {
+    return NextResponse.json(
+      { error: readinessRefusal.error, code: readinessRefusal.code, missing: readinessRefusal.missing },
+      { status: 422 },
+    )
   }
 
   // ── Build product metadata ────────────────────────────────────────────────

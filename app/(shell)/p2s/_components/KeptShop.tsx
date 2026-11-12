@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { patchShop, publishShop } from '@/lib/prompt-to-shop/client'
+import { READINESS_COPY } from '@/lib/listing-readiness'
 import type { ChooserState } from '@/lib/prompt-to-shop/cobros'
 import { ARMAR_COPY, CHECKLIST_COPY, CHECKLIST_LABELS, PHOTO_COPY, PUBLISH_COPY } from '@/lib/prompt-to-shop/copy'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
@@ -74,7 +75,7 @@ export default function KeptShop({
   const [sheet, setSheet] = useState<SheetState>(null)
   const close = useCallback(() => setSheet(null), [])
   const publicPath = shopSlug ? `/mx/s/${shopSlug}` : null
-  const [publishing, setPublishing] = useState<{ kind: 'idle' | 'busy' } | { kind: 'error'; message: string }>({ kind: 'idle' })
+  const [publishing, setPublishing] = useState<{ kind: 'idle' | 'busy' } | { kind: 'error'; message: string; notReady?: boolean }>({ kind: 'idle' })
   const [justPublished, setJustPublished] = useState(false)
 
   const draftId = view.shop.id
@@ -87,12 +88,12 @@ export default function KeptShop({
   useEffect(() => { if ((ownCards?.length ?? 0) > 0) trackFunnel('p2s_real_product_added', draftId) }, [draftId, ownCards])
   useEffect(() => { if (pagosDone) trackFunnel('p2s_payments_connected', draftId) }, [draftId, pagosDone])
 
-  async function runPublish() {
+  async function runPublish(opts: { asCatalog?: boolean } = {}) {
     if (publishing.kind === 'busy') return
     setPublishing({ kind: 'busy' })
-    const result = await publishShop()
+    const result = await publishShop(undefined, opts)
     if (!result.ok) {
-      setPublishing({ kind: 'error', message: result.message })
+      setPublishing({ kind: 'error', message: result.message, notReady: result.notReady })
       return
     }
     setPublishing({ kind: 'idle' })
@@ -153,12 +154,26 @@ export default function KeptShop({
           {publish.enabled && unpublished > 0 ? (
             <>
               <div>
-                <Button type="button" variant="primary" onClick={runPublish} disabled={publishing.kind === 'busy'} data-testid="p2s-publish">
+                <Button type="button" variant="primary" onClick={() => runPublish()} disabled={publishing.kind === 'busy'} data-testid="p2s-publish">
                   {publishing.kind === 'busy' ? PUBLISH_COPY.publishing : PHOTO_COPY.publish}
                 </Button>
               </div>
               {publishing.kind === 'error' ? (
                 <Banner variant="warning">{publishing.message}</Banner>
+              ) : null}
+              {publishing.kind === 'error' && publishing.notReady ? (
+                // listing-readiness: nobody could pay yet — fix it here, or publish as catalog on purpose.
+                <div className="grid gap-2" data-testid="p2s-not-ready">
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="secondary" onClick={() => setSheet({ kind: 'step', id: 'pagos' })}>
+                      {READINESS_COPY.fixPayments}
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={() => runPublish({ asCatalog: true })} data-testid="p2s-publish-catalog">
+                      {READINESS_COPY.publishAsCatalog}
+                    </Button>
+                  </div>
+                  <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{READINESS_COPY.catalogHint}</p>
+                </div>
               ) : null}
             </>
           ) : publish.enabled ? null : (

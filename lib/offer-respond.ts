@@ -9,6 +9,7 @@
  * check is identical whether the caller is a signed-in seller or a scoped agent.
  */
 
+import { offerCollectRefusal, shopCanCollect } from './shop-collect'
 import { db } from './supabase'
 import { stripe } from './stripe'
 import { dispatchToBuyer } from './notifications/dispatch'
@@ -124,7 +125,7 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
       *,
       marketplace_listings!inner(
         id, title, price_cents, currency, listing_type, images, status,
-        marketplace_shops!inner(id, clerk_user_id, metadata)
+        marketplace_shops!inner(id, slug, clerk_user_id, metadata)
       )
     `)
     .eq('id', id)
@@ -135,7 +136,7 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
   const listing = offer.marketplace_listings as unknown as {
     id: string; title: string; price_cents: number; currency: string
     listing_type: string; images: Array<{ url: string }> | null; status: string
-    marketplace_shops: { id: string; clerk_user_id: string | null; metadata: Record<string, unknown> | null }
+    marketplace_shops: { id: string; slug: string | null; clerk_user_id: string | null; metadata: Record<string, unknown> | null }
   }
 
   if (listing.marketplace_shops.clerk_user_id !== authorizedClerkUserId) {
@@ -174,6 +175,15 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
   }
   if (action === 'decline' && !canDecline(offer)) {
     return { ok: false, error: 'Esta oferta no puede ser rechazada.', httpStatus: 409 }
+  }
+
+  // ── Can the shop collect? (listing-readiness S1.3) ───────────────────────────
+  // Accepting or countering promises the buyer a payable price; on a shop that cannot take payment that promise
+  // dead-ends (miel-verduras, 2026-11-11). Declining is always allowed. Shared by the web route and MCP. Medusa read;
+  // fails CLOSED on an outage.
+  if (action === 'accept' || action === 'counter') {
+    const refusal = offerCollectRefusal(await shopCanCollect(listing.marketplace_shops.slug), 'seller')
+    if (refusal) return { ok: false, error: refusal.error, httpStatus: refusal.status }
   }
 
   async function emitConvEvent(eventType: string, actor: string, metadata: Record<string, unknown>, incBuyerUnread = false) {

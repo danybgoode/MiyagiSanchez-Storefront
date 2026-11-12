@@ -21,7 +21,10 @@ export const dynamic = 'force-dynamic'
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
 
-export async function POST() {
+export async function POST(req: Request) {
+  // «Publicar como catálogo» (listing-readiness D4): the merchant chose to publish products nobody can pay online.
+  const body = (await req.json().catch(() => null)) as { publish_as_catalog?: unknown } | null
+  const publishAsCatalog = body?.publish_as_catalog === true
   const { userId, getToken } = await auth()
   if (!userId) return NextResponse.json({ ok: false, error: 'signed_out', message: PUBLISH_COPY.signedOut }, { status: 401, headers: NO_STORE })
   const clerkJwt = await getToken()
@@ -34,7 +37,7 @@ export async function POST() {
       const shop = await fetchGuideShop(userId)
       return shop?.id ? fetchDeletedListingIds(shop.id) : new Set<string>()
     },
-    activate: (productId) => setListingStatus(productId, 'active', { userId, clerkJwt }),
+    activate: (productId) => setListingStatus(productId, 'active', { userId, clerkJwt }, { publishAsCatalog }),
     log: (line) => console.info('[p2s]', JSON.stringify(line)),
   })
   // The catalog's single-row activate does not bust the cache; a whole shop going public should show on the next view

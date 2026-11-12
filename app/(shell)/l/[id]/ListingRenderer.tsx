@@ -404,6 +404,9 @@ export async function ListingPage({
     sellerPaymentAvailable: sellerHasMp || sellerHasStripe || hasBankTransfer || hasDimo,
   })
   const hasAnyPayment = commerceReadiness.ready
+  // listing-readiness D5: a buyer may OPEN an offer only where a checkout could finish. The server refuses too
+  // (app/api/offers, lib/offer-respond.ts); this keeps the button from promising what the server will refuse.
+  const offersOpen = hasAnyPayment
   const fulfillmentMethods = [
     shippingSettings?.local_pickup && {
       icon: 'iconoir-shop',
@@ -648,7 +651,8 @@ export async function ListingPage({
     : {
         kind: 'generic',
         canBuy: showBuyButtons && hasAnyPayment,
-        canOffer: hasBuyablePrice && !hasConfigurator && listing.listing_type === 'product',
+        // Offers only where the shop can collect (listing-readiness D5) — an accepted price must be payable.
+        canOffer: hasBuyablePrice && !hasConfigurator && listing.listing_type === 'product' && offersOpen,
         schedule: autoLed
           ? { bookingUrl, label: autoHeroModel({ bookingUrl }).primaryLabel }
           : inmuebleLed
@@ -768,7 +772,7 @@ export async function ListingPage({
           (Daniel-confirmed scope call) — never let a buyer OPEN a new offer
           on a multi-variant listing (an already-accepted legacy one still
           renders above via the ternary regardless of hasConfigurator). */}
-      {!isPrintPlacement && hasBuyablePrice && !hasConfigurator && activeDeal?.status !== 'accepted_unpaid' && (
+      {!isPrintPlacement && hasBuyablePrice && !hasConfigurator && offersOpen && activeDeal?.status !== 'accepted_unpaid' && (
         <MakeOfferButton
           listing={{ id: listing.id, title: listing.title, price_cents: listing.price_cents!, currency: listing.currency, imageUrl: listing.images?.[0]?.url ?? null }}
           buyerInfo={requestContext.buyerPrefill ?? undefined}
@@ -915,7 +919,7 @@ export async function ListingPage({
           {redesignPrimaryCta}
           {/* Negotiation doesn't compose with the configurator this sprint —
               see the identical note on the legacy ctaButtons block above. */}
-          {hasBuyablePrice && !hasConfigurator && (
+          {hasBuyablePrice && !hasConfigurator && offersOpen && (
             <MakeOfferButton
               listing={{ id: listing.id, title: listing.title, price_cents: listing.price_cents!, currency: listing.currency, imageUrl: listing.images?.[0]?.url ?? null }}
               buyerInfo={requestContext.buyerPrefill ?? undefined}

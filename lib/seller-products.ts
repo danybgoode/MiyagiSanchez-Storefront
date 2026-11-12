@@ -9,9 +9,8 @@
 
 import { db } from './supabase'
 import { formatOfferAmount } from './offers'
-import { getShopStripe } from './stripe'
-import { sellerHasMpConnected } from './mercadopago-connect'
 import { freeEventPriceRefusal } from './evento-preset'
+import { listingReadiness, ownerShopFacts, readinessMessage, type DeliveryMode } from './listing-readiness'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const INTERNAL_SECRET = process.env.MEDUSA_INTERNAL_SECRET ?? ''
@@ -453,41 +452,15 @@ export async function patchSellerSlugViaInternal(
   }
 }
 
-function normalizeClabe(v: unknown): string {
-  return typeof v === 'string' ? v.replace(/\D/g, '') : ''
-}
-
 /**
- * Returns a plain-language reason a product listing can't be activated, or null
- * if it's OK. Mirrors the portal's checkCheckoutViability rule (a physical
- * product needs BOTH a concrete delivery method AND a concrete payment method)
- * but evaluates against the shop metadata we already hold — no Medusa fetch.
+ * Returns a plain-language reason a product listing can't be activated, or null if it's OK. The MCP door's adapter
+ * over the ONE rule in `lib/listing-readiness.ts` (epic listing-readiness S1.1): the same owner facts and message the
+ * portal's activation gate uses. This copy used to ignore arranged delivery and cash, and knew only v1 Stripe.
  */
-export function listingActivationBlock(shopMeta: Record<string, unknown> | null, listingType: string): string | null {
-  if (listingType !== 'product') return null
-  const meta = shopMeta ?? {}
-  const settings = (meta.settings ?? {}) as Record<string, unknown>
-  const shipping = (settings.shipping ?? {}) as Record<string, unknown>
-  const checkout = (settings.checkout ?? {}) as Record<string, unknown>
-
-  const hasLiveShipping = shipping.envia_enabled !== false && (() => {
-    const oa = (shipping.origin_address ?? {}) as Record<string, string | null>
-    return !!(oa.street && oa.city && oa.postal_code && (oa.state_code || oa.state))
-  })()
-  const hasDelivery = hasLiveShipping || !!shipping.local_pickup
-
-  const stripe = getShopStripe(meta)
-  const hasStripe = !!(stripe.charges_enabled && stripe.account_id && stripe.enabled !== false)
-  const hasMp = sellerHasMpConnected(meta)
-  const bankTransfer = (checkout.bank_transfer ?? {}) as Record<string, unknown>
-  const hasSpei = bankTransfer.enabled !== false && normalizeClabe(bankTransfer.clabe).length === 18
-  const dimo = (checkout.dimo ?? {}) as Record<string, unknown>
-  const hasDimo = dimo.enabled === true && normalizeClabe(dimo.phone).length >= 10
-  const hasPayment = hasStripe || hasMp || hasSpei || hasDimo
-
-  if (hasDelivery && hasPayment) return null
-  const missing: string[] = []
-  if (!hasDelivery) missing.push('una forma de entrega (envío o recolección)')
-  if (!hasPayment) missing.push('un método de pago (MercadoPago, Stripe, SPEI o DiMo)')
-  return `Para activar este anuncio configura ${missing.join(' y ')} en Mi tienda → Configuración.`
+export function listingActivationBlock(
+  shopMeta: Record<string, unknown> | null,
+  listingType: string,
+  deliveryMode?: DeliveryMode,
+): string | null {
+  return readinessMessage(listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(shopMeta) }))
 }

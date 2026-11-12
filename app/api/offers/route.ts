@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { offerCollectRefusal, shopCanCollect } from '@/lib/shop-collect'
 import { currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
 import { validateOfferAmount, formatOfferAmount } from '@/lib/offers'
@@ -117,14 +118,14 @@ export async function POST(req: NextRequest) {
   // ── Fetch listing ─────────────────────────────────────────────────────────
   let { data: listing } = await db
     .from('marketplace_listings')
-    .select('id, title, price_cents, currency, listing_type, status, images, marketplace_shops!inner(id, name, metadata, clerk_user_id)')
+    .select('id, title, price_cents, currency, listing_type, status, images, marketplace_shops!inner(id, name, slug, metadata, clerk_user_id)')
     .eq('medusa_product_id', listingId)
     .maybeSingle()
 
   if (!listing && isUuid(listingId)) {
     const fallback = await db
       .from('marketplace_listings')
-      .select('id, title, price_cents, currency, listing_type, status, images, marketplace_shops!inner(id, name, metadata, clerk_user_id)')
+      .select('id, title, price_cents, currency, listing_type, status, images, marketplace_shops!inner(id, name, slug, metadata, clerk_user_id)')
       .eq('id', listingId)
       .maybeSingle()
     listing = fallback.data
@@ -144,6 +145,16 @@ export async function POST(req: NextRequest) {
       { error: 'Esta tienda aún no está reclamada — contáctala directamente.' },
       { status: 409 },
     )
+  }
+
+  // ── Can the shop collect? (listing-readiness S1.3) ────────────────────────
+  // An offer is a promise of a payable price. Medusa read (the mirror lacks bank transfer); fails CLOSED on an outage.
+  const collectRefusal = offerCollectRefusal(
+    await shopCanCollect((listing.marketplace_shops as unknown as { slug: string | null }).slug),
+    'buyer',
+  )
+  if (collectRefusal) {
+    return NextResponse.json({ error: collectRefusal.error, code: collectRefusal.code }, { status: collectRefusal.status })
   }
 
   const mirrorListingId = listing.id
