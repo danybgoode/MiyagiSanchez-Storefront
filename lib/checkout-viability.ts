@@ -14,10 +14,14 @@
  *    method (SPEI or cash) — no carrier/pickup required, since checkout
  *    strips card/instant rails for a coordinated sale (start-checkout's 422
  *    guard already enforces manual-only).
- * Coexist-permissive (Daniel, 2026-07-11): arranged is an ADDITIONAL valid
- * path, not a replacement — a listing satisfying the traditional check stays
- * viable even if its delivery_mode happens to be 'arranged'.
+ * The 2026-07-11 "coexist-permissive" reading (an arranged listing with
+ * shipping + card stays viable) was retired in epic listing-readiness: with
+ * `shipping.arranged_only_enabled` ON in production, checkout only takes a
+ * manual method for an arranged product, so that listing was unbuyable. The rule
+ * now lives in lib/listing-readiness.ts.
  */
+
+import { listingReadiness, readinessMessage } from './listing-readiness'
 
 export interface CheckoutViabilityInput {
   listingType: string
@@ -31,28 +35,23 @@ export interface CheckoutViabilityInput {
   hasCash: boolean
 }
 
-/** Returns `null` when viable, or the es-MX error message to show the seller. */
+/**
+ * Returns `null` when viable, or the es-MX error message to show the seller. A thin adapter over the ONE rule in
+ * `lib/listing-readiness.ts` (epic listing-readiness S1.1) — kept for its callers and its spec; the rule lives there.
+ */
 export function deriveCheckoutViability(input: CheckoutViabilityInput): string | null {
-  const { listingType, deliveryMode, hasLiveShipping, hasLocalPickup, hasStripe, hasMp, hasSpei, hasDimo, hasCash } = input
-
-  if (listingType !== 'product') return null
-
-  const hasDelivery = hasLiveShipping || hasLocalPickup
-  const hasPayment = hasStripe || hasMp || hasSpei || hasDimo
-  const isArranged = deliveryMode === 'arranged'
-  const hasManual = hasSpei || hasCash
-
-  if ((isArranged && hasManual) || (hasDelivery && hasPayment)) return null
-
-  if (isArranged) {
-    return 'Para activar este anuncio con entrega acordada, configura al menos un método de pago ' +
-      'manual (SPEI o recolección con efectivo). Ve a Mi tienda → Configuración → Pagos.'
-  }
-
-  const missing: string[] = []
-  if (!hasDelivery) missing.push('una forma de entrega (envío a domicilio o recolección en mano)')
-  if (!hasPayment) missing.push('un método de pago (MercadoPago, Stripe, SPEI o DiMo)')
-
-  return `Para activar este anuncio configura ${missing.join(' y ')}. ` +
-    'Ve a Mi tienda → Configuración → Pagos y Envíos.'
+  return readinessMessage(listingReadiness({
+    listingType: input.listingType,
+    deliveryMode: input.deliveryMode,
+    shop: {
+      payments: {
+        stripe: input.hasStripe,
+        mercadopago: input.hasMp,
+        bankTransfer: input.hasSpei,
+        dimo: input.hasDimo,
+        cash: input.hasCash,
+      },
+      delivery: { liveShipping: input.hasLiveShipping, localPickup: input.hasLocalPickup },
+    },
+  }))
 }

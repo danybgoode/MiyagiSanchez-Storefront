@@ -21,11 +21,20 @@ export const dynamic = 'force-dynamic'
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
 
-export async function POST() {
+export async function POST(req: Request) {
   const { userId, getToken } = await auth()
   if (!userId) return NextResponse.json({ ok: false, error: 'signed_out', message: PUBLISH_COPY.signedOut }, { status: 401, headers: NO_STORE })
   const clerkJwt = await getToken()
   if (!clerkJwt) return NextResponse.json({ ok: false, error: 'signed_out', message: PUBLISH_COPY.signedOut }, { status: 401, headers: NO_STORE })
+  // «Publicar como catálogo» (listing-readiness D4): the merchant chose to publish products nobody can pay online.
+  // Read AFTER auth (security lens, PR 497) and only a small body: the one flag is all this route accepts.
+  // Never buffer an arbitrary body: read it only when it declares itself tiny (security lens, PR 497).
+  const declared = Number(req.headers.get('content-length') ?? '0')
+  const raw = declared > 0 && declared <= 1024 ? await req.text().catch(() => '') : ''
+  let publishAsCatalog = false
+  if (raw.length > 0 && raw.length <= 1024) {
+    try { publishAsCatalog = (JSON.parse(raw) as { publish_as_catalog?: unknown } | null)?.publish_as_catalog === true } catch { /* not the flag */ }
+  }
 
   const result = await handlePublish({
     resolveOwner: () => resolvePhotoOwner(userId, clerkJwt),
@@ -34,7 +43,7 @@ export async function POST() {
       const shop = await fetchGuideShop(userId)
       return shop?.id ? fetchDeletedListingIds(shop.id) : new Set<string>()
     },
-    activate: (productId) => setListingStatus(productId, 'active', { userId, clerkJwt }),
+    activate: (productId) => setListingStatus(productId, 'active', { userId, clerkJwt }, { publishAsCatalog }),
     log: (line) => console.info('[p2s]', JSON.stringify(line)),
   })
   // The catalog's single-row activate does not bust the cache; a whole shop going public should show on the next view

@@ -9,6 +9,7 @@
  * check is identical whether the caller is a signed-in seller or a scoped agent.
  */
 
+import { offerCanProceed, offerCollectRefusal } from './shop-collect'
 import { db } from './supabase'
 import { stripe } from './stripe'
 import { dispatchToBuyer } from './notifications/dispatch'
@@ -123,8 +124,8 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
     .select(`
       *,
       marketplace_listings!inner(
-        id, title, price_cents, currency, listing_type, images, status,
-        marketplace_shops!inner(id, clerk_user_id, metadata)
+        id, medusa_product_id, title, price_cents, currency, listing_type, images, status,
+        marketplace_shops!inner(id, slug, clerk_user_id, metadata)
       )
     `)
     .eq('id', id)
@@ -133,9 +134,9 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
   if (!offer) return { ok: false, error: 'Oferta no encontrada.', httpStatus: 404 }
 
   const listing = offer.marketplace_listings as unknown as {
-    id: string; title: string; price_cents: number; currency: string
+    id: string; medusa_product_id: string | null; title: string; price_cents: number; currency: string
     listing_type: string; images: Array<{ url: string }> | null; status: string
-    marketplace_shops: { id: string; clerk_user_id: string | null; metadata: Record<string, unknown> | null }
+    marketplace_shops: { id: string; slug: string | null; clerk_user_id: string | null; metadata: Record<string, unknown> | null }
   }
 
   if (listing.marketplace_shops.clerk_user_id !== authorizedClerkUserId) {
@@ -176,6 +177,19 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
     return { ok: false, error: 'Esta oferta no puede ser rechazada.', httpStatus: 409 }
   }
 
+  // ── Can the shop collect? (listing-readiness S1.3) ───────────────────────────
+  // Accepting or countering promises the buyer a payable price; on a shop that cannot take payment that promise
+  // dead-ends (miel-verduras, 2026-11-11). Declining is always allowed. Shared by the web route and MCP. Medusa read;
+  // fails CLOSED on an outage.
+  if (action === 'accept' || action === 'counter') {
+    const refusal = offerCollectRefusal(await offerCanProceed({
+      slug: listing.marketplace_shops.slug,
+      productId: listing.medusa_product_id,
+      listingType: listing.listing_type,
+    }), 'seller')
+    if (refusal) return { ok: false, error: refusal.error, httpStatus: refusal.status }
+  }
+
   async function emitConvEvent(eventType: string, actor: string, metadata: Record<string, unknown>, incBuyerUnread = false) {
     const { data: conv } = await db
       .from('marketplace_conversations')
@@ -191,10 +205,25 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
     ])
   }
 
+  // ── Claim the transition (validate → CLAIM → apply) ──────────────────────────
+  // The status checks above only READ. Two concurrent seller actions (accept + counter) both passed them and both wrote,
+  // leaving an offer accepted after a counter was sent (security lens on PR 497 — the readiness await widened the
+  // window). Each transition is now a conditional write on the status it was validated against, read back: the loser
+  // gets a 409 and runs no side effects.
+  const fromStatus = offer.status as string
+  async function claim(patch: Record<string, unknown>, opts: { unexpired?: boolean } = {}): Promise<boolean> {
+    let q = db.from('marketplace_offers').update(patch).eq('id', id).eq('status', fromStatus)
+    // Accept/counter answer a PENDING offer: its deadline is part of the claim — the readiness read can outlast it.
+    if (opts.unexpired) q = q.gt('expires_at', new Date().toISOString())
+    const { data, error } = await q.select('id')
+    return !error && Array.isArray(data) && data.length > 0
+  }
+  const lostRace: RespondResult = { ok: false, error: 'Esta oferta acaba de cambiar. Actualiza la página.', httpStatus: 409 }
+
   // ── Decline ───────────────────────────────────────────────────────────────────
   if (action === 'decline') {
+    if (!(await claim({ status: 'declined' }))) return lostRace
     cancelSellerReminders()
-    await db.from('marketplace_offers').update({ status: 'declined' }).eq('id', id)
     emitConvEvent('offer_declined', 'system', {}, true).catch(e => console.error('[conv] decline event:', e))
     // Buyer "Ofertas" event — email + push + Telegram, all gated by the buyer's
     // prefs in one place (the standalone notify() push is folded into the seam).
@@ -231,12 +260,12 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
     }
 
     const counterExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    await db.from('marketplace_offers').update({
+    if (!(await claim({
       status: 'countered',
       counter_amount_cents: counterAmountCents,
       counter_message: counterMessage?.trim() ?? null,
       counter_expires_at: counterExpiresAt,
-    }).eq('id', id)
+    }, { unexpired: true }))) return lostRace
 
     const conversationUrl = await getConversationUrl()
     const counteredMsg = buildBuyerMessage('offer_countered', {
@@ -287,6 +316,8 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
 
   // ── Accept ────────────────────────────────────────────────────────────────────
   if (action === 'accept') {
+    // Claim FIRST, so a losing concurrent request never creates a Stripe session; the session is attached below.
+    if (!(await claim({ status: 'accepted' }, { unexpired: true }))) return lostRace
     cancelSellerReminders()
     const acceptedCents = offer.offer_amount_cents
     const listingUrl = listingUrlFor(origin, listing.id)
@@ -332,10 +363,9 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
     }
 
     await db.from('marketplace_offers').update({
-      status: 'accepted',
       checkout_session_id: checkoutSessionId,
       checkout_expires_at: checkoutExpires,
-    }).eq('id', id)
+    }).eq('id', id).eq('status', 'accepted')
 
     emitConvEvent('offer_accepted', 'system', { amount_cents: offer.offer_amount_cents, currency: listing.currency }, true).catch(e => console.error('[conv] accept event:', e))
     const conversationUrl = await getConversationUrl()

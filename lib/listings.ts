@@ -430,6 +430,20 @@ const getOwnedShopListingCached = unstable_cache(
   { revalidate: CACHE.LISTING, tags: ['listings'] },
 )
 
+/**
+ * The same shop-scoped read, UNCACHED — for a money decision that cannot wait out the cache (listing-readiness offer
+ * gate: a seller who switched a product to arranged delivery must not take a card offer on it for another minute).
+ * `null` = not found / not this shop's / unreadable.
+ */
+export async function readOwnedShopListingFresh(sellerSlug: string, id: string): Promise<Listing | null> {
+  const res = await ownershipScopedFetch(
+    `/store/sellers/${encodeURIComponent(sellerSlug)}/products/${encodeURIComponent(id)}`,
+    { cache: 'no-store' },
+  )
+  if (!res.ok) return null
+  return readOwnedListingPayload(await res.json(), sellerSlug, id)
+}
+
 /** Trusted-channel PDP detail. Ownership + published state replace Sales Channel membership. */
 export function getOwnedShopListing(sellerSlug: string, id: string): Promise<Listing | null> {
   return getOwnedShopListingCached(sellerSlug, id)

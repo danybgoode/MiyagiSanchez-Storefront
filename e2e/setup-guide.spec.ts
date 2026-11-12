@@ -35,8 +35,12 @@ test.describe('setup-guide · computeShopCompletion', () => {
   })
 
   test('pagos is done via stripe, mercado pago, OR clabe (any one)', () => {
+    // Since listing-readiness S2.2 «pagos» IS the readiness rule's canCollect: a Stripe account must exist
+    // (`account_id`), a CLABE must be all 18 digits, and DiMo counts — the same facts activation checks.
     expect(computeShopCompletion(shopWith({ metadata: { settings: { mercadopago: { connected: true } } } })).pagos).toBe(true)
-    expect(computeShopCompletion(shopWith({ metadata: { settings: { stripe: { charges_enabled: true } } } })).pagos).toBe(true)
+    expect(computeShopCompletion(shopWith({ metadata: { settings: { stripe: { charges_enabled: true, account_id: 'acct_1' } } } })).pagos).toBe(true)
+    expect(computeShopCompletion(shopWith({ metadata: { settings: { checkout: { bank_transfer: { clabe: '01218' } } } } })).pagos).toBe(false)
+    expect(computeShopCompletion(shopWith({ metadata: { settings: { checkout: { dimo: { enabled: true, phone: '5512345678' } } } } })).pagos).toBe(true)
     expect(computeShopCompletion(shopWith({ metadata: { settings: { checkout: { bank_transfer: { clabe: '012180001234567895' } } } } })).pagos).toBe(true)
     expect(computeShopCompletion(emptyShop).pagos).toBe(false)
   })

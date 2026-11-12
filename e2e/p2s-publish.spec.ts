@@ -59,7 +59,8 @@ test('examples are never published: they are not in the product list, so nothing
 
 test('the route activates through the catalog\'s own in-process function, never over HTTP', () => {
   const route = readFileSync(join(ROOT, 'app/api/p2s/publish/route.ts'), 'utf8')
-  expect(route).toContain("setListingStatus(productId, 'active', { userId, clerkJwt })")
+  // `{ publishAsCatalog }` — «Publicar como catálogo» (listing-readiness D4) rides the same in-process call.
+  expect(route).toContain("setListingStatus(productId, 'active', { userId, clerkJwt }, { publishAsCatalog })")
   expect(route).toContain('resolvePhotoOwner(userId, clerkJwt)')
   expect(route.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')).not.toMatch(/fetch\(/)
 })

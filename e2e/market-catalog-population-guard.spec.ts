@@ -105,8 +105,9 @@ const CHECKOUT_MARKET_SCOPED = new Set([
 ])
 
 const OWNERSHIP_SCOPED = new Set([
-  // A seller publishing: is this listing actually checkout-viable for its OWNER?
-  'lib/listing-status.ts',
+  // (`lib/listing-status.ts` left this list in listing-readiness S1.2: its activation gate read the public
+  // `/store/listings/:id`, which cannot see drafts, so every draft activation failed open. It now reads the owner
+  // route `/store/sellers/me/products/:id` — not a catalog read at all.)
   // The seller's own edit form, loading their own product.
   'app/(shell)/sell/edit/[id]/page.tsx',
   // Seller-authenticated edit endpoints. These resolve a product the caller owns.

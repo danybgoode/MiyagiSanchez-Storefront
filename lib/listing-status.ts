@@ -15,12 +15,10 @@
  */
 import 'server-only'
 import { db } from '@/lib/supabase'
-import { sellerHasMpConnected } from '@/lib/mercadopago-connect'
-import { getShopStripe } from '@/lib/stripe'
 import { isEnabled } from '@/lib/flags'
 import { closeMlProduct } from '@/lib/ml-publish-bridge'
 import { notifyWriterOnPublish } from '@/lib/launchpad'
-import { deriveCheckoutViability } from '@/lib/checkout-viability'
+import { listingNotReadyRefusal, listingReadiness, ownerShopFacts, type ListingReadiness, type ReadinessMissing } from '@/lib/listing-readiness'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -58,67 +56,41 @@ async function bestEffortCloseMl(userId: string, productId: string): Promise<voi
   }
 }
 
-function normalizeClabe(v: unknown): string {
-  return typeof v === 'string' ? v.replace(/\D/g, '') : ''
-}
-
-async function checkCheckoutViability(listingId: string, clerkJwt: string): Promise<string | null> {
+/**
+ * The listing's sale readiness for activation (listing-readiness S1.1/S1.2): the ONE rule in lib/listing-readiness.ts
+ * over the OWNER's private facts. `null` = could not read (fail OPEN for publish — D3: an outage must not block a
+ * merchant; buyer surfaces still re-derive readiness from the live shop).
+ *
+ * Reads the product through the OWNER route (`/store/sellers/me/products/:id`, any status). It used to read
+ * `/store/listings/:id`, which only returns PUBLISHED products — so activating a draft, the one case this gate exists
+ * for, got a 404 and was allowed through.
+ */
+export async function readListingReadiness(listingId: string, clerkJwt: string): Promise<ListingReadiness | null> {
   try {
-    const [listingRes, sellerRes] = await Promise.all([
-      medusaFetch(`/store/listings/${listingId}`, clerkJwt),
+    const [productRes, sellerRes] = await Promise.all([
+      medusaFetch(`/store/sellers/me/products/${encodeURIComponent(listingId)}`, clerkJwt),
       medusaFetch('/store/sellers/me', clerkJwt),
     ])
-    if (!listingRes.ok || !sellerRes.ok) return null // non-fatal — allow publish on error
-
-    const { listing } = await listingRes.json() as { listing: Record<string, unknown> }
+    if (!productRes.ok || !sellerRes.ok) return null
+    const product = await productRes.json() as { listing_type?: string; delivery_mode?: 'carrier' | 'arranged' | null }
+    // An older backend does not send these fields: "could not read", not "a carrier product" — otherwise a service or
+    // event draft would get a wrong 422 (fresh-review catch, PR 497). Fail open, per D3.
+    if (typeof product.listing_type !== 'string') return null
     const { seller } = await sellerRes.json() as { seller: Record<string, unknown> }
-
-    const listingMeta = (listing?.metadata as Record<string, unknown> | null) ?? {}
-    const listingType = (listingMeta.listing_type as string) ?? 'product'
-    if (listingType !== 'product') return null
-
-    const shopMeta = (seller?.metadata ?? {}) as Record<string, unknown>
-    const settings = (shopMeta.settings ?? {}) as Record<string, unknown>
-    const shipping = (settings.shipping ?? {}) as Record<string, unknown>
-    const checkout = (settings.checkout ?? {}) as Record<string, unknown>
-
-    const hasLiveShipping = shipping.envia_enabled !== false && (() => {
-      const oa = (shipping.origin_address ?? {}) as Record<string, string | null>
-      return !!(oa.street && oa.city && oa.postal_code && (oa.state_code || oa.state))
-    })()
-    const hasLocalPickup = !!shipping.local_pickup
-    const hasDelivery = hasLiveShipping || hasLocalPickup
-
-    const stripe = getShopStripe(shopMeta)
-    const hasStripe = !!(stripe.charges_enabled && stripe.account_id && stripe.enabled !== false)
-    const hasMp = sellerHasMpConnected(shopMeta)
-    const bankTransfer = (checkout.bank_transfer ?? {}) as Record<string, unknown>
-    const hasSpei = bankTransfer.enabled !== false && normalizeClabe(bankTransfer.clabe).length === 18
-    const dimo = (checkout.dimo ?? {}) as Record<string, unknown>
-    const hasDimo = dimo.enabled === true && normalizeClabe(dimo.phone).length >= 10
-    // Cash (re-derives the same fields as the backend's sellerHasCash(), since
-    // this frontend module can't cross-import backend TS).
-    const cashPickup = (checkout.cash_pickup ?? {}) as Record<string, unknown>
-    const hasCash = hasLocalPickup && cashPickup.enabled !== false
-
-    return deriveCheckoutViability({
-      listingType,
-      deliveryMode: listingMeta.delivery_mode as 'carrier' | 'arranged' | null | undefined,
-      hasLiveShipping,
-      hasLocalPickup,
-      hasStripe,
-      hasMp,
-      hasSpei,
-      hasDimo,
-      hasCash,
+    return listingReadiness({
+      listingType: product.listing_type,
+      deliveryMode: product.delivery_mode ?? null,
+      shop: ownerShopFacts((seller?.metadata ?? null) as Record<string, unknown> | null),
     })
   } catch {
-    return null // on unexpected error, allow publish (fail open)
+    return null
   }
 }
 
 export type ListingStatusTarget = 'active' | 'paused'
-export type SetListingStatusResult = { ok: true } | { ok: false; status: number; error: string }
+export type SetListingStatusResult =
+  | { ok: true }
+  | { ok: false; status: number; error: string; code?: 'LISTING_NOT_READY'; missing?: readonly ReadinessMissing[] }
 
 /**
  * Flip a listing's status, with every side effect the single-row PATCH route
@@ -132,10 +104,14 @@ export async function setListingStatus(
   id: string,
   target: ListingStatusTarget,
   ctx: { userId: string; clerkJwt: string },
+  opts: { publishAsCatalog?: boolean } = {},
 ): Promise<SetListingStatusResult> {
   if (target === 'active') {
-    const viabilityError = await checkCheckoutViability(id, ctx.clerkJwt)
-    if (viabilityError) return { ok: false, status: 422, error: viabilityError }
+    // The merchant may activate a listing nobody can pay for online only by saying so (D4: «Solo catálogo» is a
+    // choice, derived live — never stored). Without that, the refusal names what is missing.
+    const readiness = await readListingReadiness(id, ctx.clerkJwt)
+    const refusal = readiness ? listingNotReadyRefusal(readiness, opts.publishAsCatalog === true) : null
+    if (refusal) return { ok: false, status: 422, error: refusal.error, code: refusal.code, missing: refusal.missing }
   }
 
   const medusaStatus = target === 'active' ? 'published' : 'draft'

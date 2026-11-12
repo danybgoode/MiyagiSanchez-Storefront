@@ -30,6 +30,7 @@ import AskSellerButton from '@/app/components/AskSellerButton'
 import OfferCheckoutButton from '@/app/components/OfferCheckoutButton'
 import SellerBundleSection from '@/app/components/SellerBundleSection'
 import { shopListingBase } from '@/lib/shop-presentation/chrome'
+import { deliveryModeOf, listingCanBePaid, publicShopFacts } from '@/lib/listing-readiness'
 import SpecsTable from './SpecsTable'
 import { listingSpecs } from '@/lib/listing-attributes'
 import SellerTrustCard from '@/app/components/SellerTrustCard'
@@ -397,13 +398,28 @@ export async function ListingPage({
   ].filter(Boolean) as Array<{ icon: string; label: string; note: string }>
   // Seller offers at least one online/selectable payment path → show the single
   // "Comprar ahora" button (the checkout page is the method chooser).
+  // An arranged product is a coordinated sale: checkout also takes CASH at pickup for it (backend start-checkout manual
+  // rails), so a cash-only shop can sell it — counted per listing via the one rule (cross-family review, PR 497).
+  const pdpShopFacts = publicShopFacts((listing.shop?.metadata ?? null) as Record<string, unknown> | null)
+  const arrangedCash = deliveryModeOf(listing.metadata) === 'arranged' && pdpShopFacts.payments.cash
   const commerceReadiness = resolveCommerceReadiness({
     market,
     priceCents: listing.price_cents,
     currency: listing.currency,
-    sellerPaymentAvailable: sellerHasMp || sellerHasStripe || hasBankTransfer || hasDimo,
+    sellerPaymentAvailable: sellerHasMp || sellerHasStripe || hasBankTransfer || hasDimo || arrangedCash,
   })
-  const hasAnyPayment = commerceReadiness.ready
+  // …and per LISTING (cross-family review, PR 497): an arranged product, a service or a rental is a coordinated sale
+  // checkout takes only on SPEI or cash — a card-only shop must not show «Comprar» for it (start-checkout would 422).
+  const listingPayable = listingCanBePaid({
+    listingType: listing.listing_type,
+    deliveryMode: deliveryModeOf(listing.metadata),
+    shop: pdpShopFacts,
+  })
+  const hasAnyPayment = commerceReadiness.ready && listingPayable
+  // listing-readiness D5: a buyer may OPEN an offer only where a checkout could finish. The server refuses too
+  // (app/api/offers, lib/offer-respond.ts); this keeps the button from promising what the server will refuse.
+  // Per LISTING, not per shop (cross-family review, PR 497): an arranged-delivery product sells only on a manual method.
+  const offersOpen = hasAnyPayment
   const fulfillmentMethods = [
     shippingSettings?.local_pickup && {
       icon: 'iconoir-shop',
@@ -648,7 +664,8 @@ export async function ListingPage({
     : {
         kind: 'generic',
         canBuy: showBuyButtons && hasAnyPayment,
-        canOffer: hasBuyablePrice && !hasConfigurator && listing.listing_type === 'product',
+        // Offers only where the shop can collect (listing-readiness D5) — an accepted price must be payable.
+        canOffer: hasBuyablePrice && !hasConfigurator && listing.listing_type === 'product' && offersOpen,
         schedule: autoLed
           ? { bookingUrl, label: autoHeroModel({ bookingUrl }).primaryLabel }
           : inmuebleLed
@@ -768,7 +785,7 @@ export async function ListingPage({
           (Daniel-confirmed scope call) — never let a buyer OPEN a new offer
           on a multi-variant listing (an already-accepted legacy one still
           renders above via the ternary regardless of hasConfigurator). */}
-      {!isPrintPlacement && hasBuyablePrice && !hasConfigurator && activeDeal?.status !== 'accepted_unpaid' && (
+      {!isPrintPlacement && hasBuyablePrice && !hasConfigurator && offersOpen && activeDeal?.status !== 'accepted_unpaid' && (
         <MakeOfferButton
           listing={{ id: listing.id, title: listing.title, price_cents: listing.price_cents!, currency: listing.currency, imageUrl: listing.images?.[0]?.url ?? null }}
           buyerInfo={requestContext.buyerPrefill ?? undefined}
@@ -915,7 +932,7 @@ export async function ListingPage({
           {redesignPrimaryCta}
           {/* Negotiation doesn't compose with the configurator this sprint —
               see the identical note on the legacy ctaButtons block above. */}
-          {hasBuyablePrice && !hasConfigurator && (
+          {hasBuyablePrice && !hasConfigurator && offersOpen && (
             <MakeOfferButton
               listing={{ id: listing.id, title: listing.title, price_cents: listing.price_cents!, currency: listing.currency, imageUrl: listing.images?.[0]?.url ?? null }}
               buyerInfo={requestContext.buyerPrefill ?? undefined}

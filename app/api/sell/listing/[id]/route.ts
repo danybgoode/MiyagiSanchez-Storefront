@@ -421,7 +421,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params
 
-  let body: { status?: string }
+  let body: { status?: string; publish_as_catalog?: boolean }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Datos inválidos.' }, { status: 400 }) }
 
   const allowed = ['active', 'paused']
@@ -436,8 +436,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // cascade, launchpad notify) lives in lib/listing-status.ts — shared with
   // the catalog bulk-apply path (catalog-management S3 · 3.1) so a bulk pause
   // can't bypass the Sprint 1.3 pausado/borrador fix.
-  const result = await setListingStatus(id, body.status as 'active' | 'paused', { userId, clerkJwt })
-  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
+  const result = await setListingStatus(id, body.status as 'active' | 'paused', { userId, clerkJwt }, {
+    publishAsCatalog: body.publish_as_catalog === true,
+  })
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error, code: result.code, missing: result.missing }, { status: result.status })
+  }
 
   return NextResponse.json({ id, status: body.status })
 }

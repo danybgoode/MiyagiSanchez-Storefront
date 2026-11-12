@@ -76,7 +76,7 @@ export interface PublicShopPaymentAvailability {
  * capability, not merely "an account exists" — so the two halves agree about what
  * "connected" means.
  */
-function stripeIsAvailable(stripe: Record<string, unknown>): boolean {
+export function stripeIsAvailable(stripe: Record<string, unknown>): boolean {
   // The seller's own opt-out is authoritative in BOTH generations.
   if (stripe.enabled === false) return false
 
@@ -133,5 +133,7 @@ export function publicShopPaymentAvailability(
  * hasDimo`), so a surface that offers «Comprar» agrees with the product page.
  */
 export function shopAcceptsAnyPayment(availability: PublicShopPaymentAvailability): boolean {
+  // The same predicate as `canCollect` in lib/listing-readiness.ts (which imports THIS module, so it is restated
+  // here as the four fields rather than imported back — a cycle). `listing-readiness.spec` pins that they agree.
   return availability.stripe || availability.mercadopago || availability.bankTransfer || availability.dimo
 }

@@ -5,6 +5,7 @@ import { db } from '@/lib/supabase'
 import { ensureSupabaseShopMirror, syncSupabaseListingMirror, type MedusaSellerForMirror } from '@/lib/provisioning'
 import { filterOutDeleted } from '@/lib/listing-lifecycle'
 import ManageDashboard from './ManageDashboard'
+import { deliveryModeOf, ownerShopFacts, shopCatalogOnly } from '@/lib/listing-readiness'
 import { personalizeSetupSteps } from '@/lib/setup-guide'
 import { guideProductCount, guideStepsFor } from '@/lib/setup-guide-source'
 import { fetchDeletedListingIds, fetchGuideShop } from '@/lib/setup-guide-server'
@@ -29,6 +30,8 @@ interface MedusaListingForManage {
   views: number
   images: Array<{ url: string; alt?: string | null }>
   created_at: string
+  /** The product's metadata — read here only for `delivery_mode` (listing-readiness). */
+  metadata?: Record<string, unknown> | null
 }
 
 function medusaFetch(path: string, clerkJwt: string) {
@@ -144,6 +147,17 @@ export default async function ManagePage() {
   // The route's own rule (key present = answered), so the page can never show an ask the claim would refuse.
   const guideSatisfactionAnswered = satisfactionAnswered(guideShop?.metadata)
 
+  // listing-readiness S2.2: live products on a shop that cannot collect — from the MEDUSA seller's own settings, the
+  // facts publish and activation check (never the mirror).
+  const modeById = new Map((productsData.listings ?? []).map((l) => [l.id, deliveryModeOf(l.metadata)]))
+  const shopFacts = ownerShopFacts((seller.metadata ?? null) as Record<string, unknown> | null)
+  // The banner names WHAT is missing for the live products nobody can buy online (payment, delivery, or SPEI/cash).
+  const catalogReason = shopCatalogOnly({
+    shop: shopFacts,
+    listings: listings.map((l) => ({ ...l, delivery_mode: modeById.get(l.id) ?? null })),
+  })
+  const catalogOnly = catalogReason !== null
+
   return (
     <ManageDashboard
       shop={{
@@ -156,6 +170,8 @@ export default async function ManagePage() {
       pendingOffersCount={pendingOffersCount ?? 0}
       pendingOrdersCount={pendingOrdersCount ?? 0}
       setupSteps={setupSteps}
+      catalogOnly={catalogOnly}
+      catalogReason={catalogReason ?? 'payment'}
       guideDismissed={guideDismissed}
       guideSatisfactionAnswered={guideSatisfactionAnswered}
     />

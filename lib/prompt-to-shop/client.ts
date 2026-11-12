@@ -300,18 +300,27 @@ export async function fetchCheckoutPreview(
   }
 }
 
-export type PublishResponse = { ok: true; published: number; live: number; message: string } | { ok: false; message: string }
+export type PublishResponse =
+  | { ok: true; published: number; live: number; message: string }
+  | { ok: false; message: string; notReady?: boolean }
 
 /** «Publicar» (S5.2): `POST /api/p2s/publish`. */
-export async function publishShop(deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) }): Promise<PublishResponse> {
+export async function publishShop(
+  deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) },
+  opts: { asCatalog?: boolean } = {},
+): Promise<PublishResponse> {
   try {
-    const res = await deps.fetch('/api/p2s/publish', { method: 'POST', credentials: 'same-origin' })
-    const data = (await res.json().catch(() => null)) as { ok?: unknown; published?: unknown; live?: unknown; message?: unknown } | null
+    const res = await deps.fetch('/api/p2s/publish', {
+      method: 'POST',
+      credentials: 'same-origin',
+      ...(opts.asCatalog ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish_as_catalog: true }) } : {}),
+    })
+    const data = (await res.json().catch(() => null)) as { ok?: unknown; published?: unknown; live?: unknown; message?: unknown; code?: unknown } | null
     const message = typeof data?.message === 'string' && data.message ? data.message : PUBLISH_COPY.failed
     if (res.ok && data?.ok === true && typeof data.live === 'number') {
       return { ok: true, published: typeof data.published === 'number' ? data.published : 0, live: data.live, message }
     }
-    return { ok: false, message }
+    return { ok: false, message, ...(data?.code === 'LISTING_NOT_READY' ? { notReady: true } : {}) }
   } catch {
     return { ok: false, message: PUBLISH_COPY.failed }
   }

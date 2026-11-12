@@ -40,7 +40,7 @@ function liveCount(listings: PublishListing[], deletedIds: Set<string>, publishe
   return filterOutDeleted(listings, deletedIds).filter((l) => l.status === 'active').length + published
 }
 
-export type ActivateResult = { ok: true } | { ok: false; status: number; error: string }
+export type ActivateResult = { ok: true } | { ok: false; status: number; error: string; code?: string }
 
 export interface PublishDeps {
   resolveOwner: () => Promise<OwnerLookup>
@@ -53,7 +53,7 @@ export interface PublishDeps {
 
 export type PublishBody =
   | { ok: true; published: number; live: number; message: string }
-  | { ok: false; error: 'no_shop' | 'unavailable' | 'needs_product' | 'blocked' | 'failed'; message: string; published?: number }
+  | { ok: false; error: 'no_shop' | 'unavailable' | 'needs_product' | 'blocked' | 'failed'; message: string; published?: number; code?: string }
 
 export interface PublishResult {
   status: number
@@ -87,7 +87,8 @@ export async function handlePublish(deps: PublishDeps): Promise<PublishResult> {
     }
     if (result.status === 422) {
       deps.log({ step: 'publish_blocked', draft_id: owner.draftId, published, product_id: id })
-      return { status: 422, body: { ok: false, error: 'blocked', message: result.error, published } }
+      // `code` (LISTING_NOT_READY) lets the canvas offer «Activar cobros» / «Publicar como catálogo» (listing-readiness).
+      return { status: 422, body: { ok: false, error: 'blocked', message: result.error, published, ...(result.code ? { code: result.code } : {}) } }
     }
     failed.push(id)
   }
