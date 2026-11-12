@@ -5,7 +5,7 @@ import { db } from '@/lib/supabase'
 import { ensureSupabaseShopMirror, syncSupabaseListingMirror, type MedusaSellerForMirror } from '@/lib/provisioning'
 import { filterOutDeleted } from '@/lib/listing-lifecycle'
 import ManageDashboard from './ManageDashboard'
-import { deliveryModeOf, ownerShopFacts, shopCatalogOnly } from '@/lib/listing-readiness'
+import { canCollect, deliveryModeOf, ownerShopFacts, shopCatalogOnly } from '@/lib/listing-readiness'
 import { personalizeSetupSteps } from '@/lib/setup-guide'
 import { guideProductCount, guideStepsFor } from '@/lib/setup-guide-source'
 import { fetchDeletedListingIds, fetchGuideShop } from '@/lib/setup-guide-server'
@@ -150,8 +150,11 @@ export default async function ManagePage() {
   // listing-readiness S2.2: live products on a shop that cannot collect — from the MEDUSA seller's own settings, the
   // facts publish and activation check (never the mirror).
   const modeById = new Map((productsData.listings ?? []).map((l) => [l.id, deliveryModeOf(l.metadata)]))
+  const shopFacts = ownerShopFacts((seller.metadata ?? null) as Record<string, unknown> | null)
+  // A shop that CAN collect is told what is actually missing (SPEI or cash for coordinated sales), never «no puede cobrar».
+  const catalogReason: 'cannot_collect' | 'needs_manual' = canCollect(shopFacts.payments) ? 'needs_manual' : 'cannot_collect'
   const catalogOnly = shopCatalogOnly({
-    shop: ownerShopFacts((seller.metadata ?? null) as Record<string, unknown> | null),
+    shop: shopFacts,
     listings: listings.map((l) => ({ ...l, delivery_mode: modeById.get(l.id) ?? null })),
   })
 
@@ -168,6 +171,7 @@ export default async function ManagePage() {
       pendingOrdersCount={pendingOrdersCount ?? 0}
       setupSteps={setupSteps}
       catalogOnly={catalogOnly}
+      catalogReason={catalogReason}
       guideDismissed={guideDismissed}
       guideSatisfactionAnswered={guideSatisfactionAnswered}
     />

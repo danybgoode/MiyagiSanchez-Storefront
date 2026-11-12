@@ -128,8 +128,10 @@ test.describe('readiness · the two fact readers (D2)', () => {
     expect(canCollect(facts.payments)).toBe(false)
   })
 
-  test('public facts never claim to know delivery', () => {
-    expect(publicShopFacts({ settings: { shipping: { local_pickup: true } } }).delivery).toBeNull()
+  test('public facts read delivery from the public shipping block, exactly like the owner side', () => {
+    const meta = { settings: { shipping: { local_pickup: true } } }
+    expect(publicShopFacts(meta).delivery).toEqual(ownerShopFacts(meta).delivery)
+    expect(publicShopFacts({}).delivery).toEqual({ liveShipping: false, localPickup: false })
   })
 })
 
@@ -171,11 +173,17 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
   })
   const ask = (metadata: Record<string, unknown> | null, mode?: 'carrier' | 'arranged' | null, listingType = 'product') =>
     offerCanProceed({ slug: 's', productId: 'prod_1', listingType }, deps(metadata, mode))
-  const transfer = { settings: { checkout: { bank_transfer: { configured: true } } } }
-  const cardOnly = { settings: { stripe: { connected: true, charges_enabled: true } } }
+  // Both deliver by pickup. The card-only shop turns cash off, so it really is card-only.
+  const transfer = { settings: { checkout: { bank_transfer: { configured: true } }, shipping: { local_pickup: true } } }
+  const cardOnly = { settings: { stripe: { connected: true, charges_enabled: true }, shipping: { local_pickup: true }, checkout: { cash_pickup: { enabled: false } } } }
 
   test('a transfer-only shop CAN take an offer (the mirror would have said no)', async () => {
     expect(await ask(transfer)).toBe('yes')
+  })
+
+  test('a carrier product on a shop with NO delivery path cannot take an offer (cross-family catch)', async () => {
+    const noDelivery = { settings: { checkout: { bank_transfer: { configured: true } }, shipping: { local_pickup: false, envia_enabled: false } } }
+    expect(await ask(noDelivery, 'carrier')).toBe('no')
   })
 
   test('🚨 a shop with no payment method cannot — buyer and seller each get their own sentence', async () => {
@@ -291,6 +299,11 @@ test.describe('readiness · guided and visible (S2)', () => {
     expect(read('app/api/sell/readiness/route.ts')).toContain('listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(metadata) })')
     expect(read('app/(shell)/sell/ReadinessPanel.tsx')).toContain('<CobrosChooser')
     expect(read('app/(shell)/shop/manage/page.tsx')).toContain('shopCatalogOnly({')
+    expect(read('app/(shell)/shop/manage/page.tsx')).toContain("canCollect(shopFacts.payments) ? 'needs_manual' : 'cannot_collect'")
+    // The offer gate reads the delivery mode FRESH (security lens, PR 497) — never the 60s cached owned read.
+    const collect = read('lib/shop-collect.ts')
+    expect(collect).toContain('await readOwnedShopListingFresh(slug, productId)')
+    expect(collect).not.toContain('getOwnedShopListing(')
     const card = read('app/(shell)/shop/manage/SetupGuideCard.tsx')
     expect(card).toContain('const visible = (!dismissed || locked) && loaded && !allDone')
     expect(read('app/(shell)/shop/manage/catalogo/page.tsx')).toContain('shopFacts={data.seller ? ownerShopFacts(data.seller.metadata ?? null) : null}')

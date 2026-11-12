@@ -31,9 +31,10 @@ const defaultDeps: ShopCollectDeps = {
     if (read.state === 'unavailable') throw new Error(read.reason)
     return read.state === 'resolved' ? ((read.shop.metadata ?? {}) as Record<string, unknown>) : null
   },
+  // FRESH (security lens on PR 497): the cached read could serve a stale `carrier` for a minute after a switch to arranged.
   productDeliveryMode: async (slug, productId) => {
-    const { getOwnedShopListing } = await import('@/lib/listings')
-    const listing = await getOwnedShopListing(slug, productId)
+    const { readOwnedShopListingFresh } = await import('@/lib/listings')
+    const listing = await readOwnedShopListingFresh(slug, productId)
     if (!listing) return undefined
     const mode = (listing.metadata as Record<string, unknown> | null | undefined)?.delivery_mode
     return mode === 'arranged' || mode === 'carrier' ? mode : null

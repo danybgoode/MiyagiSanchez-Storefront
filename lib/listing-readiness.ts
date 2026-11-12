@@ -112,6 +112,16 @@ function digits(v: unknown): string {
   return typeof v === 'string' ? v.replace(/\D/g, '') : ''
 }
 
+/** Delivery from the `shipping` settings block — identical for the owner and the public view (the block is public). */
+function deliveryFacts(shipping: Record<string, unknown>): DeliveryFacts {
+  const origin = objectValue(shipping.origin_address)
+  return {
+    liveShipping: shipping.envia_enabled !== false &&
+      !!(origin.street && origin.city && origin.postal_code && (origin.state_code || origin.state)),
+    localPickup: !!shipping.local_pickup,
+  }
+}
+
 /** Facts from the seller's PRIVATE metadata (owner-authenticated reads only). */
 export function ownerShopFacts(metadata: Record<string, unknown> | null | undefined): ShopFacts {
   const meta = objectValue(metadata)
@@ -119,10 +129,7 @@ export function ownerShopFacts(metadata: Record<string, unknown> | null | undefi
   const shipping = objectValue(settings.shipping)
   const checkout = objectValue(settings.checkout)
 
-  const origin = objectValue(shipping.origin_address)
-  const liveShipping = shipping.envia_enabled !== false &&
-    !!(origin.street && origin.city && origin.postal_code && (origin.state_code || origin.state))
-  const localPickup = !!shipping.local_pickup
+  const { liveShipping, localPickup } = deliveryFacts(shipping)
 
   // Inline (not lib/stripe's getShopStripe): that module loads the Stripe SDK, and this seam is client-importable.
   const stripe = objectValue(settings.stripe)
@@ -146,7 +153,11 @@ export function ownerShopFacts(metadata: Record<string, unknown> | null | undefi
   }
 }
 
-/** Facts from the privacy-safe PUBLIC projection (buyer surfaces). Delivery is unknown here, never "none". */
+/**
+ * Facts from the privacy-safe PUBLIC projection (buyer surfaces). The `shipping` block is public authored content
+ * (backend toSellerShape allowlist), so delivery IS knowable here — computed exactly like the owner side (cross-family
+ * review on PR 497: treating it as unknown let an offer through on a product checkout could not deliver).
+ */
 export function publicShopFacts(metadata: Record<string, unknown> | null | undefined): ShopFacts {
   const p = publicShopPaymentAvailability(metadata)
   // The public projection carries `shipping` and `checkout.cash_pickup` (backend toSellerShape), so cash-at-pickup is
@@ -156,7 +167,7 @@ export function publicShopFacts(metadata: Record<string, unknown> | null | undef
     objectValue(objectValue(settings.checkout).cash_pickup).enabled !== false
   return {
     payments: { stripe: p.stripe, mercadopago: p.mercadopago, bankTransfer: p.bankTransfer, dimo: p.dimo, cash },
-    delivery: null,
+    delivery: deliveryFacts(objectValue(settings.shipping)),
   }
 }
 
@@ -190,6 +201,9 @@ export const READINESS_COPY = {
   catalogHint: 'Tus clientes verán el producto y te escribirán para comprarlo. Cuando actives un cobro, se podrá pagar en línea sin que hagas nada más.',
   bannerTitle: 'Tu tienda aún no puede cobrar',
   bannerBody: 'Tus productos se ven, pero nadie puede pagarlos en línea. Activa una forma de cobro: con tu CLABE toma 2 minutos.',
+  // The shop CAN collect, but a coordinated sale (entrega acordada) needs SPEI or cash and the shop has neither.
+  bannerManualTitle: 'Algunos productos aún no se pueden pagar',
+  bannerManualBody: 'Tus productos con entrega acordada solo se pagan por SPEI o en efectivo al entregar. Activa uno de los dos para venderlos en línea.',
   catalogBadge: 'Solo catálogo',
   catalogBadgeHint: 'Se ve en tu tienda; tus clientes te escriben para comprar.',
   sellerOffersBlocked: 'Activa cómo cobrar para aceptar ofertas: hoy nadie podría pagarte el precio acordado.',

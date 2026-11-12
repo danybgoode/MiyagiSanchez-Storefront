@@ -50,6 +50,7 @@ export default async function ManageDashboard({
   pendingOrdersCount = 0,
   setupSteps,
   catalogOnly = false,
+  catalogReason = 'cannot_collect',
   guideDismissed = false,
   guideSatisfactionAnswered = false,
 }: {
@@ -60,6 +61,8 @@ export default async function ManageDashboard({
   setupSteps: SetupStep[]
   /** Live products and no way to collect (listing-readiness S2.2) — the banner, and a guide that can't be hidden. */
   catalogOnly?: boolean
+  /** Why: nothing to collect with at all, or only SPEI/cash missing for coordinated sales. */
+  catalogReason?: 'cannot_collect' | 'needs_manual'
   guideDismissed?: boolean
   guideSatisfactionAnswered?: boolean
 }) {
@@ -124,9 +127,9 @@ export default async function ManageDashboard({
       />
 
       {catalogOnly && (
-        <Banner variant="warning" title={READINESS_COPY.bannerTitle}>
-          <span data-testid="shop-cannot-collect">
-            {READINESS_COPY.bannerBody}{' '}
+        <Banner variant="warning" title={catalogReason === 'needs_manual' ? READINESS_COPY.bannerManualTitle : READINESS_COPY.bannerTitle}>
+          <span data-testid="shop-cannot-collect" data-reason={catalogReason}>
+            {catalogReason === 'needs_manual' ? READINESS_COPY.bannerManualBody : READINESS_COPY.bannerBody}{' '}
             <Link href={PAYMENTS_SETTINGS_PATH} className="font-semibold underline">{READINESS_COPY.fixPayments}</Link>
           </span>
         </Banner>
