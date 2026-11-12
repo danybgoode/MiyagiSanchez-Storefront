@@ -80,7 +80,7 @@ test('«kept» and «published» are counted on their transitions, not on a visi
   expect(claim).toMatch(/if \(result\.kind === 'kept'\) trackFunnel\('p2s_kept', result\.draftId/)
   expect(kept).not.toContain("trackFunnel('p2s_kept'")
   // The publish: only inside the handler, after a successful answer.
-  const run = kept.slice(kept.indexOf('async function runPublish()'), kept.indexOf('setJustPublished(true)'))
+  const run = kept.slice(kept.indexOf('async function runPublish('), kept.indexOf('setJustPublished(true)'))
   expect(run).toContain('if (!result.ok) {')
   expect(run).toContain("trackFunnel('p2s_published', draftId")
   expect(kept.split("trackFunnel('p2s_published'").length - 1).toBe(1)

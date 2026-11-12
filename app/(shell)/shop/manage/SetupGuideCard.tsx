@@ -10,6 +10,7 @@ import { pushAnalyticsEvent } from '@/lib/analytics-events'
 import { pushGrowthEvent } from '@/lib/growth-events'
 import type { SetupStep } from '@/lib/setup-guide'
 import SetupGuideSatisfaction from './SetupGuideSatisfaction'
+import { READINESS_COPY } from '@/lib/listing-readiness'
 
 /**
  * "Pon tu tienda en marcha" — seller-portal-setup-guide epic, B.2/B.3. Reads
@@ -31,11 +32,14 @@ import SetupGuideSatisfaction from './SetupGuideSatisfaction'
 export default function SetupGuideCard({
   steps,
   initialDismissed,
+  locked = false,
   initialSatisfactionAnswered = false,
   shopSlug,
 }: {
   steps: SetupStep[]
   initialDismissed: boolean
+  /** listing-readiness S2.2: live products and no way to collect — shown even if hidden before, and not hideable. */
+  locked?: boolean
   /** `metadata.settings.guide.satisfaction_answered`: the merchant already answered (or declined) the ask. */
   initialSatisfactionAnswered?: boolean
   shopSlug: string
@@ -48,7 +52,7 @@ export default function SetupGuideCard({
   // missing): without the length check it would ask a merchant to rate a guide they never saw (pr-reviewer, PR 434).
   const loaded = steps.length > 0
   const allDone = loaded && doneCount === steps.length
-  const visible = !dismissed && loaded && !allDone
+  const visible = (!dismissed || locked) && loaded && !allDone
   const openStep = steps.find((step) => step.open)
 
   // guide_view — once per mount while the card is actually on screen. Also forwarded
@@ -172,9 +176,13 @@ export default function SetupGuideCard({
       </ul>
 
       <div className="flex justify-end mt-3 pt-3 border-t border-[var(--color-border)]">
-        <Button type="button" variant="ghost" size="sm" onClick={handleDismiss}>
-          Ocultar
-        </Button>
+        {locked ? (
+          <p className="text-xs text-[var(--color-muted)]" data-testid="guide-locked">{READINESS_COPY.guideLocked}</p>
+        ) : (
+          <Button type="button" variant="ghost" size="sm" onClick={handleDismiss}>
+            Ocultar
+          </Button>
+        )}
       </div>
     </Card>
   )

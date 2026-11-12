@@ -12,6 +12,7 @@ import { computeSkuMarginsByChannel, type ProfitEvent, type ProfitOrderInfo, typ
 import { SellerBreadcrumb } from '../SellerBreadcrumb'
 import CatalogFilterBar from './CatalogFilterBar'
 import CatalogTable, { type CatalogListing } from './CatalogTable'
+import { canCollect, ownerShopFacts } from '@/lib/listing-readiness'
 
 export const metadata = { title: 'Catálogo — Mi tienda' }
 
@@ -58,6 +59,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const productsRes = await medusaFetch(`/store/sellers/me/products${qs}`, clerkJwt)
   if (!productsRes.ok) throw new Error('No se pudo cargar tu catálogo.')
   const data = await productsRes.json() as {
+    seller?: { metadata?: Record<string, unknown> | null }
     listings?: CatalogListing[]
     count?: number
     status_counts?: Record<string, number>
@@ -198,6 +200,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             marginRowsByChannel={marginRowsByChannel}
             ownedShopOnlyEnabled={ownedShopOnlyEnabled}
             eventRosterBySlug={eventRosterBySlug}
+            shopCannotCollect={data.seller ? !canCollect(ownerShopFacts(data.seller.metadata ?? null).payments) : false}
           />
 
           {totalPages > 1 && (

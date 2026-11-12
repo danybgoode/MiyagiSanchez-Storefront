@@ -16,6 +16,7 @@
  */
 
 import { EXISTING_CHANNELS, type TenantIntake } from './onboarding-personalization'
+import { canCollect, ownerShopFacts } from './listing-readiness'
 
 export interface ShopRow {
   name: string
@@ -49,9 +50,7 @@ export interface ShopCompletionFlags {
  */
 export function computeShopCompletion(shop: ShopRow): ShopCompletionFlags {
   const settings = (shop.metadata?.settings ?? {}) as Record<string, unknown>
-  const stripeSettings = settings.stripe as { charges_enabled?: boolean } | undefined
   const calcomSettings = settings.calcom as { connected?: boolean } | undefined
-  const checkoutSettings = settings.checkout as { bank_transfer?: { clabe?: string } } | undefined
   const ordersSettings = settings.orders as { processing_time?: string } | undefined
   const returnsPolicySettings = settings.returns_policy as { window?: string } | undefined
   const themeSettings = settings.theme as { banner_url?: string | null; accent_color?: string | null; tagline?: string | null; social?: Record<string, string | null> } | undefined
@@ -67,10 +66,6 @@ export function computeShopCompletion(shop: ShopRow): ShopCompletionFlags {
   const envios_ok = !!(shippingSettings && (shippingSettings.local_pickup || shippingSettings.envia_enabled || hasOrigin || (Array.isArray(shippingSettings.pickup_spots) && shippingSettings.pickup_spots.length > 0)))
   const negociacion_ok = !!(offersSettings && ((offersSettings.min_buyer_trust_level && offersSettings.min_buyer_trust_level !== 'unverified') || offersSettings.negotiation?.enabled))
   const notificaciones_ok = !!(notifSettings && (notifSettings.email_new_view || notifSettings.email_new_message))
-  const stripe_ok = !!stripeSettings?.charges_enabled
-  const mpSettings = settings.mercadopago as { connected?: boolean } | undefined
-  const mp_ok = !!mpSettings?.connected
-  const clabe_ok = !!checkoutSettings?.bank_transfer?.clabe
   const calcom_ok = !!calcomSettings?.connected
   const orders_ok = !!ordersSettings?.processing_time
   // 'none' = explicitly configured but not a positive trust signal → still mark done
@@ -86,7 +81,9 @@ export function computeShopCompletion(shop: ShopRow): ShopCompletionFlags {
     // flag. Using it here made this step read as done for every fresh shop
     // regardless of whether MercadoPago was ever actually connected. Read the
     // real connected state instead (mirrors Pagos.tsx / [section]/page.tsx).
-    pagos: stripe_ok || mp_ok || clabe_ok,
+    // The ONE rule's «can collect» (listing-readiness S2.2): this used to count any non-empty CLABE — even 5 digits —
+    // and ignore DiMo, so the guide could say «listo» for a shop that cannot take a payment.
+    pagos: canCollect(ownerShopFacts(shop.metadata as Record<string, unknown> | null).payments),
     citas: calcom_ok,
     canal: !!shop.custom_domain,
     pedidos: orders_ok,

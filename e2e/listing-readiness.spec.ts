@@ -8,12 +8,14 @@ import {
   ownerShopFacts,
   publicShopFacts,
   readinessMessage,
+  shopCatalogOnly,
   type PaymentFacts,
   type ShopFacts,
 } from '../lib/listing-readiness'
 import { deriveCheckoutViability } from '../lib/checkout-viability'
 import { shopAcceptsAnyPayment, publicShopPaymentAvailability } from '../lib/public-shop-commerce'
 import { offerCollectRefusal, shopCanCollect } from '../lib/shop-collect'
+import { isNotReadyAnswer, readinessChecklist } from '../lib/readiness-view'
 
 /**
  * Epic listing-readiness — every product sells online or is deliberately «Solo catálogo».
@@ -189,5 +191,57 @@ test.describe('readiness · offers only where the shop can collect (S1.3, D5)', 
     expect(sites).toBe(2)
     expect(pdp.match(/offersOpen && (?:activeDeal|\(\n\s*<MakeOfferButton)/g)?.length ?? 0).toBe(2)
     expect(pdp).toContain("listing.listing_type === 'product' && offersOpen,")
+  })
+})
+
+test.describe('readiness · guided and visible (S2)', () => {
+  const okView = (missing: Array<'payment' | 'delivery' | 'manual_payment'> | null) => ({
+    state: 'ok' as const,
+    readiness: missing ? { mode: 'catalog' as const, missing } : { mode: 'online' as const },
+    chooser: { shopSlug: 's', market: 'mx', initial: {} as never, correosAvailable: false, shape: 'products' as const },
+  })
+
+  test('the panel shows a ✓/✗ checklist only for a listing nobody could pay for', () => {
+    expect(readinessChecklist(okView(['payment']))).toEqual([
+      { key: 'delivery', done: true },
+      { key: 'payment', done: false, missing: 'payment' },
+    ])
+    expect(readinessChecklist(okView(['manual_payment']))).toEqual([{ key: 'payment', done: false, missing: 'manual_payment' }])
+  })
+
+  test('no panel when it sells online, or when we could not tell — never a false «✓ listo» (the negation)', () => {
+    expect(readinessChecklist(okView(null))).toBeNull()
+    expect(readinessChecklist({ state: 'unavailable' })).toBeNull()
+    expect(readinessChecklist({ state: 'no_shop' })).toBeNull()
+    expect(readinessChecklist(null)).toBeNull()
+  })
+
+  test('only the server\'s LISTING_NOT_READY re-opens the panel', () => {
+    expect(isNotReadyAnswer(422, { code: 'LISTING_NOT_READY' })).toBe(true)
+    expect(isNotReadyAnswer(422, { field: 'title' })).toBe(false)
+    expect(isNotReadyAnswer(500, { code: 'LISTING_NOT_READY' })).toBe(false)
+  })
+
+  test('the panel state: live products and no way to collect — an empty or early shop is not alarmed', () => {
+    const live = [{ listing_type: 'product', status: 'active' }]
+    expect(shopCatalogOnly({ payments: NONE, listings: live })).toBe(true)
+    expect(shopCatalogOnly({ payments: NONE, listings: [] })).toBe(false)
+    expect(shopCatalogOnly({ payments: NONE, listings: [{ listing_type: 'product', status: 'draft' }] })).toBe(false)
+    expect(shopCatalogOnly({ payments: NONE, listings: [{ listing_type: 'service', status: 'active' }] })).toBe(false)
+    expect(shopCatalogOnly({ payments: { ...NONE, bankTransfer: true }, listings: live })).toBe(false)
+  })
+
+  test('the form, the panel, the badges and the guide are wired to the same rule', () => {
+    const wizard = read('app/(shell)/sell/SellWizard.tsx')
+    expect(wizard).toContain('<ReadinessPanel')
+    expect(wizard).toContain('isNotReadyAnswer(res.status, data)')
+    expect(wizard).toContain('publish_as_catalog: true')
+    expect(read('app/api/sell/readiness/route.ts')).toContain('listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(metadata) })')
+    expect(read('app/(shell)/sell/ReadinessPanel.tsx')).toContain('<CobrosChooser')
+    expect(read('app/(shell)/shop/manage/page.tsx')).toContain('shopCatalogOnly({')
+    const card = read('app/(shell)/shop/manage/SetupGuideCard.tsx')
+    expect(card).toContain('const visible = (!dismissed || locked) && loaded && !allDone')
+    expect(read('app/(shell)/shop/manage/catalogo/page.tsx')).toContain('!canCollect(ownerShopFacts(data.seller.metadata ?? null).payments)')
+    expect(read('lib/setup-guide.ts')).toContain('pagos: canCollect(ownerShopFacts(')
   })
 })

@@ -6,6 +6,8 @@ import Link from 'next/link'
 import PrintEditionCard from './PrintEditionCard'
 import SellerPageHeader from '@/components/seller/SellerPageHeader'
 import SetupGuideCard from './SetupGuideCard'
+import { Banner } from '@/components/feedback/Banner'
+import { PAYMENTS_SETTINGS_PATH, READINESS_COPY } from '@/lib/listing-readiness'
 import { pendingSummary as buildPendingSummary } from '@/lib/seller-pending-summary'
 import type { SetupStep } from '@/lib/setup-guide'
 import { shopUrlFor } from '@/lib/market-url'
@@ -47,6 +49,7 @@ export default async function ManageDashboard({
   pendingOffersCount = 0,
   pendingOrdersCount = 0,
   setupSteps,
+  catalogOnly = false,
   guideDismissed = false,
   guideSatisfactionAnswered = false,
 }: {
@@ -55,6 +58,8 @@ export default async function ManageDashboard({
   pendingOffersCount?: number
   pendingOrdersCount?: number
   setupSteps: SetupStep[]
+  /** Live products and no way to collect (listing-readiness S2.2) — the banner, and a guide that can't be hidden. */
+  catalogOnly?: boolean
   guideDismissed?: boolean
   guideSatisfactionAnswered?: boolean
 }) {
@@ -118,9 +123,20 @@ export default async function ManageDashboard({
         }
       />
 
+      {catalogOnly && (
+        <Banner variant="warning" title={READINESS_COPY.bannerTitle}>
+          <span data-testid="shop-cannot-collect">
+            {READINESS_COPY.bannerBody}{' '}
+            <Link href={PAYMENTS_SETTINGS_PATH} className="font-semibold underline">{READINESS_COPY.fixPayments}</Link>
+          </span>
+        </Banner>
+      )}
+
       {/* ── Setup guide (nothing once dismissed; once all 5 steps are done, asks once whether it helped) ── */}
       <SetupGuideCard
         steps={setupSteps}
+        // While products are live and nobody can pay, the payments step stays on screen (S2.2).
+        locked={catalogOnly}
         initialDismissed={guideDismissed}
         initialSatisfactionAnswered={guideSatisfactionAnswered}
         shopSlug={shop.slug}

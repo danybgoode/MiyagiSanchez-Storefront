@@ -7,6 +7,8 @@ import { AttrsSection, type Attrs } from './AttrsSection'
 import { SlugField, type SlugStatus } from '@/components/SlugField'
 import { slugify } from '@/lib/slug'
 import { Banner } from '@/components/feedback/Banner'
+import ReadinessPanel from './ReadinessPanel'
+import { isNotReadyAnswer } from '@/lib/readiness-view'
 import { SuccessCard } from '@/components/SuccessCard'
 import { listingUrlFor, shopUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
@@ -647,6 +649,7 @@ function StepListing({
   onSubmit,
   hasShopStep,
   currency,
+  readinessSlot,
 }: {
   photos: UploadedPhoto[]; setPhotos: (fn: React.SetStateAction<UploadedPhoto[]>) => void
   title: string; setTitle: (v: string) => void
@@ -680,6 +683,8 @@ function StepListing({
   onSubmit: () => void
   hasShopStep: boolean
   currency: string
+  /** «Antes de publicar» (listing-readiness S2.1) — rendered right above the publish button. */
+  readinessSlot?: React.ReactNode
 }) {
   const [digitalUploading, setDigitalUploading] = useState(false)
   const digitalInputRef = useRef<HTMLInputElement>(null)
@@ -1231,6 +1236,8 @@ function StepListing({
         />
       )}
 
+      {readinessSlot}
+
       {/* Actions */}
       <div className="flex gap-3 pt-2">
         {hasShopStep && (
@@ -1358,6 +1365,8 @@ export default function SellWizard({
   const [listingType, setListingType] = useState<ListingType>(initialEvento ? 'service' : 'product')
   // Arranged-only delivery (epic, S1.2) — 'carrier' (default) or 'arranged'.
   const [deliveryMode, setDeliveryMode] = useState<'carrier' | 'arranged'>('carrier')
+  // Bumped when the server answers LISTING_NOT_READY, so the readiness panel re-reads (listing-readiness S2.1).
+  const [readinessRefresh, setReadinessRefresh] = useState(0)
   // "Solo mi tienda" (owned-shop-operating-channel epic, S3.1) — unchecked by
   // default, so an untouched form publishes into the marketplace exactly as
   // before this sprint.
@@ -1454,7 +1463,9 @@ export default function SellWizard({
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(opts?: { asCatalog?: boolean }) {
+    // `opts` arrives as the click event from the plain «Publicar» button — only an explicit `true` counts.
+    const asCatalog = opts?.asCatalog === true
     // Validate listing fields
     const errs: Record<string, string> = {}
     if (title.trim().length < 5) errs.title = 'El título debe tener al menos 5 caracteres.'
@@ -1550,10 +1561,19 @@ export default function SellWizard({
       const res = await fetch('/api/sell/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        // «Publicar como catálogo» (listing-readiness D4) — only when the merchant chose it in the panel.
+        body: JSON.stringify(asCatalog ? { ...payload, publish_as_catalog: true } : payload),
       })
 
-      const data = await res.json() as { shopSlug?: string; listingId?: string; error?: string; field?: string }
+      const data = await res.json() as { shopSlug?: string; listingId?: string; error?: string; field?: string; code?: string }
+
+      if (isNotReadyAnswer(res.status, data)) {
+        // Nobody could pay for it online yet: (re)open «Antes de publicar» with the fix and the catalog choice.
+        // Also the first-listing path: the shop was created by this very request, so the panel can now read it.
+        setReadinessRefresh((n) => n + 1)
+        setSubmitError(null)
+        return
+      }
 
       if (!res.ok || !data.shopSlug || !data.listingId) {
         if (data.field === 'title') setListingErrors(prev => ({ ...prev, title: data.error! }))
@@ -1666,6 +1686,15 @@ export default function SellWizard({
             onSubmit={handleSubmit}
             hasShopStep={hasShopStep}
             currency={listingCurrency}
+            readinessSlot={
+              <ReadinessPanel
+                listingType={listingType}
+                deliveryMode={arrangedOnlyEnabled ? deliveryMode : 'carrier'}
+                refreshKey={readinessRefresh}
+                submitting={submitting}
+                onPublishAsCatalog={() => { void handleSubmit({ asCatalog: true }) }}
+              />
+            }
           />
         )}
         {step === 3 && result && (

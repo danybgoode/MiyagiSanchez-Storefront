@@ -185,3 +185,16 @@ export const READINESS_COPY = {
 
 /** Where a merchant turns payments on. */
 export const PAYMENTS_SETTINGS_PATH = '/shop/manage/settings/pagos'
+
+/**
+ * The seller panel's state (S2.2): a shop with LIVE products and no way to collect is shown the banner, its product
+ * listings carry «Solo catálogo», and the setup guide's payments step cannot be hidden. A shop with nothing live is
+ * just early — no alarm.
+ */
+export function shopCatalogOnly(input: {
+  payments: PaymentFacts
+  listings: ReadonlyArray<{ listing_type?: string | null; status?: string | null }>
+}): boolean {
+  if (canCollect(input.payments)) return false
+  return input.listings.some((l) => (l.listing_type ?? 'product') === 'product' && l.status === 'active')
+}

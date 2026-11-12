@@ -22,6 +22,7 @@ import { Toast, useToast } from '@/components/feedback/Toast'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import { READINESS_COPY } from '@/lib/listing-readiness'
 import { catalogStatusToToken, publicationStateToToken } from '@/lib/status-badge'
 import { rsvpEventSlug } from '@/lib/evento-preset'
 import BulkActionBar from './BulkActionBar'
@@ -31,6 +32,8 @@ import { usePendingListingDelete } from '@/components/seller/PendingListingDelet
 export interface CatalogListing {
   id: string
   title: string
+  /** Owner listing shape's type — a product is the only type that can be «Solo catálogo» (listing-readiness D1). */
+  listing_type?: string
   sku: string | null
   price_cents: number | null
   currency: string
@@ -160,6 +163,7 @@ export default function CatalogTable({
   marginRowsByChannel = [],
   ownedShopOnlyEnabled = false,
   eventRosterBySlug = {},
+  shopCannotCollect = false,
 }: {
   listings: CatalogListing[]
   /** catalog.inventory_channels_enabled (catalog-management S2 · 2.2) — fail-safe OFF: no toggle UI renders while OFF. */
@@ -184,6 +188,11 @@ export default function CatalogTable({
   ownedShopOnlyEnabled?: boolean
   /** RSVP event slug → its roster page; a listing carrying `metadata.rsvp_event_slug` shows «Registros». */
   eventRosterBySlug?: Record<string, string>
+  /**
+   * listing-readiness S2.2: the shop has no way to take a payment (read from the Medusa seller on the server), so its
+   * live products are «Solo catálogo» — seen, but bought by writing to the merchant.
+   */
+  shopCannotCollect?: boolean
 }) {
   const fmt = useSellerFormat()
   // The listing's OWN currency. "Precio a convenir" is authored here rather than
@@ -661,7 +670,14 @@ export default function CatalogTable({
                   </td>
                 )}
                 <td className="p-3">
-                  <StatusBadge token={catalogStatusToToken(status)}>{meta.label}</StatusBadge>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <StatusBadge token={catalogStatusToToken(status)}>{meta.label}</StatusBadge>
+                    {shopCannotCollect && status === 'activo' && (listing.listing_type ?? 'product') === 'product' && (
+                      <StatusBadge token="warning" title={READINESS_COPY.catalogBadgeHint}>
+                        <span data-testid="badge-catalog-only">{READINESS_COPY.catalogBadge}</span>
+                      </StatusBadge>
+                    )}
+                  </div>
                 </td>
                 <td className="p-3">
                   <div className="hidden items-center justify-end gap-1 md:flex">
