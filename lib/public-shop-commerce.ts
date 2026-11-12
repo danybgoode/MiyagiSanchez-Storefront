@@ -126,3 +126,12 @@ export function publicShopPaymentAvailability(
       dimo.enabled === true,
   })
 }
+
+/**
+ * Does the shop accept ANY checkout payment method? The same four paths the PDP's
+ * commerce readiness counts (`sellerHasMp || sellerHasStripe || hasBankTransfer ||
+ * hasDimo`), so a surface that offers «Comprar» agrees with the product page.
+ */
+export function shopAcceptsAnyPayment(availability: PublicShopPaymentAvailability): boolean {
+  return availability.stripe || availability.mercadopago || availability.bankTransfer || availability.dimo
+}

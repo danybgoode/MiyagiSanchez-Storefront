@@ -41,6 +41,8 @@ interface Conversation {
   marketplace_shops: ConvShop | null
   marketplace_offers: ConvOffer | null
   checkout_provider?: CheckoutProvider | null
+  /** The shop accepts SOME payment method (card, MP, transfer, DiMo) — see page.tsx. */
+  checkout_available?: boolean
 }
 
 interface ConvTransaction { ledger: LedgerView; orderId: string | null }
@@ -375,12 +377,13 @@ function OfferTurnLine({ offer, role }: { offer: ConvOffer; role: 'buyer' | 'sel
 }
 
 function OfferActionBar({
-  offer, role, listing, checkoutProvider, isSignedIn, onRefresh,
+  offer, role, listing, checkoutProvider, checkoutAvailable, isSignedIn, onRefresh,
 }: {
   offer: ConvOffer
   role: 'buyer' | 'seller'
   listing: ConvListing | null
   checkoutProvider?: CheckoutProvider | null
+  checkoutAvailable?: boolean
   isSignedIn: boolean
   onRefresh: () => void
 }) {
@@ -497,13 +500,13 @@ function OfferActionBar({
         {offer.checkout_expires_at && (
           <p style={{ fontSize: 11, color: 'var(--danger)', marginBottom: 8 }}><BuyerCopyText copyKey="messages.id.ConversationClient.f8aac9a2" />{' '}{timeUntil(offer.checkout_expires_at)}</p>
         )}
-        {listing && checkoutProvider ? (
+        {listing && (checkoutProvider || checkoutAvailable) ? (
           <OfferCheckoutButton
             listingId={listing.medusa_product_id ?? listing.id}
             offerId={offer.id}
             amountCents={agreedCents}
             currency={offer.currency}
-            provider={checkoutProvider}
+            provider={checkoutProvider ?? undefined}
             isSignedIn={isSignedIn}
             label="Comprar ahora"
             variant="accent"
@@ -1012,6 +1015,7 @@ export default function ConversationClient({ conversationId, initialConversation
               role={role}
               listing={listing}
               checkoutProvider={conv.checkout_provider}
+              checkoutAvailable={conv.checkout_available}
               isSignedIn
               onRefresh={refresh}
             />

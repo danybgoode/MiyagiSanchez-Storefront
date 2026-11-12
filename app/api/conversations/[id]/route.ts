@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
-import { getShopStripe } from '@/lib/stripe'
-import { sellerHasMpConnected } from '@/lib/mercadopago-connect'
+import { resolveConversationCheckout } from '@/lib/conversation-checkout'
 import { resolveConversationLedger } from '@/lib/conversation-ledger'
 import type { LedgerOffer } from '@/lib/transaction-ledger'
 
@@ -61,13 +60,12 @@ export async function GET(
     : null
 
   const shopRaw = conv.marketplace_shops as unknown as {
+    slug?: string | null
     metadata?: Record<string, unknown> | null
-    mp_enabled?: boolean | null
   } | null
-  const stripeSettings = getShopStripe(shopRaw?.metadata ?? null)
-  const sellerHasStripe = !!(stripeSettings.charges_enabled && stripeSettings.account_id && stripeSettings.enabled !== false)
-  const sellerHasMp = sellerHasMpConnected(shopRaw?.metadata ?? null)
-  const checkoutProvider = sellerHasMp ? 'mercadopago' : sellerHasStripe ? 'stripe' : null
+  // The SAME derivation as the first render — this payload replaces it on every
+  // refresh, so a field set in only one place disappears (lib/conversation-checkout.ts).
+  const checkout = await resolveConversationCheckout(shopRaw)
 
   // Read-marking is now explicit via POST .../read (decoupled from polling).
 
@@ -88,7 +86,7 @@ export async function GET(
   const { ledger, orderId } = await resolveConversationLedger(ledgerOffer, offerId, role, medusaOrderIdHint)
 
   return NextResponse.json({
-    conversation: { ...conv, marketplace_offers: offerWithCurrency, checkout_provider: checkoutProvider },
+    conversation: { ...conv, marketplace_offers: offerWithCurrency, ...checkout },
     events: eventsResult.data ?? [],
     role,
     transaction: { ledger, orderId },
