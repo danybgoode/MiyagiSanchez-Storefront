@@ -139,8 +139,13 @@ export function ownerShopFacts(metadata: Record<string, unknown> | null | undefi
 /** Facts from the privacy-safe PUBLIC projection (buyer surfaces). Delivery is unknown here, never "none". */
 export function publicShopFacts(metadata: Record<string, unknown> | null | undefined): ShopFacts {
   const p = publicShopPaymentAvailability(metadata)
+  // The public projection carries `shipping` and `checkout.cash_pickup` (backend toSellerShape), so cash-at-pickup is
+  // knowable here — needed for an arranged-delivery listing, which sells on SPEI OR cash. Same rule as the owner side.
+  const settings = objectValue(objectValue(metadata).settings)
+  const cash = !!objectValue(settings.shipping).local_pickup &&
+    objectValue(objectValue(settings.checkout).cash_pickup).enabled !== false
   return {
-    payments: { stripe: p.stripe, mercadopago: p.mercadopago, bankTransfer: p.bankTransfer, dimo: p.dimo, cash: false },
+    payments: { stripe: p.stripe, mercadopago: p.mercadopago, bankTransfer: p.bankTransfer, dimo: p.dimo, cash },
     delivery: null,
   }
 }

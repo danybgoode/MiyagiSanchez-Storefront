@@ -14,7 +14,7 @@ import {
 } from '../lib/listing-readiness'
 import { deriveCheckoutViability } from '../lib/checkout-viability'
 import { shopAcceptsAnyPayment, publicShopPaymentAvailability } from '../lib/public-shop-commerce'
-import { offerCollectRefusal, shopCanCollect } from '../lib/shop-collect'
+import { offerCanProceed, offerCollectRefusal } from '../lib/shop-collect'
 import { isNotReadyAnswer, readinessChecklist } from '../lib/readiness-view'
 
 /**
@@ -153,39 +153,66 @@ test.describe('readiness · publish/activate (S1.2, D4)', () => {
   })
 })
 
-test.describe('readiness · offers only where the shop can collect (S1.3, D5)', () => {
-  const medusa = (metadata: Record<string, unknown> | null) => ({ sellerMetadata: async () => metadata })
+test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5)', () => {
+  const deps = (metadata: Record<string, unknown> | null, mode: 'carrier' | 'arranged' | null | undefined = null) => ({
+    sellerMetadata: async () => metadata,
+    productDeliveryMode: async () => mode,
+  })
+  const ask = (metadata: Record<string, unknown> | null, mode?: 'carrier' | 'arranged' | null, listingType = 'product') =>
+    offerCanProceed({ slug: 's', productId: 'prod_1', listingType }, deps(metadata, mode))
+  const transfer = { settings: { checkout: { bank_transfer: { configured: true } } } }
+  const cardOnly = { settings: { stripe: { connected: true, charges_enabled: true } } }
 
-  test('a transfer-only shop CAN collect (the mirror would have said no)', async () => {
-    expect(await shopCanCollect('s', medusa({ settings: { checkout: { bank_transfer: { configured: true } } } }))).toBe('yes')
+  test('a transfer-only shop CAN take an offer (the mirror would have said no)', async () => {
+    expect(await ask(transfer)).toBe('yes')
   })
 
   test('🚨 a shop with no payment method cannot — buyer and seller each get their own sentence', async () => {
-    const answer = await shopCanCollect('s', medusa({ settings: {} }))
+    const answer = await ask({ settings: {} })
     expect(answer).toBe('no')
     expect(offerCollectRefusal(answer, 'buyer')).toMatchObject({ status: 409, code: 'SHOP_CANNOT_COLLECT', error: expect.stringMatching(/Escríbele/) })
     expect(offerCollectRefusal(answer, 'seller')).toMatchObject({ status: 409, error: expect.stringMatching(/Activa cómo cobrar/) })
   })
 
-  test('an unreadable shop FAILS CLOSED (503), never "accepted" and never "cannot collect"', async () => {
-    expect(await shopCanCollect('s', medusa(null))).toBe('unavailable')
-    expect(await shopCanCollect('s', { sellerMetadata: async () => { throw new Error('down') } })).toBe('unavailable')
-    expect(await shopCanCollect(null, medusa({}))).toBe('unavailable')
+  test('PER LISTING (cross-family review): the listing\'s own rule decides, with its delivery mode', async () => {
+    // Arranged delivery sells on a MANUAL method — SPEI, or cash at pickup (visible in the public projection)…
+    expect(await ask(transfer, 'arranged')).toBe('yes')
+    expect(await ask({ settings: { shipping: { local_pickup: true } } }, 'arranged')).toBe('yes')
+    // …and, D1 coexist-permissive (Daniel 2026-07-11), ALSO through ordinary delivery: checkout then offers shipping or
+    // pickup and the card rail. The public view cannot see delivery, so it does not block; the PUBLISH gate verified
+    // delivery with the owner's facts. A card-only shop with an arranged product is therefore still sellable.
+    expect(await ask(cardOnly, 'arranged')).toBe('yes')
+    expect(await ask(cardOnly, 'carrier')).toBe('yes')
+    // The delivery mode is READ per listing: an unreadable product fails closed instead of guessing.
+    expect(await offerCanProceed({ slug: 's', productId: 'p', listingType: 'product' },
+      { sellerMetadata: async () => transfer, productDeliveryMode: async () => undefined })).toBe('unavailable')
+  })
+
+  test('a non-product listing needs only a shop that can collect', async () => {
+    expect(await ask(cardOnly, 'arranged', 'service')).toBe('yes')
+    expect(await ask({ settings: {} }, null, 'service')).toBe('no')
+  })
+
+  test('anything unreadable FAILS CLOSED (503), never "accepted" and never "cannot collect"', async () => {
+    expect(await ask(null)).toBe('unavailable')
+    expect(await offerCanProceed({ slug: 's', productId: 'p', listingType: 'product' },
+      { sellerMetadata: async () => { throw new Error('down') }, productDeliveryMode: async () => null })).toBe('unavailable')
+    expect(await offerCanProceed({ slug: null, productId: 'p', listingType: 'product' }, deps(transfer))).toBe('unavailable')
     expect(offerCollectRefusal('unavailable', 'buyer')).toMatchObject({ status: 503, code: 'COLLECT_UNVERIFIED' })
     expect(offerCollectRefusal('yes', 'seller')).toBeNull()
   })
 
   test('every offer door asks: create, seller accept/counter (web + MCP share it), and the PDP buttons', () => {
     const create = read('app/api/offers/route.ts')
-    expect(create).toContain("offerCollectRefusal(\n    await shopCanCollect(")
+    expect(create).toContain("offerCollectRefusal(\n    await offerCanProceed({")
     // Refused before the offer row is written.
     expect(create.indexOf('offerCollectRefusal(')).toBeGreaterThan(-1)
     expect(create.indexOf('offerCollectRefusal(')).toBeLessThan(create.indexOf('.insert('))
     const respond = read('lib/offer-respond.ts')
     expect(respond).toContain("if (action === 'accept' || action === 'counter') {")
-    expect(respond).toContain("offerCollectRefusal(await shopCanCollect(listing.marketplace_shops.slug), 'seller')")
+    expect(respond).toContain('offerCollectRefusal(await offerCanProceed({')
     const pdp = read('app/(shell)/l/[id]/ListingRenderer.tsx')
-    expect(pdp).toContain('const offersOpen = hasAnyPayment')
+    expect(pdp).toContain('const offersOpen = hasAnyPayment && listingReadiness({')
     // Every MakeOfferButton render site and the island's canOffer are behind offersOpen.
     const sites = pdp.split('<MakeOfferButton').length - 1
     expect(sites).toBe(2)

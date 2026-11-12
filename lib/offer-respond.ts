@@ -9,7 +9,7 @@
  * check is identical whether the caller is a signed-in seller or a scoped agent.
  */
 
-import { offerCollectRefusal, shopCanCollect } from './shop-collect'
+import { offerCanProceed, offerCollectRefusal } from './shop-collect'
 import { db } from './supabase'
 import { stripe } from './stripe'
 import { dispatchToBuyer } from './notifications/dispatch'
@@ -124,7 +124,7 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
     .select(`
       *,
       marketplace_listings!inner(
-        id, title, price_cents, currency, listing_type, images, status,
+        id, medusa_product_id, title, price_cents, currency, listing_type, images, status,
         marketplace_shops!inner(id, slug, clerk_user_id, metadata)
       )
     `)
@@ -134,7 +134,7 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
   if (!offer) return { ok: false, error: 'Oferta no encontrada.', httpStatus: 404 }
 
   const listing = offer.marketplace_listings as unknown as {
-    id: string; title: string; price_cents: number; currency: string
+    id: string; medusa_product_id: string | null; title: string; price_cents: number; currency: string
     listing_type: string; images: Array<{ url: string }> | null; status: string
     marketplace_shops: { id: string; slug: string | null; clerk_user_id: string | null; metadata: Record<string, unknown> | null }
   }
@@ -182,7 +182,11 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
   // dead-ends (miel-verduras, 2026-11-11). Declining is always allowed. Shared by the web route and MCP. Medusa read;
   // fails CLOSED on an outage.
   if (action === 'accept' || action === 'counter') {
-    const refusal = offerCollectRefusal(await shopCanCollect(listing.marketplace_shops.slug), 'seller')
+    const refusal = offerCollectRefusal(await offerCanProceed({
+      slug: listing.marketplace_shops.slug,
+      productId: listing.medusa_product_id,
+      listingType: listing.listing_type,
+    }), 'seller')
     if (refusal) return { ok: false, error: refusal.error, httpStatus: refusal.status }
   }
 

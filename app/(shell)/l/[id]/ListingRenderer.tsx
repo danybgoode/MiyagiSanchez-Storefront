@@ -30,6 +30,7 @@ import AskSellerButton from '@/app/components/AskSellerButton'
 import OfferCheckoutButton from '@/app/components/OfferCheckoutButton'
 import SellerBundleSection from '@/app/components/SellerBundleSection'
 import { shopListingBase } from '@/lib/shop-presentation/chrome'
+import { listingReadiness, publicShopFacts, type DeliveryMode } from '@/lib/listing-readiness'
 import SpecsTable from './SpecsTable'
 import { listingSpecs } from '@/lib/listing-attributes'
 import SellerTrustCard from '@/app/components/SellerTrustCard'
@@ -406,7 +407,12 @@ export async function ListingPage({
   const hasAnyPayment = commerceReadiness.ready
   // listing-readiness D5: a buyer may OPEN an offer only where a checkout could finish. The server refuses too
   // (app/api/offers, lib/offer-respond.ts); this keeps the button from promising what the server will refuse.
-  const offersOpen = hasAnyPayment
+  // Per LISTING, not per shop (cross-family review, PR 497): an arranged-delivery product sells only on a manual method.
+  const offersOpen = hasAnyPayment && listingReadiness({
+    listingType: listing.listing_type,
+    deliveryMode: (listing.metadata as Record<string, unknown> | null | undefined)?.delivery_mode as DeliveryMode,
+    shop: publicShopFacts((listing.shop?.metadata ?? null) as Record<string, unknown> | null),
+  }).mode === 'online'
   const fulfillmentMethods = [
     shippingSettings?.local_pickup && {
       icon: 'iconoir-shop',

@@ -11,13 +11,15 @@
  * never "accepted" on a guess and never "this shop can't take payment" on an outage.
  */
 
-import { canCollect, publicShopFacts, READINESS_COPY } from './listing-readiness'
+import { canCollect, listingReadiness, publicShopFacts, READINESS_COPY, type DeliveryMode } from './listing-readiness'
 
 export type CollectAnswer = 'yes' | 'no' | 'unavailable'
 
 export type ShopCollectDeps = {
   /** The Medusa seller's PUBLIC metadata by slug; `null` = not found / unreadable. May throw. */
   readonly sellerMetadata: (slug: string) => Promise<Record<string, unknown> | null>
+  /** The product's delivery mode from Medusa (`null` = carrier/unset); `undefined` = unreadable. May throw. */
+  readonly productDeliveryMode: (slug: string, productId: string) => Promise<DeliveryMode | undefined>
 }
 
 // Lazy: `lib/listings` pulls in `next/cache`, which keeps this module out of the node test runner if imported on top.
@@ -27,14 +29,35 @@ const defaultDeps: ShopCollectDeps = {
     const shop = await getShop(slug)
     return shop ? ((shop.metadata ?? {}) as Record<string, unknown>) : null
   },
+  productDeliveryMode: async (slug, productId) => {
+    const { getOwnedShopListing } = await import('@/lib/listings')
+    const listing = await getOwnedShopListing(slug, productId)
+    if (!listing) return undefined
+    const mode = (listing.metadata as Record<string, unknown> | null | undefined)?.delivery_mode
+    return mode === 'arranged' || mode === 'carrier' ? mode : null
+  },
 }
 
-export async function shopCanCollect(slug: string | null | undefined, deps: ShopCollectDeps = defaultDeps): Promise<CollectAnswer> {
-  if (!slug) return 'unavailable'
+/**
+ * Can a checkout for THIS listing finish? (D5, per listing — cross-family review on PR 497.) "The shop takes some
+ * payment" is not enough: an arranged-delivery product sells only on a MANUAL method, so a card-only shop accepting an
+ * offer on it would leave the buyer an unpayable price. The ONE rule over the public facts; non-product types need only
+ * a shop that can collect.
+ */
+export async function offerCanProceed(
+  input: { slug: string | null | undefined; productId: string | null | undefined; listingType: string | null | undefined },
+  deps: ShopCollectDeps = defaultDeps,
+): Promise<CollectAnswer> {
+  if (!input.slug) return 'unavailable'
   try {
-    const metadata = await deps.sellerMetadata(slug)
+    const metadata = await deps.sellerMetadata(input.slug)
     if (!metadata) return 'unavailable'
-    return canCollect(publicShopFacts(metadata).payments) ? 'yes' : 'no'
+    const facts = publicShopFacts(metadata)
+    if ((input.listingType ?? 'product') !== 'product') return canCollect(facts.payments) ? 'yes' : 'no'
+    if (!input.productId) return 'unavailable'
+    const deliveryMode = await deps.productDeliveryMode(input.slug, input.productId)
+    if (deliveryMode === undefined) return 'unavailable'
+    return listingReadiness({ listingType: 'product', deliveryMode, shop: facts }).mode === 'online' ? 'yes' : 'no'
   } catch {
     return 'unavailable'
   }
