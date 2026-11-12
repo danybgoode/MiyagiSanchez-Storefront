@@ -19,6 +19,7 @@
  * reintroduce the exact bug this file exists to avoid.
  */
 import type { StartCheckoutParams, StartCheckoutResult } from './cart'
+import { CheckoutStartError } from './checkout-error'
 
 export async function startCheckout(params: StartCheckoutParams): Promise<StartCheckoutResult> {
   const res = await fetch('/api/checkout/start', {
@@ -28,7 +29,7 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
   })
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    throw new Error(data?.error ?? 'No se pudo iniciar el pago.')
+    throw new CheckoutStartError(data?.error ?? 'No se pudo iniciar el pago.', data?.code ?? null)
   }
   return data as StartCheckoutResult
 }

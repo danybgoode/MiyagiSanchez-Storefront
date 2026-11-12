@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { currentUser } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
 import { createMpPreference } from '@/lib/mercadopago'
 import { detectChannel } from '@/lib/channel'
+import { OFFER_SESSION_TTL_MS, dbOfferClaim, dbOfferLookup, dbOfferRelease, gateOfferPurchase, releaseOfferReservation } from '@/lib/offer-reservation'
 
 interface CheckoutBody {
   listingId: string
@@ -60,25 +61,28 @@ export async function POST(req: NextRequest) {
   }
 
   // ── If offer-based purchase, use the accepted offer amount ────────────────
-  let priceCents = listing.price_cents
-  if (offerId) {
-    const { data: offer } = await db
-      .from('marketplace_offers')
-      .select('offer_amount_cents, counter_amount_cents, status')
-      .eq('id', offerId)
-      .eq('listing_id', listing.id)
-      .single()
-
-    if (offer?.status === 'accepted') {
-      // counter_amount_cents is set when seller countered; otherwise use offer amount
-      priceCents = offer.counter_amount_cents ?? offer.offer_amount_cents
-    }
+  // An accepted offer sets the price ONLY for the buyer who made it, and only one checkout at a
+  // time may hold it (lib/offer-reservation.ts). Anything else the caller names is ignored.
+  const { userId } = await auth()
+  const gate = await gateOfferPurchase({
+    offerId,
+    listingId: listing.id,
+    clerkUserId: userId ?? null,
+    now: new Date(),
+    lookup: dbOfferLookup(db),
+    claim: dbOfferClaim(db),
+  })
+  if (!gate.ok) {
+    return NextResponse.json({ error: gate.error, code: gate.code }, { status: gate.status })
   }
+  const priceCents = gate.priceCents ?? listing.price_cents
 
   const origin = req.headers.get('origin') ?? 'https://miyagisanchez.com'
   const isDev = process.env.NODE_ENV === 'development'
 
-  const preference = await createMpPreference({
+  let preference: Awaited<ReturnType<typeof createMpPreference>>
+  try {
+  preference = await createMpPreference({
     title: listing.title,
     priceCents,
     currency: listing.currency,
@@ -86,10 +90,16 @@ export async function POST(req: NextRequest) {
     listingId: listing.id,
     shopId: shop.id,
     listingType: listing.listing_type,
-    offerId,
+    offerId: gate.offerId ?? undefined,
     origin,
     channel: detectChannel(req),
+    ...(gate.reservedAt ? { expiresInMs: OFFER_SESSION_TTL_MS } : {}),
   })
+  } catch (e) {
+    // validate -> claim -> apply: the preference never existed, so give the offer back.
+    if (gate.offerId && gate.reservedAt) await releaseOfferReservation(dbOfferRelease(db), gate.offerId, gate.reservedAt)
+    throw e
+  }
 
   return NextResponse.json({
     preferenceId: preference.id,

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth, useUser } from '@clerk/nextjs'
 import { startCheckout } from '@/lib/cart-client'
+import { isShippingQuoteInvalid } from '@/lib/checkout-error'
 import type { CheckoutFulfillmentMethod, CheckoutProvider, CheckoutShippingAddress, CheckoutShippingQuote } from '@/lib/cart'
 import type { CartItem } from './CartContext'
 import type { PersonalizationPayload } from '@/lib/personalization'
@@ -44,6 +45,8 @@ interface CheckoutPayButtonProps {
   pickupAppointment?: { date: string; window: string }
   shippingAddress?: CheckoutShippingAddress
   shippingQuote?: CheckoutShippingQuote
+  /** The backend refused the shipping quote (stale/expired): the parent must clear it and re-quote. */
+  onShippingQuoteInvalid?: () => void
   originDomain?: string
   /** Rental: buyer's chosen date range. ONLY dates — never an amount. */
   rental?: { check_in: string; check_out: string }
@@ -71,6 +74,7 @@ export default function CheckoutPayButton({
   pickupAppointment,
   shippingAddress,
   shippingQuote,
+  onShippingQuoteInvalid,
   originDomain,
   rental,
   disabled,
@@ -137,6 +141,7 @@ export default function CheckoutPayButton({
       }
       setError('No se pudo registrar el pedido. Intenta de nuevo.')
     } catch (err) {
+      if (isShippingQuoteInvalid(err)) onShippingQuoteInvalid?.()
       const msg = err instanceof Error ? err.message : 'No se pudo iniciar el pago.'
       setError(msg.includes('SELLER_NOT_CONNECTED') ? 'El vendedor aún no ha activado pagos en línea.' : msg)
     } finally {
