@@ -79,9 +79,17 @@ export function intakeDeps(ip: string): IntakeDeps & { base64: (b: Uint8Array) =
       if (who.kind === 'user') {
         const subject = `intake-user:${who.id}`
         const month = period.slice(0, 7)
-        const { data } = await db.from('ai_allowance').select('count').eq('subject', subject).eq('kind', ANON_INTAKE.kind).eq('period', month).maybeSingle()
-        const n = (data as { count?: number } | null)?.count ?? 0
-        if (n > 0) await db.from('ai_allowance').update({ count: n - 1, updated_at: new Date().toISOString() }).eq('subject', subject).eq('kind', ANON_INTAKE.kind).eq('period', month).eq('count', n)
+        // Optimistic and RE-TRIED: two failed reads at once both see the same count; the conditional update lets one
+        // land, and the other re-reads and tries again instead of silently losing its refund (Codex, PR #501).
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const { data } = await db.from('ai_allowance').select('count').eq('subject', subject).eq('kind', ANON_INTAKE.kind).eq('period', month).maybeSingle()
+          const n = (data as { count?: number } | null)?.count ?? 0
+          if (n <= 0) return
+          const { data: written } = await db.from('ai_allowance').update({ count: n - 1, updated_at: new Date().toISOString() })
+            .eq('subject', subject).eq('kind', ANON_INTAKE.kind).eq('period', month).eq('count', n).select('subject')
+          if (Array.isArray(written) && written.length === 1) return
+        }
+        console.error('[p2s-intake] refund lost every race', subject)
         return
       }
       const { error } = await db.from('ai_allowance').update({ count: 0, updated_at: new Date().toISOString() })
