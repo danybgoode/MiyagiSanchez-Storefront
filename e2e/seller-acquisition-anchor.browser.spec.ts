@@ -13,23 +13,13 @@ test.describe('seller acquisition · anchor page', () => {
     await expect(
       page.getByRole('heading', { name: /Describe tu negocio/i }),
     ).toBeVisible()
-    await expect(page.getByText(/pídele a Claude, Gemini o ChatGPT/i)).toBeVisible()
+    // one-front-door-both-markets S3.2 — the self-check line and the copy-prompt block are gone everywhere.
+    await expect(page.getByText(/Compruébalo tú mismo/i)).toHaveCount(0)
+    await expect(page.getByTestId('vende-prompt-copy')).toHaveCount(0)
+    await expect(page.getByTestId('p2s-describe-box')).toBeVisible()
     await expect(page.getByTestId('vende-router-creadores')).toBeVisible()
     await expect(page.getByTestId('vende-router-negocios')).toBeVisible()
     await expect(page.getByTestId('vende-router-servicios')).toBeVisible()
-
-    // The hero PromptBlock shows the directive prompt as visible text + a copy button. Clicking it
-    // copies the prompt, which must carry the per-page URL and the Mercado Libre / Shopify
-    // cost-comparison instruction (the whole point of the visible prompt block).
-    // The steps aside pairs the same trust prompt with a second PromptBlock, so this text renders
-    // twice — assert the (first) hero occurrence.
-    await expect(page.getByText(/Compara cuánto pagaría ahí contra Mercado Libre y Shopify/i).first()).toBeVisible()
-    await page.getByTestId('vende-prompt-copy').click()
-    const clipboard = await page.evaluate(() => navigator.clipboard.readText())
-    expect(clipboard).toContain('https://miyagisanchez.com/')
-    expect(clipboard).not.toContain('/mx/vende')
-    expect(clipboard).toContain('Mercado Libre')
-    expect(clipboard).toContain('Shopify')
 
     await page.getByTestId('vende-router-creadores').click()
     await expect(page).toHaveURL((url) => (

@@ -5,6 +5,7 @@ import { usSellerCtaHref } from '@/lib/seller-acquisition'
 import { SellerAcquisitionPage } from '@/app/(shell)/mx/vende/_components/SellerAcquisitionSections'
 import { buildUsMarketPageConfig } from '@/app/(shell)/mx/vende/_components/page-config'
 import DescribeBox from '@/app/(shell)/mx/vende/_components/DescribeBox'
+import { LANDING_EXAMPLES } from '@/lib/prompt-to-shop/landing-examples'
 import Link from 'next/link'
 
 /**
@@ -126,7 +127,7 @@ export default async function UnitedStatesSellPage({ searchParams }: UnitedState
         config={{
           ...config,
           // one-front-door-both-markets S2.4/S3.1 — the builder is the hero here too, and it makes US shops.
-          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell?market=us'} locale="en" marketHint="us" />,
+          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell?market=us'} locale="en" marketHint="us" examples={LANDING_EXAMPLES['us']} />,
         }}
       />
       <p className="app-shell t-small" style={{ textAlign: 'center', paddingBottom: 'var(--s-8)' }}>

@@ -4,6 +4,7 @@ import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { SellerAcquisitionPage } from '@/app/(shell)/mx/vende/_components/SellerAcquisitionSections'
 import { buildUsMarketPageConfig } from '@/app/(shell)/mx/vende/_components/page-config'
 import DescribeBox from '@/app/(shell)/mx/vende/_components/DescribeBox'
+import { LANDING_EXAMPLES } from '@/lib/prompt-to-shop/landing-examples'
 import Link from 'next/link'
 
 /**
@@ -46,7 +47,7 @@ export default async function UnitedStatesVendePage({ searchParams }: Props) {
         config={{
           ...config,
           pageId: 'us-vende',
-          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell?market=us'} locale="es" marketHint="us" />,
+          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell?market=us'} locale="es" marketHint="us" examples={LANDING_EXAMPLES['us-vende']} />,
         }}
       />
       <p className="app-shell t-small" style={{ textAlign: 'center', paddingBottom: 'var(--s-8)' }}>

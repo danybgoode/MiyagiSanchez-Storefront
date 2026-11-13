@@ -58,12 +58,33 @@ test('the new hero line replaces the anchor title and the page metadata', () => 
 
 test('the box is the hero\'s first block after the title, so it is above the fold on a phone', () => {
   const sections = read('app/(shell)/mx/vende/_components/SellerAcquisitionSections.tsx')
-  const hero = sections.slice(sections.indexOf('function LandingHero'), sections.indexOf('function TrustLine'))
+  const hero = sections.slice(sections.indexOf('function LandingHero'), sections.indexOf('function HeroValueList'))
   const at = (needle: string) => hero.indexOf(needle)
   const box = at('<div className={styles.describe}>')
   expect(box).toBeGreaterThan(at('{config.title}'))
-  for (const later of ['config.lead', '<TrustLine', '<PromptBlock', '<HeroValueList']) {
+  for (const later of ['config.lead', '<HeroValueList']) {
     expect(box, later).toBeLessThan(at(later))
+  }
+})
+
+// one-front-door-both-markets S3.2 — the hero is just the input. Product owner, 2026-11-12: remove «Compruébalo tú
+// mismo», «Copiar prompt para mi IA» and the prompt, everywhere. Asserted on the whole sections file, so a twin of the
+// block in another section (the steps aside carried one) cannot come back unseen.
+test('no landing renders the self-check line or the copy-prompt block, in the hero or anywhere else', () => {
+  const sections = read('app/(shell)/mx/vende/_components/SellerAcquisitionSections.tsx')
+  expect(sections).not.toMatch(/<PromptBlock\b|<TrustLine\b|config\.trustPrompt|config\.agentTitle/)
+  expect(sections).not.toMatch(/^import .*PromptBlock/m)
+})
+
+// S3.1 — every merchant landing opens on the builder; recruiting pages for promoters and operators do not.
+test('every merchant landing gets the box with its own examples; promoter and operator pages get none', async () => {
+  const { LANDING_EXAMPLES, NO_BUILDER_PAGES } = await import('../lib/prompt-to-shop/landing-examples')
+  const sections = read('app/(shell)/mx/vende/_components/SellerAcquisitionSections.tsx')
+  expect(sections).toContain('raw.describe || NO_BUILDER_PAGES.has(raw.pageId)')
+  expect(sections).toContain('examples={LANDING_EXAMPLES[raw.pageId]}')
+  expect([...NO_BUILDER_PAGES].sort()).toEqual(['promotor', 'us-operators'])
+  for (const slug of ['comida', 'bazar', 'inmuebles', 'imprentas', 'plomeria', 'vestidos-de-novia', 'materiales-e-interiorismo', 'ropa-interior-mayoreo', 'creadores', 'negocios', 'servicios', 'autos']) {
+    expect(LANDING_EXAMPLES[slug]?.length ?? 0, slug).toBeGreaterThanOrEqual(2)
   }
 })
 

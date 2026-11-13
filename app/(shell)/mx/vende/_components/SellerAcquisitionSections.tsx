@@ -3,7 +3,8 @@ import Link from 'next/link'
 import type { SellerAcquisitionVariant } from '@/lib/seller-acquisition'
 import type { RealShopProof, DemoShop } from '@/lib/business-types'
 import { BusinessProofSlot } from './BusinessProofSlot'
-import { PromptBlock } from './PromptBlock'
+import DescribeBox from './DescribeBox'
+import { LANDING_EXAMPLES, NO_BUILDER_PAGES } from '@/lib/prompt-to-shop/landing-examples'
 import { SellerAcquisitionVariantTag } from './SellerAcquisitionVariantTag'
 import styles from './SellerAcquisitionHero.module.css'
 
@@ -226,7 +227,24 @@ export type SellerAcquisitionPageConfig = {
   realProof?: { title: string; shops: readonly RealShopProof[] }
 }
 
-export function SellerAcquisitionPage({ config }: { config: SellerAcquisitionPageConfig }) {
+export function SellerAcquisitionPage({ config: raw }: { config: SellerAcquisitionPageConfig }) {
+  // one-front-door-both-markets S3.1 — every merchant landing opens on the shop builder. A page that passes its own
+  // box (`/`, `/en`, the US pages) keeps it; a Mexican persona page gets the Spanish box with its own example chips.
+  // Promoter and operator pages recruit people who are not opening a shop, so they get none.
+  const config: SellerAcquisitionPageConfig = raw.describe || NO_BUILDER_PAGES.has(raw.pageId)
+    ? raw
+    : {
+        ...raw,
+        describe: (
+          <DescribeBox
+            siteKey={process.env.TURNSTILE_SITE_KEY || null}
+            manualHref={raw.primaryCta?.href ?? '/sell'}
+            locale="es"
+            marketHint="mx"
+            examples={LANDING_EXAMPLES[raw.pageId]}
+          />
+        ),
+      }
   return (
     <main
       className="app-shell"
@@ -374,16 +392,8 @@ function LandingHero({ config }: { config: SellerAcquisitionPageConfig }) {
         {config.lead}
       </p>
 
-      <TrustLine text={config.trustLine} className={styles.trust} />
-
-      <div className={styles.prompt}>
-        <PromptBlock
-          prompt={config.trustPrompt}
-          copyLabel={config.copyLabel}
-          copiedLabel={config.copiedLabel}
-          testId={`${config.pageId}-prompt-copy`}
-        />
-      </div>
+      {/* S3.2 — the hero is just the input: no «Compruébalo tú mismo» line and no copy-prompt block (product owner,
+          2026-11-12: "remove everywhere"). The steps section's twin of it is gone too. */}
 
       <HeroValueList values={values} className={styles.values} />
 
@@ -419,27 +429,6 @@ function LandingHero({ config }: { config: SellerAcquisitionPageConfig }) {
   )
 }
 
-function TrustLine({ text, className }: { text: string; className?: string }) {
-  return (
-    <p
-      className={className}
-      style={{
-        margin: 0,
-        color: 'var(--agent)',
-        background: 'var(--agent-soft)',
-        border: '1px solid var(--anil-100)',
-        borderRadius: 'var(--r-md)',
-        padding: 'var(--s-3) var(--s-4)',
-        lineHeight: 1.55,
-        fontSize: 14,
-        maxWidth: 660,
-      }}
-    >
-      <i className="iconoir-sparks" aria-hidden="true" style={{ marginRight: 'var(--s-2)' }} />
-      {text}
-    </p>
-  )
-}
 
 function HeroValueList({ values, className }: { values: HeroValue[]; className?: string }) {
   return (
@@ -616,22 +605,6 @@ function StepsSection({ config }: { config: SellerAcquisitionPageConfig }) {
         </ol>
       </div>
 
-      <aside style={{ display: 'grid', gap: 'var(--s-4)', alignContent: 'start' }}>
-        <div>
-          <h2 className="t-h3" style={{ color: 'var(--agent)', letterSpacing: 0, marginBottom: 'var(--s-2)' }}>
-            {config.agentTitle}
-          </h2>
-          <p className="t-small" style={{ color: 'var(--fg-muted)' }}>
-            {config.agentBody}
-          </p>
-        </div>
-        <PromptBlock
-          prompt={config.trustPrompt}
-          copyLabel={config.copyLabel}
-          copiedLabel={config.copiedLabel}
-          testId={`${config.pageId}-steps-prompt-copy`}
-        />
-      </aside>
     </section>
   )
 }
