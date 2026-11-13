@@ -411,7 +411,9 @@ test('signed in: a link\'s rows are screened too', async () => {
 
 test('the signed-in mode is a SHOP OWNER\'s: every intake route asks for one, from the session', () => {
   const route = readFileSync(join(process.cwd(), 'lib/prompt-to-shop/intake-route.ts'), 'utf8')
-  expect(route).toContain("from('marketplace_shops').select('id').eq('clerk_user_id', userId)")
+  // The seller is Medusa's (AGENTS rule 1), never the Supabase mirror.
+  expect(route).toContain('await getMySeller()')
+  expect(route).not.toContain("from('marketplace_shops')")
   for (const kind of ['photo', 'file', 'link']) {
     const src = readFileSync(join(process.cwd(), `app/api/p2s/intake/${kind}/route.ts`), 'utf8')
     expect(src, kind).toContain('userId: await intakeShopOwner()')
@@ -423,4 +425,16 @@ test('the signed-in mode is a SHOP OWNER\'s: every intake route asks for one, fr
 
 test('seed prices keep their cents (149.50 stays 149.50)', () => {
   expect(sanitizeSeedRows([{ title: 'Vela de soya lavanda', price: 149.5, category: 'otros' }], 'MXN')[0].price).toBe(149.5)
+})
+
+import { screenChunksFor } from '../lib/prompt-to-shop/intake'
+test('signed in: a benign title over a prohibited DESCRIPTION is refused; every row is screened in chunks', async () => {
+  const rows = Array.from({ length: 40 }, (_, i) => ({ title: `Accesorio número ${i + 1}`, description: i === 33 ? 'Cartuchos calibre 9mm sin papeles' : 'Accesorio de cuero', category: 'otros' as const }))
+  const chunks = screenChunksFor('una tienda', rows)
+  expect(chunks).toHaveLength(3)
+  expect(chunks.some((c) => c.includes('Cartuchos calibre 9mm'))).toBe(true)
+  for (const c of chunks) expect(c.length).toBeLessThan(7000)
+  const w = world({ fetchJson: async () => ({ products: rows.map((r) => ({ title: r.title, body_html: r.description, variants: [{ price: '100' }] })) }) })
+  ;(w.deps as IntakeDeps).screen = async (text) => (text.includes('Cartuchos') ? { verdict: 'refuse', kind: 'prohibited' } : { verdict: 'allow' })
+  expect(await handleLinkIntake({ ...common, userId: 'user_9', url: 'https://shop.example' }, w.deps)).toMatchObject({ status: 422 })
 })

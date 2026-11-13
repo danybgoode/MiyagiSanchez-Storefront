@@ -19,7 +19,7 @@ import type { ScreenVerdict } from './screen'
 import { validateSuggestion, PHOTO_MAX_BYTES, PHOTO_MIME, type PhotoSuggestion } from './photo'
 import {
   ANON_INTAKE, INTAKE_FILE_MAX_BYTES, SEED_ROWS_MAX, bigCartelRows, describeFromPage, describeFromRows, fileKindOf,
-  planLink, readPageMeta, sanitizeSeedRows, screenTextFor, shopifyJsonRows, type FileKind, type IntakeResult, type LinkPlan,
+  planLink, readPageMeta, sanitizeSeedRows, screenChunksFor, shopifyJsonRows, type FileKind, type IntakeResult, type LinkPlan,
 } from './intake'
 import { currencyFor, currencyWords, readLocale, readMarketHint, type P2sLocale, type P2sMarketHint } from './locale'
 
@@ -71,8 +71,12 @@ function refuse(status: Exclude<IntakeOutcome['status'], 200>, code: CopyKey, lo
  */
 async function finish(common: IntakeCommon, deps: IntakeDeps, result: IntakeResult, input: 'file' | 'url', locale: P2sLocale): Promise<IntakeOutcome> {
   if (common.userId && deps.screen && result.seedRows.length) {
-    const verdict = await deps.screen(screenTextFor(result.description, result.seedRows))
-    if (verdict.verdict === 'refuse' && verdict.kind === 'prohibited') return refuse(422, 'prohibited', locale)
+    // Titles AND descriptions, in chunks that fit the screen's state (Codex security, PR #501): a benign title over a
+    // prohibited description must not slip through on the direct-import path.
+    for (const text of screenChunksFor(result.description, result.seedRows)) {
+      const verdict = await deps.screen(text)
+      if (verdict.verdict === 'refuse' && verdict.kind === 'prohibited') return refuse(422, 'prohibited', locale)
+    }
   }
   return ok(result, input)
 }

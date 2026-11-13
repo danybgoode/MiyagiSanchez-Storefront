@@ -341,3 +341,16 @@ export function zipDeclaredUncompressedSize(bytes: Uint8Array): number | null {
   }
   return total
 }
+
+/**
+ * D20 — every row's title and description, in chunks of 15 rows (≤ 15 × (100 + 300) chars, under SCREEN_MAX_CHARS),
+ * each led by the description. Used where rows go straight to the importer (a signed-in «Crear con IA»).
+ */
+export function screenChunksFor(description: string, rows: readonly CatalogImportRow[]): string[] {
+  const out: string[] = []
+  for (let i = 0; i < Math.min(rows.length, SEED_ROWS_MAX); i += 15) {
+    const lines = rows.slice(i, i + 15).map((r) => `${r.title}${r.description ? ` — ${r.description.slice(0, 300)}` : ''}`)
+    out.push(`${description}\n${lines.join('\n')}`)
+  }
+  return out.length ? out : [description]
+}
