@@ -417,9 +417,19 @@ export function builderCopy(locale: P2sLocale | string | null | undefined) {
 }
 
 /** The nudge emails' copy for a locale (lib/email.ts). */
-export function nudgeCopy(locale: P2sLocale | string | null | undefined) {
+/** A US shop is paid one way — its own Stripe account (D15) — so its «pagos» reminder never says Mercado Pago or CLABE. */
+const NUDGE_PAGOS_US = {
+  es: { title: 'Activa cómo te pagan', lead: 'Conecta tu cuenta de Stripe. Sin esto nadie puede pagarte.' },
+  en: { title: 'Turn on how you get paid', lead: 'Connect your Stripe account. Without this, nobody can pay you.' },
+} as const
+
+export function nudgeCopy(locale: P2sLocale | string | null | undefined, market?: 'mx' | 'us' | null) {
   const en = locale === 'en'
-  return { NUDGE: en ? NUDGE_COPY_EN : NUDGE_COPY, STEP: en ? NUDGE_STEP_COPY_EN : NUDGE_STEP_COPY }
+  const step = en ? NUDGE_STEP_COPY_EN : NUDGE_STEP_COPY
+  return {
+    NUDGE: en ? NUDGE_COPY_EN : NUDGE_COPY,
+    STEP: market === 'us' ? { ...step, pagos: NUDGE_PAGOS_US[en ? 'en' : 'es'] } : step,
+  }
 }
 
 export function describeCopy(locale: P2sLocale): Widen<typeof DESCRIBE_COPY> {

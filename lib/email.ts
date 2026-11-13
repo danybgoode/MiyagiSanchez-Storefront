@@ -528,8 +528,8 @@ export async function sendP2sDraftLink(ctx: { to: string; shopName: string; draf
  * `p2s-nudges` cron through `dispatchToSeller` (group `onboarding`), so the merchant's channel choices hold. The
  * idempotency key makes a retried send of the same milestone one email at Resend too.
  */
-export async function sendP2sNudge(ctx: { to: string; shopName: string; step: NudgeStep; day: NudgeDay; draftId: string; locale?: 'en' }): Promise<EmailSendResult> {
-  const { NUDGE: NUDGE_COPY, STEP } = nudgeCopy(ctx.locale)
+export async function sendP2sNudge(ctx: { to: string; shopName: string; step: NudgeStep; day: NudgeDay; draftId: string; locale?: 'en'; market?: 'us' }): Promise<EmailSendResult> {
+  const { NUDGE: NUDGE_COPY, STEP } = nudgeCopy(ctx.locale, ctx.market)
   const shopName = plainLine(ctx.shopName) || (ctx.locale === 'en' ? 'Your shop' : 'Tu tienda')
   const step = STEP[ctx.step]
   return sendWithResult(ctx.to, NUDGE_COPY.subject(shopName, step.title), [

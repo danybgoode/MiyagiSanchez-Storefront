@@ -117,7 +117,7 @@ export default function TakingShape({
           </div>
         ) : null}
       </div>
-      <ShopCanvas view={view} mode="shaping" ownCards={seedCards(seedRows as SeedRow[] | undefined)} />
+      <ShopCanvas view={view} mode="shaping" ownCards={seedCards(seedRows as SeedRow[] | undefined, locale)} />
     </div>
     </BodyPortal>
     </P2sLocaleProvider>

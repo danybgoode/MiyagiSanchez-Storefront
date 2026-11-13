@@ -92,3 +92,13 @@ test('draftView: English tags examples «EXAMPLE» and formats prices as US Engl
   expect(formatSuggestedPrice(25, 'USD')).not.toBe('$25')
   expect(formatSuggestedPrice(25, 'USD', 'en')).not.toBe(formatSuggestedPrice(25, 'USD', 'es'))
 })
+
+// Codex, PR #499 — a US shop's «pagos» reminder says Stripe in both languages, never Mercado Pago or CLABE.
+test('the payments reminder follows the market: Stripe for a US shop, Mercado Pago/CLABE for a Mexican one', () => {
+  for (const locale of ['es', 'en'] as const) {
+    expect(nudgeCopy(locale, 'us').STEP.pagos.lead).toMatch(/Stripe/)
+    expect(nudgeCopy(locale, 'us').STEP.pagos.lead).not.toMatch(/Mercado Pago|CLABE|bank account/i)
+    expect(nudgeCopy(locale, 'mx').STEP.pagos.lead).toMatch(/Mercado Pago/)
+    expect(nudgeCopy(locale, null).STEP.pagos).toEqual(nudgeCopy(locale, 'mx').STEP.pagos)
+  }
+})
