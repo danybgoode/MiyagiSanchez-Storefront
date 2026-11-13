@@ -158,12 +158,12 @@ export const SHOP_FEATURE_IDS: ShopFeatureId[] = SHOP_FEATURES.map((f) => f.id)
 /** The about-section heading + lead, es / en. Kept beside the stories so one file is the whole claim. */
 export const SHOP_FEATURES_HEADING = {
   es: {
-    heading: 'Lo que tu tienda ya hace',
+    heading: 'Lo que tu tienda hace',
     lead: 'Seis cosas que vienen con tu tienda y que casi nadie ve a primera vista.',
     intro: 'Todo esto ya está en tu tienda; cada historia lleva a la página donde lo usas.',
   },
   en: {
-    heading: 'What your shop already does',
+    heading: 'What your shop does',
     lead: 'Six things that come with your shop and that almost nobody sees at first glance.',
     intro: 'All of this is already in your shop; each story points to the page where you use it.',
   },

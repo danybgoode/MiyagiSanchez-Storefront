@@ -181,7 +181,7 @@ test.describe('S2.1 · what the shop already does', () => {
     expect(section.en.points).toHaveLength(6)
     expect(section.es.points!.map((p) => p.title)).toContain('Un inventario para cada mostrador')
     expect(resource.text).toContain('miyagisanchez.com/shop/manage/offers')
-    expect(aboutLlmsTxt(base)).toContain('What your shop already does')
+    expect(aboutLlmsTxt(base)).toContain('What your shop does')
     expect(aboutManifestBlock(base).features).toHaveLength(6)
   })
 
