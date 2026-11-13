@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { connectPlanFor, usOnboardingUrl } from '../lib/stripe-connect-market'
+import { connectPlanFor, isCrossSiteNavigation, usOnboardingUrl } from '../lib/stripe-connect-market'
 import { nudgeCopy } from '../lib/prompt-to-shop/copy-en'
 
 // one-front-door-both-markets D15 + the fresh review on PR #499 — a US shop the builder makes can actually get paid.
@@ -47,4 +47,12 @@ test('the kept shop offers a US shop Stripe only, at its /us address, and its pa
   expect(kept).toContain("marketBasePath(market === 'us' ? 'us' : 'mx')")
   expect(kept).toContain("market === 'us' ? CHECKLIST_COPY.cobrosLeadUs")
   for (const locale of ['es', 'en'] as const) expect(nudgeCopy(locale, 'us').STEP.pagos.lead).toContain('Stripe')
+})
+
+test('another site cannot start a seller\'s US Stripe onboarding (Sec-Fetch-Site), and the route checks it first', () => {
+  expect(isCrossSiteNavigation('cross-site')).toBe(true)
+  for (const v of ['same-origin', 'same-site', 'none', null]) expect(isCrossSiteNavigation(v)).toBe(false)
+  const src = read('app/api/stripe/connect/route.ts')
+  const v2 = src.slice(src.indexOf("plan.kind === 'us_v2'"))
+  expect(v2.indexOf('isCrossSiteNavigation(')).toBeLessThan(v2.indexOf('getToken()'))
 })

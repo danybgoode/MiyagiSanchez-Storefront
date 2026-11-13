@@ -231,6 +231,13 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
 
   // A keep resumed after a claim that stopped before its shop existed needs the market too (the first request held it).
   if (!market) return { kind: 'market_required', draftId }
+  // The draft says what was CHOSEN before the shop exists, so nothing downstream (the reminders) can read a stale hint
+  // for a shop that was made (Codex, PR #499). A failed write here is safe to retry: nothing has been created yet.
+  const recorded = deps.recordMarket ? await deps.recordMarket(draftId, userId, market).catch(() => false) : true
+  if (!recorded) {
+    deps.log({ event: 'claim_market_record_failed', draft: draftId, market })
+    return { kind: 'retry', message: RETRY.shop }
+  }
   const shop = await deps.ensureShop(shopInputFrom(identity, market))
   // D13 — the backend's NAMED refusals (409 a market conflict, 422 a market it will not take) are shown and the
   // question asked again; retrying the same choice could never succeed (fresh review, PR #499). Anything else is
@@ -246,8 +253,6 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
   // 201: this call created the seller from this draft. Record that first; it is what makes a reload harmless.
   const marked = await deps.markSeller(draftId, userId, shop.sellerId).catch(() => false)
   // The draft's market now says what was CHOSEN, not what was hinted: the kept view and its reminders read it.
-  const recorded = deps.recordMarket ? await deps.recordMarket(draftId, userId, market).catch(() => false) : true
-  if (!recorded) deps.log({ event: 'claim_market_record_failed', draft: draftId, market })
   if (!marked) deps.log({ event: 'claim_mark_failed', draft: draftId, seller: shop.sellerId })
 
   const applied = await deps.applyConfig(manifestFrom(identity, words)).catch(() => ({ ok: false }))

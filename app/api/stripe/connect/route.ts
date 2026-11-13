@@ -5,7 +5,7 @@ import { db } from '@/lib/supabase'
 import { syncMedusaSellerProfile } from '@/lib/medusa-seller-sync'
 import { resolveOrigin } from '@/lib/request-origin'
 import { getMySeller } from '@/lib/get-my-seller'
-import { connectPlanFor, usOnboardingUrl } from '@/lib/stripe-connect-market'
+import { connectPlanFor, isCrossSiteNavigation, usOnboardingUrl } from '@/lib/stripe-connect-market'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
   const plan = connectPlanFor(await getMySeller().catch(() => null))
   if (plan.kind === 'unknown_market') return errorRedirect('market_unavailable')
   if (plan.kind === 'us_v2') {
+    if (isCrossSiteNavigation(req.headers.get('sec-fetch-site'))) return errorRedirect('cross_site')
     const jwt = await getToken()
     if (!jwt) return NextResponse.redirect(new URL('/sign-in', req.url))
     const res = await fetch(`${MEDUSA_BASE}/store/sellers/me/stripe-connect`, {

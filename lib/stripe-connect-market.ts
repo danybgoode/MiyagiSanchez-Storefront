@@ -32,3 +32,13 @@ export function usOnboardingUrl(json: unknown): string | null {
     return null
   }
 }
+
+/**
+ * A cross-site navigation must not start a seller's Stripe onboarding (Codex security lens, PR #499): the route is a
+ * GET link on our own settings page, so a request another site triggered arrives with `Sec-Fetch-Site: cross-site`.
+ * Same-origin, same-site and a typed URL (`none`) are allowed; a browser that sends no header is allowed too — the
+ * account is resolved server-side from the seller, so the most a forged request could do is open their own setup.
+ */
+export function isCrossSiteNavigation(secFetchSite: string | null): boolean {
+  return (secFetchSite ?? '').trim().toLowerCase() === 'cross-site'
+}

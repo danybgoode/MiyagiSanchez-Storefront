@@ -393,3 +393,16 @@ test('a backend market refusal (409/422) asks the question again with its messag
   w.deps = (u: string) => ({ ...base(u), ensureShop: async () => ({ ok: false as const, status: 500, error: 'x' }) })
   expect((await keep(w, { market: 'us' })).kind).toBe('retry')
 })
+
+test('the chosen market is written to the draft BEFORE the shop exists; if it cannot be, nothing is created (Codex, PR #499)', async () => {
+  const w = world()
+  const base = w.deps
+  const order: string[] = []
+  w.deps = (u: string) => {
+    const d = base(u)
+    return { ...d, recordMarket: async () => { order.push('record'); return false }, ensureShop: async (i) => { order.push('ensure'); return d.ensureShop(i) } }
+  }
+  const res = await keep(w, { market: 'us' })
+  expect(res.kind).toBe('retry')
+  expect(order).toEqual(['record'])
+})
