@@ -67,12 +67,6 @@ test.describe('rootLanguageRedirect · one hop, never a loop', () => {
   test('moves a visitor only toward the document they can read', () => {
     expect(rootLanguageRedirect({ current: 'es', languages: ['en-US'] })).toBe('/en')
     expect(rootLanguageRedirect({ current: 'en', languages: ['es-MX'] })).toBe('/')
-    // …which is why the strip's English link must store the choice, under the switcher's own key.
-    const key = /const CHOICE_KEY = '([^']+)'/
-    const switcherKey = key.exec(source('app/(site)/RootLanguageSwitch.tsx'))?.[1]
-    expect(switcherKey).toBeTruthy()
-    expect(key.exec(source('app/(site)/RootEnglishLink.tsx'))?.[1]).toBe(switcherKey)
-    expect(source('app/(site)/RootEnglishLink.tsx')).toContain('localStorage.setItem(CHOICE_KEY')
   })
 
   test('a visitor already on their language is left alone', () => {
@@ -106,40 +100,25 @@ test.describe('rootLanguageRedirect · one hop, never a loop', () => {
   })
 })
 
-test.describe('the selector wires language to destination', () => {
+test.describe('the front door wires language to destination', () => {
   test('each document sends a seller to the landing in its own language', () => {
-    // The bottom CTA is the one thing on the page that varies by language rather than
-    // being a translation: Spanish reader → the Spanish landing, English → the English.
     expect(sellerLandingPath('mx')).toBe('/')
     expect(sellerLandingPath('us')).toBe('/us/sell')
-
-    const selector = source('app/(site)/MarketSelector.tsx')
-    expect(selector).toContain("sellerLandingPath(language === 'en' ? 'us' : 'mx')")
-    expect(selector).toContain('data-testid="market-selector-sell-cta"')
-    // Never a literal — this CTA pointed at a hardcoded `/vende` in both languages.
-    expect(selector).not.toMatch(/href="\/(?:vende|sell)"/)
   })
 
   test('language decides the document; region still only RECOMMENDS a market', () => {
-    // Two browser-derived decisions live on this page and they must not merge.
-    // Language navigates, because reading the page is a precondition for choosing at
-    // all. Market only badges, because a market carries currency, payments and
-    // shipping — consequences a visitor opts into. `es-US` proves they are separate:
-    // Spanish document, United States suggestion.
+    // `es-US` proves they are separate: Spanish document, United States suggestion.
     expect(preferredRootLanguage(['es-US'])).toBe('es')
     expect(recommendedMarketForLocale('es-US')).toBe('us')
     expect(preferredRootLanguage(['en-MX'])).toBe('en')
     expect(recommendedMarketForLocale('en-MX')).toBe('mx')
 
-    const island = source('app/(site)/RootLanguageSwitch.tsx')
+    // The hop lives in the header's switch now (2026-11-13), and still REPLACES, so the back button leaves the site.
+    const island = source('app/components/LanguageSwitch.tsx')
     expect(island).toContain("'use client'")
-    // `replace`, so the back button leaves the site instead of bouncing off the
-    // document the visitor was just moved out of.
-    expect(island).toContain('router.replace(target)')
-    expect(island).not.toContain('router.push(')
-    // The selector's server render must read no request headers, or `/en` stops being a
-    // static CDN asset — the ~30s cold start marketplace-static-shell fixed. `/` renders
-    // per request now (root-shop-builder-home D2) but still has no reason to read them.
+    expect(island).toContain('router.replace(`${target}${window.location.search}`)')
+    expect(island).toContain('builderLanguageRedirect(')
+    // `/` and `/en` are pinned to their address's language; their server render reads no request state.
     for (const route of ['app/(site)/page.tsx', 'app/(en-site)/en/page.tsx']) {
       expect(source(route), route).not.toMatch(/\bheaders\(\)|\bcookies\(\)/)
     }
@@ -153,17 +132,15 @@ test.describe('the selector wires language to destination', () => {
     expect(source('app/(site)/page.tsx')).toMatch(/export const dynamic = 'force-dynamic'/)
   })
 
-  test('/ and /en are the same builder in two languages, each running the one-time hop (D16)', () => {
+  test('/ and /en are the same builder in two languages, the header switch running the one-time hop (D16)', () => {
     const root = source('app/(site)/page.tsx')
     const en = source('app/(en-site)/en/page.tsx')
     for (const page of [root, en]) {
       expect(page).toMatch(/^import DescribeBox from /m)
       expect(page).not.toMatch(/^import .*MarketSelector/m)
     }
-    expect(root).toContain('<RootLanguageSwitch current="es" />')
-    expect(en).toContain('language="en"')
-    expect(source('app/(site)/RootMarketLinks.tsx')).toContain('<RootLanguageSwitch current="en" />')
-    expect(source('app/(site)/RootLanguageSwitch.tsx')).toContain('builderLanguageRedirect(')
+    // Both render the platform chrome, whose header carries the one switch and its one-time hop.
+    expect(source('app/components/PlatformShell.tsx')).toContain('<LanguageSwitch current={presentation.language} />')
   })
 
   test('the builder hop: English moves / → /en unless the browser says Mexico; Spanish moves /en → /', () => {

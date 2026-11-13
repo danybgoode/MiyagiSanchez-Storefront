@@ -1,10 +1,14 @@
 import { expect, test } from '@playwright/test'
 import {
-  SELLER_LOCALE_COOKIE,
   isSellerLocale,
   resolveSellerLocale,
   sellerCopyBoundaryNeeded,
 } from '../lib/seller-locale'
+import {
+  LEGACY_SELLER_LOCALE_COOKIE,
+  SITE_LANGUAGE_COOKIE,
+  languagePreferenceFromCookieHeader,
+} from '../lib/site-language'
 
 test.describe('seller locale · market default with an explicit override', () => {
   test('falls back to the market when no preference is stored', () => {
@@ -34,7 +38,12 @@ test.describe('seller locale · market default with an explicit override', () =>
     expect(sellerCopyBoundaryNeeded('en')).toBe(true)
   })
 
-  test('the cookie name is stable', () => {
-    expect(SELLER_LOCALE_COOKIE).toBe('seller_locale')
+  test('the portal reads the ONE site-wide choice, and still honours a choice stored before the merge', () => {
+    // 2026-11-13: the portal's own `seller_locale` cookie became the site-wide `ms_lang`, so a language picked in the
+    // back office survives "Volver a comprar". The old cookie is read as a fallback, never written.
+    expect(SITE_LANGUAGE_COOKIE).toBe('ms_lang')
+    expect(LEGACY_SELLER_LOCALE_COOKIE).toBe('seller_locale')
+    expect(languagePreferenceFromCookieHeader('seller_locale=en')).toBe('en')
+    expect(languagePreferenceFromCookieHeader('seller_locale=en; ms_lang=es')).toBe('es')
   })
 })

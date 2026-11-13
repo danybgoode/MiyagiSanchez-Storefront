@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
 /* eslint-disable @next/next/no-img-element -- conversation thumbnails preserve arbitrary seller-hosted image URLs */
 import { redirect } from 'next/navigation'
@@ -9,7 +10,7 @@ import { browseUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 import { formatPresentationCurrency, formatPresentationDate, marketCodeForCurrency, resolveMarketPresentation, type MarketPresentation } from '@/lib/market-presentation'
 
-export const metadata: Metadata = { title: 'Mensajes — Miyagi Sánchez' }
+export const metadata: Metadata = { title: { absolute: 'Mensajes — Miyagi Sánchez' } }
 
 function timeAgo(iso: string, presentation: MarketPresentation) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -45,6 +46,7 @@ function lastEventSummary(eventType: string, actor: string, metadata: Record<str
 export default async function MessagesPage() {
   const user = await currentUser()
   if (!user) redirect('/sign-in?redirect_url=/messages')
+  const language = await getLanguagePreference()
 
   // NOTE the absent `marketplace_shops.market_code`. That column has never existed
   // on the mirror — the operating market is a fact of the Medusa seller — and asking
@@ -100,7 +102,7 @@ export default async function MessagesPage() {
   function ConversationRow({ conv, role }: { conv: typeof conversations[0]; role: 'buyer' | 'seller' }) {
     const listing = conv.marketplace_listings as unknown as { id: string; title: string; price_cents: number | null; currency: string; images: Array<{ url: string }> | null } | null
     const shop    = conv.marketplace_shops as unknown as { name: string; slug: string } | null
-    const presentation = resolveMarketPresentation(marketCodeForCurrency(listing?.currency) ?? 'mx')
+    const presentation = resolveMarketPresentation(marketCodeForCurrency(listing?.currency) ?? 'mx', language)
     const lastEv  = lastEventMap.get(conv.id)
     const unread  = role === 'buyer' ? conv.buyer_unread : conv.seller_unread
     const otherParty = role === 'buyer'

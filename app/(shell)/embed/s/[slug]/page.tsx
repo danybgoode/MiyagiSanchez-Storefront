@@ -17,6 +17,7 @@
  * where the Sprint 1 cookie tags the sale `channel=embed`. No commerce logic here.
  */
 
+import { resolveMarketPresentation } from '@/lib/market-presentation'
 import { notFound } from 'next/navigation'
 import { getShop, getShopListings, formatPrice } from '@/lib/listings'
 import { assertShopNotPreviewPrivate, isShopPreviewPrivateBySlug } from '@/lib/preview-access'
@@ -85,6 +86,9 @@ export default async function EmbedShopPage({
       accentColor={accent}
       logoUrl={shop.logo_url ?? null}
       domain=""
+      // Request-neutral: the embed is also served from the public-read cache, and a cross-site iframe carries no
+      // first-party cookie anyway — so the market's own language. The switch still works inside the frame.
+      language={resolveMarketPresentation(embedMarket).language}
       // The Gratis badge (plans-gratis-negocio D7) — the embed is a white-label surface too.
       showBadge={await shopShowsBadge(shop.slug)}
       badgeHref={badgeHref(shop.slug)}

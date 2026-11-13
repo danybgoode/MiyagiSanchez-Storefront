@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { BuyerCopyText, BuyerPresentationProvider } from '@/app/components/BuyerPresentationContext'
 import { redirect, notFound } from 'next/navigation'
 import { currentUser } from '@clerk/nextjs/server'
@@ -94,7 +95,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     metadata?: Record<string, unknown> | null
     mp_enabled?: boolean | null
   } | null
-  const presentation = resolveMarketPresentation(marketCodeForCurrency(listingCurrency) ?? 'mx')
+  const presentation = resolveMarketPresentation(marketCodeForCurrency(listingCurrency) ?? 'mx', await getLanguagePreference())
   const buyerCopy = (await getDictionary(presentation.language)).buyerCopy
   const stripeSettings = getShopStripe(shopRaw?.metadata ?? null)
   const sellerHasStripe = !!(stripeSettings.charges_enabled && stripeSettings.account_id && stripeSettings.enabled !== false)

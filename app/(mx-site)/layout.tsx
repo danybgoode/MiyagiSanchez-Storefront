@@ -3,6 +3,7 @@ import MarketDocument, { ROOT_METADATA, ROOT_VIEWPORT } from '@/app/components/M
 import PlatformShell from '@/app/components/PlatformShell'
 import PlatformThemeScript from '@/app/components/PlatformThemeScript'
 import ReferralAttribution from '@/app/components/ReferralAttribution'
+import { layoutLanguage } from '@/lib/site-language-server'
 import '@/app/globals.css'
 import '@/app/iconoir-subset.css'
 
@@ -10,11 +11,17 @@ export const metadata: Metadata = ROOT_METADATA
 export const viewport: Viewport = ROOT_VIEWPORT
 
 /** Static Mexico marketplace root: no request reads, preserving `/mx` ISR. */
-export default function MexicoSiteLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Per request since 2026-11-13: the chrome renders in the visitor's stored language (`lib/site-language.ts`), and a
+ * cookie-dependent render must never be served from a shared cache. The data underneath stays cached at the fetch /
+ * `unstable_cache` layer, so this costs a render, not a Medusa round-trip.
+ */
+export default async function MexicoSiteLayout({ children }: { children: React.ReactNode }) {
+  const language = await layoutLanguage()
   return (
-    <MarketDocument market="mx">
+    <MarketDocument market="mx" language={language}>
       <PlatformThemeScript />
-      <PlatformShell market="mx" platformThemeEligible>{children}</PlatformShell>
+      <PlatformShell market="mx" language={language} platformThemeEligible>{children}</PlatformShell>
       <ReferralAttribution />
     </MarketDocument>
   )

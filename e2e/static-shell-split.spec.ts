@@ -23,10 +23,10 @@ function source(relPath: string): string {
 test.describe('static-shell split · static invariant', () => {
   test('the static `(site)` + root layout chain reads no request headers', () => {
     const rootLayout = source('app/components/MarketDocument.tsx')
+    // `(mx-site)` and `(us-site)` left this list on 2026-11-13: the marketplace chrome follows the visitor's stored
+    // ES/EN choice, so those roots render per request — see the test below. `/` stays pinned to Spanish.
     const siteLayouts = [
       source('app/(site)/layout.tsx'),
-      source('app/(mx-site)/layout.tsx'),
-      source('app/(us-site)/layout.tsx'),
     ]
 
     // Static-able: no per-request header/auth read anywhere in the homepage's chain.
@@ -37,6 +37,19 @@ test.describe('static-shell split · static invariant', () => {
       expect(siteLayout).not.toContain('next/headers')
       expect(siteLayout).not.toMatch(/\bheaders\(/)
       expect(siteLayout).not.toContain('x-miyagi')
+    }
+  })
+
+  test('the market roots follow the stored language and therefore never serve from a shared cache', () => {
+    // A render that depends on a cookie must never be cached for the next visitor: every market root reads the
+    // preference through ONE helper, and its pages say force-dynamic rather than a revalidate that would invite a CDN.
+    for (const layout of ['app/(mx-site)/layout.tsx', 'app/(us-site)/layout.tsx', 'app/(us-shell)/layout.tsx', 'app/(shell)/layout.tsx']) {
+      expect(source(layout), layout).toContain('await layoutLanguage()')
+      expect(source(layout), layout).toMatch(/<MarketDocument market="(?:mx|us)" language=\{language\}>/)
+    }
+    for (const page of ['app/(mx-site)/mx/page.tsx', 'app/(us-site)/us/page.tsx', 'app/(us-site)/us/sell/page.tsx']) {
+      expect(source(page), page).toMatch(/export const dynamic = 'force-dynamic'/)
+      expect(source(page), page).not.toMatch(/export const revalidate/)
     }
   })
 
@@ -71,9 +84,9 @@ test.describe('static-shell split · static invariant', () => {
 
     for (const file of [rootLayout, ...siteLayouts]) {
       expect(file).not.toContain('next/headers')
-      expect(file).not.toMatch(/\bheaders\(/)
       expect(file).not.toContain('lib/copy-overrides')
     }
+    for (const file of [rootLayout, siteLayouts[0]]) expect(file).not.toMatch(/\bheaders\(/)
   })
 })
 

@@ -41,6 +41,11 @@ const SETTLE_CAP_MS = 12_000
  * Quiescence solves both: a hop that has not happened yet keeps resetting the timer,
  * and a path that is genuinely staying put clears it in QUIET_MS.
  */
+/** The header's ES/EN switch. The chrome renders a mobile and a desktop header; exactly one is visible. */
+function switchTo(page: Page, language: 'es' | 'en') {
+  return page.getByTestId(`language-switch-${language}`).locator('visible=true').first()
+}
+
 async function settledPath(page: Page): Promise<string> {
   const deadline = Date.now() + SETTLE_CAP_MS
   let last = new URL(page.url()).pathname
@@ -112,7 +117,7 @@ test.describe('an English browser', () => {
 
     // Settling BEFORE the click is load-bearing, not defensive padding: clicking while a
     // hop is still committing hits a node React is replacing, and no navigation happens.
-    const toSpanish = page.getByTestId('root-language-es')
+    const toSpanish = switchTo(page, 'es')
     await expect(toSpanish).toBeVisible()
     await toSpanish.click()
 
@@ -134,12 +139,11 @@ test.describe('a Spanish browser is left alone', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX')
   })
 
-  test('the English link on / is a real choice: it lands on /en and stays there', async ({ page }) => {
-    // A plain link bounced every es-MX phone straight back: /en hops a Spanish browser to / unless
-    // a choice is stored. The strip's link stores it (reviewer finding on PR #454).
+  test('EN in the header on / is a real choice: it lands on /en and stays there', async ({ page }) => {
+    // /en hops a Spanish browser to / unless a choice is stored; the switch stores it (the `ms_lang` cookie).
     await page.goto('/')
     expect(await settledPath(page)).toBe('/')
-    await page.getByTestId('root-market-link-en').click()
+    await switchTo(page, 'en').click()
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 10_000 }).toBe('/en')
     expect(await settledPath(page)).toBe('/en')
     await expect(page.getByTestId('p2s-describe-box')).toContainText('Tell us what you sell')
@@ -168,9 +172,32 @@ test.describe('a browser that reads neither language falls to Spanish', () => {
   test('/ is the default and does not hop', async ({ page }) => {
     // Spanish is the canonical locale and the deliberate fallback for the majority of
     // the world's languages — not a claim the visitor reads it, which is why the
-    // English document stays one link away.
+    // English document stays one tap away, in the header.
     await page.goto('/')
     expect(await settledPath(page)).toBe('/')
-    await expect(page.getByTestId('root-market-link-en')).toBeVisible()
+    await expect(switchTo(page, 'en')).toBeVisible()
+  })
+})
+
+test.describe('one choice, everywhere (2026-11-13)', () => {
+  test.use({ locale: 'es-MX' })
+
+  test('EN on a marketplace page re-renders the same page in English, and the choice follows to the front door', async ({ page }) => {
+    await page.goto('/mx')
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX')
+    await switchTo(page, 'en').click()
+    // Same URL, same market, other language: the switch refreshes in place rather than moving to /us.
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en-MX', { timeout: 10_000 })
+    expect(new URL(page.url()).pathname).toBe('/mx')
+    await expect(switchTo(page, 'en')).toHaveAttribute('aria-pressed', 'true')
+
+    // The stored choice outranks a Spanish browser on the front door — the back-office complaint that started this.
+    await page.goto('/')
+    expect(await settledPath(page)).toBe('/en')
+
+    // And back: ES on /en returns to / and stays there.
+    await switchTo(page, 'es').click()
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 10_000 }).toBe('/')
+    expect(await settledPath(page)).toBe('/')
   })
 })

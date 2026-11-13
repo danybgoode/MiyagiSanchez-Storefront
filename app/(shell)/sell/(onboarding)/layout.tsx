@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import LanguageSwitch from '@/app/components/LanguageSwitch'
+import { getLanguagePreference } from '@/lib/site-language-server'
 
 /**
  * Onboarding three-doors chrome (Sprint 1) — the dark top bar only, no
@@ -18,7 +20,10 @@ import Link from 'next/link'
  * `sellShellEligible` check only ever matches the exact `/sell`/`/sell/setup`
  * strings, so it renders `<>{children}</>` for these three routes.
  */
-export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
+export default async function OnboardingLayout({ children }: { children: React.ReactNode }) {
+  // Pre-shop: no market yet, so Spanish unless the visitor chose otherwise. `sell/layout.tsx`'s copy boundary
+  // translates the screens below from the same preference.
+  const language = (await getLanguagePreference()) ?? 'es'
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <div
@@ -54,8 +59,10 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
             <i className="iconoir-shop" style={{ fontSize: 18, lineHeight: 1 }} />
             Miyagi Sánchez · Vendedor
           </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <LanguageSwitch current={language} variant="inverse" />
           <Link
-            href="/"
+            href="/mx"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -70,6 +77,7 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
             <i className="iconoir-arrow-left" style={{ fontSize: 16, lineHeight: 1 }} />
             Volver a comprar
           </Link>
+          </span>
         </div>
       </div>
 

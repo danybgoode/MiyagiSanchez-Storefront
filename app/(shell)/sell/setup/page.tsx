@@ -3,7 +3,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import SetupClient from './SetupClient'
 
 export const metadata = {
-  title: 'Arma tu tienda con tu agente — Miyagi Sánchez',
+  title: { absolute: 'Arma tu tienda con tu agente — Miyagi Sánchez' },
   description:
     'Pega el archivo que generó tu agente de IA y crea tu tienda y catálogo en un solo paso.',
 }

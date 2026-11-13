@@ -12,6 +12,7 @@ import { isLikelyListingId, isLikelyShopSlug, isBoundaryDeniedPath } from '@/lib
 import { resolveSubdomainEntitlement } from '@/lib/subdomain-entitlement-server'
 import { FUNDADORAS_VISITOR_COOKIE_NAME } from '@/lib/fundadoras-experiment'
 import { isPlatformHost } from '@/lib/platform-host'
+import { languagePreferenceFromCookies } from '@/lib/site-language'
 import {
   platformMarketRedirectPath,
   retiredShopMarketRedirectPath,
@@ -86,6 +87,11 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   }
 
   const hostname = req.headers.get('host') ?? ''
+  // A visitor who has chosen a language (the ES/EN switch, `lib/site-language.ts`) is never served the shared
+  // public-read cache: that render is request-neutral and always in the market's default language, so it would
+  // silently undo their choice. They take the dynamic route, which reads the cookie. Crawlers and first-time visitors
+  // carry no such cookie and keep the cached render.
+  const hasLanguageChoice = languagePreferenceFromCookies((name) => req.cookies.get(name)?.value) !== null
   let requestDb: SupabaseClient | undefined
   const getRequestDb = () => {
     requestDb ??= createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -165,7 +171,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       }
 
       const publicCandidate = subdomainPublicReadCandidate(req.nextUrl.pathname, req.nextUrl.search)
-      if (publicCandidate && (await publicReadEligibility({ slug, clerk_user_id: shopClerkId })).eligible) {
+      if (publicCandidate && !hasLanguageChoice && (await publicReadEligibility({ slug, clerk_user_id: shopClerkId })).eligible) {
         let resolved = publicCandidate.kind === 'shop'
         if (publicCandidate.kind === 'listing' && shopId) {
           try {
@@ -415,7 +421,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   if (req.nextUrl.pathname.startsWith('/embed/')) {
     headers.set('x-miyagi-embed', '1')
     const publicCandidate = embedPublicReadCandidate(req.nextUrl.pathname, req.nextUrl.search)
-    if (publicCandidate) {
+    if (publicCandidate && !hasLanguageChoice) {
       try {
         const supabase = getRequestDb()
         const { data: shop, error } = await supabase
@@ -482,7 +488,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     url.pathname = `${PUBLIC_PREVIEW_PREFIX}/mx/s/${encodeURIComponent(publicCandidate.shopSlug)}`
     return NextResponse.rewrite(url, { request: { headers } })
   }
-  if (publicCandidate) {
+  if (publicCandidate && !hasLanguageChoice) {
     try {
       const supabase = getRequestDb()
       if (publicCandidate.kind === 'shop') {

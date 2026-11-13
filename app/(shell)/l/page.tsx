@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
 /* eslint-disable @next/next/no-img-element -- marketplace media hosts are seller-controlled and not finitely allow-listable */
 import Link from 'next/link'
@@ -42,7 +43,7 @@ export async function ListingsPage({
   marketBasePath?: string
 }) {
   const [params, user] = await Promise.all([searchParams, currentUser()])
-  const presentation = resolveMarketPresentation(market)
+  const presentation = resolveMarketPresentation(market, await getLanguagePreference())
   // Autos facet rail rides alongside the grid fetch (cars-vertical S1.1); modelo
   // options scope to the applied marca. Only for the autos category — every other
   // category skips the extra call. Null (no facet_pool yet / non-autos) ⇒ the

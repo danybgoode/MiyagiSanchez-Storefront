@@ -3,7 +3,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import { getOrCreateReferralCode, getReferralStats } from '@/lib/referrals'
 import ReferralsClient from './ReferralsClient'
 
-export const metadata = { title: 'Invita y gana — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Invita y gana — Miyagi Sánchez' } }
 export const dynamic = 'force-dynamic'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://miyagisanchez.com'

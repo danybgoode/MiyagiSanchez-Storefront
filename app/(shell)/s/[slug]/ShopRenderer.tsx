@@ -28,6 +28,7 @@ import { marketCatalogCanonical } from '@/lib/market-seo'
 import { readPublicSellerMarket } from '@/lib/owned-market'
 import { getDictionary } from '@/lib/dictionary'
 import { resolveMarketPresentation } from '@/lib/market-presentation'
+import type { SiteLanguage } from '@/lib/site-language'
 import { readPublicWall } from '@/lib/wall/public'
 import { resolvePublicWallShop } from '@/lib/wall/store'
 import { normalizeSections } from '@/lib/shop-presentation/sections'
@@ -43,6 +44,8 @@ interface Social { instagram?: string; facebook?: string; whatsapp?: string; tik
 export type ShopRequestContext = {
   channel?: 'marketplace' | 'subdomain' | 'custom' | 'embed'
   domain?: string | null
+  /** The visitor's stored ES/EN choice, read by the dynamic wrapper. Absent on the public-read cache ⇒ market language. */
+  language?: SiteLanguage | null
 }
 
 export type ShopSettingsOverlay = (
@@ -134,7 +137,8 @@ export async function ShopPage({
   }
   if (market && readPublicSellerMarket(shop)?.market_code !== market) notFound()
   const presentationMarket = market ?? readPublicSellerMarket(shop)?.market_code ?? 'mx'
-  const buyerCopy = (await getDictionary(resolveMarketPresentation(presentationMarket).language)).buyerCopy
+  const presentation = resolveMarketPresentation(presentationMarket, requestContext.language)
+  const buyerCopy = (await getDictionary(presentation.language)).buyerCopy
 
   // Consent-safe preview leak guard (founding-merchant-consent-previews S1.2): a
   // shop with a non-activated preview anchor is private across every public
@@ -186,7 +190,7 @@ export async function ShopPage({
         shopSlug: wallShop.slug,
         basePath: navBasePath,
         listingBase: productLinkBase,
-        locale: resolveMarketPresentation(presentationMarket).htmlLang,
+        locale: presentation.htmlLang,
       })
     : { entries: [], hasMore: false, total: 0 }
 
@@ -413,7 +417,7 @@ export async function ShopPage({
           ctx={{
             copy: buyerCopy,
             basePath: navBasePath,
-            htmlLang: resolveMarketPresentation(presentationMarket).htmlLang,
+            htmlLang: presentation.htmlLang,
             shopName: shop.name,
             shopLogoUrl: shop.logo_url ?? null,
             now: renderNow,
@@ -448,7 +452,7 @@ export async function ShopPage({
                     listing_type: listing.listing_type ?? 'product',
                     paymentMethods: { stripe: sellerHasStripe, mp: sellerHasMp, spei: hasBankTransfer },
                     href: listingHref({ listingBase: productLinkBase }, listing.id),
-                    formattedPrice: formatPrice(listing, resolveMarketPresentation(presentationMarket).htmlLang),
+                    formattedPrice: formatPrice(listing, presentation.htmlLang),
                     status: listing.status,
                     hasExcerpt: hasExcerpt(listing.metadata),
                   }}

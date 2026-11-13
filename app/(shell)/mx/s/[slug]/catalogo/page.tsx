@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { resolveShopPresentation } from '@/lib/shop-presentation/context'
+import { resolveMarketShopPresentation } from '@/lib/shop-presentation/request-context'
 import CatalogBody, { catalogFor, catalogMetadata } from '@/app/(shell)/_shop-sections/CatalogBody'
 import type { Metadata } from 'next'
 
@@ -13,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function MarketCatalogPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const ctx = await resolveShopPresentation(slug, { marketBasePath: '/mx', market: 'mx' })
+  const ctx = await resolveMarketShopPresentation(slug, { marketBasePath: '/mx', market: 'mx' })
   if (!ctx) notFound()
   return <CatalogBody ctx={ctx} />
 }

@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getShop } from '@/lib/listings'
@@ -35,5 +36,5 @@ export default async function ChannelPoliticasPage() {
   // so it needs the guard independently of the /s/[slug] variant.
   await assertShopNotPreviewPrivate(shop)
 
-  return <PoliticasBody shop={shop} basePath="" />
+  return <PoliticasBody shop={shop} basePath="" language={await getLanguagePreference()} />
 }

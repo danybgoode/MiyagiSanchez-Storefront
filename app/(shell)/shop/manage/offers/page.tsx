@@ -3,7 +3,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
 import OfferInbox from './OfferInbox'
 
-export const metadata = { title: 'Ofertas — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Ofertas — Miyagi Sánchez' } }
 
 export default async function OffersPage() {
   const user = await currentUser()

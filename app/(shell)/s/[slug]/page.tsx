@@ -1,5 +1,6 @@
 import { headers } from 'next/headers'
 import { applyPreviewOverlay } from '@/lib/shop-presentation/preview'
+import { getLanguagePreference } from '@/lib/site-language-server'
 import {
   ShopPage as renderShopPage,
   generateShopMetadata as renderShopMetadata,
@@ -17,6 +18,7 @@ async function requestContext(): Promise<ShopRequestContext> {
       ? channel
       : undefined,
     domain: requestHeaders.get('x-miyagi-domain'),
+    language: await getLanguagePreference(),
   }
 }
 

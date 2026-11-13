@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
 /* eslint-disable @next/next/no-img-element -- marketplace media hosts are seller-controlled and not finitely allow-listable */
 import { redirect } from 'next/navigation'
@@ -10,7 +11,7 @@ import { browseUrlFor, listingUrlFor } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 import { formatPresentationCurrency, marketCodeForCurrency, resolveMarketPresentation } from '@/lib/market-presentation'
 
-export const metadata: Metadata = { title: 'Favoritos — Miyagi Sánchez' }
+export const metadata: Metadata = { title: { absolute: 'Favoritos — Miyagi Sánchez' } }
 
 function conditionLabel(c: string) {
   const map: Record<string, string> = { new: 'Nuevo', like_new: 'Como nuevo', good: 'Buen estado', fair: 'Aceptable', poor: 'Con detalles' }
@@ -20,6 +21,7 @@ function conditionLabel(c: string) {
 export default async function FavoritesPage() {
   const user = await currentUser()
   if (!user) redirect('/sign-in?redirect_url=/account/favorites')
+  const language = await getLanguagePreference()
 
   // No `marketplace_shops.market_code` — it has never been a column on the mirror,
   // and asking for it made PostgREST 400 the whole query. `data` was destructured
@@ -95,7 +97,7 @@ export default async function FavoritesPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }} className="sm:grid-cols-3">
             {active.map(fav => {
               const listing = fav.marketplace_listings!
-              const presentation = resolveMarketPresentation(marketCodeForCurrency(listing.currency) ?? 'mx')
+              const presentation = resolveMarketPresentation(marketCodeForCurrency(listing.currency) ?? 'mx', language)
               const formatPrice = (priceCents: number) =>
                 formatPresentationCurrency(presentation, priceCents, listing.currency, { maximumFractionDigits: 0 })
               const priceDrop = fav.price_cents_at_save && listing.price_cents && listing.price_cents < fav.price_cents_at_save

@@ -5,7 +5,7 @@ import { getMlConnection } from '@/lib/ml-connection'
 import AgenteIntakeClient from './AgenteIntakeClient'
 
 export const metadata = {
-  title: 'Trae tu catálogo — Miyagi Sánchez',
+  title: { absolute: 'Trae tu catálogo — Miyagi Sánchez' },
 }
 
 /**

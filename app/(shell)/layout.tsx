@@ -16,6 +16,8 @@ import { isPlatformThemeEligiblePath } from '@/lib/platform-theme'
 import { isSellerModePath } from '@/lib/seller-mode'
 import { sellShellEligible } from '@/lib/seller-shell-gate'
 import { isOnboardingPath } from '@/lib/onboarding-path'
+import { layoutLanguage } from '@/lib/site-language-server'
+import { resolveMarketPresentation } from '@/lib/market-presentation'
 import '@/app/globals.css'
 import '@/app/iconoir-subset.css'
 
@@ -101,8 +103,12 @@ export default async function ShellLayout({ children }: { children: React.ReactN
 
   const platformThemeEligible = !whiteLabel && isPlatformThemeEligiblePath(platformPath)
 
+  // The visitor's ES/EN choice (or the address's own language on a URL-language page) — one value for the document,
+  // the chrome and the switch, so the header and the page can never disagree.
+  const language = await layoutLanguage()
+
   return (
-    <MarketDocument market="mx">
+    <MarketDocument market="mx" language={language}>
     {/* AgentContextProvider wraps both the chrome (where AIAgentButton's card lives) and
         children (where a server page's SetAgentContext pushes its details) so the
         hand-off prompt can name the actual product/shop. It wraps all three branches; on
@@ -121,6 +127,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
           domain={channelDomain}
           showBadge={channelShowsBadge}
           badgeHref={channelShop ? badgeHref(channelShop.slug) : undefined}
+          language={resolveMarketPresentation('mx', language).language}
           trust={
             // Epic D / D.2 — slim trust chips beside the assurance lead line the shell
             // renders. paymentProtected is suppressed here (the lead line "Pago seguro ·
@@ -136,7 +143,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
           {children}
         </ChannelLayout>
       ) : showBuyerChrome ? (
-        <PlatformShell market="mx" platformThemeEligible={platformThemeEligible}>
+        <PlatformShell market="mx" language={language} platformThemeEligible={platformThemeEligible}>
           {children}
         </PlatformShell>
       ) : (

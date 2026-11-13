@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
 import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
@@ -58,7 +59,7 @@ export default async function CollectionPage({
 
   const [sectionNav, navDict, allCollections, listingRead] = await Promise.all([
     resolveShopNav(shop),
-    getDictionary(resolveMarketPresentation(market ?? 'mx').language),
+    getDictionary(resolveMarketPresentation(market ?? 'mx', await getLanguagePreference()).language),
     getShopCollections(shop.slug, market),
     // The shop's OWN catalog on every channel, as the shop home and `/tienda` read
     // it — a «Solo mi tienda» product belongs in its collection too (2026-11-11).

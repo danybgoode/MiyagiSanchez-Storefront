@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { BuyerCopyText, BuyerPresentationProvider } from '@/app/components/BuyerPresentationContext'
 /**
  * /payment/success
@@ -20,7 +21,7 @@ import { formatPresentationCurrency, formatPresentationDate, resolveMarketPresen
 import { isMarketCode } from '@/lib/markets'
 import { getDictionary } from '@/lib/dictionary'
 
-export const metadata = { title: 'Pago completado — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Pago completado — Miyagi Sánchez' } }
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const MEDUSA_PUB_KEY = process.env.MEDUSA_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -74,8 +75,8 @@ async function getListingSeller(productId: string): Promise<{ name: string | nul
   }
 }
 
-function presentationFor(value: unknown): MarketPresentation {
-  return resolveMarketPresentation(isMarketCode(value) ? value : 'mx')
+function presentationFor(value: unknown, language: string | null): MarketPresentation {
+  return resolveMarketPresentation(isMarketCode(value) ? value : 'mx', language)
 }
 
 function formatCents(presentation: MarketPresentation, cents: unknown, currency: unknown): string | null {
@@ -91,6 +92,7 @@ export default async function PaymentSuccessPage({
 }) {
   const params = await searchParams
   const requestHeaders = await headers()
+  const language = await getLanguagePreference()
   const channel = requestHeaders.get('x-miyagi-channel')
   const onCustomDomain = channel === 'custom'
   const onTenantChannel = channel === 'custom' || channel === 'subdomain'
@@ -142,7 +144,7 @@ export default async function PaymentSuccessPage({
 
     const supportMeta = (orderMeta.support ?? null) as Record<string, unknown> | null
     if (supportMeta?.kind === 'support') {
-      const presentation = presentationFor(supportMeta.market_code ?? orderMeta.market_code)
+      const presentation = presentationFor(supportMeta.market_code ?? orderMeta.market_code, language)
       const buyerCopy = (await getDictionary(presentation.language)).buyerCopy
       return <BuyerPresentationProvider presentation={presentation} copy={buyerCopy}><SupportSuccessUI
         cartId={cartId}
@@ -159,7 +161,7 @@ export default async function PaymentSuccessPage({
     const productId = (order?.items as Array<Record<string, unknown>> | undefined)?.[0]?.product_id as string | undefined
     const itemName = ((order?.items as Array<Record<string, unknown>> | undefined)?.[0]?.title as string | undefined) ?? null
     const seller = productId ? await getListingSeller(productId) : { name: null, marketCode: null }
-    const presentation = presentationFor(orderMeta.market_code ?? seller.marketCode)
+    const presentation = presentationFor(orderMeta.market_code ?? seller.marketCode, language)
     const buyerCopy = (await getDictionary(presentation.language)).buyerCopy
     const amountTotal = order?.total as number | undefined
     const currency = order?.currency_code as string ?? 'MXN'
@@ -202,7 +204,7 @@ export default async function PaymentSuccessPage({
   const listingId = session!.metadata?.listing_id
   const listingType = session!.metadata?.listing_type
   const legacySeller = listingId ? await getListingSeller(listingId) : { name: null, marketCode: null }
-  const presentation = presentationFor(session!.metadata?.market_code ?? legacySeller.marketCode)
+  const presentation = presentationFor(session!.metadata?.market_code ?? legacySeller.marketCode, language)
   const buyerCopy = (await getDictionary(presentation.language)).buyerCopy
 
   // Fetch order for digital download URL (legacy Supabase orders)

@@ -27,13 +27,22 @@ const LANGUAGE_BY_MARKET: Readonly<Record<MarketCode, Locale>> = Object.freeze({
  * Resolve every presentation fact from a MARKET, never from a browser locale.
  * Currency and timezone remain fields of the market record; the language table
  * cannot influence channel, payment, fulfillment, or publication decisions.
+ *
+ * `language` is the visitor's EXPLICIT choice (`lib/site-language.ts`, the `ms_lang`
+ * cookie) and only ever changes the words: a Mexican shop read in English is still
+ * priced in MXN on Mexico City time. `htmlLang` keeps the market's country so dates
+ * and money format for the place the goods are in (`en-MX`, `es-US`). Absent or
+ * unreadable ⇒ the market's own language, exactly as before the preference existed.
  */
-export function resolveMarketPresentation(value: unknown): MarketPresentation {
+export function resolveMarketPresentation(value: unknown, language?: string | null): MarketPresentation {
   const market = requireMarket(value)
+  const marketLanguage = LANGUAGE_BY_MARKET[market.code]
+  const chosen: Locale = language === 'es' || language === 'en' ? language : marketLanguage
+  const country = market.default_locale.split('-')[1]
   return Object.freeze({
     market: market.code,
-    htmlLang: market.default_locale,
-    language: LANGUAGE_BY_MARKET[market.code],
+    htmlLang: chosen === marketLanguage || !country ? market.default_locale : `${chosen}-${country}`,
+    language: chosen,
     currency: market.currency_code.toUpperCase() as MarketPresentation['currency'],
     timezone: market.timezone,
   })

@@ -24,7 +24,7 @@ import { OperatorApplication } from './OperatorApplication'
  * than like the bespoke editorial layout it carried before.
  */
 export const metadata: Metadata = {
-  title: 'Miyagi Operators — open stores, close in person, keep the commission',
+  title: { absolute: 'Miyagi Operators — open stores, close in person, keep the commission' },
   description:
     'Open online stores for the businesses on your street, take payment in person, and keep your commission. No monthly fee and no sales commission for the merchant, ever.',
   robots: { index: false, follow: false },

@@ -84,7 +84,7 @@ test('seller body copy is a complete market-derived transform and MX remains the
     // any boundary or dictionary enters the render path.
     expect(layout).toContain('seller?.market')
     expect(layout).toContain('resolveSellerLocale(')
-    expect(layout).toContain('SELLER_LOCALE_COOKIE')
+    expect(layout).toContain('preference: await getLanguagePreference()')
     expect(layout).toContain('SellerCopyBoundary')
     expect(layout).toContain('if (!sellerCopyBoundaryNeeded(locale)) return content')
     expect(layout).not.toContain("if (market !== 'us') return content")

@@ -1,8 +1,8 @@
+import { getLanguagePreference } from './site-language-server'
 import 'server-only'
 import { cache } from 'react'
-import { cookies } from 'next/headers'
 import { getMySeller } from './get-my-seller'
-import { SELLER_LOCALE_COOKIE, resolveSellerLocale } from './seller-locale'
+import { resolveSellerLocale } from './seller-locale'
 import { sellerFormatContextForMarket, type SellerFormatContext } from './seller-format'
 import { DEFAULT_MARKET } from './markets'
 
@@ -22,7 +22,7 @@ export const getSellerFormatContext = cache(async (): Promise<SellerFormatContex
   const seller = await getMySeller()
   const market = seller?.market ?? DEFAULT_MARKET
   const locale = resolveSellerLocale({
-    preference: (await cookies()).get(SELLER_LOCALE_COOKIE)?.value,
+    preference: await getLanguagePreference(),
     market,
   })
   return sellerFormatContextForMarket(locale, market)

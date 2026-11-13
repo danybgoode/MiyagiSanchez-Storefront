@@ -9,7 +9,7 @@ import ShelfCard from './ShelfCard'
 import { marketplaceUrl } from '@/lib/market-url'
 import { SITE_ORIGIN } from '@/lib/market-seo'
 
-export const metadata = { title: 'Convocatoria — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Convocatoria — Miyagi Sánchez' } }
 
 export default async function ConvocatoriaManagePage() {
   // Dark-shipped behind the launchpad kill-switch — the whole surface 404s

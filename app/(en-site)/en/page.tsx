@@ -48,7 +48,7 @@ export default async function EnglishBuilderPage({ searchParams }: Props) {
           describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref="/sell" locale="en" />,
         }}
       />
-      <RootMarketLinks copy={en.sellerAcquisition.anchor.marketLinks} language="en" />
+      <RootMarketLinks copy={en.sellerAcquisition.anchor.marketLinks} />
     </>
   )
 }

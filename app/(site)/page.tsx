@@ -6,7 +6,6 @@ import { SellerAcquisitionPage } from '@/app/(shell)/mx/vende/_components/Seller
 import { buildAnchorPageConfig } from '@/app/(shell)/mx/vende/_components/page-config'
 import DescribeBox from '@/app/(shell)/mx/vende/_components/DescribeBox'
 import RootMarketLinks from './RootMarketLinks'
-import RootLanguageSwitch from './RootLanguageSwitch'
 import { builderLanguageMetadata } from '@/lib/market-seo'
 
 /**
@@ -103,11 +102,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell'} locale="es" />,
         }}
       />
+      {/* The ES/EN switch, and D16's one-time browser hop to `/en`, live in the header's `LanguageSwitch` now. */}
       <RootMarketLinks copy={ui.anchor.marketLinks} />
-      {/* D16 — the one-time hop to `/en` for a browser that reads English and says nothing of Mexico. */}
-      <div className="app-shell" style={{ display: 'flex', justifyContent: 'center', paddingBottom: 'var(--s-6)' }}>
-        <RootLanguageSwitch current="es" />
-      </div>
     </>
   )
 }

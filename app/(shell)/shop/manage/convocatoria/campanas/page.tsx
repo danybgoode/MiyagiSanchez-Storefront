@@ -5,7 +5,7 @@ import { isEnabled } from '@/lib/flags'
 import { SellerBreadcrumb } from '../../SellerBreadcrumb'
 import CampaignsManager from './CampaignsManager'
 
-export const metadata = { title: 'Campañas de votación — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Campañas de votación — Miyagi Sánchez' } }
 
 /**
  * Bookshop launchpad · Sprint 3.1 — the voting-campaign builder, nested under the

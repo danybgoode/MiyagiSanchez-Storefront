@@ -6,6 +6,7 @@ import ShopThemeShell from '@/app/(shell)/_shop-sections/ShopThemeShell'
 import { resolveShopNav } from '@/lib/shop-presentation/context'
 import { getDictionary } from '@/lib/dictionary'
 import { resolveMarketPresentation } from '@/lib/market-presentation'
+import type { SiteLanguage } from '@/lib/site-language'
 import { readPublicSellerMarket } from '@/lib/owned-market'
 import { wellFormedFaqItems } from '@/lib/shop-content'
 import type { Shop } from '@/lib/types'
@@ -19,12 +20,12 @@ import type { Shop } from '@/lib/types'
  * link. `wellFormedFaqItems` filters out any row missing a question/answer
  * (defense against a non-editor write path persisting a blank row).
  */
-export default async function FaqBody({ shop, basePath }: { shop: Shop; basePath: string }) {
+export default async function FaqBody({ shop, basePath, language }: { shop: Shop; basePath: string; language?: SiteLanguage | null }) {
   // Story 3.5 — this page is part of the shop site, not an orphan footer link,
   // so it renders the SAME nav as the Wall and the catalog.
   const nav = await resolveShopNav(shop)
   const market = readPublicSellerMarket(shop)?.market_code ?? 'mx'
-  const navCopy = (await getDictionary(resolveMarketPresentation(market).language)).buyerCopy
+  const navCopy = (await getDictionary(resolveMarketPresentation(market, language).language)).buyerCopy
   const settings = ((shop.metadata as Record<string, unknown> | null)?.settings ?? {}) as Record<string, unknown>
   const faq = settings.faq as { items?: Array<{ question?: string; answer?: string }> } | null | undefined
   const items = wellFormedFaqItems(faq?.items)

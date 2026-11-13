@@ -8,10 +8,12 @@ import DesktopUnreadBadge from '@/app/components/DesktopUnreadBadge'
 import PlatformBrand from '@/app/components/PlatformBrand'
 import PlatformThemeToggle from '@/app/components/PlatformThemeToggle'
 import CartButton from '@/app/components/CartButton'
+import LanguageSwitch from '@/app/components/LanguageSwitch'
 import { getDictionary } from '@/lib/dictionary'
 import { marketBasePath, type MarketCode } from '@/lib/markets'
 import { sellerLandingPath } from '@/lib/seller-acquisition'
 import { resolveMarketPresentation } from '@/lib/market-presentation'
+import type { SiteLanguage } from '@/lib/site-language'
 import { CONTACT_EMAIL, contactMailto } from '@/lib/contact'
 
 /**
@@ -28,14 +30,21 @@ import { CONTACT_EMAIL, contactMailto } from '@/lib/contact'
  */
 export default async function PlatformShell({
   market,
+  language,
   platformThemeEligible,
   children,
 }: {
   market: MarketCode
+  /**
+   * The language to render the chrome in: the visitor's choice on a per-request layout, the address's language on
+   * `/` and `/en`. Absent ⇒ the market's own. It must be the SAME value the layout gave `MarketDocument`, or the
+   * header and the page would disagree.
+   */
+  language?: SiteLanguage | null
   platformThemeEligible: boolean
   children: React.ReactNode
 }) {
-  const presentation = resolveMarketPresentation(market)
+  const presentation = resolveMarketPresentation(market, language)
   const dict = await getDictionary(presentation.language)
   const themeToggleLabels = dict.platformTheme.toggle
   const copy = dict.buyerShell
@@ -159,6 +168,9 @@ export default async function PlatformShell({
                 </Link>
               </AuthShow>
 
+              {/* ES/EN — on every page, in every viewport (2026-11-13: "always a language switcher wherever you are"). */}
+              <LanguageSwitch current={presentation.language} />
+
               {/* Cart */}
               <CartButton label={copy.cart} />
 
@@ -249,6 +261,7 @@ export default async function PlatformShell({
 
               {/* Right nav */}
               <nav style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <LanguageSwitch current={presentation.language} />
                 <AuthShow when="signed-in">
                   <Link
                     href="/messages"

@@ -22,7 +22,7 @@ export async function generateMetadata({
   const { lang } = await searchParams
   const locale = normalizeLocale(lang)
   const event = await getEventBySlug(slug)
-  if (!event) return { title: 'Eventos - Miyagi Sánchez' }
+  if (!event) return { title: { absolute: 'Eventos - Miyagi Sánchez' } }
   const dict = await getDictionary(locale)
   return {
     title: event.title,
