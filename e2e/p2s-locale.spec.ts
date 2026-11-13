@@ -102,3 +102,28 @@ test('the payments reminder follows the market: Stripe for a US shop, Mercado Pa
     expect(nudgeCopy(locale, null).STEP.pagos).toEqual(nudgeCopy(locale, 'mx').STEP.pagos)
   }
 })
+
+// Follow-up: the client's own failure messages, and the server's Spanish refusals, read in the screen's language.
+import { englishFor } from '../lib/prompt-to-shop/copy-en'
+import { claimDraft, publishShop, setClientLocale } from '../lib/prompt-to-shop/client'
+import { PHOTO_COPY, PUBLISH_COPY } from '../lib/prompt-to-shop/copy'
+
+test('a Spanish builder message from the server has its English twin; anything else is unchanged', () => {
+  expect(englishFor(PHOTO_COPY.noShop)).toBe(builderCopy('en').PHOTO.noShop)
+  expect(englishFor(PUBLISH_COPY.failed)).toBe(builderCopy('en').PUBLISH.failed)
+  expect(englishFor('Mensaje del backend sin gemelo')).toBe('Mensaje del backend sin gemelo')
+})
+
+test('an English screen shows English fallbacks and translated server refusals; Spanish stays Spanish', async () => {
+  const dead = { fetch: async () => { throw new Error('offline') } } as never
+  const refusing = { fetch: async () => new Response(JSON.stringify({ ok: false, message: PUBLISH_COPY.failed }), { status: 500 }) } as never
+  try {
+    setClientLocale('en')
+    expect(await claimDraft('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', dead)).toEqual({ kind: 'retry', message: builderCopy('en').ARMAR.failed })
+    expect(await publishShop(refusing)).toMatchObject({ ok: false, message: builderCopy('en').PUBLISH.failed })
+    setClientLocale('es')
+    expect(await claimDraft('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', dead)).toEqual({ kind: 'retry', message: builderCopy('es').ARMAR.failed })
+  } finally {
+    setClientLocale('es')
+  }
+})

@@ -2,22 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createAccountLink, getShopStripe } from '@/lib/stripe'
 import { db } from '@/lib/supabase'
-import { resolveOrigin } from '@/lib/request-origin'
+import { resolveOrigin, publicUrl } from '@/lib/request-origin'
 
 // GET — Stripe redirects here if the onboarding link expires (or the seller
 // clicks "Completar configuración" from Pagos.tsx, which passes account_id
 // explicitly); we generate a fresh onboarding link.
 export async function GET(req: NextRequest) {
   const { userId } = await auth()
-  if (!userId) return NextResponse.redirect(new URL('/sign-in', req.url))
+  if (!userId) return NextResponse.redirect(publicUrl('/sign-in'))
 
   const errorRedirect = (reason: string) =>
     NextResponse.redirect(
-      new URL(`/shop/manage/settings?stripe=error&reason=${encodeURIComponent(reason)}`, req.url),
+      publicUrl(`/shop/manage/settings?stripe=error&reason=${encodeURIComponent(reason)}`),
     )
 
   const accountId = req.nextUrl.searchParams.get('account_id')
-  if (!accountId) return NextResponse.redirect(new URL('/shop/manage/settings', req.url))
+  if (!accountId) return NextResponse.redirect(publicUrl('/shop/manage/settings'))
 
   // Ownership check — account_id is caller-supplied (a query param), so an
   // authenticated user must not be able to mint a fresh Stripe onboarding

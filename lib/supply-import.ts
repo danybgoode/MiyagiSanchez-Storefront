@@ -20,6 +20,9 @@ import { supplyItemToProductBody, type SupplyItem } from '@/lib/supply'
 import { syncSupabaseListingMirror } from '@/lib/provisioning'
 import { ingestImageUrls } from '@/lib/image-ingest'
 import { describeMedusaNetworkFailure, getMedusaInternalBaseUrl } from './medusa-internal'
+import { screenText, type ScreenVerdict } from './prompt-to-shop/screen'
+import { PROHIBITED_IMPORT_MESSAGE, prohibitedItemIds } from './supply-screen'
+import { screenDeps } from './prompt-to-shop/screen-server'
 
 const MEDUSA_BASE = getMedusaInternalBaseUrl()
 const INTERNAL_SECRET = process.env.MEDUSA_INTERNAL_SECRET ?? ''
@@ -50,7 +53,10 @@ export type ImportHooks = {
   checkDuplicate?: (item: SupplyItem) => Promise<{ duplicate: boolean; existingListingId?: string | null }>
   /** Runs after a product is created (e.g. record the ML linkage). Non-fatal: a throw fails the item. */
   afterCreate?: (productId: string, item: SupplyItem, sellerSlug: string) => Promise<void>
+  /** The prohibited-goods screen (D1 of one-front-door-both-markets). Defaults to Jev; injected by specs. */
+  screen?: (text: string) => Promise<ScreenVerdict>
 }
+
 
 export type ImportCounts = { imported: number; duplicate: number; failed: number }
 
@@ -76,9 +82,11 @@ export async function importApprovedItems(items: SupplyItem[], hooks: ImportHook
   let imported = 0
   let duplicate = 0
   let failed = 0
+  const prohibited = await prohibitedItemIds(items, hooks.screen ?? ((text) => screenText(text, screenDeps())))
 
   for (const item of items) {
     try {
+      if (prohibited.has(item.id)) throw new Error(PROHIBITED_IMPORT_MESSAGE)
       if (!item.listing_title || item.listing_title.trim().length < 5) throw new Error('Missing listing title')
       if (!item.source_url) throw new Error('Missing original source URL')
       if (!item.category) throw new Error('Missing category')

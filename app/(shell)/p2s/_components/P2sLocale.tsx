@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo } from 'react'
 import { builderCopy } from '@/lib/prompt-to-shop/copy-en'
+import { setClientLocale } from '@/lib/prompt-to-shop/client'
 import type { P2sLocale } from '@/lib/prompt-to-shop/locale'
 
 /**
@@ -12,6 +13,8 @@ import type { P2sLocale } from '@/lib/prompt-to-shop/locale'
 const Ctx = createContext<P2sLocale>('es')
 
 export function P2sLocaleProvider({ locale, children }: { locale: P2sLocale; children: React.ReactNode }) {
+  // The client calls' own failure messages follow the screen's language too (idempotent; the last screen wins).
+  setClientLocale(locale)
   return <Ctx.Provider value={locale}>{children}</Ctx.Provider>
 }
 

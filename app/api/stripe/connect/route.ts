@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { stripe, createAccountLink, getShopStripe } from '@/lib/stripe'
 import { db } from '@/lib/supabase'
 import { syncMedusaSellerProfile } from '@/lib/medusa-seller-sync'
-import { resolveOrigin } from '@/lib/request-origin'
+import { resolveOrigin, publicUrl } from '@/lib/request-origin'
 import { getMySeller } from '@/lib/get-my-seller'
 import { connectPlanFor, isAllowedConnectNavigation, usOnboardingUrl } from '@/lib/stripe-connect-market'
 
@@ -14,12 +14,12 @@ const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
 export async function GET(req: NextRequest) {
   const { userId, getToken } = await auth()
   if (!userId) {
-    return NextResponse.redirect(new URL('/sign-in', req.url))
+    return NextResponse.redirect(publicUrl('/sign-in'))
   }
 
   const errorRedirect = (reason: string) =>
     NextResponse.redirect(
-      new URL(`/shop/manage/settings?stripe=error&reason=${encodeURIComponent(reason)}`, req.url),
+      publicUrl(`/shop/manage/settings?stripe=error&reason=${encodeURIComponent(reason)}`),
     )
 
   // Fetch shop
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
 
   if (!shop) {
-    return NextResponse.redirect(new URL('/sell', req.url))
+    return NextResponse.redirect(publicUrl('/sell'))
   }
 
 
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       return errorRedirect('cross_site')
     }
     const jwt = await getToken()
-    if (!jwt) return NextResponse.redirect(new URL('/sign-in', req.url))
+    if (!jwt) return NextResponse.redirect(publicUrl('/sign-in'))
     const res = await fetch(`${MEDUSA_BASE}/store/sellers/me/stripe-connect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-publishable-api-key': PUB_KEY, Authorization: `Bearer ${jwt}` },

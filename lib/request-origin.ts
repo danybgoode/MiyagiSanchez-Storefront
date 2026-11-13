@@ -68,3 +68,17 @@ export function resolveOrigin(input: ResolveOriginInput): string {
       'baked into .env.local, which only next dev/next start read automatically).',
   )
 }
+
+/** The platform's own origin, for when the environment names none. */
+const FALLBACK_ORIGIN = 'https://miyagisanchez.com'
+
+/**
+ * A redirect target on the PUBLIC origin. Behind the VM's Caddy, `req.url` carries the container's own bind address
+ * (`https://0.0.0.0:8080/…`), so `new URL(path, req.url)` sent a signed-out seller to 0.0.0.0 (found 2026-11-13,
+ * one-front-door-both-markets). Only a TRUSTED origin is used: the configured site URL, else the platform's own —
+ * never the request's Host header, which a caller controls (an open redirect on a payments route; Codex, PR #502).
+ */
+export function publicUrl(path: string): URL {
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')
+  return new URL(path, site || FALLBACK_ORIGIN)
+}

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
-import { runDraftRequest } from '@/lib/prompt-to-shop/client'
+import { runDraftRequest, setClientLocale } from '@/lib/prompt-to-shop/client'
 import { builderCopy } from '@/lib/prompt-to-shop/copy-en'
 import { draftView, seedCards, type DraftBlocks, type SeedRow } from '@/lib/prompt-to-shop/view'
 import ShopCanvas from './ShopCanvas'
@@ -55,6 +55,7 @@ export default function TakingShape({
 }) {
   const router = useRouter()
   const { NARRATION, SHAPING: SHAPING_COPY } = builderCopy(locale)
+  setClientLocale(locale) // its request's own failure messages follow the box's language
   const [blocks, setBlocks] = useState<DraftBlocks>(EMPTY)
   const [message, setMessage] = useState<string | null>(null)
   const started = useRef(false)
