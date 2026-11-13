@@ -30,3 +30,10 @@ test('the import loop refuses a flagged item before any create', async () => {
   expect(loop.indexOf('prohibitedItemIds(')).toBeLessThan(loop.indexOf('internalFetch('))
   expect(loop).toContain('if (prohibited.has(item.id)) throw new Error(PROHIBITED_IMPORT_MESSAGE)')
 })
+
+import { SUPPLY_SCREEN_CHUNK_TEXT } from '../lib/supply-screen'
+import { SCREEN_MAX_CHARS } from '../lib/prompt-to-shop/screen'
+test('padded titles cannot push an item past the screen window: a full chunk of maximal items still fits', () => {
+  const huge = Array.from({ length: 15 }, (_, i) => ({ id: `p${i}`, listing_title: 'x'.repeat(5000), listing_description: 'y'.repeat(5000) }))
+  expect(SUPPLY_SCREEN_CHUNK_TEXT(huge).length).toBeLessThanOrEqual(SCREEN_MAX_CHARS)
+})

@@ -8,7 +8,9 @@ export const PROHIBITED_IMPORT_MESSAGE = 'Producto no permitido: los pagos en l�
 const SCREEN_CHUNK = 15
 
 function itemText(item: Pick<ScreenableItem, 'listing_title' | 'listing_description'>): string {
-  return `${item.listing_title ?? ''}${item.listing_description ? ` — ${String(item.listing_description).slice(0, 300)}` : ''}`
+  // Bounded per item so a full chunk always fits the screen's state (15 × (150 + 3 + 300) + header < 7,000): a padded
+  // title must not push a later item past the window the screen reads (Codex security, PR #502).
+  return `${String(item.listing_title ?? '').slice(0, 150)}${item.listing_description ? ` — ${String(item.listing_description).slice(0, 300)}` : ''}`
 }
 
 /**
@@ -18,6 +20,8 @@ function itemText(item: Pick<ScreenableItem, 'listing_title' | 'listing_descript
  * chunk is re-screened item by item to find the offender. `unavailable` lets the item through, as every import path
  * does when the screen cannot look (D4).
  */
+export const SUPPLY_SCREEN_CHUNK_TEXT = (items: ScreenableItem[]) => `Productos para importar a una tienda en línea:\n${items.map(itemText).join('\n')}`
+
 export async function prohibitedItemIds(
   items: ScreenableItem[],
   screen: (text: string) => Promise<ScreenVerdict>,
@@ -29,7 +33,7 @@ export async function prohibitedItemIds(
   }
   for (let i = 0; i < items.length; i += SCREEN_CHUNK) {
     const chunk = items.slice(i, i + SCREEN_CHUNK)
-    if (!(await refused(`Productos para importar a una tienda en línea:\n${chunk.map(itemText).join('\n')}`))) continue
+    if (!(await refused(SUPPLY_SCREEN_CHUNK_TEXT(chunk)))) continue
     for (const item of chunk) if (await refused(itemText(item))) out.add(item.id)
   }
   return out
