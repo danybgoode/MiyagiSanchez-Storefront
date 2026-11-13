@@ -338,13 +338,18 @@ test('the claim route reads the device cookie and the Clerk session, and nothing
   const src = read('app/api/p2s/claim/[id]/route.ts')
   expect(src).toContain('DEVICE_COOKIE')
   expect(src).toContain('await auth()')
-  expect(src).not.toMatch(/searchParams|nextUrl|headers\.get|\.headers\[/)
+  // No identity from the query string or headers; the one header read is the body's size, for the cap (PR #499).
+  expect(src).not.toMatch(/searchParams|nextUrl|headers\.get\('(?!content-length')|\.headers\[/)
   // one-front-door-both-markets D13: the body carries the merchant's CHOSEN MARKET and nothing else — never who they
   // are or which draft (those come from the session and the path). Allow the negation of what is banned: the body is
   // read, and only `market` is taken from it.
-  expect(src).toContain('req.json()')
+  // Read only after the session check, and capped while it streams (Codex security, PR #499).
+  expect(src).toContain('readCappedBody(req.body')
+  expect(src.indexOf('readCappedBody(')).toBeGreaterThan(src.indexOf("kind: 'signed_out'"))
   const fromBody = [...src.matchAll(/body\?\.(\w+)/g)].map((m) => m[1])
-  expect(fromBody).toEqual(['market'])
+  expect(fromBody).toEqual(['market', 'locale'])
+  // …and nothing else is ever read from it, by any spelling (fresh review, PR #499: destructuring would pass a regex on `body?.`).
+  expect(src).not.toMatch(/body\??\.(?!market\b|locale\b)\w+|\{[^}]*\}\s*=\s*body/)
 })
 
 // ── D13 — the market is asked, never defaulted ──────────────────────────────────────────────────────────────────
@@ -376,4 +381,31 @@ test('a merchant who already has a shop is never asked — the answer could not 
   const w = world({ sellers: { [USER]: { id: 'sel_9', slug: 'mi-tienda' } } })
   const res = await keep(w, { market: undefined })
   expect(res.kind).not.toBe('market_required')
+})
+
+test('a backend market refusal (409/422) asks the question again with its message — never an endless retry', async () => {
+  for (const status of [409, 422]) {
+    const w = world()
+    const base = w.deps
+    w.deps = (u: string) => ({ ...base(u), ensureShop: async () => ({ ok: false as const, status, error: 'Ese mercado no acepta tiendas nuevas.' }) })
+    const res = await keep(w, { market: 'us' })
+    expect(res).toEqual({ kind: 'market_required', draftId: DRAFT, message: 'Ese mercado no acepta tiendas nuevas.' })
+  }
+  const w = world()
+  const base = w.deps
+  w.deps = (u: string) => ({ ...base(u), ensureShop: async () => ({ ok: false as const, status: 500, error: 'x' }) })
+  expect((await keep(w, { market: 'us' })).kind).toBe('retry')
+})
+
+test('the chosen market is written to the draft BEFORE the shop exists; if it cannot be, nothing is created (Codex, PR #499)', async () => {
+  const w = world()
+  const base = w.deps
+  const order: string[] = []
+  w.deps = (u: string) => {
+    const d = base(u)
+    return { ...d, recordMarket: async () => { order.push('record'); return false }, ensureShop: async (i) => { order.push('ensure'); return d.ensureShop(i) } }
+  }
+  const res = await keep(w, { market: 'us' })
+  expect(res.kind).toBe('retry')
+  expect(order).toEqual(['record'])
 })

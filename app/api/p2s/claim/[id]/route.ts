@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { claimAndApply, type ClaimOutcome } from '@/lib/prompt-to-shop/claim'
 import { claimDeps } from '@/lib/prompt-to-shop/claim-server'
 import { DEVICE_COOKIE } from '@/lib/prompt-to-shop/handler'
+import { readCappedBody } from '@/lib/prompt-to-shop/intake'
 
 /**
  * POST /api/p2s/claim/[id] — keep a draft: claim it, then make it the signed-in user's shop (epic S3.2, D16).
@@ -34,12 +35,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params
   const { userId, getToken } = await auth()
   const clerkJwt = userId ? await getToken() : null
-  // D13 — the merchant's chosen market rides in a tiny JSON body; anything unreadable is "no choice", never a guess.
-  const body = (await req.json().catch(() => null)) as { market?: unknown } | null
-  const outcome: ClaimOutcome = !userId || !clerkJwt
-    ? { kind: 'signed_out' }
-    : await claimAndApply(
-        { draftId: id, deviceCookie: req.cookies.get(DEVICE_COOKIE)?.value, userId, market: body?.market },
+  if (!userId || !clerkJwt) {
+    return NextResponse.json({ kind: 'signed_out' } satisfies ClaimOutcome, { status: STATUS.signed_out, headers: { 'Cache-Control': 'private, no-store' } })
+  }
+  // D13 — the merchant's chosen market rides in a tiny JSON body, read only after the session is known and capped
+  // while it streams (Codex security, PR #499); anything unreadable is "no choice", never a guess.
+  const raw = await readCappedBody(req.body, req.headers.get('content-length'), 2048).catch(() => null)
+  let body: { market?: unknown; locale?: unknown } | null = null
+  try { body = raw ? JSON.parse(new TextDecoder().decode(raw)) : null } catch { body = null }
+  const outcome: ClaimOutcome = await claimAndApply(
+        { draftId: id, deviceCookie: req.cookies.get(DEVICE_COOKIE)?.value, userId, market: body?.market, locale: body?.locale },
         claimDeps(userId, clerkJwt),
       )
   return NextResponse.json(outcome, { status: STATUS[outcome.kind], headers: { 'Cache-Control': 'private, no-store' } })

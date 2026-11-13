@@ -220,13 +220,14 @@ export async function claimDraft(
   draftId: string,
   deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) },
   market?: 'mx' | 'us' | null,
+  locale: 'es' | 'en' = 'es',
 ): Promise<ClaimOutcome> {
   try {
     const res = await deps.fetch(`/api/p2s/claim/${draftId}`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(market ? { market } : {}),
+      body: JSON.stringify({ ...(market ? { market } : {}), locale }),
     })
     const data = (await res.json().catch(() => null)) as { kind?: unknown } | null
     if (data && CLAIM_KINDS.includes(data.kind as ClaimOutcome['kind'])) return data as ClaimOutcome

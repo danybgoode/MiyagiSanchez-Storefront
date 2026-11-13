@@ -174,5 +174,19 @@ test.describe('the selector wires language to destination', () => {
     expect(builderLanguageRedirect({ current: 'en', languages: ['es-MX'] })).toBe('/')
     expect(builderLanguageRedirect({ current: 'en', languages: ['en-MX'] })).toBeNull()
     expect(builderLanguageRedirect({ current: 'es', languages: ['en-US'], chosen: 'es' })).toBeNull()
+    // D16 as locked: English must come FIRST, and no Spanish anywhere (fresh review, PR #499).
+    expect(builderLanguageRedirect({ current: 'es', languages: ['en-US', 'es-US'] })).toBeNull()
+    expect(builderLanguageRedirect({ current: 'es', languages: ['fr', 'en-US'] })).toBeNull()
+    expect(builderLanguageRedirect({ current: 'es', languages: ['en-GB', 'fr'] })).toBe('/en')
   })
+})
+
+import { builderLanguageMetadata } from '../lib/market-seo'
+test('the builder pair names only its own two documents: es /, en /en, x-default / — never the marketplaces', () => {
+  for (const lang of ['es', 'en'] as const) {
+    const langs = builderLanguageMetadata(lang).alternates?.languages as Record<string, string>
+    expect(langs).toEqual({ es: 'https://miyagisanchez.com/', en: 'https://miyagisanchez.com/en', 'x-default': 'https://miyagisanchez.com/' })
+  }
+  expect(source('app/(site)/page.tsx')).toContain("builderLanguageMetadata('es')")
+  expect(source('app/(en-site)/en/page.tsx')).toContain("builderLanguageMetadata('en')")
 })

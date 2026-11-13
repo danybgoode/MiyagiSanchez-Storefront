@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import en from '@/locales/en.json'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
-import { rootSelectorMetadata } from '@/lib/market-seo'
+import { builderLanguageMetadata } from '@/lib/market-seo'
 import { GLOBAL_LANDING_EN } from '@/lib/global-landing-copy'
 import { SellerAcquisitionPage } from '@/app/(shell)/mx/vende/_components/SellerAcquisitionSections'
 import { buildGlobalEnglishPageConfig } from '@/app/(shell)/mx/vende/_components/page-config'
@@ -28,7 +28,7 @@ const meta = GLOBAL_LANDING_EN.metadata
 export const metadata: Metadata = {
   title: { absolute: meta.title },
   description: meta.description,
-  ...rootSelectorMetadata('en'),
+  ...builderLanguageMetadata('en'),
   openGraph: { type: 'website', locale: 'en_US', url: 'https://miyagisanchez.com/en', siteName: 'Miyagi Sánchez', title: meta.title, description: meta.description },
   twitter: { card: 'summary_large_image', title: meta.title, description: meta.description },
 }

@@ -235,7 +235,7 @@ export default function KeptShop({
       {sheet?.kind === 'step' && (sheet.id === 'pagos' || sheet.id === 'envios') ? (
         <OwnerSheet
           title={sheet.id === 'pagos' ? CHECKLIST_COPY.cobrosTitle : CHECKLIST_COPY.entregasTitle}
-          lead={sheet.id === 'pagos' ? CHECKLIST_COPY.cobrosLead : CHECKLIST_COPY.entregasLead}
+          lead={sheet.id === 'pagos' ? (market === 'us' ? CHECKLIST_COPY.cobrosLeadUs : CHECKLIST_COPY.cobrosLead) : CHECKLIST_COPY.entregasLead}
           onClose={close}
           testId={`p2s-sheet-${sheet.id}`}
         >

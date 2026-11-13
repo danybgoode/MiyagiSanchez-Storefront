@@ -103,6 +103,11 @@ export function builderLanguageRedirect(input: {
 }): string | null {
   const target = rootLanguageRedirect(input)
   if (target !== ROOT_LANGUAGE_PATHS.en) return target
-  const saysMexico = (input.languages ?? []).some((tag) => /[-_]mx$/i.test((tag ?? '').trim()))
-  return saysMexico ? null : target
+  // D16 as locked: the FIRST language is English, and nothing in the list is Spanish or says Mexico. Stricter than
+  // the selector's first-match rule on purpose: `/` is the Mexican pitch, and only a browser with no sign of Spanish
+  // or Mexico is sure to be better served by `/en` (fresh review, PR #499).
+  const tags = (input.languages ?? []).map((tag) => (tag ?? '').trim().toLowerCase())
+  if (!/^en(?:[-_]|$)/.test(tags[0] ?? '')) return null
+  if (tags.some((tag) => /^es(?:[-_]|$)/.test(tag) || /[-_]mx$/.test(tag))) return null
+  return target
 }

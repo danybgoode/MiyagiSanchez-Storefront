@@ -6,8 +6,9 @@
 The site is **es-MX by default** — the seller portal and most pages are Spanish-only. A defined
 allow-list of surfaces is **bilingual (es/en)** via the `locales/{es,en}.json` dictionary (~119
 keys) + `getDictionary()`: the dictionary-backed public pages (e.g. `app/terminos`), the
-sweepstakes public flow (`app/g/[slug]`, `?lang=en`, per-campaign `*_en/*_es`), and the embed
-widget locale toggle. The gate: (a) **es-MX copy-completeness** everywhere — no orphan strings,
+sweepstakes public flow (`app/g/[slug]`, `?lang=en`, per-campaign `*_en/*_es`), the embed
+widget locale toggle, and the **shop builder** (one-front-door-both-markets D11): `/en`, `/us/sell`, `/us/vende`
+and every prompt-to-shop screen and reminder email, in the draft's language via `lib/prompt-to-shop/copy-en.ts`. The gate: (a) **es-MX copy-completeness** everywhere — no orphan strings,
 no hardcoded English; (b) on the allow-list, **both `es` + `en` keys present**. Don't make a new
 surface bilingual by default — extend the allow-list deliberately.
 

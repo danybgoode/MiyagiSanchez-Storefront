@@ -4,6 +4,11 @@ import { stripe, createAccountLink, getShopStripe } from '@/lib/stripe'
 import { db } from '@/lib/supabase'
 import { syncMedusaSellerProfile } from '@/lib/medusa-seller-sync'
 import { resolveOrigin } from '@/lib/request-origin'
+import { getMySeller } from '@/lib/get-my-seller'
+import { connectPlanFor, isAllowedConnectNavigation, usOnboardingUrl } from '@/lib/stripe-connect-market'
+
+const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
+const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
 
 // GET — initiate Stripe Connect onboarding for the current seller
 export async function GET(req: NextRequest) {
@@ -30,6 +35,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/sell', req.url))
   }
 
+
   const meta = (shop.metadata ?? {}) as Record<string, unknown>
   const settings = (meta.settings ?? {}) as Record<string, unknown>
   const stripeSettings = getShopStripe(shop.metadata as Record<string, unknown> | null)
@@ -39,6 +45,30 @@ export async function GET(req: NextRequest) {
     origin = resolveOrigin({ siteUrl: process.env.NEXT_PUBLIC_SITE_URL, host: req.headers.get('host') })
   } catch (e) {
     return errorRedirect(e instanceof Error ? e.message : 'origin_unresolvable')
+  }
+
+  // A US shop onboards through the backend's Accounts v2 route; everything below is the Mexican Express flow
+  // (`lib/stripe-connect-market.ts` has the why). An unreadable market is refused, never treated as Mexico.
+  const plan = connectPlanFor(await getMySeller().catch(() => null))
+  if (plan.kind === 'unknown_market') return errorRedirect('market_unavailable')
+  if (plan.kind === 'us_v2') {
+    if (!isAllowedConnectNavigation({ secFetchSite: req.headers.get('sec-fetch-site'), referer: req.headers.get('referer'), siteHost: new URL(origin).host })) {
+      return errorRedirect('cross_site')
+    }
+    const jwt = await getToken()
+    if (!jwt) return NextResponse.redirect(new URL('/sign-in', req.url))
+    const res = await fetch(`${MEDUSA_BASE}/store/sellers/me/stripe-connect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-publishable-api-key': PUB_KEY, Authorization: `Bearer ${jwt}` },
+      body: '{}',
+      cache: 'no-store',
+    }).catch(() => null)
+    const url = res && res.ok ? usOnboardingUrl(await res.json().catch(() => null)) : null
+    if (!url) {
+      console.error('[stripe/connect] US v2 onboarding failed', res?.status ?? 'fetch_failed')
+      return errorRedirect('us_onboarding_failed')
+    }
+    return NextResponse.redirect(url)
   }
 
   // ── Create or retrieve Connect account ───────────────────────────────────
