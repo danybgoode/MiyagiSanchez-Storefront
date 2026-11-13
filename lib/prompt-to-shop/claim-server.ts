@@ -63,6 +63,10 @@ export function claimDeps(userId: string, clerkJwt: string): ClaimDeps {
     },
     ensureShop: (input) => ensureShop(userId, clerkJwt, input),
     applyConfig: (manifest) => applyStoreConfig(userId, clerkJwt, manifest),
+    recordMarket: async (draftId, user, market) => {
+      const { data, error } = await db.from('shop_drafts').update({ market }).eq('id', draftId).eq('claimed_by', user).select('id')
+      return !error && Array.isArray(data) && data.length === 1
+    },
     markSeller: async (draftId, user, sellerId) => {
       // The 201 that precedes this proves the seller came from this draft, so the marker also re-asserts the claim
       // if a racing tab released it in the meantime (that tab saw a 200 and could not tell whose seller it was).

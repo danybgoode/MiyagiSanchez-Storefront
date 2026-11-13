@@ -164,6 +164,14 @@ export const SEED_COPY_EN = {
 } satisfies Widen<typeof SEED_COPY>
 
 export const ARMAR_COPY_EN = {
+  marketTitle: 'Where will you sell?',
+  marketLead: "Your shop takes payments in its country's currency. Choose one; this can't be changed later.",
+  marketMx: 'Mexico',
+  marketMxBody: 'You get paid in pesos: card, SPEI bank transfer, Mercado Pago or cash, with national shipping.',
+  marketUs: 'United States',
+  marketUsBody: 'You get paid in dollars through your own Stripe account. Pickup, local delivery or your own carrier.',
+  marketNote: 'To sell in both countries, open a second shop.',
+  marketConfirm: 'Keep my shop',
   metaTitle: 'Your shop',
   working: 'Saving your shop…',
   keptTitle: (name: string | null) => (name ? `Done! ${name} is yours` : 'Done! Your shop is yours'),
@@ -261,6 +269,9 @@ export const PHOTO_COPY_EN = {
 } satisfies Widen<typeof PHOTO_COPY>
 
 export const COBROS_COPY_EN = {
+  stripeName: 'Card payments with Stripe',
+  stripeLead: 'Buyers pay by card in dollars and the money goes straight to your own Stripe account.',
+  stripeConnect: 'Connect Stripe',
   pageTitle: 'Payments and delivery',
   pageLead: 'Choose how you get paid and how you deliver. Below you can see what your buyers will see.',
   payTitle: 'How you get paid',

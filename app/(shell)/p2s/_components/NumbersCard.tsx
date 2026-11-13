@@ -1,3 +1,5 @@
+'use client'
+
 import type { ExampleRow } from '@/lib/prompt-to-shop/blocks'
 import type { NumbersBlock } from '@/lib/prompt-to-shop/numbers'
 import { useBuilderCopy, useP2sLocale } from './P2sLocale'

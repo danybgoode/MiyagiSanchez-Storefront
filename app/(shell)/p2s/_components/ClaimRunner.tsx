@@ -31,26 +31,92 @@ function Panel({ title, lead, children }: { title: string; lead: string; childre
   )
 }
 
-export default function ClaimRunner({ draftId, initial }: { draftId: string | null; initial?: ClaimOutcome }) {
+/** The choice survives a reload or a second tab, keyed by draft: the question is answered once. */
+const marketKey = (draftId: string) => `p2s.market.${draftId}`
+function readStoredMarket(draftId: string): 'mx' | 'us' | null {
+  try {
+    const v = window.sessionStorage.getItem(marketKey(draftId))
+    return v === 'mx' || v === 'us' ? v : null
+  } catch {
+    return null
+  }
+}
+
+export default function ClaimRunner({ draftId, initial, marketHint = null }: {
+  draftId: string | null
+  initial?: ClaimOutcome
+  /** D14 — the draft's own hint, to preselect; null preselects nothing. Never sent as the choice. */
+  marketHint?: 'mx' | 'us' | null
+}) {
   const { ARMAR: ARMAR_COPY } = useBuilderCopy()
   const router = useRouter()
   const [outcome, setOutcome] = useState<ClaimOutcome | null>(initial ?? null)
   const [attempt, setAttempt] = useState(0)
   const started = useRef(-1)
+  const [picked, setPicked] = useState<'mx' | 'us' | null>(marketHint)
+  const [chosen, setChosen] = useState<'mx' | 'us' | null>(null)
 
   useEffect(() => {
     if (initial || !draftId || started.current === attempt) return
     // One request per attempt. No cancel-on-cleanup: React's dev double-run would cancel the only request it sent.
     started.current = attempt
-    claimDraft(draftId).then((result) => {
+    // A choice made earlier in this tab (before a reload) is sent; otherwise none — the server asks only if needed.
+    const market = chosen ?? readStoredMarket(draftId)
+    claimDraft(draftId, undefined, market).then((result) => {
       setOutcome(result)
       // Funnel step 4 (S5.3): counted on the keep itself — the claim's answer — never on a later visit to the shop.
-      if (result.kind === 'kept') trackFunnel('p2s_kept', result.draftId, { resumed: result.resumed })
+      if (result.kind === 'kept') trackFunnel('p2s_kept', result.draftId, { resumed: result.resumed, market: market ?? 'existing' })
       // A keep whose colours and words did not save stays on this panel: the kept view draws them from the draft,
       // so it would show the merchant a shop the live one is not.
       if (result.kind === 'kept' && result.configApplied) router.refresh()
     })
-  }, [draftId, attempt, initial, router])
+  }, [draftId, attempt, initial, router, chosen])
+
+  if (outcome?.kind === 'market_required' && draftId) {
+    const options: Array<{ code: 'mx' | 'us'; label: string; body: string }> = [
+      { code: 'mx', label: ARMAR_COPY.marketMx, body: ARMAR_COPY.marketMxBody },
+      { code: 'us', label: ARMAR_COPY.marketUs, body: ARMAR_COPY.marketUsBody },
+    ]
+    return (
+      <Panel title={ARMAR_COPY.marketTitle} lead={ARMAR_COPY.marketLead}>
+        <fieldset data-testid="p2s-market-question" style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 'var(--s-2)' }}>
+          <legend className="sr-only">{ARMAR_COPY.marketTitle}</legend>
+          {options.map((o) => (
+            <label
+              key={o.code}
+              className="card-panel"
+              data-testid={`p2s-market-${o.code}`}
+              style={{ padding: 'var(--s-3)', display: 'flex', gap: 'var(--s-3)', alignItems: 'flex-start', cursor: 'pointer', borderColor: picked === o.code ? 'var(--accent)' : undefined }}
+            >
+              <input type="radio" name="p2s-market" value={o.code} checked={picked === o.code} onChange={() => setPicked(o.code)} style={{ marginTop: 4 }} />
+              <span>
+                <strong style={{ display: 'block' }}>{o.label}</strong>
+                <span className="t-small" style={{ color: 'var(--fg-muted)' }}>{o.body}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{ARMAR_COPY.marketNote}</p>
+        <div>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={!picked}
+            data-testid="p2s-market-confirm"
+            onClick={() => {
+              if (!picked) return
+              try { window.sessionStorage.setItem(marketKey(draftId), picked) } catch { /* the choice still rides in this request */ }
+              setChosen(picked)
+              setOutcome(null)
+              setAttempt((n) => n + 1)
+            }}
+          >
+            {ARMAR_COPY.marketConfirm}
+          </Button>
+        </div>
+      </Panel>
+    )
+  }
 
   if (outcome?.kind === 'kept' && !outcome.configApplied) {
     return (

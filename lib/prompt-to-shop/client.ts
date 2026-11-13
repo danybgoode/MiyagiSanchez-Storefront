@@ -213,15 +213,21 @@ export async function mailDraftLink(
   }
 }
 
-const CLAIM_KINDS: ReadonlyArray<ClaimOutcome['kind']> = ['kept', 'other_phone', 'has_shop', 'incomplete', 'signed_out', 'retry']
+const CLAIM_KINDS: ReadonlyArray<ClaimOutcome['kind']> = ['kept', 'other_phone', 'has_shop', 'incomplete', 'signed_out', 'market_required', 'retry']
 
 /** `POST /api/p2s/claim/[id]` — keep it. A dead connection is a `retry`, never a guess at the outcome. */
 export async function claimDraft(
   draftId: string,
   deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) },
+  market?: 'mx' | 'us' | null,
 ): Promise<ClaimOutcome> {
   try {
-    const res = await deps.fetch(`/api/p2s/claim/${draftId}`, { method: 'POST', credentials: 'same-origin' })
+    const res = await deps.fetch(`/api/p2s/claim/${draftId}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(market ? { market } : {}),
+    })
     const data = (await res.json().catch(() => null)) as { kind?: unknown } | null
     if (data && CLAIM_KINDS.includes(data.kind as ClaimOutcome['kind'])) return data as ClaimOutcome
   } catch {

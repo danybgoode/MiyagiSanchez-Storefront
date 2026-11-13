@@ -191,6 +191,15 @@ export const SEED_COPY = {
 } as const
 
 export const ARMAR_COPY = {
+  // one-front-door-both-markets D13/D14 — the one question before the shop exists.
+  marketTitle: '¿Dónde vas a vender?',
+  marketLead: 'Tu tienda cobra en la moneda de su país. Elige uno; esto no se puede cambiar después.',
+  marketMx: 'México',
+  marketMxBody: 'Cobras en pesos: tarjeta, transferencia SPEI, Mercado Pago o efectivo, y envíos nacionales.',
+  marketUs: 'Estados Unidos',
+  marketUsBody: 'Cobras en dólares con tu propia cuenta de Stripe. Entregas en persona, a domicilio o con tu paquetería.',
+  marketNote: 'Para vender en los dos países, abre una segunda tienda.',
+  marketConfirm: 'Quedármela',
   metaTitle: 'Tu tienda',
   working: 'Guardando tu tienda…',
   keptTitle: (name: string | null) => (name ? `¡Listo! ${name} ya es tuya` : '¡Listo! Tu tienda ya es tuya'),
@@ -303,6 +312,10 @@ export const PHOTO_COPY = {
 // ── S5.1 · The cobros / entregas chooser ─────────────────────────────────────────────────────────────────────────
 
 export const COBROS_COPY = {
+  // one-front-door-both-markets D15 — a US shop gets paid one way: card, into the merchant's own Stripe.
+  stripeName: 'Tarjeta con Stripe',
+  stripeLead: 'Tus compradores pagan con tarjeta en dólares y el dinero llega directo a tu propia cuenta de Stripe.',
+  stripeConnect: 'Conectar Stripe',
   pageTitle: 'Cobros y entregas',
   pageLead: 'Elige cómo te pagan y cómo entregas. Abajo ves lo que verá quien te compre.',
   payTitle: 'Cómo te pagan',

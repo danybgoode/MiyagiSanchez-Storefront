@@ -2,6 +2,10 @@ import type { Metadata } from 'next'
 import { shapeOf } from '@/lib/business-shape'
 import { sellerLandingPath } from '@/lib/seller-acquisition'
 import { auth } from '@clerk/nextjs/server'
+import { cookies } from 'next/headers'
+import { readDeps } from '@/lib/prompt-to-shop/read'
+import { DEVICE_COOKIE, readDeviceId } from '@/lib/prompt-to-shop/handler'
+import { readLocale, readMarketHint } from '@/lib/prompt-to-shop/locale'
 import { redirect } from 'next/navigation'
 import ClaimRunner from '@/app/(shell)/p2s/_components/ClaimRunner'
 import KeptShop from '@/app/(shell)/p2s/_components/KeptShop'
@@ -100,5 +104,11 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
   }
   if (kept) return <P2sLocaleProvider locale={kept.locale}><ClaimRunner draftId={kept.id} /></P2sLocaleProvider>
   if (!draftId) redirect('/sell')
-  return <ClaimRunner draftId={draftId} />
+  // Not kept yet: the draft on THIS device gives the question its preselect (D14) and the screen its language.
+  const owned = await readDeps.findOwned(draftId, readDeviceId((await cookies()).get(DEVICE_COOKIE)?.value) ?? '').catch(() => null)
+  return (
+    <P2sLocaleProvider locale={readLocale(owned?.locale)}>
+      <ClaimRunner draftId={draftId} marketHint={readMarketHint(owned?.market)} />
+    </P2sLocaleProvider>
+  )
 }

@@ -44,6 +44,8 @@
 
 import { SHAPE_DEFAULTS, shapeOf } from '../business-shape'
 import type { EnsureShopResult, ShopCreateInput } from '../ensure-shop'
+import { resolveSellerSignupMarket } from '../seller-signup-market'
+import type { MarketCode } from '../markets'
 import type { StoreConfigManifest } from '../settings-import'
 import { coerceBlocks } from './access'
 import { profileOf, type IdentityBlock, type WordsBlock } from './blocks'
@@ -88,6 +90,8 @@ export interface ClaimDeps {
   log: (line: Record<string, unknown>) => void
   revalidate: () => void
   now: () => Date
+  /** D13 — overwrite the draft's hint with the chosen market once the shop exists. Best effort; optional for older callers. */
+  recordMarket?: (draftId: string, userId: string, market: MarketCode) => Promise<boolean>
 }
 
 export type ClaimOutcome =
@@ -98,18 +102,25 @@ export type ClaimOutcome =
   /** The draft is this phone's and unclaimed, but its name and colours have not landed yet. */
   | { kind: 'incomplete'; draftId: string }
   | { kind: 'signed_out' }
+  /**
+   * one-front-door-both-markets D13 — this keep would CREATE the shop, and no open market was chosen. The market is
+   * immutable after creation, so the claim asks instead of defaulting: nothing is claimed, nothing is created.
+   */
+  | { kind: 'market_required'; draftId: string }
   /** Something transient failed. Nothing is lost: the same user re-entering resumes from wherever it stopped. */
   | { kind: 'retry'; message: string }
 
 /** What the draft becomes in the shop create. The name is required (the claim refuses a draft without identity). */
-export function shopInputFrom(identity: IdentityBlock): ShopCreateInput {
+export function shopInputFrom(identity: IdentityBlock, market?: MarketCode): ShopCreateInput {
   return {
+    // D13 — the merchant's explicit choice, already resolved against the market registry by the caller.
+    ...(market ? { operatingMarket: market } : {}),
     name: identity.name,
     description: identity.description,
     ...(identity.state ? { state: identity.state } : {}),
     ...(identity.city ? { city: identity.city } : {}),
-    // No slug: the backend derives a free one from the name (see the module header). No market: a draft is an
-    // es-MX shop (AGENTS rule 5), which is the documented default when it is omitted.
+    // No slug: the backend derives a free one from the name (see the module header). The market is the merchant's
+    // own choice (D13); `claimAndApply` never reaches the create without one.
   }
 }
 
@@ -135,6 +146,8 @@ export interface ClaimInput {
   draftId: string
   deviceCookie: string | null | undefined
   userId: string | null | undefined
+  /** D13 — the market the merchant chose, raw from the request. Read through `resolveSellerSignupMarket`. */
+  market?: unknown
 }
 
 /** Who is asking about this row, decided purely. */
@@ -161,11 +174,19 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
   const seller = await deps.findSeller()
   if (seller.state === 'unavailable') return { kind: 'retry', message: CLAIM_RETRY.lookup }
 
+  // D13 — three states: a chosen open market, none (ask), and the backend's own named refusals later. Asked only when
+  // this keep could CREATE the shop: a merchant who already has one, or who is resuming a keep that already made it,
+  // is never stopped by a question whose answer cannot change anything.
+  const market = resolveSellerSignupMarket(input.market)
+
   let row: ClaimRow | null = null
   let resumed = false
   try {
     // ── claim: only for a user with no shop, on the phone that made the draft ────────────────────────────────────
-    if (seller.state === 'absent' && deviceId) row = await deps.claim(draftId, deviceId, userId)
+    if (seller.state === 'absent' && deviceId) {
+      if (!market) return { kind: 'market_required', draftId }
+      row = await deps.claim(draftId, deviceId, userId)
+    }
     if (!row) {
       // Zero rows (or no claim attempted): re-read and decide what the row means for THIS user.
       const current = await deps.reread(draftId)
@@ -203,7 +224,9 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
   // The claim's WHERE requires an identity, so this is a row damaged after the fact. Refuse rather than invent one.
   if (!identity) return { kind: 'incomplete', draftId }
 
-  const shop = await deps.ensureShop(shopInputFrom(identity))
+  // A keep resumed after a claim that stopped before its shop existed needs the market too (the first request held it).
+  if (!market) return { kind: 'market_required', draftId }
+  const shop = await deps.ensureShop(shopInputFrom(identity, market))
   if (!shop.ok) return { kind: 'retry', message: CLAIM_RETRY.shop }
   if (shop.status !== 201) {
     // The seller already existed: this keep did not make it, so the draft is not poured into it.
@@ -213,6 +236,8 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
 
   // 201: this call created the seller from this draft. Record that first; it is what makes a reload harmless.
   const marked = await deps.markSeller(draftId, userId, shop.sellerId).catch(() => false)
+  // The draft's market now says what was CHOSEN, not what was hinted: the kept view and its reminders read it.
+  await deps.recordMarket?.(draftId, userId, market).catch(() => false)
   if (!marked) deps.log({ event: 'claim_mark_failed', draft: draftId, seller: shop.sellerId })
 
   const applied = await deps.applyConfig(manifestFrom(identity, words)).catch(() => ({ ok: false }))

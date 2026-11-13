@@ -94,6 +94,7 @@ export default function CobrosChooser({
   }
 
   const speiReady = clabeComplete(clabe)
+  const us = market === 'us'
   const offeredDelivery = preview !== 'loading' && preview.kind === 'ready' ? preview.delivery : []
   const manualCarrier = offeredDelivery.some((d) => d.key === 'manual_carrier')
 
@@ -101,6 +102,16 @@ export default function CobrosChooser({
     <div className="grid gap-5" data-testid="p2s-cobros">
       <section className="grid gap-2" aria-labelledby="p2s-cobros-pay">
         <h3 id="p2s-cobros-pay" className="t-small" style={{ margin: 0, fontWeight: 700 }}>{COBROS_COPY.payTitle}</h3>
+
+        {/* D15 — a US shop takes card payments into the merchant's own Stripe account and nothing else: checkout
+            refuses SPEI, Mercado Pago and cash for `us` (lib/checkout-market-strategy.ts), so they are not offered. */}
+        {us ? (
+          <div className="card-panel grid gap-2" style={{ padding: 'var(--s-3)' }} data-testid="p2s-choice-stripe">
+            <span style={{ fontWeight: 700 }}>{COBROS_COPY.stripeName}</span>
+            <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COBROS_COPY.stripeLead}</p>
+            <div><Link href="/shop/manage/settings/pagos" prefetch={false} className="btn btn-primary btn-sm">{COBROS_COPY.stripeConnect}</Link></div>
+          </div>
+        ) : (<>
 
         <Choice
           mark={<span className="t-small" style={{ fontWeight: 800, color: 'var(--fg-inverse)', background: 'var(--provider-mercadopago)', borderRadius: 'var(--r-sm)', padding: '4px 6px', lineHeight: 1 }}>MP</span>}
@@ -177,6 +188,7 @@ export default function CobrosChooser({
           {!state.handDelivery ? <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COBROS_COPY.cashNeedsHand}</p> : null}
           <Toggle on={state.cash} busy={busy === 'cash'} disabled={!!busy} onToggle={(v) => void save('cash', cashPatch(v), { cash: v })} />
         </Choice>
+        </>)}
       </section>
 
       <section className="grid gap-2" aria-labelledby="p2s-cobros-deliver">
@@ -186,7 +198,7 @@ export default function CobrosChooser({
           <Toggle on={state.handDelivery} busy={busy === 'hand'} disabled={!!busy} onToggle={(v) => void save('hand', handDeliveryPatch(v), { handDelivery: v })} />
         </Choice>
 
-        {offersCorreos(shape, state.correos) ? (
+        {!us && offersCorreos(shape, state.correos) ? (
         <Choice mark={<i className="iconoir-mail" aria-hidden="true" style={{ fontSize: 22 }} />} name={COBROS_COPY.correosName} lead={COBROS_COPY.correosLead} on={state.correos && correosAvailable && state.hasOrigin} testId="p2s-choice-correos">
           {!correosAvailable ? (
             <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COBROS_COPY.correosUnavailable}</p>

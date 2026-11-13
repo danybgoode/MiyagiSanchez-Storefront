@@ -102,9 +102,14 @@ function world(opts: { expired?: boolean; noIdentity?: boolean; claimedBy?: stri
   return { trace, manifests, logs, row, sellers, deps }
 }
 
-const keep = (w: World, who: { userId?: string | null; device?: string | null; draftId?: string } = {}) =>
+// one-front-door-both-markets D13: every keep that creates a shop carries the merchant's chosen market. The existing
+// tests choose Mexico, the market every shop had before the question existed; the market tests below vary it.
+const keep = (w: World, who: { userId?: string | null; device?: string | null; draftId?: string; market?: unknown } = {}) =>
   claimAndApply(
-    { draftId: who.draftId ?? DRAFT, deviceCookie: who.device === undefined ? DEVICE : who.device, userId: who.userId === undefined ? USER : who.userId },
+    {
+      draftId: who.draftId ?? DRAFT, deviceCookie: who.device === undefined ? DEVICE : who.device, userId: who.userId === undefined ? USER : who.userId,
+      market: 'market' in who ? who.market : 'mx',
+    },
     w.deps(who.userId ?? USER),
   )
 
@@ -333,5 +338,42 @@ test('the claim route reads the device cookie and the Clerk session, and nothing
   const src = read('app/api/p2s/claim/[id]/route.ts')
   expect(src).toContain('DEVICE_COOKIE')
   expect(src).toContain('await auth()')
-  expect(src).not.toMatch(/searchParams|nextUrl|headers\.get|\.headers\[|req\.json/)
+  expect(src).not.toMatch(/searchParams|nextUrl|headers\.get|\.headers\[/)
+  // one-front-door-both-markets D13: the body carries the merchant's CHOSEN MARKET and nothing else — never who they
+  // are or which draft (those come from the session and the path). Allow the negation of what is banned: the body is
+  // read, and only `market` is taken from it.
+  expect(src).toContain('req.json()')
+  const fromBody = [...src.matchAll(/body\?\.(\w+)/g)].map((m) => m[1])
+  expect(fromBody).toEqual(['market'])
+})
+
+// ── D13 — the market is asked, never defaulted ──────────────────────────────────────────────────────────────────
+
+test('no chosen market: the keep asks BEFORE claiming or creating anything (the market is immutable once made)', async () => {
+  for (const market of [undefined, null, '', 'br', 'es-MX', 42]) {
+    const w = world()
+    const res = await keep(w, { market })
+    expect(res, String(market)).toEqual({ kind: 'market_required', draftId: DRAFT })
+    expect(w.trace, String(market)).toEqual(['findSeller'])
+  }
+})
+
+test('a chosen market travels WITH the create: a US keep makes a US shop', async () => {
+  const w = world()
+  const seen: unknown[] = []
+  const base = w.deps
+  w.deps = (u: string) => {
+    const d = base(u)
+    const ensure = d.ensureShop
+    return { ...d, ensureShop: async (input) => { seen.push(input.operatingMarket); return ensure(input) } }
+  }
+  const res = await keep(w, { market: 'us' })
+  expect(res).toMatchObject({ kind: 'kept' })
+  expect(seen).toEqual(['us'])
+})
+
+test('a merchant who already has a shop is never asked — the answer could not change anything', async () => {
+  const w = world({ sellers: { [USER]: { id: 'sel_9', slug: 'mi-tienda' } } })
+  const res = await keep(w, { market: undefined })
+  expect(res.kind).not.toBe('market_required')
 })

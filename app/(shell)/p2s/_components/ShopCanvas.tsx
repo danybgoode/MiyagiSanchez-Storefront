@@ -1,3 +1,5 @@
+'use client'
+
 import ShopThemeShell from '@/app/(shell)/_shop-sections/ShopThemeShell'
 import { Banner } from '@/components/feedback/Banner'
 import { shopInitials, SHOP_INDEX_GRID_CLASS } from '@/lib/shop-presentation/chrome'

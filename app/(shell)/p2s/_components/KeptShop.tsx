@@ -1,5 +1,6 @@
 'use client'
 
+import { marketBasePath } from '@/lib/markets'
 import type { SeedRow } from '@/lib/prompt-to-shop/view'
 import type { BusinessShape } from '@/lib/business-shape'
 import { useCallback, useEffect, useState } from 'react'
@@ -80,7 +81,8 @@ export default function KeptShop({
   const router = useRouter()
   const [sheet, setSheet] = useState<SheetState>(null)
   const close = useCallback(() => setSheet(null), [])
-  const publicPath = shopSlug ? `/mx/s/${shopSlug}` : null
+  // The shop's own market prefix (D15): a US shop lives under /us/s, never /mx/s.
+  const publicPath = shopSlug ? `${marketBasePath(market === 'us' ? 'us' : 'mx')}/s/${shopSlug}` : null
   const [publishing, setPublishing] = useState<{ kind: 'idle' | 'busy' } | { kind: 'error'; message: string; notReady?: boolean }>({ kind: 'idle' })
   const [justPublished, setJustPublished] = useState(false)
 
