@@ -5,6 +5,8 @@
  */
 
 import 'server-only'
+import { auth } from '@clerk/nextjs/server'
+import { db } from '@/lib/supabase'
 import { randomUUID } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { DEVICE_COOKIE, DEVICE_COOKIE_MAX_AGE, readDeviceId } from './handler'
@@ -41,4 +43,16 @@ export async function readUpload(req: NextRequest): Promise<{ form: FormData; fi
   const f = form.get('file')
   if (!f || typeof f === 'string') return { form, file: null }
   return { form, file: { bytes: new Uint8Array(await f.arrayBuffer()), mime: f.type, name: f.name } }
+}
+
+/**
+ * D20 — the signed-in mode is for a merchant WHO OWNS A SHOP (fresh review, PR #501): an account with no shop is
+ * treated as signed out, so throwaway accounts cannot skip Turnstile or draw on anyone's plan. The shop is looked up
+ * by the Clerk user from the session; any failure reads as "no shop" (signed-out rules, never a free pass).
+ */
+export async function intakeShopOwner(): Promise<string | null> {
+  const { userId } = await auth()
+  if (!userId) return null
+  const { data, error } = await db.from('marketplace_shops').select('id').eq('clerk_user_id', userId).limit(1).maybeSingle()
+  return !error && data ? userId : null
 }

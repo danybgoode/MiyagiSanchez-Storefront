@@ -128,7 +128,15 @@ function Uploader({ shopSlug, pagosConfigured }: { shopSlug: string | null; pago
     setEditRows([])
     setFileName(payload.file?.name ?? null)
     setAiBusy(kind)
-    const answer = await runIntake(kind, { ...payload, turnstileToken: '', locale: 'es', marketHint: null }, 'No pudimos leerlo. Inténtalo de nuevo en un momento.')
+    // A CSV or JSON list is read HERE by the same parser as the upload below — every column kept, no 60-row cap
+    // (fresh review, PR #501). Only a spreadsheet, a PDF, a photo or a link needs the server.
+    if (kind === 'file' && payload.file && /\.(csv|tsv|txt|json)$/i.test(payload.file.name)) {
+      setAiBusy(null)
+      await handleFile(payload.file)
+      return
+    }
+    // The shop's own market: a US shop's rows are priced in dollars (the backend refuses a currency mismatch).
+    const answer = await runIntake(kind, { ...payload, turnstileToken: '', locale: 'es', marketHint: fmt.currency === 'USD' ? 'us' : 'mx' }, 'No pudimos leerlo. Inténtalo de nuevo en un momento.')
     setAiBusy(null)
     if (!answer.ok) {
       setError(answer.message)

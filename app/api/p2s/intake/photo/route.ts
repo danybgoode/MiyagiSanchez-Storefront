@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getClientIp } from '@/lib/ratelimit'
-import { auth } from '@clerk/nextjs/server'
 import { handlePhotoIntake } from '@/lib/prompt-to-shop/intake-handler'
 import { intakeDeps } from '@/lib/prompt-to-shop/intake-server'
-import { intakeDevice, intakeResponse, readUpload } from '@/lib/prompt-to-shop/intake-route'
+import { intakeDevice, intakeShopOwner, intakeResponse, readUpload } from '@/lib/prompt-to-shop/intake-route'
 
 /**
  * POST /api/p2s/intake/photo — start a shop from one photo, signed out (D6).
@@ -20,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (!upload) return NextResponse.json({ ok: false, code: 'invalid' }, { status: 400, headers: { 'Cache-Control': 'private, no-store' } })
   const { form, file } = upload
   const outcome = await handlePhotoIntake(
-    { file, locale: form.get('locale'), marketHint: form.get('market_hint'), turnstileToken: form.get('turnstile_token'), deviceId: device.deviceId, userId: (await auth()).userId },
+    { file, locale: form.get('locale'), marketHint: form.get('market_hint'), turnstileToken: form.get('turnstile_token'), deviceId: device.deviceId, userId: await intakeShopOwner() },
     intakeDeps(getClientIp(req)),
   )
   return intakeResponse(outcome, device)

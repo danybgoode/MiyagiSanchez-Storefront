@@ -69,7 +69,7 @@ export function sanitizeSeedRows(raw: unknown, currency: ImportCurrency): Catalo
   for (const s of staged) {
     if (!s.valid) continue
     const images = (s.row.images ?? []).filter((u) => typeof u === 'string' && /^https:\/\//i.test(u)).slice(0, 4)
-    const price = typeof s.row.price === 'number' && Number.isFinite(s.row.price) && s.row.price > 0 ? Math.round(s.row.price) : undefined
+    const price = typeof s.row.price === 'number' && Number.isFinite(s.row.price) && s.row.price > 0 ? Math.round(s.row.price * 100) / 100 : undefined
     rows.push({
       title: s.row.title,
       ...(s.row.description ? { description: s.row.description.slice(0, 2000) } : {}),

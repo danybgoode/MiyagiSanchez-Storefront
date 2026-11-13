@@ -14,13 +14,14 @@ import { checkRateLimit } from '@/lib/ratelimit'
 import { uploadToR2, isR2Configured } from '@/lib/r2'
 import { pinnedFetch } from '@/lib/ssrf-fetch'
 import { CATALOG_CATEGORY_KEYS, buildExtractionPrompt } from '@/lib/catalog-import'
-import { budgetPeriod } from './allowance'
+import { budgetPeriod, monthPeriod, userSubject } from './allowance'
 import { verifyTurnstile } from './turnstile'
 import { screenText } from './screen'
 import { screenDeps } from './screen-server'
 import { callModelBody, MODEL_CONFIGURED } from './server'
 import { ANON_INTAKE, readCappedBody, zipDeclaredUncompressedSize, XLSX_MAX_UNCOMPRESSED, SEED_ROWS_MAX, INTAKE_FETCH_TIMEOUT_MS, INTAKE_MAX_REDIRECTS, INTAKE_PAGE_MAX_BYTES, nextHop, resolveAnonIntakeBudget } from './intake'
-import { SIGNED_IN_INTAKES_PER_MONTH, type IntakeDeps } from './intake-handler'
+import type { IntakeDeps } from './intake-handler'
+import { ownerPhotoCap } from './photo-server'
 
 const VISION_TIMEOUT_MS = 25_000
 
@@ -69,24 +70,27 @@ export function intakeDeps(ip: string): IntakeDeps & { base64: (b: Uint8Array) =
       const [byIp, byDevice] = await Promise.all([checkRateLimit('p2s_intake_ip', ip), checkRateLimit('p2s_intake_device', deviceId)])
       return byIp.allowed && byDevice.allowed
     },
-    spendDevice: (who) => who.kind === 'user'
-      ? spendAllowance(`intake-user:${who.id}`, ANON_INTAKE.kind, period.slice(0, 7), SIGNED_IN_INTAKES_PER_MONTH)
+    // D20 — a merchant's AI read is one of their PLAN's monthly photos: the same subject, kind, period and cap the
+    // canvas's PhotoSheet spends (`userSubject`, `photo`, the month, `ownerPhotoCap`), so a plan's 20 or 60 holds
+    // across both doors and there is no second pool (fresh review, PR #501).
+    spendDevice: async (who) => who.kind === 'user'
+      ? spendAllowance(userSubject(who.id), 'photo', monthPeriod(new Date()), await ownerPhotoCap(who.id))
       : spendAllowance(ANON_INTAKE.deviceSubject(who.id), ANON_INTAKE.kind, 'all', ANON_INTAKE.perDevice),
     spendDay: () => spendAllowance(ANON_INTAKE.budgetSubject, ANON_INTAKE.budgetKind, period, resolveAnonIntakeBudget(process.env.P2S_ANON_INTAKE_DAILY_BUDGET)),
     refundDevice: async (who) => {
       // A device has one try, so its refund is a reset; a merchant's month gives back exactly one (a conditional
       // decrement through the same read-then-write the RPC would do — best effort, never below zero).
       if (who.kind === 'user') {
-        const subject = `intake-user:${who.id}`
-        const month = period.slice(0, 7)
+        const subject = userSubject(who.id)
+        const month = monthPeriod(new Date())
         // Optimistic and RE-TRIED: two failed reads at once both see the same count; the conditional update lets one
         // land, and the other re-reads and tries again instead of silently losing its refund (Codex, PR #501).
         for (let attempt = 0; attempt < 4; attempt++) {
-          const { data } = await db.from('ai_allowance').select('count').eq('subject', subject).eq('kind', ANON_INTAKE.kind).eq('period', month).maybeSingle()
+          const { data } = await db.from('ai_allowance').select('count').eq('subject', subject).eq('kind', 'photo').eq('period', month).maybeSingle()
           const n = (data as { count?: number } | null)?.count ?? 0
           if (n <= 0) return
           const { data: written } = await db.from('ai_allowance').update({ count: n - 1, updated_at: new Date().toISOString() })
-            .eq('subject', subject).eq('kind', ANON_INTAKE.kind).eq('period', month).eq('count', n).select('subject')
+            .eq('subject', subject).eq('kind', 'photo').eq('period', month).eq('count', n).select('subject')
           if (Array.isArray(written) && written.length === 1) return
         }
         console.error('[p2s-intake] refund lost every race', subject)

@@ -393,3 +393,34 @@ test('signed out still needs Turnstile even when a userId-shaped value is absent
   const w = world({ verifyTurnstile: async () => ({ ok: false as const, reason: 'rejected' }) })
   expect((await handleLinkIntake({ ...common, userId: null, url: 'https://shop.com' }, w.deps)).status).toBe(403)
 })
+
+// Fresh review, PR #501 ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('signed in: a model failure gives the MERCHANT their read back (not a device)', async () => {
+  const refunded: unknown[] = []
+  const w = world({ model: 'not json', refundDevice: async (who) => { refunded.push(who) } })
+  await handlePhotoIntake({ ...common, userId: 'user_9', file: PNG }, w.deps)
+  expect(refunded).toEqual([{ kind: 'user', id: 'user_9' }])
+})
+
+test('signed in: a link\'s rows are screened too', async () => {
+  const w = world({ fetchJson: async () => ({ products: [{ title: 'Pistola 9mm sin papeles', variants: [{ price: '500' }] }] }) })
+  ;(w.deps as IntakeDeps).screen = async () => ({ verdict: 'refuse', kind: 'prohibited' })
+  expect(await handleLinkIntake({ ...common, userId: 'user_9', url: 'https://shop.example' }, w.deps)).toMatchObject({ status: 422, body: { code: 'prohibited' } })
+})
+
+test('the signed-in mode is a SHOP OWNER\'s: every intake route asks for one, from the session', () => {
+  const route = readFileSync(join(process.cwd(), 'lib/prompt-to-shop/intake-route.ts'), 'utf8')
+  expect(route).toContain("from('marketplace_shops').select('id').eq('clerk_user_id', userId)")
+  for (const kind of ['photo', 'file', 'link']) {
+    const src = readFileSync(join(process.cwd(), `app/api/p2s/intake/${kind}/route.ts`), 'utf8')
+    expect(src, kind).toContain('userId: await intakeShopOwner()')
+  }
+  // …and a merchant's AI read is a PLAN photo: the canvas's subject, kind and cap — one pool, not two.
+  const server = readFileSync(join(process.cwd(), 'lib/prompt-to-shop/intake-server.ts'), 'utf8')
+  expect(server).toContain("spendAllowance(userSubject(who.id), 'photo', monthPeriod(new Date()), await ownerPhotoCap(who.id))")
+})
+
+test('seed prices keep their cents (149.50 stays 149.50)', () => {
+  expect(sanitizeSeedRows([{ title: 'Vela de soya lavanda', price: 149.5, category: 'otros' }], 'MXN')[0].price).toBe(149.5)
+})

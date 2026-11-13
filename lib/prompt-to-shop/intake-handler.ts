@@ -87,9 +87,10 @@ export interface IntakeCommon {
   turnstileToken: unknown
   deviceId: string
   /**
-   * S4.1 / D20 — the signed-in merchant using «Crear con IA» from their dashboard, from the Clerk session (never the
-   * body). A signed-in request needs no Turnstile (the session IS the identity), spends that merchant's own monthly
-   * intake allowance instead of the device's single try, and its rows are screened HERE for prohibited goods, because
+   * S4.1 / D20 — a signed-in merchant WHO OWNS A SHOP, from the Clerk session (never the body); the route sets it only
+   * for a shop owner, so an account with no shop is treated as signed out (fresh review, PR #501). It needs no
+   * Turnstile (the session IS the identity), spends the merchant's PLAN photos for the month (the same pool as the
+   * canvas's PhotoSheet, `ownerPhotoCap`) instead of the device's single try, and its rows are screened HERE for prohibited goods, because
    * they go straight to the importer instead of through a draft's screened generation. Absent = signed out.
    */
   userId?: string | null
@@ -97,8 +98,6 @@ export interface IntakeCommon {
 
 /** Whose allowance an intake spends: the device's one signed-out try, or the merchant's month. */
 export type IntakeIdentity = { kind: 'device'; id: string } | { kind: 'user'; id: string }
-
-export const SIGNED_IN_INTAKES_PER_MONTH = 20
 
 function identityOf(common: IntakeCommon): IntakeIdentity {
   return common.userId ? { kind: 'user', id: common.userId } : { kind: 'device', id: common.deviceId }
@@ -149,8 +148,8 @@ async function spendIntake(who: IntakeIdentity, deps: IntakeDeps, locale: P2sLoc
     return refuse(503, 'unavailable', locale)
   }
   if (device === null) return refuse(429, who.kind === 'user' ? 'usedMonth' : 'used', locale)
-  const cap = who.kind === 'user' ? SIGNED_IN_INTAKES_PER_MONTH : ANON_INTAKE.perDevice
-  if (!Number.isInteger(device) || device < 1 || device > cap) return refuse(503, 'unavailable', locale)
+  // A merchant's cap is their PLAN's monthly photos (read server-side); only the device's single try has a fixed bound.
+  if (!Number.isInteger(device) || device < 1 || (who.kind === 'device' && device > ANON_INTAKE.perDevice)) return refuse(503, 'unavailable', locale)
   let day: number | null
   try {
     day = await deps.spendDay()
