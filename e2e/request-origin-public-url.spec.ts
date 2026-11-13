@@ -22,3 +22,13 @@ test('no Stripe or Mercado Pago connect route builds a redirect from req.url any
     expect(readFileSync(f, 'utf8'), f).not.toMatch(/new URL\([^)]*req\.url\)/)
   }
 })
+
+test('a forged Host header never becomes the redirect origin (Codex, PR #502)', () => {
+  const prev = process.env.NEXT_PUBLIC_SITE_URL
+  delete process.env.NEXT_PUBLIC_SITE_URL
+  try {
+    expect(publicUrl('/sign-in', req('attacker.example')).toString()).toBe('https://miyagisanchez.com/sign-in')
+  } finally {
+    process.env.NEXT_PUBLIC_SITE_URL = prev
+  }
+})

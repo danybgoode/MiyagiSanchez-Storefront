@@ -69,16 +69,16 @@ export function resolveOrigin(input: ResolveOriginInput): string {
   )
 }
 
+/** The platform's own origin, for when the environment names none. */
+const FALLBACK_ORIGIN = 'https://miyagisanchez.com'
+
 /**
  * A redirect target on the PUBLIC origin. Behind the VM's Caddy, `req.url` carries the container's own bind address
  * (`https://0.0.0.0:8080/…`), so `new URL(path, req.url)` sent a signed-out seller to 0.0.0.0 (found 2026-11-13,
- * one-front-door-both-markets). The site URL wins, then a usable Host header, then — only when neither resolves —
- * the request's own URL, so a misconfigured environment still redirects somewhere rather than throwing.
+ * one-front-door-both-markets). Only a TRUSTED origin is used: the configured site URL, else the platform's own —
+ * never the request's Host header, which a caller controls (an open redirect on a payments route; Codex, PR #502).
  */
-export function publicUrl(path: string, req: { url: string; headers: { get: (k: string) => string | null } }): URL {
-  try {
-    return new URL(path, resolveOrigin({ siteUrl: process.env.NEXT_PUBLIC_SITE_URL, host: req.headers.get('host') }))
-  } catch {
-    return new URL(path, req.url)
-  }
+export function publicUrl(path: string, _req?: unknown): URL {
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')
+  return new URL(path, site || FALLBACK_ORIGIN)
 }
