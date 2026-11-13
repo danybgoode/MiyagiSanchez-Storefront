@@ -87,10 +87,20 @@ test('photo: in English for a US visitor, prices in dollars', async () => {
   expect(out.body.seed_rows[0]).toMatchObject({ currency: 'USD', price: 24 })
 })
 
-test('photo: a model that returned no business sentence is a failure the visitor can retry by typing', async () => {
+test('photo: a model that returned no business sentence gives the visitor their one try back', async () => {
   const w = world({ model: 'not json' })
   const out = await handlePhotoIntake({ ...common, file: PNG }, w.deps)
   expect(out).toMatchObject({ status: 502, body: { code: 'unavailable' } })
+  expect(w.trace).toEqual(['turnstile', 'burst', 'spend:device', 'spend:day', 'model', 'refund:device'])
+})
+
+test('pdf: a model call that failed gives the try back; one that read nothing usable keeps it (the read happened)', async () => {
+  const f = world({ model: null })
+  expect((await handleFileIntake({ ...common, file: { bytes: new Uint8Array([1]), mime: 'application/pdf', name: 'm.pdf' } }, f.deps)).status).toBe(502)
+  expect(f.trace).toContain('refund:device')
+  const e = world({ model: '[]' })
+  expect((await handleFileIntake({ ...common, file: { bytes: new Uint8Array([1]), mime: 'application/pdf', name: 'm.pdf' } }, e.deps)).status).toBe(422)
+  expect(e.trace).not.toContain('refund:device')
 })
 
 // ── File ──────────────────────────────────────────────────────────────────────────────────────────────────────────

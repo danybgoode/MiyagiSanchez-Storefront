@@ -207,7 +207,12 @@ export async function handlePhotoIntake(
   const business = typeof parsed?.business === 'string' ? parsed.business.trim().slice(0, 500) : ''
   const card = validateSuggestion(parsed)
   deps.log?.({ event: 'intake_photo', ok: !!business && card.ok })
-  if (!business) return refuse(502, 'unavailable', locale)
+  if (!business) {
+    // The visitor got nothing, so their one try comes back — the copy invites a retry (Codex, PR #498). The day's
+    // budget keeps the spend: the model call was made.
+    await deps.refundDevice(input.deviceId).catch(() => {})
+    return refuse(502, 'unavailable', locale)
+  }
   // Prohibited goods are refused HERE, before the photo is stored on our public bucket (fresh review, PR #498).
   if (deps.screen) {
     const verdict = await deps.screen(`${business}\n${card.ok ? `${card.suggestion.title}\n${card.suggestion.description}` : ''}`)
@@ -262,7 +267,12 @@ export async function handleFileIntake(
   if (kind === 'pdf') {
     const spent = await spendIntake(input.deviceId, deps, locale)
     if (spent) return spent
-    raw = jsonArray(await deps.callModel(pdfRequest(deps.base64(file.bytes), deps.extractionPrompt)))
+    const text = await deps.callModel(pdfRequest(deps.base64(file.bytes), deps.extractionPrompt))
+    if (text === null) {
+      await deps.refundDevice(input.deviceId).catch(() => {})
+      return refuse(502, 'unavailable', locale)
+    }
+    raw = jsonArray(text)
   } else {
     const text = kind === 'xlsx' ? deps.xlsxToCsv(file.bytes) : new TextDecoder('utf-8').decode(file.bytes)
     if (text === null) return refuse(400, 'invalid', locale)

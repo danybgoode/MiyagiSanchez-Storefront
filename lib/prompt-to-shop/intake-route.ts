@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { DEVICE_COOKIE, DEVICE_COOKIE_MAX_AGE, readDeviceId } from './handler'
 import type { IntakeOutcome } from './intake-handler'
+import { readCappedBody } from './intake'
 
 export function intakeDevice(req: NextRequest): { deviceId: string; minted: boolean } {
   const existing = readDeviceId(req.cookies.get(DEVICE_COOKIE)?.value)
@@ -23,11 +24,19 @@ export function intakeResponse(outcome: IntakeOutcome, device: { deviceId: strin
   return res
 }
 
-/** One uploaded file from a multipart body, or null. The size cap is the handler's; this only refuses absurd bodies. */
+/** The whole multipart body a signed-out intake may send: an 8 MB photo or a 5 MB file, plus the form's own bytes. */
+const UPLOAD_BODY_MAX = 9 * 1024 * 1024
+
+/**
+ * One uploaded file from a multipart body, or null. The body is read through `readCappedBody`, counting AS IT READS
+ * (Codex, PR #498): `req.formData()` alone buffers whatever a stranger sends — a missing or understated
+ * `Content-Length` is no limit. The handler then applies the per-kind cap.
+ */
 export async function readUpload(req: NextRequest): Promise<{ form: FormData; file: { bytes: Uint8Array; mime: string; name: string } | null } | null> {
-  const len = Number(req.headers.get('content-length') ?? '0')
-  if (len > 12 * 1024 * 1024) return null
-  const form = await req.formData().catch(() => null)
+  const bytes = await readCappedBody(req.body, req.headers.get('content-length'), UPLOAD_BODY_MAX).catch(() => null)
+  if (!bytes) return null
+  const copy = new Uint8Array(bytes.byteLength); copy.set(bytes)
+  const form = await new Response(copy.buffer, { headers: { 'content-type': req.headers.get('content-type') ?? '' } }).formData().catch(() => null)
   if (!form) return null
   const f = form.get('file')
   if (!f || typeof f === 'string') return { form, file: null }
