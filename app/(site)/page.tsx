@@ -7,7 +7,7 @@ import { buildAnchorPageConfig } from '@/app/(shell)/mx/vende/_components/page-c
 import DescribeBox from '@/app/(shell)/mx/vende/_components/DescribeBox'
 import RootMarketLinks from './RootMarketLinks'
 import RootLanguageSwitch from './RootLanguageSwitch'
-import { rootSelectorMetadata } from '@/lib/market-seo'
+import { builderLanguageMetadata } from '@/lib/market-seo'
 
 /**
  * `/` — the Mexico shop builder. Epic root-shop-builder-home (D1).
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   // `absolute`: the title already ends with the brand; a layout template must not append it twice.
   title: { absolute: meta.title },
   description: meta.description,
-  ...rootSelectorMetadata('es'),
+  ...builderLanguageMetadata('es'),
   openGraph: {
     type: 'website',
     locale: 'es_MX',

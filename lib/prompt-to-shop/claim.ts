@@ -50,6 +50,8 @@ import type { StoreConfigManifest } from '../settings-import'
 import { coerceBlocks } from './access'
 import { profileOf, type IdentityBlock, type WordsBlock } from './blocks'
 import { CLAIM_RETRY } from './copy'
+import { CLAIM_RETRY_EN } from './copy-en'
+import { readLocale } from './locale'
 import { readDeviceId } from './handler'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -106,7 +108,7 @@ export type ClaimOutcome =
    * one-front-door-both-markets D13 — this keep would CREATE the shop, and no open market was chosen. The market is
    * immutable after creation, so the claim asks instead of defaulting: nothing is claimed, nothing is created.
    */
-  | { kind: 'market_required'; draftId: string }
+  | { kind: 'market_required'; draftId: string; message?: string }
   /** Something transient failed. Nothing is lost: the same user re-entering resumes from wherever it stopped. */
   | { kind: 'retry'; message: string }
 
@@ -148,6 +150,8 @@ export interface ClaimInput {
   userId: string | null | undefined
   /** D13 — the market the merchant chose, raw from the request. Read through `resolveSellerSignupMarket`. */
   market?: unknown
+  /** The builder's language, for the retry messages only (fresh review, PR #499). Absent is Spanish. */
+  locale?: unknown
 }
 
 /** Who is asking about this row, decided purely. */
@@ -171,8 +175,9 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
   const deviceId = readDeviceId(input.deviceCookie)
 
   // ── look up the seller BEFORE any write: an existing shop is never handed a draft ──────────────────────────────
+  const RETRY = readLocale(input.locale) === 'en' ? CLAIM_RETRY_EN : CLAIM_RETRY
   const seller = await deps.findSeller()
-  if (seller.state === 'unavailable') return { kind: 'retry', message: CLAIM_RETRY.lookup }
+  if (seller.state === 'unavailable') return { kind: 'retry', message: RETRY.lookup }
 
   // D13 — three states: a chosen open market, none (ask), and the backend's own named refusals later. Asked only when
   // this keep could CREATE the shop: a merchant who already has one, or who is resuming a keep that already made it,
@@ -203,7 +208,7 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
         // that the re-read then shows as claimed). The draft stays unclaimed and the existing shop untouched.
         if (seller.state === 'present') return { kind: 'has_shop', shopSlug: seller.seller.slug }
         // The claim matched nothing, yet the row reads claimable: a row that changed under us. Do not guess.
-        return { kind: 'retry', message: CLAIM_RETRY.draft }
+        return { kind: 'retry', message: RETRY.draft }
       }
       // verdict === 'mine' — this user kept it before (a reload, a second tab, or a keep that stopped half way).
       row = current!
@@ -216,7 +221,7 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
       }
     }
   } catch {
-    return { kind: 'retry', message: CLAIM_RETRY.draft }
+    return { kind: 'retry', message: RETRY.draft }
   }
 
   // ── apply: the draft is this user's and not yet a finished shop ───────────────────────────────────────────────
@@ -227,7 +232,11 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
   // A keep resumed after a claim that stopped before its shop existed needs the market too (the first request held it).
   if (!market) return { kind: 'market_required', draftId }
   const shop = await deps.ensureShop(shopInputFrom(identity, market))
-  if (!shop.ok) return { kind: 'retry', message: CLAIM_RETRY.shop }
+  // D13 — the backend's NAMED refusals (409 a market conflict, 422 a market it will not take) are shown and the
+  // question asked again; retrying the same choice could never succeed (fresh review, PR #499). Anything else is
+  // transient and retried.
+  if (!shop.ok && (shop.status === 409 || shop.status === 422)) return { kind: 'market_required', draftId, message: shop.error }
+  if (!shop.ok) return { kind: 'retry', message: RETRY.shop }
   if (shop.status !== 201) {
     // The seller already existed: this keep did not make it, so the draft is not poured into it.
     await release(deps, draftId, userId)
@@ -237,7 +246,8 @@ export async function claimAndApply(input: ClaimInput, deps: ClaimDeps): Promise
   // 201: this call created the seller from this draft. Record that first; it is what makes a reload harmless.
   const marked = await deps.markSeller(draftId, userId, shop.sellerId).catch(() => false)
   // The draft's market now says what was CHOSEN, not what was hinted: the kept view and its reminders read it.
-  await deps.recordMarket?.(draftId, userId, market).catch(() => false)
+  const recorded = deps.recordMarket ? await deps.recordMarket(draftId, userId, market).catch(() => false) : true
+  if (!recorded) deps.log({ event: 'claim_market_record_failed', draft: draftId, market })
   if (!marked) deps.log({ event: 'claim_mark_failed', draft: draftId, seller: shop.sellerId })
 
   const applied = await deps.applyConfig(manifestFrom(identity, words)).catch(() => ({ ok: false }))

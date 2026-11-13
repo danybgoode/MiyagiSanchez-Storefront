@@ -4,6 +4,11 @@ import { stripe, createAccountLink, getShopStripe } from '@/lib/stripe'
 import { db } from '@/lib/supabase'
 import { syncMedusaSellerProfile } from '@/lib/medusa-seller-sync'
 import { resolveOrigin } from '@/lib/request-origin'
+import { getMySeller } from '@/lib/get-my-seller'
+import { connectPlanFor, usOnboardingUrl } from '@/lib/stripe-connect-market'
+
+const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
+const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
 
 // GET — initiate Stripe Connect onboarding for the current seller
 export async function GET(req: NextRequest) {
@@ -28,6 +33,27 @@ export async function GET(req: NextRequest) {
 
   if (!shop) {
     return NextResponse.redirect(new URL('/sell', req.url))
+  }
+
+  // A US shop onboards through the backend's Accounts v2 route; everything below is the Mexican Express flow
+  // (`lib/stripe-connect-market.ts` has the why). An unreadable market is refused, never treated as Mexico.
+  const plan = connectPlanFor(await getMySeller().catch(() => null))
+  if (plan.kind === 'unknown_market') return errorRedirect('market_unavailable')
+  if (plan.kind === 'us_v2') {
+    const jwt = await getToken()
+    if (!jwt) return NextResponse.redirect(new URL('/sign-in', req.url))
+    const res = await fetch(`${MEDUSA_BASE}/store/sellers/me/stripe-connect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-publishable-api-key': PUB_KEY, Authorization: `Bearer ${jwt}` },
+      body: '{}',
+      cache: 'no-store',
+    }).catch(() => null)
+    const url = res && res.ok ? usOnboardingUrl(await res.json().catch(() => null)) : null
+    if (!url) {
+      console.error('[stripe/connect] US v2 onboarding failed', res?.status ?? 'fetch_failed')
+      return errorRedirect('us_onboarding_failed')
+    }
+    return NextResponse.redirect(url)
   }
 
   const meta = (shop.metadata ?? {}) as Record<string, unknown>

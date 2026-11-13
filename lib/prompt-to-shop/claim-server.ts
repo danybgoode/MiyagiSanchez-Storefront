@@ -13,7 +13,7 @@ import { db } from '@/lib/supabase'
 import type { ClaimDeps, ClaimRow, SellerLookup } from './claim'
 import type { DraftBlocks } from './view'
 import { coerceBlocks } from './access'
-import { readLocale, type P2sLocale } from './locale'
+import { readLocale, readMarketHint, type P2sLocale, type P2sMarketHint } from './locale'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -107,6 +107,8 @@ export interface KeptDraft {
   sellerId: string | null
   /** The language the draft was built in — the kept shop's builder screens follow it. */
   locale: P2sLocale
+  /** D14 — the draft's hint (or, once kept, the choice); preselects the question on a resumed keep. */
+  market: P2sMarketHint | null
 }
 
 const KEPT_COLUMNS = 'id, identity, words, catalog, numbers, block_status, claimed_seller_id, seed_rows, locale, market'
@@ -117,6 +119,6 @@ export async function findKeptDraft(userId: string, draftId: string | null): Pro
   const { data, error } = await query.maybeSingle()
   if (error) return 'unavailable'
   if (!data) return null
-  const row = data as { id: string; identity: unknown; words: unknown; catalog: unknown; numbers?: unknown; block_status: unknown; claimed_seller_id: string | null; seed_rows?: unknown; locale?: unknown }
-  return { id: row.id, blocks: coerceBlocks(row), sellerId: row.claimed_seller_id, locale: readLocale(row.locale) }
+  const row = data as { id: string; identity: unknown; words: unknown; catalog: unknown; numbers?: unknown; block_status: unknown; claimed_seller_id: string | null; seed_rows?: unknown; locale?: unknown; market?: unknown }
+  return { id: row.id, blocks: coerceBlocks(row), sellerId: row.claimed_seller_id, locale: readLocale(row.locale), market: readMarketHint(row.market) }
 }

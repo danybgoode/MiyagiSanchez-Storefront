@@ -220,6 +220,7 @@ export const CHECKLIST_COPY_EN = {
   saveFailed: "We couldn't save right now. Please try again.",
   cobrosTitle: 'Payments',
   cobrosLead: 'Connect how you get paid: card or bank transfer. Without this, nobody can pay you.',
+  cobrosLeadUs: 'Connect your Stripe account to take card payments in dollars. Without this, nobody can pay you.',
   entregasTitle: 'Delivery',
   entregasLead: 'Say how you deliver: in person, by shipping or for pickup.',
   goSettings: 'Set up now',

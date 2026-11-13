@@ -258,6 +258,7 @@ export const CHECKLIST_COPY = {
   saveFailed: 'No pudimos guardar ahora. Inténtalo de nuevo.',
   cobrosTitle: 'Cobros',
   cobrosLead: 'Conecta cómo te pagan: Mercado Pago o transferencia bancaria. Sin esto nadie puede pagarte.',
+  cobrosLeadUs: 'Conecta tu cuenta de Stripe para cobrar con tarjeta en dólares. Sin esto nadie puede pagarte.',
   entregasTitle: 'Entregas',
   entregasLead: 'Di cómo entregas: en persona, por paquetería o para recoger.',
   goSettings: 'Configurar ahora',

@@ -102,7 +102,7 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
       </P2sLocaleProvider>
     )
   }
-  if (kept) return <P2sLocaleProvider locale={kept.locale}><ClaimRunner draftId={kept.id} /></P2sLocaleProvider>
+  if (kept) return <P2sLocaleProvider locale={kept.locale}><ClaimRunner draftId={kept.id} marketHint={kept.market ?? null} /></P2sLocaleProvider>
   if (!draftId) redirect('/sell')
   // Not kept yet: the draft on THIS device gives the question its preselect (D14) and the screen its language.
   const owned = await readDeps.findOwned(draftId, readDeviceId((await cookies()).get(DEVICE_COOKIE)?.value) ?? '').catch(() => null)

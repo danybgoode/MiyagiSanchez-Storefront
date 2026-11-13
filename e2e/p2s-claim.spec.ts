@@ -344,7 +344,9 @@ test('the claim route reads the device cookie and the Clerk session, and nothing
   // read, and only `market` is taken from it.
   expect(src).toContain('req.json()')
   const fromBody = [...src.matchAll(/body\?\.(\w+)/g)].map((m) => m[1])
-  expect(fromBody).toEqual(['market'])
+  expect(fromBody).toEqual(['market', 'locale'])
+  // …and nothing else is ever read from it, by any spelling (fresh review, PR #499: destructuring would pass a regex on `body?.`).
+  expect(src).not.toMatch(/body\??\.(?!market\b|locale\b)\w+|\{[^}]*\}\s*=\s*body/)
 })
 
 // ── D13 — the market is asked, never defaulted ──────────────────────────────────────────────────────────────────
@@ -376,4 +378,18 @@ test('a merchant who already has a shop is never asked — the answer could not 
   const w = world({ sellers: { [USER]: { id: 'sel_9', slug: 'mi-tienda' } } })
   const res = await keep(w, { market: undefined })
   expect(res.kind).not.toBe('market_required')
+})
+
+test('a backend market refusal (409/422) asks the question again with its message — never an endless retry', async () => {
+  for (const status of [409, 422]) {
+    const w = world()
+    const base = w.deps
+    w.deps = (u: string) => ({ ...base(u), ensureShop: async () => ({ ok: false as const, status, error: 'Ese mercado no acepta tiendas nuevas.' }) })
+    const res = await keep(w, { market: 'us' })
+    expect(res).toEqual({ kind: 'market_required', draftId: DRAFT, message: 'Ese mercado no acepta tiendas nuevas.' })
+  }
+  const w = world()
+  const base = w.deps
+  w.deps = (u: string) => ({ ...base(u), ensureShop: async () => ({ ok: false as const, status: 500, error: 'x' }) })
+  expect((await keep(w, { market: 'us' })).kind).toBe('retry')
 })

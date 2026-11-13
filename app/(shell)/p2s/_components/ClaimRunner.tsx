@@ -9,7 +9,7 @@ import { Banner } from '@/components/feedback/Banner'
 import type { ClaimOutcome } from '@/lib/prompt-to-shop/claim'
 import { claimDraft } from '@/lib/prompt-to-shop/client'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
-import { useBuilderCopy } from './P2sLocale'
+import { useBuilderCopy, useP2sLocale } from './P2sLocale'
 
 /**
  * Runs the keep from the browser (epic S3.2): `POST /api/p2s/claim/[id]`, then shows what happened.
@@ -49,6 +49,7 @@ export default function ClaimRunner({ draftId, initial, marketHint = null }: {
   marketHint?: 'mx' | 'us' | null
 }) {
   const { ARMAR: ARMAR_COPY } = useBuilderCopy()
+  const locale = useP2sLocale()
   const router = useRouter()
   const [outcome, setOutcome] = useState<ClaimOutcome | null>(initial ?? null)
   const [attempt, setAttempt] = useState(0)
@@ -62,7 +63,12 @@ export default function ClaimRunner({ draftId, initial, marketHint = null }: {
     started.current = attempt
     // A choice made earlier in this tab (before a reload) is sent; otherwise none — the server asks only if needed.
     const market = chosen ?? readStoredMarket(draftId)
-    claimDraft(draftId, undefined, market).then((result) => {
+    claimDraft(draftId, undefined, market, locale).then((result) => {
+      // A refused choice is forgotten, so the question starts clean instead of re-sending what the backend refused.
+      if (result.kind === 'market_required' && market) {
+        try { window.sessionStorage.removeItem(marketKey(draftId)) } catch { /* nothing stored */ }
+        setChosen(null)
+      }
       setOutcome(result)
       // Funnel step 4 (S5.3): counted on the keep itself — the claim's answer — never on a later visit to the shop.
       if (result.kind === 'kept') trackFunnel('p2s_kept', result.draftId, { resumed: result.resumed, market: market ?? 'existing' })
@@ -70,7 +76,7 @@ export default function ClaimRunner({ draftId, initial, marketHint = null }: {
       // so it would show the merchant a shop the live one is not.
       if (result.kind === 'kept' && result.configApplied) router.refresh()
     })
-  }, [draftId, attempt, initial, router, chosen])
+  }, [draftId, attempt, initial, router, chosen, locale])
 
   if (outcome?.kind === 'market_required' && draftId) {
     const options: Array<{ code: 'mx' | 'us'; label: string; body: string }> = [
@@ -96,6 +102,7 @@ export default function ClaimRunner({ draftId, initial, marketHint = null }: {
             </label>
           ))}
         </fieldset>
+        {outcome.message ? <Banner variant="warning">{outcome.message}</Banner> : null}
         <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{ARMAR_COPY.marketNote}</p>
         <div>
           <Button

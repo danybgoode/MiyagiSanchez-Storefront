@@ -35,11 +35,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const { userId, getToken } = await auth()
   const clerkJwt = userId ? await getToken() : null
   // D13 — the merchant's chosen market rides in a tiny JSON body; anything unreadable is "no choice", never a guess.
-  const body = (await req.json().catch(() => null)) as { market?: unknown } | null
+  const body = (await req.json().catch(() => null)) as { market?: unknown; locale?: unknown } | null
   const outcome: ClaimOutcome = !userId || !clerkJwt
     ? { kind: 'signed_out' }
     : await claimAndApply(
-        { draftId: id, deviceCookie: req.cookies.get(DEVICE_COOKIE)?.value, userId, market: body?.market },
+        { draftId: id, deviceCookie: req.cookies.get(DEVICE_COOKIE)?.value, userId, market: body?.market, locale: body?.locale },
         claimDeps(userId, clerkJwt),
       )
   return NextResponse.json(outcome, { status: STATUS[outcome.kind], headers: { 'Cache-Control': 'private, no-store' } })

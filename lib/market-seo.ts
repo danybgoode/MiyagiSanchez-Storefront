@@ -96,6 +96,24 @@ export function rootSelectorMetadata(language: RootLanguage): Pick<Metadata, 'al
   }
 }
 
+/**
+ * The shop builder's language pair (one-front-door-both-markets D16): `/` in Spanish, `/en` in English, `x-default`
+ * `/`. Its OWN set, not the selector's: that one also names `/mx` and `/us` as the `es-MX` / `en-US` documents, which
+ * would tell a crawler the Mexican-Spanish telling of the builder is the marketplace (fresh review, PR #499).
+ */
+export function builderLanguageMetadata(language: RootLanguage): Pick<Metadata, 'alternates'> {
+  return {
+    alternates: {
+      canonical: absoluteUrl(ROOT_LANGUAGE_PATHS[language]),
+      languages: {
+        es: absoluteUrl(ROOT_LANGUAGE_PATHS.es),
+        en: absoluteUrl(ROOT_LANGUAGE_PATHS.en),
+        'x-default': absoluteUrl(ROOT_LANGUAGE_PATHS.es),
+      },
+    },
+  }
+}
+
 /** The Spanish selector's metadata. Kept as its own name because `/` is the entry point every caller means. */
 export function selectorMetadata(): Pick<Metadata, 'alternates'> {
   return rootSelectorMetadata('es')
