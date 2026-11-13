@@ -1,5 +1,6 @@
 'use client'
 
+import type { SeedRow } from '@/lib/prompt-to-shop/view'
 import type { BusinessShape } from '@/lib/business-shape'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -20,6 +21,7 @@ import OwnerSheet from './OwnerSheet'
 import PhotoSheet from './PhotoSheet'
 import PublishedMoment from './PublishedMoment'
 import ShopCanvas from './ShopCanvas'
+import SeedImport from './SeedImport'
 
 /**
  * The owner's kept shop on `/sell/armar` (epic prompt-to-shop S3.2 → S4): the shop as the canvas draws it, with a
@@ -53,6 +55,7 @@ export default function KeptShop({
   chooser,
   correosAvailable,
   shape,
+  seedRows,
 }: {
   view: CanvasView
   shopSlug: string | null
@@ -70,6 +73,8 @@ export default function KeptShop({
   correosAvailable: boolean
   /** What kind of business this is (business-infrastructure D1), from the kept draft's identity. */
   shape: BusinessShape
+  /** one-front-door-both-markets D9 — the merchant's own rows still to upload (none once their titles are products). */
+  seedRows?: SeedRow[]
 }) {
   const router = useRouter()
   const [sheet, setSheet] = useState<SheetState>(null)
@@ -217,6 +222,8 @@ export default function KeptShop({
           </button>
         )}
       />
+
+      {seedRows && seedRows.length ? <SeedImport draftId={draftId} rows={seedRows} currency={market === 'us' ? 'USD' : 'MXN'} /> : null}
 
       {sheet?.kind === 'photo' ? (
         <PhotoSheet replace={sheet.replace} photosLeft={photosLeft} onClose={close} onAdded={() => router.refresh()} />

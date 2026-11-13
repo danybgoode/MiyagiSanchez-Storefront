@@ -17,6 +17,8 @@ import type { EditDeps } from './edit'
 import type { DraftRef, DraftsDeps } from './handler'
 import type { ModelRequest, ModelResult } from './planner'
 import { verifyTurnstile } from './turnstile'
+import { screenText } from './screen'
+import { screenDeps } from './screen-server'
 import { parseServiceAccount, vertexGenerateUrl, vertexTokenSource } from './vertex'
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash'
@@ -81,7 +83,7 @@ export async function callModelBody(body: object, timeoutMs: number = MODEL_TIME
   }
 }
 
-const DRAFT_COLUMNS = 'id, description'
+const DRAFT_COLUMNS = 'id, description, market, locale'
 
 export function draftsDeps(ip: string): DraftsDeps {
   // One budget day per request: a refund just after Mexico City midnight must give back the day it was spent on.
@@ -115,10 +117,13 @@ export function draftsDeps(ip: string): DraftsDeps {
         .maybeSingle()
       return error || !data ? null : (data as DraftRef)
     },
-    createDraft: async (deviceId, description, versionsUsed) => {
+    createDraft: async (deviceId, description, versionsUsed, meta) => {
       const { data, error } = await db
         .from('shop_drafts')
-        .insert({ device_id: deviceId, description, versions_used: versionsUsed })
+        .insert({
+          device_id: deviceId, description, versions_used: versionsUsed,
+          locale: meta.locale, market: meta.market, seed_rows: meta.seedRows,
+        })
         .select(DRAFT_COLUMNS)
         .single()
       return error || !data ? null : (data as DraftRef)
@@ -148,6 +153,7 @@ export function draftsDeps(ip: string): DraftsDeps {
       const { error } = await db.rpc('refund_p2s_generation', { p_device: subject, p_budget_period: period })
       if (error) console.error('[p2s] refund failed', error.message)
     },
+    screen: (text) => screenText(text, screenDeps()),
     callModel: callGemini,
     modelConfigured: MODEL_CONFIGURED,
     newDeviceId: () => randomUUID(),

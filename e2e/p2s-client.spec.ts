@@ -105,7 +105,7 @@ test('the screen reads the stream itself (no EventSource), starts once, and ride
   expect(src).toContain('runDraftRequest(')
   // Two dev mounts must not mean two spent versions.
   expect(src).toContain('if (started.current) return')
-  expect(src).toContain('<ShopCanvas view={view} mode="shaping" />')
+  expect(src).toContain('<ShopCanvas view={view} mode="shaping"')
   expect(src).toContain('router.push(`/p2s/${outcome.draftId}`)')
   // A pending line renders before any block lands: the narration does not wait for the network.
   expect(src).toContain('`${line.label}…`')

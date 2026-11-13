@@ -43,6 +43,9 @@ export interface OwnedDraftRow {
   versions_used: number
   updated_at: string
   view_token: string
+  seed_rows?: unknown
+  locale?: unknown
+  market?: unknown
 }
 
 /** A row as the view-only route reads it: content only. No id, no device, no token echoed back, no description. */
@@ -51,6 +54,8 @@ export interface SharedDraftRow {
   words: unknown
   catalog: unknown
   block_status: unknown
+  seed_rows?: unknown
+  locale?: unknown
 }
 
 export interface ReadDeps {
@@ -67,7 +72,7 @@ const str = (v: unknown) => typeof v === 'string'
  * Stored jsonb → typed blocks. A block that is not the shape we wrote reads as "not landed" instead of crashing the
  * page: a corrupt row must show a placeholder, never a 500.
  */
-export function coerceBlocks(row: Pick<SharedDraftRow, 'identity' | 'words' | 'catalog' | 'block_status'> & { numbers?: unknown }): DraftBlocks {
+export function coerceBlocks(row: Pick<SharedDraftRow, 'identity' | 'words' | 'catalog' | 'block_status'> & { numbers?: unknown; seed_rows?: unknown }): DraftBlocks {
   const i = row.identity
   const w = row.words
   const c = row.catalog
@@ -91,7 +96,15 @@ export function coerceBlocks(row: Pick<SharedDraftRow, 'identity' | 'words' | 'c
     catalog,
     numbers: coerceNumbers(row.numbers, catalog ?? []),
     block_status: { identity: pick('identity'), words: pick('words'), catalog: pick('catalog'), numbers: pick('numbers') },
+    seedRows: coerceSeedRows(row.seed_rows),
   }
+}
+
+/** D9 — rows were validated on the way in (and the DB caps them at 60); this only drops a shape it cannot show. */
+function coerceSeedRows(v: unknown): DraftBlocks['seedRows'] {
+  if (!Array.isArray(v)) return null
+  const rows = v.filter((r): r is { title: string } => isObj(r) && str(r.title)).slice(0, 60)
+  return rows.length ? (rows as NonNullable<DraftBlocks['seedRows']>) : null
 }
 
 export type OwnerResolution =

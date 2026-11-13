@@ -9,6 +9,7 @@
  */
 
 import { NUMBERS_SCHEMA } from './numbers'
+import { currencyWords, type P2sMarketHint } from './locale'
 import { CATALOG_CATEGORY_KEYS } from '../catalog-import'
 import { EXAMPLE_SETUP, SETUP_LANGUAGE_DIRECTIVE } from '../setup-spec'
 import { EXAMPLE_ROWS_MAX, EXAMPLE_ROWS_MIN, FAQ_MAX_ITEMS, GENERATABLE_PRESETS, type BlockKey, type IdentityBlock } from './blocks'
@@ -36,7 +37,7 @@ function wrap(description: string): string {
  */
 export function identityPrompt(description: string, shapeHint?: BusinessShape): string {
   const example = EXAMPLE_SETUP.profile ?? {}
-  return `Eres el diseñador de marca de Miyagi Sánchez, un marketplace en México. Un pequeño negocio te describe lo que vende en una frase. Propón la identidad de su tienda en línea.
+  return `Eres el diseñador de marca de Miyagi Sánchez, una plataforma de tiendas en línea para México y Estados Unidos. Un pequeño negocio te describe lo que vende en una frase. Propón la identidad de su tienda en línea.
 
 Devuelve un objeto JSON con:
 - "name": nombre corto y memorable de la tienda (máx. 60 caracteres). Si el negocio ya dice su nombre, úsalo.
@@ -95,7 +96,8 @@ ${SAFETY}
 ${wrap(description)}`
 }
 
-export function catalogPrompt(description: string, identity: Pick<IdentityBlock, 'name'>, shape: BusinessShape = DEFAULT_SHAPE): string {
+export function catalogPrompt(description: string, identity: Pick<IdentityBlock, 'name'>, shape: BusinessShape = DEFAULT_SHAPE, market: P2sMarketHint | null = null): string {
+  const money = currencyWords(market)
   const d = SHAPE_DEFAULTS[shape]
   const example = (EXAMPLE_SETUP.catalog ?? []).slice(0, 2).map(({ title, description: d, price, category }) => ({ title, description: d, price, category }))
   return `Propón entre ${EXAMPLE_ROWS_MIN} y ${EXAMPLE_ROWS_MAX} ${d.noun.many} DE EJEMPLO para la tienda "${identity.name}". Son ejemplos para que el vendedor vea cómo se vería su tienda; después los cambiará por los suyos.
@@ -104,7 +106,7 @@ ${d.catalogHint}
 Devuelve un objeto JSON {"products": [...]} (la clave se llama así aunque sean ${d.noun.many}); cada uno lleva:
 - "title": 5 a 100 caracteres.
 - "description": una o dos frases.
-- "price": precio sugerido realista en pesos mexicanos (1850 = $1,850), nunca en centavos.
+- "price": precio sugerido realista en ${money.es} (${money.example}), nunca en centavos.
 - "category": una de estas claves exactas: ${CATALOG_CATEGORY_KEYS.join(', ')}.
 No incluyas imágenes ni URLs.
 

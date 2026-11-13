@@ -184,6 +184,7 @@ test('the handler hands the parsed shape to the planner, without moving the orde
       return { ok: false, error: 'not needed' }
     },
     modelConfigured: true,
+    screen: async () => ({ verdict: 'allow' as const }),
     newDeviceId: () => DEVICE,
   }
   const result = await handleCreateDraft({ body: { draft_id: DRAFT, shape: 'food', turnstile_token: 't' }, deviceCookie: DEVICE }, deps)

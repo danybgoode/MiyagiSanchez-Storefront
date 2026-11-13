@@ -65,6 +65,7 @@ test('the handler hands the parsed tone to the model, and a tone changes neither
     refund: async () => {},
     callModel: async (req) => { if (req.block === 'words') wordsPromptText = req.body.contents[0].parts[0].text; return { ok: true, text: goodText[req.block] } },
     modelConfigured: true,
+    screen: async () => ({ verdict: 'allow' as const }),
     newDeviceId: () => DEVICE,
   }
   const result = await handleCreateDraft({ body: { draft_id: DRAFT, tone: 'formal', turnstile_token: 't' }, deviceCookie: DEVICE }, deps)

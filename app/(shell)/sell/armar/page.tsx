@@ -14,7 +14,7 @@ import { readChooserState, type CobrosSettings } from '@/lib/prompt-to-shop/cobr
 import { ARMAR_COPY } from '@/lib/prompt-to-shop/copy'
 import { publishState } from '@/lib/prompt-to-shop/photo'
 import { listOwnProducts, ownerPhotoCap, photosUsedThisMonth } from '@/lib/prompt-to-shop/photo-server'
-import { draftView, ownProductCards } from '@/lib/prompt-to-shop/view'
+import { draftView, ownProductCards, pendingSeedRows } from '@/lib/prompt-to-shop/view'
 import { guideProductCount, guideProgress, guideStepsFor } from '@/lib/setup-guide-source'
 import { fetchDeletedListingIds, fetchGuideShop } from '@/lib/setup-guide-server'
 
@@ -91,6 +91,7 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
         chooser={readChooserState((guideShop?.metadata as { settings?: CobrosSettings } | null)?.settings)}
         correosAvailable={correosAvailable}
         shape={shapeOf(kept.blocks.identity)}
+        seedRows={pendingSeedRows(kept.blocks.seedRows, own)}
       />
     )
   }

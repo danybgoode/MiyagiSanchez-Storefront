@@ -46,6 +46,7 @@ function db() {
     refund: async () => { trace.push('refund') },
     callModel: async () => { trace.push('model'); return { ok: false } },
     modelConfigured: true,
+    screen: async () => ({ verdict: 'allow' as const }),
     newDeviceId: () => '55555555-5555-4555-8555-555555555555',
   })
   return { trace, reads, edits, drafts }
@@ -167,7 +168,9 @@ test('the viewer read selects content only, never filters on claim (a kept draft
   const src = read('lib/prompt-to-shop/read.ts')
   const shared = src.slice(src.indexOf('findByViewToken'))
   const columns = src.match(/SHARED_COLUMNS = '([^']+)'/)![1]
-  expect(columns.split(',').map((c) => c.trim())).toEqual(['identity', 'words', 'catalog', 'block_status'])
+  // seed_rows (one-front-door-both-markets D9) is shop CONTENT — the merchant's own products — and locale is the
+  // language it is shown in. Still no id, device, description, market or claim field.
+  expect(columns.split(',').map((c) => c.trim())).toEqual(['identity', 'words', 'catalog', 'block_status', 'seed_rows', 'locale'])
   expect(shared).toContain(".eq('view_token', token)")
   expect(shared).toContain(".gt('expires_at'")
   expect(shared).not.toContain('claimed_by')

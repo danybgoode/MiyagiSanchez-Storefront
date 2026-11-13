@@ -11,7 +11,7 @@ import { versionsLeftCopy } from '@/lib/prompt-to-shop/allowance'
 import { patchDraft } from '@/lib/prompt-to-shop/client'
 import { DESCRIBE_COPY, OWNER_COPY } from '@/lib/prompt-to-shop/copy'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
-import { draftView, type DraftBlocks } from '@/lib/prompt-to-shop/view'
+import { draftView, seedCards, type DraftBlocks } from '@/lib/prompt-to-shop/view'
 import type { CanvasControl } from '@/lib/prompt-to-shop/access'
 import KeepSheet from './KeepSheet'
 import ShopCanvas from './ShopCanvas'
@@ -277,7 +277,7 @@ export default function OwnerCanvas({
   const landed = !view.pending.identity && !view.pending.words && !view.pending.catalog
   return (
     <>
-      <ShopCanvas view={view} mode="owner" toolbar={toolbar} />
+      <ShopCanvas view={view} mode="owner" toolbar={toolbar} ownCards={seedCards(blocks.seedRows)} />
       {can('keep') ? <KeepSheet draftId={draftId} shopName={view.name} signedIn={signedIn} ready={landed} /> : null}
     </>
   )

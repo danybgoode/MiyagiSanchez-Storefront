@@ -45,6 +45,21 @@ export const DESCRIBE_COPY = {
   manualLink: 'Armar a mano',
   /** No site key in this environment: the box cannot be verified, so it says so instead of looking broken. */
   unverifiable: 'No pudimos verificar que eres tú. Recarga la página e inténtalo de nuevo.',
+  // one-front-door-both-markets S1.3–S1.5 — start from what the merchant already has.
+  startWith: 'O empieza con lo que ya tienes',
+  photo: 'Una foto',
+  file: 'Tu lista en Excel o PDF',
+  link: 'El link de tu tienda',
+  linkLabel: 'La dirección de tu tienda o tu página',
+  linkPlaceholder: 'tutienda.myshopify.com',
+  linkSubmit: 'Leer',
+  reading: 'Leyendo…',
+  waitVerify: 'Un momento, estamos verificando…',
+  seeded: (n: number, source: string | null) =>
+    `${n === 1 ? 'Un producto' : `${n} productos`}${source ? ` de ${source}` : ''}. Se suben a tu tienda cuando sea tuya.`,
+  seededPhoto: 'Tu foto será el primer producto de tu tienda.',
+  remove: 'Quitar',
+  failed: 'No pudimos leerlo. Inténtalo de nuevo o describe tu negocio en una frase.',
 } as const
 
 export function characterCounter(length: number): string {
@@ -163,6 +178,18 @@ export const CLAIM_RETRY = {
   draft: 'No pudimos abrir tu tienda en armado ahora. Inténtalo de nuevo en un momento.',
 } as const
 
+/** one-front-door-both-markets D9 — the merchant's own products, uploaded once the shop is theirs. */
+export const SEED_COPY = {
+  title: (n: number) => (n === 1 ? 'Tu producto está listo para subir' : `Tus ${n} productos están listos para subir`),
+  lead: 'Los trajimos de tu foto, tu lista o tu tienda anterior. Súbelos a tu tienda y revísalos en tu panel antes de vender.',
+  run: (n: number) => (n === 1 ? 'Subir mi producto' : `Subir mis ${n} productos`),
+  busy: 'Subiendo…',
+  again: 'Volver a subir',
+  done: (created: number, failed: number) =>
+    failed ? `Subimos ${created}; ${failed} no se pudieron subir. Revísalos en tu panel, en Productos.` : `Listo: subimos ${created} a tu tienda.`,
+  failed: 'No pudimos subirlos ahora. Inténtalo de nuevo en un momento.',
+} as const
+
 export const ARMAR_COPY = {
   metaTitle: 'Tu tienda',
   working: 'Guardando tu tienda…',
@@ -235,6 +262,7 @@ export const CHECKLIST_COPY = {
 } as const
 
 export const PHOTO_COPY = {
+  prohibited: 'No podemos publicar productos que los pagos en línea no aceptan (por ejemplo medicamentos controlados, armas o réplicas).',
   // The sheet
   take: 'Tomar foto',
   pick: 'Elegir de mi galería',

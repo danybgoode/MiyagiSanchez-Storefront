@@ -31,6 +31,59 @@ export interface DraftBlocks {
    */
   numbers?: NumbersBlock | null
   block_status: Partial<Record<BlockKey, BlockStatus>>
+  /** one-front-door-both-markets D9 — the merchant's OWN products from a photo, a file or a store link. */
+  seedRows?: SeedRow[] | null
+}
+
+/** A seed row as the canvas reads it (the DB holds the validated `CatalogImportRow` shape). */
+export interface SeedRow { title: string; price?: number; currency?: string; images?: string[]; description?: string; category?: string }
+
+/**
+ * The seed rows still worth offering: none once every title is already one of the shop's products (the upload
+ * landed). An unreadable product list (null) offers them all — the importer's external ids make a repeat harmless.
+ */
+export function pendingSeedRows(rows: readonly SeedRow[] | null | undefined, products: ReadonlyArray<{ title: string }> | null): SeedRow[] {
+  if (!rows?.length) return []
+  if (!products) return [...rows]
+  const have = new Set(products.map((p) => p.title.trim().toLowerCase()))
+  return rows.every((r) => have.has(r.title.trim().toLowerCase())) ? [] : [...rows]
+}
+
+/** Must match CHUNK_MAX in app/api/sell/import/route.ts (the import page reads the same number). */
+export const SEED_IMPORT_CHUNK = 25
+
+/**
+ * D9 — the rows `/api/sell/import` receives. The external id is derived from the draft and the row's position, so
+ * importing twice UPDATES what the first import made (the importer's own re-upload rule) instead of duplicating it.
+ */
+export function seedImportRows(
+  draftId: string,
+  rows: readonly SeedRow[],
+  shopCurrency: string,
+): Array<SeedRow & { external_id: string; quantity: number; listing_type: string; category: string; currency: string }> {
+  // The row's currency is the market HINT the visitor had when the draft started; the shop's is the market they
+  // CHOSE. When they differ, a price in the hint's currency would be mislabelled in the shop's (US$95 → MX$95), so
+  // the price is dropped and the merchant sets it — never converted, never relabelled (fresh review, PR #498).
+  return rows.map((r, i) => ({
+    ...r,
+    currency: shopCurrency,
+    ...(r.currency && r.currency !== shopCurrency ? { price: undefined } : {}),
+    category: r.category ?? 'otros',
+    listing_type: 'product',
+    quantity: 1,
+    external_id: `p2s-${draftId.slice(0, 8)}-${i + 1}`,
+  }))
+}
+
+/** The merchant's own rows as cards: never «EJEMPLO», shown before the examples, «not published yet». */
+export function seedCards(rows: readonly SeedRow[] | null | undefined): OwnProductCardView[] {
+  return (rows ?? []).map((r, i) => ({
+    id: `seed-${i}`,
+    title: r.title,
+    priceLabel: typeof r.price === 'number' ? formatSuggestedPrice(r.price, r.currency) : null,
+    imageUrl: r.images?.[0] ?? null,
+    published: false,
+  }))
 }
 
 export interface ExampleCardView {

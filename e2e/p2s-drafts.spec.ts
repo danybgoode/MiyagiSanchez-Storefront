@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { handleCreateDraft, parseDraftsBody, P2S_COPY, sseFrame, type DraftsDeps } from '../lib/prompt-to-shop/handler'
 import type { BlockEvent } from '../lib/prompt-to-shop/planner'
+import type { ScreenVerdict } from '../lib/prompt-to-shop/screen'
 
 // Prompt-to-shop S1.3 + S1.4 — POST /api/p2s/drafts, driven with fakes (epic D7, D8, D11, D12).
 //
@@ -22,7 +23,7 @@ const goodText = {
 
 type Spend = { data: unknown; error: unknown }
 
-function fakes(over: Partial<DraftsDeps> & { spendAnswer?: Spend; turnstileOk?: boolean } = {}) {
+function fakes(over: Partial<DraftsDeps> & { spendAnswer?: Spend; turnstileOk?: boolean; screenVerdict?: ScreenVerdict } = {}) {
   const trace: string[] = []
   const deps: DraftsDeps = {
     verifyTurnstile: async () => { trace.push('turnstile'); return over.turnstileOk === false ? { ok: false, reason: 'rejected' } : { ok: true } },
@@ -35,6 +36,7 @@ function fakes(over: Partial<DraftsDeps> & { spendAnswer?: Spend; turnstileOk?: 
     refund: async () => { trace.push('refund') },
     callModel: async (req) => { trace.push(`model:${req.block}`); return { ok: true, text: goodText[req.block] } },
     modelConfigured: true,
+    screen: async () => { trace.push('screen'); return over.screenVerdict ?? { verdict: 'allow' as const } },
     newDeviceId: () => DEVICE,
     ...over,
   }
@@ -60,7 +62,7 @@ test('a new draft streams exactly three blocks and done, each saved before it is
   expect(events.slice(0, 4).map((e) => (e.data as BlockEvent).key)).toEqual(['identity', 'words', 'catalog', 'numbers'])
   expect(events[4].data).toEqual({ draft_id: DRAFT, versions_left: 2 })
   expect(trace).toEqual([
-    'turnstile', 'burst', 'spend', 'create',
+    'turnstile', 'burst', 'screen', 'spend', 'create',
     'model:identity', 'save:identity@1', 'model:words', 'save:words@1', 'model:catalog', 'save:catalog@1', 'model:numbers', 'save:numbers@1',
   ])
 })
@@ -76,7 +78,7 @@ test('an exhausted budget closes the box with the come-back-tomorrow message, no
   const { deps, trace } = fakes({ spendAnswer: { data: { ok: false, reason: 'budget', versions_used: 0 }, error: null } })
   const result = await handleCreateDraft({ body, deviceCookie: DEVICE }, deps)
   expect(result).toMatchObject({ kind: 'refuse', status: 503, message: 'Hoy ya armamos muchas tiendas. Vuelve mañana o déjanos tu correo.' })
-  expect(trace).toEqual(['turnstile', 'burst', 'spend'])
+  expect(trace).toEqual(['turnstile', 'burst', 'screen', 'spend'])
 })
 
 test('a failed Turnstile refuses before anything else, and creates no draft', async () => {
@@ -90,7 +92,7 @@ test('a spend the database could not answer refuses (fails closed)', async () =>
   const { deps, trace } = fakes({ spendAnswer: { data: null, error: { message: 'timeout' } } })
   const result = await handleCreateDraft({ body, deviceCookie: DEVICE }, deps)
   expect(result).toMatchObject({ kind: 'refuse', status: 503, error: 'unavailable' })
-  expect(trace).toEqual(['turnstile', 'burst', 'spend'])
+  expect(trace).toEqual(['turnstile', 'burst', 'screen', 'spend'])
 })
 
 test('no model configured refuses BEFORE an allowance is spent', async () => {
@@ -141,7 +143,7 @@ test('a draft write that fails AFTER the spend refunds it, and never reaches the
   const create = fakes({ createDraft: async () => null })
   const created = await handleCreateDraft({ body, deviceCookie: DEVICE }, create.deps)
   expect(created).toMatchObject({ kind: 'refuse', status: 503, error: 'unavailable' })
-  expect(create.trace).toEqual(['turnstile', 'burst', 'spend', 'refund'])
+  expect(create.trace).toEqual(['turnstile', 'burst', 'screen', 'spend', 'refund'])
 
   const rerun = fakes({ startVersion: async () => false })
   await handleCreateDraft({ body: { draft_id: DRAFT, turnstile_token: 'tok' }, deviceCookie: DEVICE }, rerun.deps)

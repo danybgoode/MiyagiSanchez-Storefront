@@ -12,6 +12,7 @@
  * Pure: no I/O, no `next/*`.
  */
 
+import type { P2sMarketHint } from './locale'
 import { SETUP_LANGUAGE_DIRECTIVE } from '../setup-spec'
 import { SHAPE_DEFAULTS, type BusinessShape } from '../business-shape'
 import type { DraftNumbers } from '../business-plan/model'
@@ -117,17 +118,20 @@ export function numbersPrompt(
   shopName: string,
   examples: Array<{ title: string; price?: number | null }>,
   shape: BusinessShape,
+  market: P2sMarketHint | null = null,
 ): string {
+  const money = market === 'us' ? 'dólares (USD)' : 'pesos'
+  const place = market === 'us' ? 'Estados Unidos' : 'México'
   const list = examples.map((e, i) => `${i}. ${e.title.replace(/[\r\n]+/g, ' ')} — $${e.price ?? '?'}`).join('\n')
-  return `Eres el asesor de negocio de Miyagi Sánchez. Estima los números de "${shopName}", un negocio de ${SHAPE_DEFAULTS[shape].label.toLowerCase()} en México, para que el dueño vea cuánto le cuesta lo que vende. Son ESTIMACIONES realistas para un negocio pequeño; el dueño las corregirá.
+  return `Eres el asesor de negocio de Miyagi Sánchez. Estima los números de "${shopName}", un negocio de ${SHAPE_DEFAULTS[shape].label.toLowerCase()} en ${place}, para que el dueño vea cuánto le cuesta lo que vende. Son ESTIMACIONES realistas para un negocio pequeño; el dueño las corregirá.
 
-Sus ${SHAPE_DEFAULTS[shape].noun.many} de ejemplo (índice. título — precio en pesos):
+Sus ${SHAPE_DEFAULTS[shape].noun.many} de ejemplo (índice. título — precio en ${money}):
 ${list}
 
 Devuelve un objeto JSON con:
-- "offers": uno por ejemplo: {"index": el índice de arriba, "unit_cost": lo que le cuesta hacer o conseguir UNO en pesos (materiales, insumos, mercancía; sin su sueldo), menor que el precio, "minutes_per_unit": minutos de su recurso limitante que toma UNO}.
+- "offers": uno por ejemplo: {"index": el índice de arriba, "unit_cost": lo que le cuesta hacer o conseguir UNO en ${money} (materiales, insumos, mercancía; sin su sueldo), menor que el precio, "minutes_per_unit": minutos de su recurso limitante que toma UNO}.
 - "capacity": {"resource": el UN recurso que limita cuánto puede producir o atender (por ejemplo "tu tiempo", "el horno", "la camioneta"), máx. 60 caracteres; "hours_per_month": horas al mes que ese recurso está disponible}.
-- "fixed_costs": hasta ${NUMBERS_LIMITS.maxFixedCosts} costos fijos al mes que un negocio así suele tener: {"label": por ejemplo "Renta" o "Gas", "monthly": pesos al mes}. Si no suele tener, devuelve [].
+- "fixed_costs": hasta ${NUMBERS_LIMITS.maxFixedCosts} costos fijos al mes que un negocio así suele tener: {"label": por ejemplo "Renta" o "Gas", "monthly": ${money} al mes}. Si no suele tener, devuelve [].
 No inventes ventas, márgenes ni metas.
 
 IDIOMA
