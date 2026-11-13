@@ -8,7 +8,7 @@ import { syncMedusaSellerProfile } from '@/lib/medusa-seller-sync'
 // GET — Stripe redirects here after seller completes onboarding
 export async function GET(req: NextRequest) {
   const { userId, getToken } = await auth()
-  if (!userId) return NextResponse.redirect(publicUrl('/sign-in', req))
+  if (!userId) return NextResponse.redirect(publicUrl('/sign-in'))
 
   const requestedAccountId = req.nextUrl.searchParams.get('account_id')
 
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     .limit(1)
     .maybeSingle()
 
-  if (!shop) return NextResponse.redirect(publicUrl('/sell', req))
+  if (!shop) return NextResponse.redirect(publicUrl('/sell'))
 
   const existingBeforeUpdate = getShopStripe(shop.metadata as Record<string, unknown> | null)
 
@@ -82,5 +82,5 @@ export async function GET(req: NextRequest) {
   }
 
   const status = chargesEnabled ? 'connected' : 'pending'
-  return NextResponse.redirect(publicUrl(`/shop/manage/settings?stripe=${status}`, req))
+  return NextResponse.redirect(publicUrl(`/shop/manage/settings?stripe=${status}`))
 }

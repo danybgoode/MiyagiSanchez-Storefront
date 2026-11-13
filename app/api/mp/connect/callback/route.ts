@@ -16,7 +16,7 @@ import { resolveOrigin, publicUrl } from '@/lib/request-origin'
 
 export async function GET(req: NextRequest) {
   const { userId, getToken } = await auth()
-  if (!userId) return NextResponse.redirect(publicUrl('/sign-in', req))
+  if (!userId) return NextResponse.redirect(publicUrl('/sign-in'))
 
   // Onboarding three-doors S7 — the ONLY change to this callback: read where the
   // GET handler stashed the return destination, so the wizard's out-and-back
@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
   const errorRedirect = (reason: string) =>
     clearReturnCookie(NextResponse.redirect(
       returnToWizard
-        ? publicUrl(`/shop/manage/settings/pagos/wizard?mp=error&reason=${encodeURIComponent(reason)}`, req)
-        : publicUrl(`/shop/manage/settings/pagos?mp=error&reason=${encodeURIComponent(reason)}#mercadopago`, req),
+        ? publicUrl(`/shop/manage/settings/pagos/wizard?mp=error&reason=${encodeURIComponent(reason)}`)
+        : publicUrl(`/shop/manage/settings/pagos?mp=error&reason=${encodeURIComponent(reason)}#mercadopago`),
     ))
 
   const code = req.nextUrl.searchParams.get('code')
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     .limit(1)
     .maybeSingle()
 
-  if (!shop) return NextResponse.redirect(publicUrl('/sell', req))
+  if (!shop) return NextResponse.redirect(publicUrl('/sell'))
 
   // Must byte-match the redirect_uri used at authorization AND registered in MP
   // (trailing slash → invalid_grant) — resolveOrigin() strips one defensively.
@@ -83,8 +83,8 @@ export async function GET(req: NextRequest) {
 
     const res = NextResponse.redirect(
       returnToWizard
-        ? publicUrl('/shop/manage/settings/pagos/wizard?mp=connected', req)
-        : publicUrl('/shop/manage/settings/pagos?mp=connected#mercadopago', req),
+        ? publicUrl('/shop/manage/settings/pagos/wizard?mp=connected')
+        : publicUrl('/shop/manage/settings/pagos?mp=connected#mercadopago'),
     )
     res.cookies.set('mp_pkce_verifier', '', { maxAge: 0, path: '/api/mp/connect' })
     res.cookies.set('mp_return_to', '', { maxAge: 0, path: '/api/mp/connect' })

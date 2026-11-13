@@ -78,7 +78,7 @@ const FALLBACK_ORIGIN = 'https://miyagisanchez.com'
  * one-front-door-both-markets). Only a TRUSTED origin is used: the configured site URL, else the platform's own —
  * never the request's Host header, which a caller controls (an open redirect on a payments route; Codex, PR #502).
  */
-export function publicUrl(path: string, _req?: unknown): URL {
+export function publicUrl(path: string): URL {
   const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')
   return new URL(path, site || FALLBACK_ORIGIN)
 }

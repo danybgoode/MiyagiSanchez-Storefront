@@ -14,12 +14,12 @@ const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
 export async function GET(req: NextRequest) {
   const { userId, getToken } = await auth()
   if (!userId) {
-    return NextResponse.redirect(publicUrl('/sign-in', req))
+    return NextResponse.redirect(publicUrl('/sign-in'))
   }
 
   const errorRedirect = (reason: string) =>
     NextResponse.redirect(
-      publicUrl(`/shop/manage/settings?stripe=error&reason=${encodeURIComponent(reason)}`, req),
+      publicUrl(`/shop/manage/settings?stripe=error&reason=${encodeURIComponent(reason)}`),
     )
 
   // Fetch shop
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
 
   if (!shop) {
-    return NextResponse.redirect(publicUrl('/sell', req))
+    return NextResponse.redirect(publicUrl('/sell'))
   }
 
 
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       return errorRedirect('cross_site')
     }
     const jwt = await getToken()
-    if (!jwt) return NextResponse.redirect(publicUrl('/sign-in', req))
+    if (!jwt) return NextResponse.redirect(publicUrl('/sign-in'))
     const res = await fetch(`${MEDUSA_BASE}/store/sellers/me/stripe-connect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-publishable-api-key': PUB_KEY, Authorization: `Bearer ${jwt}` },

@@ -9,15 +9,15 @@ import { resolveOrigin, publicUrl } from '@/lib/request-origin'
 // explicitly); we generate a fresh onboarding link.
 export async function GET(req: NextRequest) {
   const { userId } = await auth()
-  if (!userId) return NextResponse.redirect(publicUrl('/sign-in', req))
+  if (!userId) return NextResponse.redirect(publicUrl('/sign-in'))
 
   const errorRedirect = (reason: string) =>
     NextResponse.redirect(
-      publicUrl(`/shop/manage/settings?stripe=error&reason=${encodeURIComponent(reason)}`, req),
+      publicUrl(`/shop/manage/settings?stripe=error&reason=${encodeURIComponent(reason)}`),
     )
 
   const accountId = req.nextUrl.searchParams.get('account_id')
-  if (!accountId) return NextResponse.redirect(publicUrl('/shop/manage/settings', req))
+  if (!accountId) return NextResponse.redirect(publicUrl('/shop/manage/settings'))
 
   // Ownership check — account_id is caller-supplied (a query param), so an
   // authenticated user must not be able to mint a fresh Stripe onboarding

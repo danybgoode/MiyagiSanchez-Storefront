@@ -14,10 +14,10 @@ import { resolveOrigin, publicUrl } from '@/lib/request-origin'
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth()
-  if (!userId) return NextResponse.redirect(publicUrl('/sign-in', req))
+  if (!userId) return NextResponse.redirect(publicUrl('/sign-in'))
 
   const errorRedirect = (reason: string) =>
-    NextResponse.redirect(publicUrl(`/shop/manage/settings/pagos?mp=error&reason=${encodeURIComponent(reason)}#mercadopago`, req))
+    NextResponse.redirect(publicUrl(`/shop/manage/settings/pagos?mp=error&reason=${encodeURIComponent(reason)}#mercadopago`))
 
   const { data: shop } = await db
     .from('marketplace_shops')
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     .limit(1)
     .maybeSingle()
 
-  if (!shop) return NextResponse.redirect(publicUrl('/sell', req))
+  if (!shop) return NextResponse.redirect(publicUrl('/sell'))
 
   try {
     // resolveOrigin() already strips a trailing slash, so the redirect_uri
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE() {
   const { userId, getToken } = await auth()
   if (!userId) return NextResponse.json({ error: 'No autenticado.' }, { status: 401 })
 

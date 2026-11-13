@@ -5,13 +5,12 @@ import { publicUrl } from '../lib/request-origin'
 // A signed-out seller on /api/stripe/connect was sent to https://0.0.0.0:8080/sign-in: behind Caddy, `req.url` is the
 // container's bind address. Redirects use the public origin.
 
-const req = (host: string | null) => ({ url: 'https://0.0.0.0:8080/api/stripe/connect', headers: { get: (k: string) => (k === 'host' ? host : null) } })
 
-test('the site URL wins over the container address', () => {
+test('the site URL is the redirect origin, never the container address', () => {
   const prev = process.env.NEXT_PUBLIC_SITE_URL
   process.env.NEXT_PUBLIC_SITE_URL = 'https://miyagisanchez.com'
   try {
-    expect(publicUrl('/sign-in', req('0.0.0.0:8080')).toString()).toBe('https://miyagisanchez.com/sign-in')
+    expect(publicUrl('/sign-in').toString()).toBe('https://miyagisanchez.com/sign-in')
   } finally {
     process.env.NEXT_PUBLIC_SITE_URL = prev
   }
@@ -27,7 +26,7 @@ test('a forged Host header never becomes the redirect origin (Codex, PR #502)', 
   const prev = process.env.NEXT_PUBLIC_SITE_URL
   delete process.env.NEXT_PUBLIC_SITE_URL
   try {
-    expect(publicUrl('/sign-in', req('attacker.example')).toString()).toBe('https://miyagisanchez.com/sign-in')
+    expect(publicUrl('/sign-in').toString()).toBe('https://miyagisanchez.com/sign-in')
   } finally {
     process.env.NEXT_PUBLIC_SITE_URL = prev
   }
