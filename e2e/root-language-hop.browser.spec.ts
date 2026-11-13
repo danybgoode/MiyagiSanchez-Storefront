@@ -62,26 +62,21 @@ async function settledPath(page: Page): Promise<string> {
 }
 
 /**
- * root-shop-builder-home (2026-10-29): `/` is the Mexico shop builder and NEVER hops.
+ * one-front-door-both-markets D16 (2026-11-12): `/` and `/en` are the SAME shop builder in two languages.
  *
- * Before this epic `/` was the Spanish copy of the selector and moved English browsers to
- * `/en`. That hop would now carry an `en-MX` phone — common in Mexico — straight past the
- * pitch onto a country picker, so the selector island is no longer mounted on `/`. `/en` is
- * untouched by product-owner decision: it still hops a Spanish browser to `/`, which now
- * lands them on the pitch, and its "Español" link still goes to `/`.
+ * An `en-US` browser on `/` is moved once to `/en`, the English builder. An `en-MX` phone is NOT
+ * (root-shop-builder-home D5 still holds: an English-set phone in Mexico must not skip the Mexican pitch) — see the
+ * `en-MX` block below. `/en` hops a Spanish browser to `/`, and a stored choice beats both.
  */
 test.describe('an English browser', () => {
   test.use({ locale: 'en-US' })
 
-  test('/ does not hop: it stays on the shop builder', async ({ page }) => {
+  test('/ hops once to the English builder', async ({ page }) => {
     await page.goto('/')
 
-    expect(await settledPath(page)).toBe('/')
-    await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX')
+    expect(await settledPath(page)).toBe('/en')
     await expect(page.getByTestId('p2s-describe-box')).toBeVisible()
-    await expect(page.getByTestId('market-selector')).toHaveCount(0)
-    // The English document is one deliberate tap away, never an automatic move.
-    await expect(page.getByTestId('root-market-link-en')).toHaveAttribute('href', '/en')
+    await expect(page.getByTestId('p2s-describe-box')).toContainText('Tell us what you sell')
   })
 
   test('/en is a terminus, not a bounce — an English browser stays put', async ({ page }) => {
@@ -108,7 +103,7 @@ test.describe('an English browser', () => {
 
     expect(movedAway, 'an English browser on /en must not be moved anywhere').toEqual([])
     expect(new URL(page.url()).pathname).toBe('/en')
-    await expect(page.getByTestId('market-selector')).toBeVisible()
+    await expect(page.getByTestId('p2s-describe-box')).toBeVisible()
   })
 
   test('Español on /en lands on the shop builder, and it stays there', async ({ page }) => {
@@ -147,13 +142,23 @@ test.describe('a Spanish browser is left alone', () => {
     await page.getByTestId('root-market-link-en').click()
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 10_000 }).toBe('/en')
     expect(await settledPath(page)).toBe('/en')
-    await expect(page.getByTestId('market-selector')).toBeVisible()
+    await expect(page.getByTestId('p2s-describe-box')).toContainText('Tell us what you sell')
   })
 
   test('/en hops back to the Spanish document, which is now the shop builder', async ({ page }) => {
     await page.goto('/en')
     expect(await settledPath(page)).toBe('/')
     await expect(page.getByTestId('p2s-describe-box')).toBeVisible()
+  })
+})
+
+test.describe('an English-set phone in Mexico stays on the Mexican builder (D5 kept)', () => {
+  test.use({ locale: 'en-MX' })
+
+  test('/ does not hop for en-MX', async ({ page }) => {
+    await page.goto('/')
+    expect(await settledPath(page)).toBe('/')
+    await expect(page.getByTestId('p2s-describe-box')).toContainText('Cuéntanos qué vendes')
   })
 })
 

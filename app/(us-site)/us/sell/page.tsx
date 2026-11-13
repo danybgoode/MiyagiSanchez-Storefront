@@ -4,6 +4,8 @@ import { getOverriddenDictionary } from '@/lib/copy-overrides'
 import { usSellerCtaHref } from '@/lib/seller-acquisition'
 import { SellerAcquisitionPage } from '@/app/(shell)/mx/vende/_components/SellerAcquisitionSections'
 import { buildUsMarketPageConfig } from '@/app/(shell)/mx/vende/_components/page-config'
+import DescribeBox from '@/app/(shell)/mx/vende/_components/DescribeBox'
+import Link from 'next/link'
 
 /**
  * `/us/sell` — the US merchant landing, with a URL of its own.
@@ -69,7 +71,7 @@ const meta = en.sellerAcquisition.us.metadata
 export const metadata: Metadata = {
   title: meta.title,
   description: meta.description,
-  alternates: { canonical: `${BASE_URL}${PAGE_PATH}` },
+  alternates: { canonical: `${BASE_URL}${PAGE_PATH}`, languages: { "en-US": `${BASE_URL}${PAGE_PATH}`, "es-US": `${BASE_URL}/us/vende` } },
   openGraph: {
     type: 'website',
     locale: 'en_US',
@@ -120,7 +122,16 @@ export default async function UnitedStatesSellPage({ searchParams }: UnitedState
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <SellerAcquisitionPage config={config} />
+      <SellerAcquisitionPage
+        config={{
+          ...config,
+          // one-front-door-both-markets S2.4/S3.1 — the builder is the hero here too, and it makes US shops.
+          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell?market=us'} locale="en" marketHint="us" />,
+        }}
+      />
+      <p className="app-shell t-small" style={{ textAlign: 'center', paddingBottom: 'var(--s-8)' }}>
+        <Link href="/us/vende" hrefLang="es-US" prefetch={false} data-testid="us-sell-spanish">Lee esta página en español</Link>
+      </p>
     </>
   )
 }

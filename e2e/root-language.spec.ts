@@ -6,6 +6,7 @@ import {
   ROOT_LANGUAGE_PATHS,
   preferredRootLanguage,
   rootLanguageRedirect,
+  builderLanguageRedirect,
 } from '../lib/root-language'
 import { recommendedMarketForLocale } from '../lib/market-recommendation'
 import { sellerLandingPath } from '../lib/seller-acquisition'
@@ -139,29 +140,39 @@ test.describe('the selector wires language to destination', () => {
     // The selector's server render must read no request headers, or `/en` stops being a
     // static CDN asset — the ~30s cold start marketplace-static-shell fixed. `/` renders
     // per request now (root-shop-builder-home D2) but still has no reason to read them.
-    for (const route of ['app/(site)/page.tsx', 'app/(en-site)/en/page.tsx', 'app/(site)/MarketSelector.tsx']) {
+    for (const route of ['app/(site)/page.tsx', 'app/(en-site)/en/page.tsx']) {
       expect(source(route), route).not.toMatch(/\bheaders\(\)|\bcookies\(\)/)
     }
   })
 
   test('both roots bound their CDN TTL', () => {
     // Duplicated from the population guard on purpose: this is the one property whose
-    // absence is invisible until a deploy. `/en` is a 60 s ISR document; `/` renders per
-    // request, which Cloudflare never stores (root-shop-builder-home D2).
-    expect(source('app/(en-site)/en/page.tsx')).toMatch(/export const revalidate = 60\b/)
+    // absence is invisible until a deploy. Both builders render per request, which Cloudflare
+    // never stores (root-shop-builder-home D2) — and the describe box needs its runtime site key.
+    expect(source('app/(en-site)/en/page.tsx')).toMatch(/export const dynamic = 'force-dynamic'/)
     expect(source('app/(site)/page.tsx')).toMatch(/export const dynamic = 'force-dynamic'/)
   })
 
-  test('/ is the shop builder and never hops; /en still does', () => {
+  test('/ and /en are the same builder in two languages, each running the one-time hop (D16)', () => {
     const root = source('app/(site)/page.tsx')
-    // The island that moves English browsers lives only in the selector, which `/` no
-    // longer renders — so an en-MX phone stays on the pitch.
-    // Imports, not text: the page's own comment explains the move and names the selector.
-    expect(root).not.toMatch(/^import .*RootLanguageSwitch/m)
-    expect(root).not.toMatch(/^import .*MarketSelector/m)
-    expect(root).toMatch(/^import DescribeBox from /m)
-    // `/en` keeps the island, and its target for a Spanish reader is still `/`.
-    expect(source('app/(site)/MarketSelector.tsx')).toContain('<RootLanguageSwitch current={language} />')
-    expect(rootLanguageRedirect({ current: 'en', languages: ['es-MX'] })).toBe('/')
+    const en = source('app/(en-site)/en/page.tsx')
+    for (const page of [root, en]) {
+      expect(page).toMatch(/^import DescribeBox from /m)
+      expect(page).not.toMatch(/^import .*MarketSelector/m)
+    }
+    expect(root).toContain('<RootLanguageSwitch current="es" />')
+    expect(en).toContain('language="en"')
+    expect(source('app/(site)/RootMarketLinks.tsx')).toContain('<RootLanguageSwitch current="en" />')
+    expect(source('app/(site)/RootLanguageSwitch.tsx')).toContain('builderLanguageRedirect(')
+  })
+
+  test('the builder hop: English moves / → /en unless the browser says Mexico; Spanish moves /en → /', () => {
+    expect(builderLanguageRedirect({ current: 'es', languages: ['en-US'] })).toBe('/en')
+    expect(builderLanguageRedirect({ current: 'es', languages: ['en-MX'] })).toBeNull()
+    expect(builderLanguageRedirect({ current: 'es', languages: ['en-US', 'es-MX'] })).toBeNull()
+    expect(builderLanguageRedirect({ current: 'es', languages: ['en_mx'] })).toBeNull()
+    expect(builderLanguageRedirect({ current: 'en', languages: ['es-MX'] })).toBe('/')
+    expect(builderLanguageRedirect({ current: 'en', languages: ['en-MX'] })).toBeNull()
+    expect(builderLanguageRedirect({ current: 'es', languages: ['en-US'], chosen: 'es' })).toBeNull()
   })
 })
