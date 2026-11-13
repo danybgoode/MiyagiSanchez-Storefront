@@ -340,3 +340,21 @@ test('a page body is capped AS IT IS READ: a declared length over the cap reads 
   expect((growing as unknown as { wasCancelled: () => boolean }).wasCancelled()).toBe(true)
   expect((await readCappedBody(streamOf([300, 300]), null, 1000))?.byteLength).toBe(600)
 })
+
+import * as XLSX from 'xlsx'
+import { zipDeclaredUncompressedSize, XLSX_MAX_UNCOMPRESSED } from '../lib/prompt-to-shop/intake'
+
+test('a spreadsheet\'s declared expansion is read from the zip directory before any parse (zip-bomb guard)', () => {
+  const ws = XLSX.utils.aoa_to_sheet([['title', 'price'], ['Vela de soya lavanda', 180]])
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'A')
+  const bytes = new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer)
+  const size = zipDeclaredUncompressedSize(bytes)
+  expect(size).toBeGreaterThan(100)
+  expect(size!).toBeLessThan(XLSX_MAX_UNCOMPRESSED)
+  // Patch the first central-directory entry to declare 2 GB: the guard must see it without inflating anything.
+  const bomb = bytes.slice()
+  const v = new DataView(bomb.buffer)
+  for (let i = 0; i < bomb.length - 4; i++) if (v.getUint32(i, true) === 0x02014b50) { v.setUint32(i + 24, 0x7fffffff, true); break }
+  expect(zipDeclaredUncompressedSize(bomb)!).toBeGreaterThan(XLSX_MAX_UNCOMPRESSED)
+  expect(zipDeclaredUncompressedSize(new TextEncoder().encode('not a zip at all, just text'))).toBeNull()
+})

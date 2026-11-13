@@ -311,3 +311,33 @@ export async function readCappedBody(body: ReadableStream<Uint8Array> | null, co
   for (const c of chunks) { out.set(c, at); at += c.byteLength }
   return out
 }
+
+/** What a spreadsheet may expand to before we parse it (Codex security, PR #498): a 5 MB upload can be a zip bomb. */
+export const XLSX_MAX_UNCOMPRESSED = 40 * 1024 * 1024
+
+/**
+ * The total UNCOMPRESSED size an .xlsx (a zip) declares in its central directory, or null when it is not a readable
+ * zip. Read from the end-of-central-directory record; never inflates anything. A declared size can lie, so the parse
+ * that follows is ALSO bounded (`sheetRows`) — this refuses the honest-but-huge and the obviously hostile cheaply.
+ */
+export function zipDeclaredUncompressedSize(bytes: Uint8Array): number | null {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const minEocd = 22
+  if (bytes.byteLength < minEocd) return null
+  let eocd = -1
+  for (let i = bytes.byteLength - minEocd; i >= Math.max(0, bytes.byteLength - minEocd - 0xffff); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break }
+  }
+  if (eocd < 0) return null
+  const entries = view.getUint16(eocd + 10, true)
+  let at = view.getUint32(eocd + 16, true)
+  let total = 0
+  for (let n = 0; n < entries; n++) {
+    if (at + 46 > bytes.byteLength || view.getUint32(at, true) !== 0x02014b50) return null
+    const size = view.getUint32(at + 24, true)
+    if (size === 0xffffffff) return Number.POSITIVE_INFINITY // zip64: refuse rather than read a second format
+    total += size
+    at += 46 + view.getUint16(at + 28, true) + view.getUint16(at + 30, true) + view.getUint16(at + 32, true)
+  }
+  return total
+}
