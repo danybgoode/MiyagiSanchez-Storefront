@@ -12,11 +12,11 @@ import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
 import { exchangeMpCode, mpSettingsFromToken, getShopMercadoPago } from '@/lib/mercadopago-connect'
 import { syncMedusaSellerProfile } from '@/lib/medusa-seller-sync'
-import { resolveOrigin } from '@/lib/request-origin'
+import { resolveOrigin, publicUrl } from '@/lib/request-origin'
 
 export async function GET(req: NextRequest) {
   const { userId, getToken } = await auth()
-  if (!userId) return NextResponse.redirect(new URL('/sign-in', req.url))
+  if (!userId) return NextResponse.redirect(publicUrl('/sign-in', req))
 
   // Onboarding three-doors S7 — the ONLY change to this callback: read where the
   // GET handler stashed the return destination, so the wizard's out-and-back
@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
   const errorRedirect = (reason: string) =>
     clearReturnCookie(NextResponse.redirect(
       returnToWizard
-        ? new URL(`/shop/manage/settings/pagos/wizard?mp=error&reason=${encodeURIComponent(reason)}`, req.url)
-        : new URL(`/shop/manage/settings/pagos?mp=error&reason=${encodeURIComponent(reason)}#mercadopago`, req.url),
+        ? publicUrl(`/shop/manage/settings/pagos/wizard?mp=error&reason=${encodeURIComponent(reason)}`, req)
+        : publicUrl(`/shop/manage/settings/pagos?mp=error&reason=${encodeURIComponent(reason)}#mercadopago`, req),
     ))
 
   const code = req.nextUrl.searchParams.get('code')
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     .limit(1)
     .maybeSingle()
 
-  if (!shop) return NextResponse.redirect(new URL('/sell', req.url))
+  if (!shop) return NextResponse.redirect(publicUrl('/sell', req))
 
   // Must byte-match the redirect_uri used at authorization AND registered in MP
   // (trailing slash → invalid_grant) — resolveOrigin() strips one defensively.
@@ -83,8 +83,8 @@ export async function GET(req: NextRequest) {
 
     const res = NextResponse.redirect(
       returnToWizard
-        ? new URL('/shop/manage/settings/pagos/wizard?mp=connected', req.url)
-        : new URL('/shop/manage/settings/pagos?mp=connected#mercadopago', req.url),
+        ? publicUrl('/shop/manage/settings/pagos/wizard?mp=connected', req)
+        : publicUrl('/shop/manage/settings/pagos?mp=connected#mercadopago', req),
     )
     res.cookies.set('mp_pkce_verifier', '', { maxAge: 0, path: '/api/mp/connect' })
     res.cookies.set('mp_return_to', '', { maxAge: 0, path: '/api/mp/connect' })

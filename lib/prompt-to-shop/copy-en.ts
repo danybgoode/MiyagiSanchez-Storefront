@@ -436,3 +436,24 @@ export function nudgeCopy(locale: P2sLocale | string | null | undefined, market?
 export function describeCopy(locale: P2sLocale): Widen<typeof DESCRIBE_COPY> {
   return locale === 'en' ? DESCRIBE_COPY_EN : DESCRIBE_COPY
 }
+
+/**
+ * English for a builder message the SERVER sent in Spanish (one-front-door-both-markets follow-up): the photo, confirm,
+ * publish and claim routes answer in the platform's Spanish; an English screen shows the twin at the same key. Built
+ * once from the same bundle pairs `builderCopy` uses, so a new Spanish line with an English twin is covered with no
+ * second list. A message with no twin (a backend's own text) is returned unchanged.
+ */
+let EN_FOR: Map<string, string> | null = null
+export function englishFor(message: string): string {
+  if (!EN_FOR) {
+    EN_FOR = new Map()
+    const walk = (es: unknown, en: unknown) => {
+      if (typeof es === 'string' && typeof en === 'string') { if (!EN_FOR!.has(es)) EN_FOR!.set(es, en); return }
+      if (es && en && typeof es === 'object' && typeof en === 'object') {
+        for (const k of Object.keys(es as object)) walk((es as Record<string, unknown>)[k], (en as Record<string, unknown>)[k])
+      }
+    }
+    walk(builderCopy('es'), builderCopy('en'))
+  }
+  return EN_FOR.get(message) ?? message
+}

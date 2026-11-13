@@ -6,6 +6,7 @@
  * that opens the seller's Express Dashboard directly.
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { publicUrl } from '@/lib/request-origin'
 import { currentUser } from '@clerk/nextjs/server'
 import { stripe } from '@/lib/stripe'
 import { db } from '@/lib/supabase'
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
   // here — this file just never needed `origin` in the first place).
   const user = await currentUser()
   if (!user) {
-    return NextResponse.redirect(new URL('/sign-in', req.url))
+    return NextResponse.redirect(publicUrl('/sign-in', req))
   }
 
   // ── Fetch seller's shop ──────────────────────────────────────────────────
@@ -34,14 +35,14 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
 
   if (!shop) {
-    return NextResponse.redirect(new URL('/sell', req.url))
+    return NextResponse.redirect(publicUrl('/sell', req))
   }
 
   const stripeSettings = getShopStripe(shop.metadata as Record<string, unknown> | null)
 
   if (!stripeSettings.account_id) {
     return NextResponse.redirect(
-      new URL('/shop/manage/settings?stripe=error&reason=No+hay+cuenta+Stripe+conectada.', req.url),
+      publicUrl('/shop/manage/settings?stripe=error&reason=No+hay+cuenta+Stripe+conectada.', req),
     )
   }
 
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(loginLink.url)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error al acceder al panel Stripe.'
-    const url = new URL('/shop/manage/settings', req.url)
+    const url = publicUrl('/shop/manage/settings', req)
     url.searchParams.set('stripe', 'error')
     url.searchParams.set('reason', msg)
     return NextResponse.redirect(url)

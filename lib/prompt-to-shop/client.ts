@@ -12,10 +12,24 @@ import type { IdentityBlock } from './blocks'
 import type { ClaimOutcome } from './claim'
 import type { BlockEvent } from './planner'
 import { checkoutOptionsQuery, checkoutPreview, type CheckoutPreview } from '../checkout-options'
-import { ARMAR_COPY, CHECKLIST_COPY, KEEP_COPY, OWNER_COPY, PHOTO_COPY, PUBLISH_COPY, SHAPING_COPY } from './copy'
+import { builderCopy, englishFor } from './copy-en'
+import type { P2sLocale } from './locale'
+
+/**
+ * The language the builder screen on show is in (one-front-door-both-markets follow-up): these calls' own failure
+ * messages — a dead connection, a body that did not parse — must read in that language, not always Spanish. Set by
+ * `P2sLocaleProvider` and by the taking-shape screen (which renders outside any provider); Spanish until set.
+ */
+let clientLocale: P2sLocale = 'es'
+export function setClientLocale(locale: P2sLocale): void {
+  clientLocale = locale
+}
+const C = () => builderCopy(clientLocale)
+/** A message the server sent, in the screen's language (the server answers in Spanish). */
+const say = (message: string) => (clientLocale === 'en' ? englishFor(message) : message)
 import type { PhotoSuggestion } from './photo'
 
-const SAVE_FAILED = OWNER_COPY.saveFailed
+const SAVE_FAILED = () => C().OWNER.saveFailed
 
 export type StreamFrame =
   | { event: 'block'; data: BlockEvent }
@@ -98,7 +112,7 @@ export async function runIntake(
         input: data.input === 'photo' || data.input === 'file' ? data.input : 'url',
       }
     }
-    return { ok: false, message: typeof data?.error === 'string' ? data.error : failed, code: typeof data?.code === 'string' ? data.code : null }
+    return { ok: false, message: typeof data?.error === 'string' ? say(data.error) : failed, code: typeof data?.code === 'string' ? data.code : null }
   } catch {
     return { ok: false, message: failed, code: null }
   }
@@ -129,13 +143,13 @@ export async function runDraftRequest(
       body: JSON.stringify(body),
     })
   } catch {
-    return { kind: 'failed', message: SHAPING_COPY.broken }
+    return { kind: 'failed', message: C().SHAPING.broken }
   }
 
   if (!res.ok || !res.body) {
     // A refusal is plain JSON `{error, code}` and its `error` is already merchant-facing: show it verbatim.
     const refusal = (await res.json().catch(() => null)) as { error?: unknown; code?: unknown } | null
-    const message = typeof refusal?.error === 'string' && refusal.error ? refusal.error : SHAPING_COPY.broken
+    const message = typeof refusal?.error === 'string' && refusal.error ? say(refusal.error) : C().SHAPING.broken
     return { kind: 'refused', message, code: typeof refusal?.code === 'string' ? refusal.code : undefined }
   }
 
@@ -153,13 +167,13 @@ export async function runDraftRequest(
       for (const frame of frames) {
         if (frame.event === 'block') onBlock(frame.data)
         else if (frame.event === 'done') outcome = { kind: 'done', draftId: frame.data.draft_id, versionsLeft: frame.data.versions_left }
-        else outcome = { kind: 'failed', message: frame.data.message || SHAPING_COPY.broken }
+        else outcome = { kind: 'failed', message: (frame.data.message ? say(frame.data.message) : '') || C().SHAPING.broken }
       }
     }
   } catch {
-    return outcome ?? { kind: 'failed', message: SHAPING_COPY.broken }
+    return outcome ?? { kind: 'failed', message: C().SHAPING.broken }
   }
-  return outcome ?? { kind: 'failed', message: SHAPING_COPY.broken }
+  return outcome ?? { kind: 'failed', message: C().SHAPING.broken }
 }
 
 export type PatchBody = { name?: string; accent_color?: string }
@@ -186,9 +200,9 @@ export async function patchDraft(
     if (res.ok && data?.ok === true && data.identity && typeof data.identity === 'object') {
       return { ok: true, identity: data.identity as IdentityBlock }
     }
-    return { ok: false, status: res.status, message: typeof data?.error === 'string' && data.error ? data.error : SAVE_FAILED }
+    return { ok: false, status: res.status, message: typeof data?.error === 'string' && data.error ? say(data.error) : SAVE_FAILED() }
   } catch {
-    return { ok: false, status: 0, message: SAVE_FAILED }
+    return { ok: false, status: 0, message: SAVE_FAILED() }
   }
 }
 
@@ -206,10 +220,10 @@ export async function mailDraftLink(
       body: JSON.stringify({ email }),
     })
     const data = (await res.json().catch(() => null)) as { ok?: unknown; message?: unknown } | null
-    const message = typeof data?.message === 'string' && data.message ? data.message : KEEP_COPY.mailFailed
+    const message = typeof data?.message === 'string' && data.message ? say(data.message) : C().KEEP.mailFailed
     return { ok: res.ok && data?.ok === true, message }
   } catch {
-    return { ok: false, message: KEEP_COPY.mailFailed }
+    return { ok: false, message: C().KEEP.mailFailed }
   }
 }
 
@@ -234,7 +248,7 @@ export async function claimDraft(
   } catch {
     // fall through
   }
-  return { kind: 'retry', message: ARMAR_COPY.failed }
+  return { kind: 'retry', message: C().ARMAR.failed }
 }
 
 // ── Make it yours (S4) ───────────────────────────────────────────────────────────────────────────────────────────
@@ -248,9 +262,9 @@ export async function uploadPhoto(file: File, deps: DraftRequestDeps = { fetch: 
     const res = await deps.fetch('/api/sell/upload', { method: 'POST', body: form, credentials: 'same-origin' })
     const data = (await res.json().catch(() => null)) as { url?: unknown; error?: unknown } | null
     if (res.ok && typeof data?.url === 'string') return { ok: true, url: data.url }
-    return { ok: false, message: typeof data?.error === 'string' && data.error ? data.error : PHOTO_COPY.uploadFailed }
+    return { ok: false, message: typeof data?.error === 'string' && data.error ? say(data.error) : C().PHOTO.uploadFailed }
   } catch {
-    return { ok: false, message: PHOTO_COPY.uploadFailed }
+    return { ok: false, message: C().PHOTO.uploadFailed }
   }
 }
 
@@ -272,13 +286,13 @@ export async function analyzePhotoRequest(imageUrl: string, deps: DraftRequestDe
       return {
         ok: true,
         suggestion: (data.suggestion as PhotoSuggestion | null) ?? null,
-        message: typeof data.message === 'string' ? data.message : null,
+        message: typeof data.message === 'string' ? say(data.message) : null,
         photosLeft: typeof data.photos_left === 'number' ? data.photos_left : null,
       }
     }
-    return { ok: false, message: typeof data?.error === 'string' && data.error ? data.error : PHOTO_COPY.fillYourself, code: typeof data?.code === 'string' ? data.code : null }
+    return { ok: false, message: typeof data?.error === 'string' && data.error ? say(data.error) : C().PHOTO.fillYourself, code: typeof data?.code === 'string' ? data.code : null }
   } catch {
-    return { ok: false, message: PHOTO_COPY.uploadFailed, code: null }
+    return { ok: false, message: C().PHOTO.uploadFailed, code: null }
   }
 }
 
@@ -308,9 +322,9 @@ export async function confirmPhotoRequest(body: ConfirmBody, deps: DraftRequestD
       // retries the same nonce once (an absent field reads as finished, the shape before this flag existed).
       return { ok: true, productId: data.product_id, duplicate: data.duplicate === true, finished: data.finished !== false, photosLeft: typeof data.photos_left === 'number' ? data.photos_left : null }
     }
-    return { ok: false, status: res.status, message: typeof data?.error === 'string' && data.error ? data.error : PHOTO_COPY.createFailed, code: typeof data?.code === 'string' ? data.code : null }
+    return { ok: false, status: res.status, message: typeof data?.error === 'string' && data.error ? say(data.error) : C().PHOTO.createFailed, code: typeof data?.code === 'string' ? data.code : null }
   } catch {
-    return { ok: false, status: 0, message: PHOTO_COPY.createFailed, code: null }
+    return { ok: false, status: 0, message: C().PHOTO.createFailed, code: null }
   }
 }
 
@@ -329,13 +343,13 @@ export async function patchShop(
     const data = (await res.json().catch(() => null)) as { error?: unknown; storefront_synced?: unknown } | null
     return {
       ok: res.ok,
-      message: res.ok ? CHECKLIST_COPY.saved : typeof data?.error === 'string' && data.error ? data.error : CHECKLIST_COPY.saveFailed,
+      message: res.ok ? C().CHECKLIST.saved : typeof data?.error === 'string' && data.error ? say(data.error) : C().CHECKLIST.saveFailed,
       // `res.ok` only means the settings row was written. The PUBLIC shop — and checkout — read the Medusa seller, and
       // that sync can fail on its own (the route says so with `storefront_synced: false`).
       synced: res.ok && data?.storefront_synced !== false,
     }
   } catch {
-    return { ok: false, message: CHECKLIST_COPY.saveFailed, synced: false }
+    return { ok: false, message: C().CHECKLIST.saveFailed, synced: false }
   }
 }
 
@@ -373,12 +387,12 @@ export async function publishShop(
       ...(opts.asCatalog ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish_as_catalog: true }) } : {}),
     })
     const data = (await res.json().catch(() => null)) as { ok?: unknown; published?: unknown; live?: unknown; message?: unknown; code?: unknown } | null
-    const message = typeof data?.message === 'string' && data.message ? data.message : PUBLISH_COPY.failed
+    const message = typeof data?.message === 'string' && data.message ? say(data.message) : C().PUBLISH.failed
     if (res.ok && data?.ok === true && typeof data.live === 'number') {
       return { ok: true, published: typeof data.published === 'number' ? data.published : 0, live: data.live, message }
     }
     return { ok: false, message, ...(data?.code === 'LISTING_NOT_READY' ? { notReady: true } : {}) }
   } catch {
-    return { ok: false, message: PUBLISH_COPY.failed }
+    return { ok: false, message: C().PUBLISH.failed }
   }
 }

@@ -68,3 +68,17 @@ export function resolveOrigin(input: ResolveOriginInput): string {
       'baked into .env.local, which only next dev/next start read automatically).',
   )
 }
+
+/**
+ * A redirect target on the PUBLIC origin. Behind the VM's Caddy, `req.url` carries the container's own bind address
+ * (`https://0.0.0.0:8080/…`), so `new URL(path, req.url)` sent a signed-out seller to 0.0.0.0 (found 2026-11-13,
+ * one-front-door-both-markets). The site URL wins, then a usable Host header, then — only when neither resolves —
+ * the request's own URL, so a misconfigured environment still redirects somewhere rather than throwing.
+ */
+export function publicUrl(path: string, req: { url: string; headers: { get: (k: string) => string | null } }): URL {
+  try {
+    return new URL(path, resolveOrigin({ siteUrl: process.env.NEXT_PUBLIC_SITE_URL, host: req.headers.get('host') }))
+  } catch {
+    return new URL(path, req.url)
+  }
+}

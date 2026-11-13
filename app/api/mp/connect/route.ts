@@ -10,14 +10,14 @@ import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
 import { buildMpAuthorizationUrl, generateMpPkce } from '@/lib/mercadopago-connect'
 import { syncMedusaSellerProfile } from '@/lib/medusa-seller-sync'
-import { resolveOrigin } from '@/lib/request-origin'
+import { resolveOrigin, publicUrl } from '@/lib/request-origin'
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth()
-  if (!userId) return NextResponse.redirect(new URL('/sign-in', req.url))
+  if (!userId) return NextResponse.redirect(publicUrl('/sign-in', req))
 
   const errorRedirect = (reason: string) =>
-    NextResponse.redirect(new URL(`/shop/manage/settings/pagos?mp=error&reason=${encodeURIComponent(reason)}#mercadopago`, req.url))
+    NextResponse.redirect(publicUrl(`/shop/manage/settings/pagos?mp=error&reason=${encodeURIComponent(reason)}#mercadopago`, req))
 
   const { data: shop } = await db
     .from('marketplace_shops')
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     .limit(1)
     .maybeSingle()
 
-  if (!shop) return NextResponse.redirect(new URL('/sell', req.url))
+  if (!shop) return NextResponse.redirect(publicUrl('/sell', req))
 
   try {
     // resolveOrigin() already strips a trailing slash, so the redirect_uri
