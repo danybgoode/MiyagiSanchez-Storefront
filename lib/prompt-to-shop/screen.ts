@@ -42,8 +42,8 @@ export const SCREEN_QUESTIONS = {
 export const SCREEN_MODEL = 'jev-latest'
 /** Beyond this the screen is `unavailable`: a stalled judgment must not hold the merchant's first impression. */
 export const SCREEN_TIMEOUT_MS = 2_000
-/** Jev reads a description, not a novel; the builder caps descriptions at 500 chars, intake text is cut here. */
-export const SCREEN_MAX_CHARS = 2_000
+/** Jev reads a description, not a novel: 500 chars of description + up to 60 product titles of ≤ 100 chars. */
+export const SCREEN_MAX_CHARS = 7_000
 
 /** D3 — the policy. A refusal needs a CONFIDENT non-business answer, or a confident prohibited one. Anything less
  *  goes through to the model: wrongly refusing a real merchant is worse than spending one generation on junk. */

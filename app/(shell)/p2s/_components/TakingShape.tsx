@@ -63,7 +63,10 @@ export default function TakingShape({
     void runDraftRequest(
       {
         turnstile_token: turnstileToken, ...(description ? { description } : {}), ...(draftId ? { draft_id: draftId } : {}), ...(tone ? { tone } : {}), ...(shape ? { shape } : {}),
-        ...(draftId ? {} : { locale, market_hint: marketHint, input, ...(seedRows?.length ? { seed_rows: seedRows } : {}) }),
+        // The language rides on every request (it picks the refusal copy); the hint, input and rows only on a first
+        // generation — a re-run keeps the draft's own market (Codex, PR #498).
+        locale,
+        ...(draftId ? {} : { market_hint: marketHint, input, ...(seedRows?.length ? { seed_rows: seedRows } : {}) }),
       },
       (event) =>
         setBlocks((prev) => ({

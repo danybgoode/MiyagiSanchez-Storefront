@@ -272,3 +272,22 @@ test('the intake spends only allowance kinds the database accepts, on subjects o
   expect(ANON_INTAKE.budgetSubject).not.toBe('global')
   expect(ANON_INTAKE.deviceSubject('x')).not.toMatch(/^(device|user):/)
 })
+
+// ── Security lens, PR #498 ───────────────────────────────────────────────────────────────────────────────────────
+
+test('a redirect cannot reach another port or carry credentials (the same door as the first URL)', () => {
+  expect(nextHop('https://shop.com/', 'http://shop.com:9000/admin')).toBeNull()
+  expect(nextHop('https://shop.com/', 'https://shop.com:6379/')).toBeNull()
+  expect(nextHop('https://shop.com/', 'https://u:p@shop.com/')).toBeNull()
+  expect(nextHop('https://shop.com/', 'https://shop.com:443/ok')).toBe('https://shop.com/ok')
+})
+
+test('the screen sees EVERY row title, so a list cannot hide prohibited items past the first few', () => {
+  const rows = [...Array.from({ length: 40 }, (_, i) => ({ title: `Vela aromática ${i + 1}`, category: 'otros' as const })), { title: 'Réplica AAA Rolex', category: 'otros' as const }]
+  expect(screenTextFor('una tienda', rows)).toContain('Réplica AAA Rolex')
+})
+
+test('an out-of-range numeric entity on a stranger\'s page does not crash the read', () => {
+  expect(() => readPageMeta('<title>a &#99999999; b &#x110000; c &#xD800;</title>')).not.toThrow()
+  expect(readPageMeta('<title>Velas &#241; &#x1F56F;</title>').title).toBe('Velas ñ 🕯')
+})

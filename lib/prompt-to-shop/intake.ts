@@ -85,9 +85,13 @@ export function sanitizeSeedRows(raw: unknown, currency: ImportCurrency): Catalo
   return rows
 }
 
-/** The text the screen judges for a draft that carries rows: the description plus the first rows' titles. */
+/**
+ * The text the screen judges for a draft that carries rows: the description plus EVERY row's title. Every row a
+ * draft can carry is a product the merchant can later upload, so screening only the first few would let a list hide
+ * its prohibited items past position 15 (security lens, PR #498). 60 titles × 100 chars stays under SCREEN_MAX_CHARS.
+ */
 export function screenTextFor(description: string, rows: readonly CatalogImportRow[]): string {
-  const titles = rows.slice(0, 15).map((r) => r.title).join('; ')
+  const titles = rows.slice(0, SEED_ROWS_MAX).map((r) => r.title).join('; ')
   return titles ? `${description}\n${titles}` : description
 }
 
@@ -162,12 +166,17 @@ const NAMED: Record<string, string> = {
   Oacute: 'Ó', Uacute: 'Ú', Ntilde: 'Ñ', uuml: 'ü', copy: '©', reg: '®', trade: '™', iexcl: '¡', iquest: '¿',
 }
 
+/** A stranger's page can carry `&#99999999;`: `String.fromCodePoint` throws on it (security lens, PR #498). */
+function safeCodePoint(n: number, original: string): string {
+  return Number.isInteger(n) && n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff) ? String.fromCodePoint(n) : original
+}
+
 function decodeEntities(s: string): string {
   return s
     .replace(/&([a-zA-Z]+);/g, (m, name: string) => (name in NAMED ? NAMED[name] : m))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#x([0-9a-f]+);/gi, (m, h) => safeCodePoint(parseInt(h, 16), m))
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#(\d+);/g, (m, d) => safeCodePoint(Number(d), m))
 }
 
 function metaContent(html: string, key: string): string | null {
@@ -263,6 +272,10 @@ export function nextHop(current: string, location: string | null): string | null
   try {
     const next = new URL(location, current)
     if (next.protocol !== 'https:' && next.protocol !== 'http:') return null
+    // The same door as `planLink`: a redirect must not reach a port or carry credentials the first URL could not
+    // (security lens, PR #498 — a 443 page redirecting to :9000 or :6379 on a public host).
+    if (next.username || next.password) return null
+    if (next.port && next.port !== '443' && next.port !== '80') return null
     if (!isPublicDomainShape(next.hostname)) return null
     return next.toString()
   } catch {

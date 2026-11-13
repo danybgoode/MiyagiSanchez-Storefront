@@ -83,7 +83,7 @@ export async function callModelBody(body: object, timeoutMs: number = MODEL_TIME
   }
 }
 
-const DRAFT_COLUMNS = 'id, description'
+const DRAFT_COLUMNS = 'id, description, market, locale'
 
 export function draftsDeps(ip: string): DraftsDeps {
   // One budget day per request: a refund just after Mexico City midnight must give back the day it was spent on.
