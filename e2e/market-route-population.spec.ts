@@ -87,8 +87,10 @@ test.describe('market route population', () => {
     expect(source).toContain('data-testid="market-selector"')
     // One href expression, derived per market from the registry — not two literals.
     expect(source).toContain('href={marketBasePath(code)}')
+    // Since one-front-door-both-markets D16 `/en` is the English builder; no route mounts the selector, and the
+    // markets are reached from the strip at the end of both builders. The no-catalog proof still holds for `/en`.
     const en = readFileSync(path.join(ROOT, 'app/(en-site)/en/page.tsx'), 'utf8')
-    expect(en).toContain('<MarketSelector language=')
+    expect(en).not.toMatch(/^import .*MarketSelector/m)
     expect(en).not.toMatch(/from ['"]@\/lib\/(?:listings|medusa|supabase)['"]/)
     // The honest no-catalog proof is the absence of a data import. This spec used
     // to ALSO assert `not.toMatch(/export const revalidate/)`, using "no

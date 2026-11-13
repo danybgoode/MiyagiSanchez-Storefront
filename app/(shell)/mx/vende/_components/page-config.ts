@@ -18,6 +18,7 @@ import type { PromoterSku } from '@/lib/promoter-skus'
 import type { PromoterSkuPrices } from '@/lib/promoter-pricing'
 import { fillFixedPricingTokens } from '@/lib/pricing-catalog'
 import { SHOP_FEATURES, SHOP_FEATURES_HEADING } from '@/lib/shop-features'
+import { GLOBAL_LANDING_EN } from '@/lib/global-landing-copy'
 import {
   BUSINESS_TYPE_CARDS,
   BUSINESS_TYPE_COMMON,
@@ -705,4 +706,51 @@ export function applySellerAcquisitionPageVariant<T extends VariantCapablePage>(
   }
 
   return { ...page, ...override }
+}
+
+/**
+ * `/en` — the English builder for both markets (one-front-door-both-markets D16). The anchor's section system and
+ * English copy, minus everything that is Mexico's money truth (benchmark vs Mercado Libre, MXN pricing, the
+ * Vecindario bonus, the Spanish persona and business-type routers), plus «Where you'll sell»: the one place the two
+ * markets differ, each card pointing at its own page.
+ */
+export function buildGlobalEnglishPageConfig(copy: SellerAcquisitionCopy, query: QueryParams): SellerAcquisitionPageConfig {
+  const base = buildAnchorPageConfig(copy, query)
+  const g = GLOBAL_LANDING_EN
+  return {
+    ...base,
+    pageId: 'en',
+    eyebrow: g.eyebrow,
+    title: g.heroTitle,
+    lead: g.heroLead,
+    heroValues: [...g.heroValues],
+    proofTitle: g.proofTitle,
+    proofLead: g.proofLead,
+    proofPoints: [...g.proofPoints],
+    secondaryCta: { label: g.whereTitle, href: '#en-router-title' },
+    closingTitle: g.closingTitle,
+    closingBody: g.closingBody,
+    closingCta: { label: g.closingCta, href: '#en-hero-title', testId: 'en-closing-cta' },
+    benchmark: undefined,
+    pricingCallout: undefined,
+    marketplaceBonus: undefined,
+    businessTypes: undefined,
+    featureStories: {
+      title: SHOP_FEATURES_HEADING.en.heading,
+      lead: SHOP_FEATURES_HEADING.en.lead,
+      items: SHOP_FEATURES.map((feature) => ({
+        id: feature.id,
+        icon: feature.icon,
+        title: feature.en.title,
+        tagline: feature.en.tagline,
+        body: feature.en.body,
+        links: feature.links,
+      })),
+    },
+    personaRouter: {
+      title: g.whereTitle,
+      lead: g.whereLead,
+      cards: g.where.map((card) => ({ ...card })),
+    },
+  }
 }
