@@ -31,6 +31,8 @@ const SCREEN_FILES = [
   'app/(shell)/p2s/_components/PublishedMoment.tsx',
   'app/(shell)/sell/armar/cobros/page.tsx',
   'lib/prompt-to-shop/copy.ts',
+  'lib/prompt-to-shop/copy-en.ts',
+  'app/(shell)/p2s/_components/P2sLocale.tsx',
   'lib/prompt-to-shop/view.ts',
 ]
 

@@ -1,10 +1,11 @@
+'use client'
+
 import ShopThemeShell from '@/app/(shell)/_shop-sections/ShopThemeShell'
 import { Banner } from '@/components/feedback/Banner'
 import { shopInitials, SHOP_INDEX_GRID_CLASS } from '@/lib/shop-presentation/chrome'
-import { CANVAS_COPY, FALLBACK_NOTE } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 import type { BlockKey } from '@/lib/prompt-to-shop/blocks'
 import type { CanvasView, ExampleCardView, OwnProductCardView } from '@/lib/prompt-to-shop/view'
-import { PHOTO_COPY } from '@/lib/prompt-to-shop/copy'
 import ExampleIllustration from './ExampleIllustration'
 
 /**
@@ -29,6 +30,7 @@ function Bar({ width, height = 14 }: { width: string; height?: number }) {
 }
 
 function ExampleCard({ card, accent, accentText, action }: { card: ExampleCardView; accent: string; accentText: string; action?: React.ReactNode }) {
+  const { CANVAS: CANVAS_COPY } = useBuilderCopy()
   return (
     <article
       data-testid="p2s-example-card"
@@ -63,6 +65,7 @@ function ExampleCard({ card, accent, accentText, action }: { card: ExampleCardVi
 
 /** One of the merchant's OWN products (a real Medusa product, S4.2) — the photo is theirs, never generated. */
 function OwnProductCard({ card, accent }: { card: OwnProductCardView; accent: string }) {
+  const { PHOTO: PHOTO_COPY } = useBuilderCopy()
   return (
     <article
       data-testid="p2s-own-card"
@@ -126,6 +129,7 @@ export default function ShopCanvas({
   /** «Cambiar por mi foto» on each example (S4.3). Owner mode only. */
   exampleAction?: (card: ExampleCardView) => React.ReactNode
 }) {
+  const { CANVAS: CANVAS_COPY, FALLBACK_NOTE } = useBuilderCopy()
   const owner = mode === 'owner'
   const waiting = (Object.keys(view.pending) as BlockKey[]).some((k) => view.pending[k])
   // «Otra versión» is the owner's next step, so a read-only visitor is not told to take it.

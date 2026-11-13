@@ -2,6 +2,10 @@ import type { Metadata } from 'next'
 import { shapeOf } from '@/lib/business-shape'
 import { sellerLandingPath } from '@/lib/seller-acquisition'
 import { auth } from '@clerk/nextjs/server'
+import { cookies } from 'next/headers'
+import { readDeps } from '@/lib/prompt-to-shop/read'
+import { DEVICE_COOKIE, readDeviceId } from '@/lib/prompt-to-shop/handler'
+import { readLocale, readMarketHint } from '@/lib/prompt-to-shop/locale'
 import { redirect } from 'next/navigation'
 import ClaimRunner from '@/app/(shell)/p2s/_components/ClaimRunner'
 import KeptShop from '@/app/(shell)/p2s/_components/KeptShop'
@@ -11,6 +15,7 @@ import { filterOutDeleted } from '@/lib/listing-lifecycle'
 import { photosLeft } from '@/lib/prompt-to-shop/allowance'
 import { findKeptDraft } from '@/lib/prompt-to-shop/claim-server'
 import { readChooserState, type CobrosSettings } from '@/lib/prompt-to-shop/cobros'
+import { P2sLocaleProvider } from '@/app/(shell)/p2s/_components/P2sLocale'
 import { ARMAR_COPY } from '@/lib/prompt-to-shop/copy'
 import { publishState } from '@/lib/prompt-to-shop/photo'
 import { listOwnProducts, ownerPhotoCap, photosUsedThisMonth } from '@/lib/prompt-to-shop/photo-server'
@@ -78,12 +83,13 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
     const steps = guideStepsFor(guideShop, guideProductCount(listings ?? [], deletedIds))
     const own = listings ? filterOutDeleted(listings, deletedIds) : null
     return (
+      <P2sLocaleProvider locale={kept.locale}>
       <KeptShop
-        view={draftView(kept.id, kept.blocks)}
+        view={draftView(kept.id, kept.blocks, kept.locale)}
         shopSlug={seller?.slug ?? null}
         steps={steps}
         progress={guideProgress(steps)}
-        ownCards={own ? ownProductCards(own) : null}
+        ownCards={own ? ownProductCards(own, kept.locale) : null}
         publish={publishState(own ? own.length : null)}
         photosLeft={photosLeft(used, photoCap)}
         profile={{ name: guideShop?.name ?? kept.blocks.identity?.name ?? '', description: guideShop?.description ?? '' }}
@@ -93,9 +99,16 @@ export default async function ArmarPage({ searchParams }: { searchParams: Promis
         shape={shapeOf(kept.blocks.identity)}
         seedRows={pendingSeedRows(kept.blocks.seedRows, own)}
       />
+      </P2sLocaleProvider>
     )
   }
-  if (kept) return <ClaimRunner draftId={kept.id} />
+  if (kept) return <P2sLocaleProvider locale={kept.locale}><ClaimRunner draftId={kept.id} marketHint={kept.market ?? null} /></P2sLocaleProvider>
   if (!draftId) redirect('/sell')
-  return <ClaimRunner draftId={draftId} />
+  // Not kept yet: the draft on THIS device gives the question its preselect (D14) and the screen its language.
+  const owned = await readDeps.findOwned(draftId, readDeviceId((await cookies()).get(DEVICE_COOKIE)?.value) ?? '').catch(() => null)
+  return (
+    <P2sLocaleProvider locale={readLocale(owned?.locale)}>
+      <ClaimRunner draftId={draftId} marketHint={readMarketHint(owned?.market)} />
+    </P2sLocaleProvider>
+  )
 }

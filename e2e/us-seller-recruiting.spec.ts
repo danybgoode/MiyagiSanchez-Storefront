@@ -107,7 +107,9 @@ test.describe('US seller recruiting · signed-out /sell', () => {
 
     expect(landing).toContain('buildUsMarketPageConfig(')
     expect(landing).toContain('SellerAcquisitionPage')
-    expect(landing).toContain("alternates: { canonical: `${BASE_URL}${PAGE_PATH}` }")
+    expect(landing).toContain("alternates: { canonical: `${BASE_URL}${PAGE_PATH}`")
+    // D17 — the Spanish telling is its hreflang twin.
+    expect(landing).toContain('"es-US": `${BASE_URL}/us/vende`')
     expect(landing).toContain("const PAGE_PATH = '/us/sell'")
     // The canonical is a real path, not the query string it used to be. Asserted on
     // the EMITTED urls rather than on the file text — the header comment explains the
@@ -116,7 +118,7 @@ test.describe('US seller recruiting · signed-out /sell', () => {
     // `/sign-up?redirect_url=…` by design — account creation first).
     for (const emitted of landing.match(/\$\{BASE_URL\}[^`'"]*/g) ?? []) {
       expect(
-        ['${BASE_URL}${PAGE_PATH}', '${BASE_URL}${usSellerCtaHref(query)}'],
+        ['${BASE_URL}${PAGE_PATH}', '${BASE_URL}${usSellerCtaHref(query)}', '${BASE_URL}/us/vende'],
         'every emitted absolute URL is the page path or the sign-up CTA',
       ).toContain(emitted)
     }

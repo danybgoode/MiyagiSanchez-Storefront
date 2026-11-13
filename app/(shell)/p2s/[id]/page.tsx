@@ -7,6 +7,7 @@ import { P2S_LIMITS } from '@/lib/prompt-to-shop/allowance'
 import { DEVICE_COOKIE } from '@/lib/prompt-to-shop/handler'
 import { readDeps } from '@/lib/prompt-to-shop/read'
 import OwnerCanvas from '../_components/OwnerCanvas'
+import { P2sLocaleProvider } from '../_components/P2sLocale'
 
 /**
  * The owner's canvas (epic prompt-to-shop S2.4, D15).
@@ -36,6 +37,7 @@ export default async function OwnerCanvasPage({ params }: { params: Promise<{ id
   const { userId } = await auth()
 
   return (
+    <P2sLocaleProvider locale={resolved.locale}>
     <OwnerCanvas
       // A re-run changes `updated_at`; the new key remounts the client state on the freshly read blocks.
       key={resolved.updatedAt}
@@ -47,5 +49,6 @@ export default async function OwnerCanvasPage({ params }: { params: Promise<{ id
       controls={controlsFor(resolved.access)}
       signedIn={!!userId}
     />
+    </P2sLocaleProvider>
   )
 }

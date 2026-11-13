@@ -1,5 +1,6 @@
 'use client'
 
+import { marketBasePath } from '@/lib/markets'
 import type { SeedRow } from '@/lib/prompt-to-shop/view'
 import type { BusinessShape } from '@/lib/business-shape'
 import { useCallback, useEffect, useState } from 'react'
@@ -10,7 +11,7 @@ import { Banner } from '@/components/feedback/Banner'
 import { patchShop, publishShop } from '@/lib/prompt-to-shop/client'
 import { READINESS_COPY } from '@/lib/listing-readiness'
 import type { ChooserState } from '@/lib/prompt-to-shop/cobros'
-import { ARMAR_COPY, CHECKLIST_COPY, CHECKLIST_LABELS, PHOTO_COPY, PUBLISH_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 import type { PublishState } from '@/lib/prompt-to-shop/photo'
 import type { CanvasView, OwnProductCardView } from '@/lib/prompt-to-shop/view'
@@ -76,10 +77,12 @@ export default function KeptShop({
   /** one-front-door-both-markets D9 — the merchant's own rows still to upload (none once their titles are products). */
   seedRows?: SeedRow[]
 }) {
+  const { ARMAR: ARMAR_COPY, CHECKLIST: CHECKLIST_COPY, CHECKLIST_LABELS, PHOTO: PHOTO_COPY, PUBLISH: PUBLISH_COPY } = useBuilderCopy()
   const router = useRouter()
   const [sheet, setSheet] = useState<SheetState>(null)
   const close = useCallback(() => setSheet(null), [])
-  const publicPath = shopSlug ? `/mx/s/${shopSlug}` : null
+  // The shop's own market prefix (D15): a US shop lives under /us/s, never /mx/s.
+  const publicPath = shopSlug ? `${marketBasePath(market === 'us' ? 'us' : 'mx')}/s/${shopSlug}` : null
   const [publishing, setPublishing] = useState<{ kind: 'idle' | 'busy' } | { kind: 'error'; message: string; notReady?: boolean }>({ kind: 'idle' })
   const [justPublished, setJustPublished] = useState(false)
 
@@ -232,7 +235,7 @@ export default function KeptShop({
       {sheet?.kind === 'step' && (sheet.id === 'pagos' || sheet.id === 'envios') ? (
         <OwnerSheet
           title={sheet.id === 'pagos' ? CHECKLIST_COPY.cobrosTitle : CHECKLIST_COPY.entregasTitle}
-          lead={sheet.id === 'pagos' ? CHECKLIST_COPY.cobrosLead : CHECKLIST_COPY.entregasLead}
+          lead={sheet.id === 'pagos' ? (market === 'us' ? CHECKLIST_COPY.cobrosLeadUs : CHECKLIST_COPY.cobrosLead) : CHECKLIST_COPY.entregasLead}
           onClose={close}
           testId={`p2s-sheet-${sheet.id}`}
         >
@@ -261,6 +264,7 @@ export default function KeptShop({
 }
 
 function PerfilSheet({ profile, onClose, onSaved }: { profile: { name: string; description: string }; onClose: () => void; onSaved: () => void }) {
+  const { CHECKLIST: CHECKLIST_COPY } = useBuilderCopy()
   const [name, setName] = useState(profile.name)
   const [description, setDescription] = useState(profile.description)
   const [state, setState] = useState<{ kind: 'idle' | 'saving' | 'saved' | 'error'; message?: string }>({ kind: 'idle' })
@@ -297,6 +301,7 @@ function PerfilSheet({ profile, onClose, onSaved }: { profile: { name: string; d
 }
 
 function ShareSheet({ publicPath, onClose, onShared }: { publicPath: string | null; onClose: () => void; onShared: () => void }) {
+  const { CHECKLIST: CHECKLIST_COPY } = useBuilderCopy()
   const [copied, setCopied] = useState<'idle' | 'copied' | 'manual'>('idle')
   const [url, setUrl] = useState<string | null>(null)
 

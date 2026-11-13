@@ -9,7 +9,7 @@ import { CLABE_LENGTH, MX_BANKS, OTHER_BANK, clabeComplete, initialBankPick, nor
 import type { CheckoutPreview } from '@/lib/checkout-options'
 import { fetchCheckoutPreview, patchShop } from '@/lib/prompt-to-shop/client'
 import { MP_CONNECT_HREF, cashPatch, correosPatch, handDeliveryPatch, speiOffPatch, speiPatch, type ChooserState, type SettingsPatch } from '@/lib/prompt-to-shop/cobros'
-import { COBROS_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 
 /**
@@ -48,6 +48,7 @@ export default function CobrosChooser({
   draftId: string | null
   onSaved?: () => void
 }) {
+  const { COBROS: COBROS_COPY } = useBuilderCopy()
   const [state, setState] = useState(initial)
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
@@ -93,6 +94,7 @@ export default function CobrosChooser({
   }
 
   const speiReady = clabeComplete(clabe)
+  const us = market === 'us'
   const offeredDelivery = preview !== 'loading' && preview.kind === 'ready' ? preview.delivery : []
   const manualCarrier = offeredDelivery.some((d) => d.key === 'manual_carrier')
 
@@ -100,6 +102,16 @@ export default function CobrosChooser({
     <div className="grid gap-5" data-testid="p2s-cobros">
       <section className="grid gap-2" aria-labelledby="p2s-cobros-pay">
         <h3 id="p2s-cobros-pay" className="t-small" style={{ margin: 0, fontWeight: 700 }}>{COBROS_COPY.payTitle}</h3>
+
+        {/* D15 — a US shop takes card payments into the merchant's own Stripe account and nothing else: checkout
+            refuses SPEI, Mercado Pago and cash for `us` (lib/checkout-market-strategy.ts), so they are not offered. */}
+        {us ? (
+          <div className="card-panel grid gap-2" style={{ padding: 'var(--s-3)' }} data-testid="p2s-choice-stripe">
+            <span style={{ fontWeight: 700 }}>{COBROS_COPY.stripeName}</span>
+            <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COBROS_COPY.stripeLead}</p>
+            <div><Link href="/shop/manage/settings/pagos" prefetch={false} className="btn btn-primary btn-sm">{COBROS_COPY.stripeConnect}</Link></div>
+          </div>
+        ) : (<>
 
         <Choice
           mark={<span className="t-small" style={{ fontWeight: 800, color: 'var(--fg-inverse)', background: 'var(--provider-mercadopago)', borderRadius: 'var(--r-sm)', padding: '4px 6px', lineHeight: 1 }}>MP</span>}
@@ -176,6 +188,7 @@ export default function CobrosChooser({
           {!state.handDelivery ? <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COBROS_COPY.cashNeedsHand}</p> : null}
           <Toggle on={state.cash} busy={busy === 'cash'} disabled={!!busy} onToggle={(v) => void save('cash', cashPatch(v), { cash: v })} />
         </Choice>
+        </>)}
       </section>
 
       <section className="grid gap-2" aria-labelledby="p2s-cobros-deliver">
@@ -185,7 +198,7 @@ export default function CobrosChooser({
           <Toggle on={state.handDelivery} busy={busy === 'hand'} disabled={!!busy} onToggle={(v) => void save('hand', handDeliveryPatch(v), { handDelivery: v })} />
         </Choice>
 
-        {offersCorreos(shape, state.correos) ? (
+        {!us && offersCorreos(shape, state.correos) ? (
         <Choice mark={<i className="iconoir-mail" aria-hidden="true" style={{ fontSize: 22 }} />} name={COBROS_COPY.correosName} lead={COBROS_COPY.correosLead} on={state.correos && correosAvailable && state.hasOrigin} testId="p2s-choice-correos">
           {!correosAvailable ? (
             <p className="t-small" style={{ margin: 0, color: 'var(--fg-muted)' }}>{COBROS_COPY.correosUnavailable}</p>
@@ -217,6 +230,7 @@ export default function CobrosChooser({
 }
 
 function Choice({ mark, name, lead, on, testId, children }: { mark: React.ReactNode; name: string; lead: string; on: boolean; testId: string; children?: React.ReactNode }) {
+  const { COBROS: COBROS_COPY } = useBuilderCopy()
   return (
     <div className="card-panel grid gap-2" style={{ padding: 'var(--s-3)', borderColor: on ? 'var(--accent)' : undefined }} data-testid={testId} data-on={on}>
       <div className="flex items-start gap-3">
@@ -237,6 +251,7 @@ function Choice({ mark, name, lead, on, testId, children }: { mark: React.ReactN
 }
 
 function Toggle({ on, busy, disabled, onToggle }: { on: boolean; busy: boolean; disabled: boolean; onToggle: (next: boolean) => void }) {
+  const { COBROS: COBROS_COPY } = useBuilderCopy()
   return (
     <div>
       <Button type="button" variant={on ? 'ghost' : 'secondary'} size="sm" disabled={disabled} onClick={() => onToggle(!on)}>
@@ -248,6 +263,7 @@ function Toggle({ on, busy, disabled, onToggle }: { on: boolean; busy: boolean; 
 
 /** The buyer's side: exactly the methods checkout answered with, nothing re-derived here. */
 function CheckoutPreviewCard({ preview }: { preview: CheckoutPreview | 'loading' }) {
+  const { COBROS: COBROS_COPY } = useBuilderCopy()
   return (
     <section className="card-panel grid gap-3" style={{ padding: 'var(--s-4)', background: 'var(--bg-sunk)' }} aria-labelledby="p2s-preview-title" data-testid="p2s-checkout-preview">
       <h3 id="p2s-preview-title" className="t-small" style={{ margin: 0, fontWeight: 700 }}>

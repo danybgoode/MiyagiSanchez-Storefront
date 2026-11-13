@@ -7,7 +7,7 @@ import { Banner } from '@/components/feedback/Banner'
 import BodyPortal from '@/components/ui/BodyPortal'
 import LazySignUp from '@/app/components/clerk-lazy/LazySignUp'
 import { mailDraftLink } from '@/lib/prompt-to-shop/client'
-import { KEEP_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 
 /**
  * «Quedármela» (epic prompt-to-shop S3.1) — screen 4: the keep action, and the sign-up sheet over the canvas.
@@ -45,6 +45,7 @@ export default function KeepSheet({
   /** False while a block is still landing: a draft without a name and colours cannot become a shop yet. */
   ready: boolean
 }) {
+  const { KEEP: KEEP_COPY } = useBuilderCopy()
   const keepHref = `/sell/armar?draft=${draftId}`
   const [opened, setOpened] = useState(false)
   const [dismissed, setDismissed] = useState(false)

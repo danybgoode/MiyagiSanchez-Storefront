@@ -6,7 +6,7 @@ import { useEffect } from 'react'
 import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
 import {
   ROOT_LANGUAGE_PATHS,
-  rootLanguageRedirect,
+  builderLanguageRedirect,
   type RootLanguage,
 } from '@/lib/root-language'
 
@@ -67,7 +67,7 @@ export default function RootLanguageSwitch({ current }: { current: RootLanguage 
   const other: RootLanguage = current === 'es' ? 'en' : 'es'
 
   useEffect(() => {
-    const target = rootLanguageRedirect({
+    const target = builderLanguageRedirect({
       current,
       // `languages` is the ordered list the visitor actually configured;
       // `language` alone is the single top entry, and older browsers have only it.

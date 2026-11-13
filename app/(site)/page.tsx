@@ -6,6 +6,8 @@ import { SellerAcquisitionPage } from '@/app/(shell)/mx/vende/_components/Seller
 import { buildAnchorPageConfig } from '@/app/(shell)/mx/vende/_components/page-config'
 import DescribeBox from '@/app/(shell)/mx/vende/_components/DescribeBox'
 import RootMarketLinks from './RootMarketLinks'
+import RootLanguageSwitch from './RootLanguageSwitch'
+import { builderLanguageMetadata } from '@/lib/market-seo'
 
 /**
  * `/` — the Mexico shop builder. Epic root-shop-builder-home (D1).
@@ -36,14 +38,14 @@ const PAGE_PATH = sellerLandingPath('mx')
 
 const meta = es.sellerAcquisition.anchor.metadata
 
-// No `languages` alternates on purpose (D3): `/` and `/en` are no longer the same document in
-// two languages, so an hreflang pair would tell crawlers something false. The OG image is the
-// sibling `opengraph-image.tsx` file convention, which hashes the served route.
+// `/` and `/en` are the same builder in two languages again (one-front-door-both-markets D16, reversing
+// root-shop-builder-home D3), so they name each other: `rootSelectorMetadata` carries the es/en pair and x-default.
+// The OG image is the sibling `opengraph-image.tsx` file convention, which hashes the served route.
 export const metadata: Metadata = {
   // `absolute`: the title already ends with the brand; a layout template must not append it twice.
   title: { absolute: meta.title },
   description: meta.description,
-  alternates: { canonical: `${BASE_URL}${PAGE_PATH}` },
+  ...builderLanguageMetadata('es'),
   openGraph: {
     type: 'website',
     locale: 'es_MX',
@@ -98,10 +100,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         config={{
           ...config,
           // Prompt-to-shop S2.2: the describe box is the hero's first action.
-          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell'} />,
+          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref={config.primaryCta?.href ?? '/sell'} locale="es" />,
         }}
       />
       <RootMarketLinks copy={ui.anchor.marketLinks} />
+      {/* D16 — the one-time hop to `/en` for a browser that reads English and says nothing of Mexico. */}
+      <div className="app-shell" style={{ display: 'flex', justifyContent: 'center', paddingBottom: 'var(--s-6)' }}>
+        <RootLanguageSwitch current="es" />
+      </div>
     </>
   )
 }

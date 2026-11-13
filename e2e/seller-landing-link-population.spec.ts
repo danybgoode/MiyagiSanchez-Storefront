@@ -50,7 +50,9 @@ const SCAN_ROOTS = ['app', 'lib']
  * route keeps its own path. Anchoring the pattern on a non-`/api` boundary keeps the
  * guard from demanding a rename that would break a live form POST.
  */
-const STALE_LANDING = /(?<!\/api)(?<!\/mx)\/vende(?![a-z0-9-])/i
+// `(?<!\/us)`: `/us/vende` is the US landing told in Spanish (one-front-door-both-markets D17), a real page, not the
+// pre-move Mexican `/vende`.
+const STALE_LANDING = /(?<!\/api)(?<!\/mx)(?<!\/us)\/vende(?![a-z0-9-])/i
 
 /** The bare anchor landing at its 2026-08 address — a 308 to `/` now. Sub-paths are allowed. */
 const STALE_MX_ANCHOR = /\/mx\/vende(?![\/a-z0-9-])/i

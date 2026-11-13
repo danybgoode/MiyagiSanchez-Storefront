@@ -1,40 +1,54 @@
 import type { Metadata } from 'next'
-import { rootSelectorMetadata } from '@/lib/market-seo'
-import MarketSelector from '@/app/(site)/MarketSelector'
+import en from '@/locales/en.json'
+import { getOverriddenDictionary } from '@/lib/copy-overrides'
+import { builderLanguageMetadata } from '@/lib/market-seo'
+import { GLOBAL_LANDING_EN } from '@/lib/global-landing-copy'
+import { SellerAcquisitionPage } from '@/app/(shell)/mx/vende/_components/SellerAcquisitionSections'
+import { buildGlobalEnglishPageConfig } from '@/app/(shell)/mx/vende/_components/page-config'
+import DescribeBox from '@/app/(shell)/mx/vende/_components/DescribeBox'
+import RootMarketLinks from '@/app/(site)/RootMarketLinks'
 
 /**
- * `/en` — the master-brand market selector, English telling.
+ * `/en` — the shop builder, in English, for both markets (epic one-front-door-both-markets D16).
  *
- * The twin of `/`. Same component, same dictionary keys; the language comes from
- * this route's own layout (`(en-site)` mounts the US market document, so the copy,
- * `<html lang>`, Clerk localization and chrome are all English) rather than from
- * anything this file decides.
+ * Until this epic `/en` was the market picker, and `/` the Mexican builder: an English-reading merchant had to choose
+ * a country before they could see what they would get. Now `/` and `/en` are the SAME page in two languages — the
+ * builder first, the market chosen when the shop becomes theirs (D13) — so they name each other as hreflang
+ * alternates again (reversing root-shop-builder-home D3, which held while they were different documents). The two
+ * marketplaces and the Spanish document stay one tap away in the strip at the end.
  *
- * It exists because the front door was Spanish-only. An English-reading visitor
- * landed on "Tu tienda es tuya. El mercado es por país." and had to guess; the
- * platform operates a US market and recruits US merchants, so the page that asks
- * which market you want could not be readable in only one of the two.
- *
- * `lib/root-language.ts` carries the reasoning for two static documents over one
- * `Accept-Language`-sniffing page — briefly: `/` must stay a CDN asset, and
- * Cloudflare would not vary its cache key on the header anyway.
+ * Rendered per request like `/` (`force-dynamic`): the describe box needs `TURNSTILE_SITE_KEY` at RUNTIME, and a
+ * prerendered page would bake the build machine's empty value into it. It reads no request header: the language
+ * comes from the route and its `(en-site)` layout, the hop from a client island (`lib/root-language.ts`).
  */
+export const dynamic = 'force-dynamic'
 
-/**
- * Bounds the CDN TTL. A prerendered page with no `revalidate` is served
- * `s-maxage=31536000`, and the edge then keeps serving HTML that references
- * `/_next/static/chunks/*` deleted by the next deploy — the unstyled-homepage
- * failure of 2026-08-06. Matches `/` and `/mx` at 60s.
- */
-export const revalidate = 60
+const meta = GLOBAL_LANDING_EN.metadata
 
 export const metadata: Metadata = {
-  title: 'Miyagi Sánchez — Your own shop, and a market in every country',
-  description:
-    'Explore the Miyagi Sánchez markets in Mexico and the United States, or open your own shop and sell to whoever you want.',
-  ...rootSelectorMetadata('en'),
+  title: { absolute: meta.title },
+  description: meta.description,
+  ...builderLanguageMetadata('en'),
+  openGraph: { type: 'website', locale: 'en_US', url: 'https://miyagisanchez.com/en', siteName: 'Miyagi Sánchez', title: meta.title, description: meta.description },
+  twitter: { card: 'summary_large_image', title: meta.title, description: meta.description },
 }
 
-export default function EnglishMarketSelectorPage() {
-  return <MarketSelector language="en" />
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> }
+
+export default async function EnglishBuilderPage({ searchParams }: Props) {
+  const query = await searchParams
+  const dict = await getOverriddenDictionary('en')
+  const config = buildGlobalEnglishPageConfig(dict.sellerAcquisition, query)
+  return (
+    <>
+      <SellerAcquisitionPage
+        config={{
+          ...config,
+          // No market: a visitor here may sell in either. The box asks the browser for a hint at the tap (D12).
+          describe: <DescribeBox siteKey={process.env.TURNSTILE_SITE_KEY || null} manualHref="/sell" locale="en" />,
+        }}
+      />
+      <RootMarketLinks copy={en.sellerAcquisition.anchor.marketLinks} language="en" />
+    </>
+  )
 }

@@ -8,6 +8,7 @@
     "app/(shell)/sell/(onboarding)/puertas/page.tsx",
     "app/(shell)/sell/AttrsSection.tsx",
     "app/(shell)/sell/InspectionReportField.tsx",
+    "app/(shell)/sell/ReadinessPanel.tsx",
     "app/(shell)/sell/SellWizard.tsx",
     "app/(shell)/sell/armar/cobros/page.tsx",
     "app/(shell)/sell/armar/page.tsx",
@@ -190,6 +191,7 @@
       "file": "app/(shell)/sell/AttrsSection.tsx",
       "keys": [
         "s_44e33fcac55db21e",
+        "s_d8696a90e7bcdd6c",
         "s_4ee939bb578de7fc",
         "s_3c41f9546e61bf68"
       ]
@@ -280,6 +282,7 @@
         "s_f936e9136e6b86f9",
         "s_f19e198de76e420d",
         "s_069d9fe0de77566d",
+        "s_ddf123dedcf0b5d4",
         "s_e3167befe90eb9c9",
         "s_8127f121b5e1ad43",
         "s_8ad186d56d847d37",
@@ -292,6 +295,7 @@
         "s_be364154dc50dea3",
         "s_fa8ed0bdabdd6bcb",
         "s_cbf0b4c175efbabb",
+        "s_fce4e714eca4e074",
         "s_1ce80078b21e6f23",
         "s_2e4385b6057f6d7f",
         "s_f964faa20ce905ff",
@@ -337,6 +341,7 @@
         "s_52969396c54f799b",
         "s_fcd5c32df9119c7e",
         "s_5423cbf94307a057",
+        "s_3bf45d4989a25479",
         "s_bcbc209cc88a5a4b",
         "s_cf6bdf7cddc767e8",
         "s_7a5c87486c223d61",
@@ -375,6 +380,7 @@
         "s_14bdfaf2face3a07",
         "s_64008a2ad417b378",
         "s_6e4941a223bf2050",
+        "s_1f71e9739422b447",
         "s_6d0a28c839813902",
         "s_d46ac85820f26e01",
         "s_b0861ce436e749e9",
@@ -388,6 +394,7 @@
         "s_088fbec99385f8ae",
         "s_c3c68929a0f00a33",
         "s_362d2130bdef06ce",
+        "s_4e12c9e7ce6bb197",
         "s_f28cebd5efd7c96e",
         "s_84277eff88e3ee7e",
         "s_553f5b2ff5d004f1",
@@ -1202,6 +1209,7 @@
         "s_0d61e028a88e813f",
         "s_bbaa3fb46f1b74b9",
         "s_ba058eca0350af4c",
+        "s_4e12c9e7ce6bb197",
         "s_4950852f759abe68",
         "s_f88ba99c9b342767",
         "s_1466356fce365a59",
@@ -4044,6 +4052,10 @@
       "source": "Colección"
     },
     {
+      "key": "s_1f71e9739422b447",
+      "source": "Los lugares de este evento gratis se cambian en"
+    },
+    {
       "key": "s_1f7edc6de9e5afab",
       "source": "producto(s)"
     },
@@ -4920,6 +4932,10 @@
       "source": "Copia este prompt en tu IA (Claude, ChatGPT o Gemini) y dale capturas o textos de la configuración de tu tienda actual. Te devolverá un archivo listo para subir."
     },
     {
+      "key": "s_3bf45d4989a25479",
+      "source": "🎟️ Evento"
+    },
+    {
       "key": "s_3bf7170f1c8a9cfc",
       "source": "Sin conexión. Intenta de nuevo."
     },
@@ -5402,6 +5418,10 @@
     {
       "key": "s_4ddb68fd5aedbbc6",
       "source": "Confirmación automática de entrega"
+    },
+    {
+      "key": "s_4e12c9e7ce6bb197",
+      "source": "Registros y entrada"
     },
     {
       "key": "s_4e26fc7e1de50ee4",
@@ -9956,6 +9976,10 @@
       "source": "Pedidos"
     },
     {
+      "key": "s_d8696a90e7bcdd6c",
+      "source": "Fecha, hora, lugar y lugares disponibles son obligatorios."
+    },
+    {
       "key": "s_d8be0ba8e9605457",
       "source": "¿Te atendió un promotor?"
     },
@@ -10154,6 +10178,10 @@
     {
       "key": "s_ddefb12b435b08df",
       "source": "Ocultar de Miyagi"
+    },
+    {
+      "key": "s_ddf123dedcf0b5d4",
+      "source": "Obra, taller, concierto… gratis o de pago"
     },
     {
       "key": "s_ddfd8abf0a15841a",
@@ -11110,6 +11138,10 @@
     {
       "key": "s_fcd5c32df9119c7e",
       "source": "✓ Publicar anuncio"
+    },
+    {
+      "key": "s_fce4e714eca4e074",
+      "source": "Pon $0 si el evento es gratis: la gente se registra y recibe su boleto por correo."
     },
     {
       "key": "s_fd0137cd1dfed775",

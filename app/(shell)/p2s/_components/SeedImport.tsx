@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
-import { SEED_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 import { seedImportRows, SEED_IMPORT_CHUNK, type SeedRow } from '@/lib/prompt-to-shop/view'
 
 /**
@@ -15,6 +15,7 @@ import { seedImportRows, SEED_IMPORT_CHUNK, type SeedRow } from '@/lib/prompt-to
  * products it made instead of creating them twice.
  */
 export default function SeedImport({ draftId, rows, currency }: { draftId: string; rows: SeedRow[]; currency: 'MXN' | 'USD' }) {
+  const { SEED: SEED_COPY } = useBuilderCopy()
   const router = useRouter()
   const [state, setState] = useState<{ kind: 'idle' | 'busy' } | { kind: 'done'; created: number; failed: number } | { kind: 'error'; message: string }>({ kind: 'idle' })
   const payload = seedImportRows(draftId, rows, currency)

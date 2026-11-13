@@ -87,3 +87,27 @@ export function rootLanguageRedirect(input: {
   if (preferred === input.current) return null
   return ROOT_LANGUAGE_PATHS[preferred]
 }
+
+/**
+ * The shop builder's hop (one-front-door-both-markets D16) — the same two documents, one more rule.
+ *
+ * `/` is the Spanish builder and `/en` the English one. A browser that prefers English is moved from `/` to `/en`
+ * ONLY when nothing in its list says Mexico: an `en-MX` phone is common in Mexico, and root-shop-builder-home D5
+ * found that hopping it would skip the Mexican pitch entirely. `/en` → `/` stays the plain language rule. A stored
+ * choice (`chosen`) wins over both, exactly as `rootLanguageRedirect` says.
+ */
+export function builderLanguageRedirect(input: {
+  current: RootLanguage
+  languages: readonly (string | null | undefined)[] | null | undefined
+  chosen?: string | null
+}): string | null {
+  const target = rootLanguageRedirect(input)
+  if (target !== ROOT_LANGUAGE_PATHS.en) return target
+  // D16 as locked: the FIRST language is English, and nothing in the list is Spanish or says Mexico. Stricter than
+  // the selector's first-match rule on purpose: `/` is the Mexican pitch, and only a browser with no sign of Spanish
+  // or Mexico is sure to be better served by `/en` (fresh review, PR #499).
+  const tags = (input.languages ?? []).map((tag) => (tag ?? '').trim().toLowerCase())
+  if (!/^en(?:[-_]|$)/.test(tags[0] ?? '')) return null
+  if (tags.some((tag) => /^es(?:[-_]|$)/.test(tag) || /[-_]mx$/.test(tag))) return null
+  return target
+}
