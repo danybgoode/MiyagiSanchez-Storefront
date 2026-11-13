@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/ratelimit'
 import { screenText } from '@/lib/prompt-to-shop/screen'
 import { screenDeps } from '@/lib/prompt-to-shop/screen-server'
 import { screenChunksFor } from '@/lib/prompt-to-shop/intake'
@@ -102,6 +103,9 @@ export async function POST(req: NextRequest) {
   // one-front-door-both-markets D20 (Codex security, PR #501) — the ONE door every bulk import walks through (a file,
   // a paste, «Crear con IA», the builder's «Subir mis productos»), so prohibited goods are refused HERE rather than at
   // each of its doors. After the seller lookup: an account with no shop never reaches the screen (Codex security). Prohibited only; an `unavailable` screen proceeds as the import always has (D4), and logs it.
+  if (!(await checkRateLimit('sell_import', userId)).allowed) {
+    return NextResponse.json({ error: 'Vas muy rápido. Espera unos minutos e inténtalo de nuevo.' }, { status: 429 })
+  }
   const screenRows = staged.filter((s) => s.valid).map((s) => s.row)
   for (const text of screenChunksFor('Productos para importar a una tienda en línea', screenRows)) {
     const verdict = await screenText(text, screenDeps()).catch(() => ({ verdict: 'unavailable' as const, reason: 'threw' }))

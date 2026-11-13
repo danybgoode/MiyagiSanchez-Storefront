@@ -218,6 +218,15 @@ const p2sGenerateDeviceLimiter = () => {
   return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(6, '10 m'), prefix: 'rl:p2s_generate_device' })
 }
 
+// The bulk importer's prohibited-goods screen (one-front-door-both-markets D20, Codex security PR #501): each batch
+// of ≤ 25 rows costs one or two TypeSafe calls, so one seller cannot drain the shared screening quota. 120 batches an
+// hour is 3,000 rows — ten times the largest catalog the importer takes in one go. Fails open like the rest.
+const sellImportLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(120, '1 h'), prefix: 'rl:sell_import' })
+}
+
 // Intake bursts (one-front-door-both-markets D6–D8): a photo, a file or a store link in the describe box. The same
 // two buckets as generation. The link intake is an outbound fetch of a URL the visitor typed, so the IP bucket is
 // what keeps it from being used to hammer someone else's site through us. Fails open; the photo/PDF spend does not.
@@ -306,7 +315,7 @@ const catalogPdfIpLimiter = () => {
 
 // ── Public helper ──────────────────────────────────────────────────────────────
 
-export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_intake_ip' | 'p2s_intake_device' | 'p2s_mail_link' | 'p2s_mail_link_device' | 'p2s_photo' | 'catalog_pdf_shop' | 'catalog_pdf_ip' | 'shop_chat_ip' | 'shop_chat_shop' | 'shop_chat_leave_ip' | 'shop_chat_leave_shop'
+export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_intake_ip' | 'p2s_intake_device' | 'sell_import' | 'p2s_mail_link' | 'p2s_mail_link_device' | 'p2s_photo' | 'catalog_pdf_shop' | 'catalog_pdf_ip' | 'shop_chat_ip' | 'shop_chat_shop' | 'shop_chat_leave_ip' | 'shop_chat_leave_shop'
 
 function limiterFor(key: LimitKey): Ratelimit | null {
   const getLimiter = key === 'offers'          ? offerLimiter
@@ -330,6 +339,7 @@ function limiterFor(key: LimitKey): Ratelimit | null {
     : key === 'fundadoras_track' ? fundadorasTrackLimiter
     : key === 'p2s_generate_ip' ? p2sGenerateIpLimiter
     : key === 'p2s_generate_device' ? p2sGenerateDeviceLimiter
+    : key === 'sell_import' ? sellImportLimiter
     : key === 'p2s_intake_ip' ? p2sIntakeIpLimiter
     : key === 'p2s_intake_device' ? p2sIntakeDeviceLimiter
     : key === 'p2s_mail_link' ? p2sMailLinkLimiter

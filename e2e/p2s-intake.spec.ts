@@ -453,6 +453,9 @@ test('the bulk importer itself refuses prohibited goods — the one door every i
   expect(screened).toBeGreaterThan(src.indexOf('listRes.status === 404'))
   expect(screened).toBeLessThan(src.indexOf('for (const s of staged)') > 0 ? src.indexOf('for (const s of staged)') : src.length)
   expect(src).toContain("verdict.kind === 'prohibited'")
+  // …and it is rate-limited per seller before it spends a screen (Codex security, PR #501).
+  expect(src.indexOf("checkRateLimit('sell_import', userId)")).toBeGreaterThan(0)
+  expect(src.indexOf("checkRateLimit('sell_import', userId)")).toBeLessThan(screened)
 })
 
 test('a signed-in refund gives back the month it was spent in (one month per request)', () => {
