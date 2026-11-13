@@ -438,3 +438,17 @@ test('signed in: a benign title over a prohibited DESCRIPTION is refused; every 
   ;(w.deps as IntakeDeps).screen = async (text) => (text.includes('Cartuchos') ? { verdict: 'refuse', kind: 'prohibited' } : { verdict: 'allow' })
   expect(await handleLinkIntake({ ...common, userId: 'user_9', url: 'https://shop.example' }, w.deps)).toMatchObject({ status: 422 })
 })
+
+test('a screen that throws is unavailable on the direct-import path, never an escaped error (Codex, PR #501)', async () => {
+  const w = world({ fetchJson: async () => ({ products: [{ title: 'Vela de soya grande', variants: [{ price: '300' }] }] }) })
+  ;(w.deps as IntakeDeps).screen = async () => { throw new Error('jev down') }
+  expect((await handleLinkIntake({ ...common, userId: 'user_9', url: 'https://shop.example' }, w.deps)).status).toBe(200)
+})
+
+test('the bulk importer itself refuses prohibited goods — the one door every import walks through', () => {
+  const src = readFileSync(join(process.cwd(), 'app/api/sell/import/route.ts'), 'utf8')
+  const screened = src.indexOf('screenChunksFor(')
+  expect(screened).toBeGreaterThan(src.indexOf('validateRows(body.rows)'))
+  expect(screened).toBeLessThan(src.indexOf("medusaFetch('/store/sellers/me/products"))
+  expect(src).toContain("verdict.kind === 'prohibited'")
+})

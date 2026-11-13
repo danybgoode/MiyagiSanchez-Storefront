@@ -74,7 +74,8 @@ async function finish(common: IntakeCommon, deps: IntakeDeps, result: IntakeResu
     // Titles AND descriptions, in chunks that fit the screen's state (Codex security, PR #501): a benign title over a
     // prohibited description must not slip through on the direct-import path.
     for (const text of screenChunksFor(result.description, result.seedRows)) {
-      const verdict = await deps.screen(text)
+      // A screen that throws is `unavailable` (Codex, PR #501): never an escaped error after a paid PDF read.
+      const verdict = await deps.screen(text).catch((): ScreenVerdict => ({ verdict: 'unavailable', reason: 'threw' }))
       if (verdict.verdict === 'refuse' && verdict.kind === 'prohibited') return refuse(422, 'prohibited', locale)
     }
   }
