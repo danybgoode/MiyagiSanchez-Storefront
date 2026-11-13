@@ -1,7 +1,11 @@
 /**
  * Prompt-to-shop — the `POST /api/p2s/drafts` decision sequence (epic D7, D11, D12).
  *
- *   validate → Turnstile → burst limit → (re-run: ownership) → spend → write draft → stream
+ *   validate → Turnstile → burst limit → (re-run: ownership) → SCREEN → spend → write draft → stream
+ *
+ * The screen (one-front-door-both-markets D2) sits after Turnstile and the burst limit — it must not be a free oracle
+ * for anyone who can POST — and before the spend, so a refused description costs neither the device's versions nor
+ * the platform's daily budget. `unavailable` proceeds under the guards that existed before it (D4).
  *
  * Nothing that costs money runs before the spend is claimed, and no refusal reaches the model. Every effect is
  * injected, so the `api` spec records a trace and asserts the ORDER, not only the status: a refusal that happened
@@ -16,6 +20,10 @@ import { isTone, type Tone } from './prompts'
 import { isBusinessShape, type BusinessShape } from '../business-shape'
 import { generateDraft, type BlockEvent, type ModelRequest, type ModelResult } from './planner'
 import type { TurnstileVerdict } from './turnstile'
+import { refusalCopyKey, type ScreenVerdict } from './screen'
+import { currencyFor, readLocale, readMarketHint, type P2sLocale, type P2sMarketHint } from './locale'
+import { sanitizeSeedRows, screenTextFor, type IntakeKind } from './intake'
+import type { CatalogImportRow } from '../catalog-import'
 
 export const DEVICE_COOKIE = 'p2s_device'
 export const DEVICE_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
@@ -30,7 +38,27 @@ export const P2S_COPY = {
   budget: 'Hoy ya armamos muchas tiendas. Vuelve mañana o déjanos tu correo.',
   notFound: 'No encontramos esa tienda en este teléfono. Empieza una nueva.',
   unavailable: 'No pudimos armar tu tienda ahora. Inténtalo de nuevo en un momento.',
+  // D5 — every non-prohibited refusal reads the same, so an attacker never learns which check fired.
+  notABusiness: 'Esto no parece un negocio. Cuéntanos qué vendes o qué ofreces y armamos tu tienda.',
+  prohibited: 'No podemos armar tiendas para productos que los pagos en línea no aceptan (por ejemplo medicamentos controlados, armas o réplicas).',
 } as const
+
+/** The same refusals in English (D11). `satisfies` makes a key missing here a type error, not a blank message. */
+export const P2S_COPY_EN = {
+  invalid: 'Tell us in a sentence what you sell (up to 500 characters).',
+  verify: "We couldn't verify it's you. Reload the page and try again.",
+  rateLimited: "You're going fast. Wait a moment and try again.",
+  allowance: `You've used your ${P2S_LIMITS.anonVersions} versions. Keep the one you like best.`,
+  budget: "We've built a lot of shops today. Come back tomorrow.",
+  notFound: "We couldn't find that shop on this phone. Start a new one.",
+  unavailable: "We couldn't build your shop right now. Try again in a moment.",
+  notABusiness: "This doesn't look like a business. Tell us what you sell or offer and we'll build your shop.",
+  prohibited: "We can't build shops for products online payments don't accept (for example controlled drugs, weapons or replicas).",
+} as const satisfies Record<keyof typeof P2S_COPY, string>
+
+export function p2sCopy(locale: P2sLocale): Record<keyof typeof P2S_COPY, string> {
+  return locale === 'en' ? P2S_COPY_EN : P2S_COPY
+}
 
 export interface DraftRef {
   id: string
@@ -45,7 +73,9 @@ export interface DraftsDeps {
   spend: (args: { subject: string; versionCap: number }) => Promise<{ data: unknown; error: unknown }>
   /** An unclaimed, unexpired draft owned by this device, or null. */
   findOwnedDraft: (draftId: string, deviceId: string) => Promise<DraftRef | null>
-  createDraft: (deviceId: string, description: string, versionsUsed: number) => Promise<DraftRef | null>
+  createDraft: (deviceId: string, description: string, versionsUsed: number, meta: DraftMeta) => Promise<DraftRef | null>
+  /** D1 — the screen. Resolves a verdict; `unavailable` is a verdict, not a throw. */
+  screen: (text: string) => Promise<ScreenVerdict>
   /** Start a new version on an owned draft. Resolves false when no row was updated. */
   startVersion: (draft: DraftRef, deviceId: string, description: string, versionsUsed: number) => Promise<boolean>
   /** Save one block, only while `version` is still the draft's current one (a superseded run stops). */
@@ -60,6 +90,13 @@ export interface DraftsDeps {
 
 export type Refusal = { kind: 'refuse'; status: number; error: keyof typeof P2S_COPY; message: string }
 
+/** What a new draft is born with besides its description (D10–D12, D9). */
+export interface DraftMeta {
+  locale: P2sLocale
+  market: P2sMarketHint | null
+  seedRows: CatalogImportRow[] | null
+}
+
 export type Accepted = {
   kind: 'stream'
   draftId: string
@@ -70,8 +107,8 @@ export type Accepted = {
 
 export type DraftsResult = (Refusal | Accepted) & { deviceId: string; mintedDevice: boolean }
 
-function refuse(status: number, error: keyof typeof P2S_COPY): Refusal {
-  return { kind: 'refuse', status, error, message: P2S_COPY[error] }
+function refuse(status: number, error: keyof typeof P2S_COPY, locale: P2sLocale = 'es'): Refusal {
+  return { kind: 'refuse', status, error, message: p2sCopy(locale)[error] }
 }
 
 export interface ParsedBody {
@@ -82,7 +119,15 @@ export interface ParsedBody {
   tone: Tone | null
   /** Optional business shape the merchant picked («Tipo de negocio»). Absent = the model decides. */
   shape: BusinessShape | null
+  locale: P2sLocale
+  marketHint: P2sMarketHint | null
+  /** Which kind of input started it (D19); text when absent. */
+  input: IntakeKind | 'text'
+  /** The merchant's own rows from an intake, re-validated here (never trusted as sent). Null = none. */
+  seedRows: CatalogImportRow[] | null
 }
+
+const INPUTS = ['text', 'photo', 'file', 'url'] as const
 
 /** Pure. A new draft needs a description; a re-run needs a draft id and may bring a new description. */
 export function parseDraftsBody(body: unknown): ParsedBody | null {
@@ -97,7 +142,17 @@ export function parseDraftsBody(body: unknown): ParsedBody | null {
   if (b.tone !== undefined && b.tone !== null && !isTone(b.tone)) return null
   // Same rule for the shape: it is stated to the model outside the data tags, so only our own enum may arrive.
   if (b.shape !== undefined && b.shape !== null && !isBusinessShape(b.shape)) return null
-  return { description, draftId, turnstileToken: b.turnstile_token, tone: b.tone ?? null, shape: b.shape ?? null }
+  if (b.input !== undefined && b.input !== null && !(INPUTS as readonly unknown[]).includes(b.input)) return null
+  if (b.seed_rows !== undefined && b.seed_rows !== null && !Array.isArray(b.seed_rows)) return null
+  const marketHint = readMarketHint(b.market_hint)
+  const rows = Array.isArray(b.seed_rows) ? sanitizeSeedRows(b.seed_rows, currencyFor(marketHint)) : []
+  return {
+    description, draftId, turnstileToken: b.turnstile_token, tone: b.tone ?? null, shape: b.shape ?? null,
+    locale: readLocale(b.locale),
+    marketHint,
+    input: (b.input as ParsedBody['input'] | undefined) ?? 'text',
+    seedRows: rows.length ? rows : null,
+  }
 }
 
 export function readDeviceId(cookieValue: string | undefined | null): string | null {
@@ -113,46 +168,57 @@ export async function handleCreateDraft(
   const withDevice = <T extends Refusal | Accepted>(r: T) => ({ ...r, deviceId, mintedDevice: !existingDevice })
 
   const parsed = parseDraftsBody(input.body)
-  if (!parsed) return withDevice(refuse(400, 'invalid'))
+  if (!parsed) return withDevice(refuse(400, 'invalid', readLocale((input.body as { locale?: unknown } | null)?.locale)))
+  const L = parsed.locale
 
   const verdict = await deps.verifyTurnstile(parsed.turnstileToken)
   if (!verdict.ok) {
     deps.log?.({ event: 'turnstile_refused', reason: verdict.reason })
-    return withDevice(refuse(403, 'verify'))
+    return withDevice(refuse(403, 'verify', L))
   }
 
-  if (!(await deps.burstAllowed(deviceId))) return withDevice(refuse(429, 'rateLimited'))
+  if (!(await deps.burstAllowed(deviceId))) return withDevice(refuse(429, 'rateLimited', L))
 
   // Without a model there is nothing to sell the allowance for: refuse BEFORE spending it.
-  if (!deps.modelConfigured) return withDevice(refuse(503, 'unavailable'))
+  if (!deps.modelConfigured) return withDevice(refuse(503, 'unavailable', L))
 
   let draft: DraftRef | null = null
   if (parsed.draftId) {
     // A re-run is only for a draft this device owns. Checked before the spend, so a stranger's draft id cannot
     // cost this device (or the platform) a generation.
     draft = await deps.findOwnedDraft(parsed.draftId, deviceId)
-    if (!draft) return withDevice(refuse(404, 'notFound'))
+    if (!draft) return withDevice(refuse(404, 'notFound', L))
+  }
+
+  // D2 — the screen, on any NEW text: a first description, or a re-run that brings one. A re-run with no new text
+  // regenerates words already screened, so it is not asked again.
+  if (parsed.description) {
+    const verdict = await deps.screen(screenTextFor(parsed.description, parsed.seedRows ?? []))
+    if (verdict.verdict === 'refuse') {
+      deps.log?.({ event: 'screen_refused', kind: verdict.kind, input: parsed.input })
+      return withDevice(refuse(422, refusalCopyKey(verdict.kind), L))
+    }
   }
 
   const spend: SpendDecision = decideSpend(await deps.spend({ subject: deviceSubject(deviceId), versionCap: P2S_LIMITS.anonVersions }))
   if (!spend.ok) {
     deps.log?.({ event: 'spend_refused', reason: spend.reason })
-    if (spend.reason === 'allowance') return withDevice(refuse(429, 'allowance'))
-    if (spend.reason === 'budget') return withDevice(refuse(503, 'budget'))
-    return withDevice(refuse(503, 'unavailable'))
+    if (spend.reason === 'allowance') return withDevice(refuse(429, 'allowance', L))
+    if (spend.reason === 'budget') return withDevice(refuse(503, 'budget', L))
+    return withDevice(refuse(503, 'unavailable', L))
   }
 
   // The spend is claimed; if the draft write after it fails, the merchant got nothing, so they pay nothing.
   const refundAndRefuse = async () => {
     await deps.refund({ subject: deviceSubject(deviceId) }).catch(() => {})
     deps.log?.({ event: 'refunded', reason: 'draft_write_failed' })
-    return withDevice(refuse(503, 'unavailable'))
+    return withDevice(refuse(503, 'unavailable', L))
   }
   const description = parsed.description ?? draft?.description ?? ''
   if (draft) {
     if (!(await deps.startVersion(draft, deviceId, description, spend.versionsUsed))) return refundAndRefuse()
   } else {
-    draft = await deps.createDraft(deviceId, description, spend.versionsUsed)
+    draft = await deps.createDraft(deviceId, description, spend.versionsUsed, { locale: L, market: parsed.marketHint, seedRows: parsed.seedRows })
     if (!draft) return refundAndRefuse()
   }
 
@@ -179,12 +245,12 @@ export async function handleCreateDraft(
           saveBlock: (event) => deps.saveBlock(draftId, deviceId, version, event),
           emit: (event) => send('block', event),
           log: (line) => deps.log?.({ event: 'block', draft_id: draftId, ...line }),
-        }, { tone: parsed.tone ?? undefined, shape: parsed.shape ?? undefined })
+        }, { tone: parsed.tone ?? undefined, shape: parsed.shape ?? undefined, market: parsed.marketHint })
         if (outcome.ok) send('done', { draft_id: draftId, versions_left: versionsLeft })
-        else send('error', { message: P2S_COPY.unavailable, block: outcome.failedBlock })
+        else send('error', { message: p2sCopy(L).unavailable, block: outcome.failedBlock })
       } catch (e) {
         deps.log?.({ event: 'stream_failed', draft_id: draftId, error: e instanceof Error ? e.message : String(e) })
-        send('error', { message: P2S_COPY.unavailable })
+        send('error', { message: p2sCopy(L).unavailable })
       }
     },
   })

@@ -37,6 +37,7 @@
  * Pure: every effect is injected, so `e2e/p2s-photo.spec.ts` drives the order with a trace and no network.
  */
 
+import type { ScreenVerdict } from './screen'
 import { DEFAULT_SHAPE, SHAPE_DEFAULTS, type BusinessShape } from '../business-shape'
 import { CATALOG_CATEGORY_KEYS, validateRows, type CatalogImportRow } from '../catalog-import'
 import type { CategoryKey } from '../types'
@@ -252,7 +253,7 @@ export interface AnalyzeInput {
   hosts: PhotoHosts
 }
 
-const refuse = <S extends 400 | 403 | 409 | 429 | 502 | 503>(status: S, code: string, error: string) =>
+const refuse = <S extends 400 | 403 | 409 | 422 | 429 | 502 | 503>(status: S, code: string, error: string) =>
   ({ status, body: { ok: false as const, error, code } })
 
 export async function analyzePhoto(input: AnalyzeInput, deps: AnalyzeDeps): Promise<AnalyzeOutcome> {
@@ -469,6 +470,10 @@ export interface ConfirmDeps {
   createProduct: (row: CatalogImportRow, imageUrl: string, nonce: string, exampleTitle: string | null) => Promise<{ ok: true; productId: string } | { ok: false; message: string | null }>
   log?: (line: Record<string, unknown>) => void
   now: () => Date
+  /** one-front-door-both-markets S1.2 — the prohibited-goods half of the screen, on the card the merchant confirms.
+   *  Only `prohibited` blocks here: a product title is not a business description, so "off task" means nothing.
+   *  Omitted (an older caller) → not screened. */
+  screen?: (text: string) => Promise<ScreenVerdict>
 }
 
 export interface ConfirmInput {
@@ -479,7 +484,7 @@ export interface ConfirmInput {
 
 export type ConfirmOutcome =
   | { status: 200; body: { ok: true; product_id: string; duplicate: boolean; example_removed: boolean; finished: boolean; photos_left: number | null } }
-  | { status: 400 | 403 | 409 | 429 | 502 | 503; body: { ok: false; error: string; code: string } }
+  | { status: 400 | 403 | 409 | 422 | 429 | 502 | 503; body: { ok: false; error: string; code: string } }
 
 export interface ConfirmRequest {
   nonce: string
@@ -516,6 +521,12 @@ export async function confirmPhoto(input: ConfirmInput, deps: ConfirmDeps): Prom
   if (owner.kind === 'none') return refuse(403, 'no_shop', PHOTO_COPY.noShop)
   if (owner.kind === 'unavailable') return refuse(503, 'unavailable', PHOTO_COPY.unavailable)
   const { draftId } = owner
+
+  // S1.2 — before the reserve and the spend: a refused card costs the merchant no photo.
+  if (deps.screen) {
+    const verdict = await deps.screen(`${row.title}\n${row.description ?? ''}`)
+    if (verdict.verdict === 'refuse' && verdict.kind === 'prohibited') return refuse(422, 'prohibited', PHOTO_COPY.prohibited)
+  }
 
   // reserve — before the spend, so a double tap spends once.
   const reserved = await deps.mutate(draftId, (r) => reserveMutation(r, nonce, deps.now()))

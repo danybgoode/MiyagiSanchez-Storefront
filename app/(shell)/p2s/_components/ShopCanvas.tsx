@@ -200,7 +200,7 @@ export default function ShopCanvas({
           <h2 className="text-xl font-bold mb-1">{CANVAS_COPY.productsTitle}</h2>
           <p className="text-xs mb-4" style={{ color: 'var(--shop-fg-muted, var(--fg-muted))' }}>{CANVAS_COPY.exampleNote}</p>
           <div className={SHOP_INDEX_GRID_CLASS}>
-            {owner && ownCards ? ownCards.map((card) => <OwnProductCard key={card.id} card={card} accent={view.accent} />) : null}
+            {mode !== 'viewer' && ownCards ? ownCards.map((card) => <OwnProductCard key={card.id} card={card} accent={view.accent} />) : null}
             {view.cards
               ? view.cards.map((card) => (
                   <ExampleCard

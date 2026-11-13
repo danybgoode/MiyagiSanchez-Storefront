@@ -218,6 +218,21 @@ const p2sGenerateDeviceLimiter = () => {
   return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(6, '10 m'), prefix: 'rl:p2s_generate_device' })
 }
 
+// Intake bursts (one-front-door-both-markets D6–D8): a photo, a file or a store link in the describe box. The same
+// two buckets as generation. The link intake is an outbound fetch of a URL the visitor typed, so the IP bucket is
+// what keeps it from being used to hammer someone else's site through us. Fails open; the photo/PDF spend does not.
+const p2sIntakeIpLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(20, '1 h'), prefix: 'rl:p2s_intake_ip' })
+}
+
+const p2sIntakeDeviceLimiter = () => {
+  const redis = getRedis()
+  if (!redis) return null
+  return new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(6, '10 m'), prefix: 'rl:p2s_intake_device' })
+}
+
 // «Mándame el enlace» (prompt-to-shop S3.1): each request emails an address the requester typed. Five an hour per IP
 // bounds anyone using it to fill a stranger's inbox; a merchant needs one. Fails open like the rest — the draft
 // ownership check behind it does not.
@@ -291,7 +306,7 @@ const catalogPdfIpLimiter = () => {
 
 // ── Public helper ──────────────────────────────────────────────────────────────
 
-export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_mail_link' | 'p2s_mail_link_device' | 'p2s_photo' | 'catalog_pdf_shop' | 'catalog_pdf_ip' | 'shop_chat_ip' | 'shop_chat_shop' | 'shop_chat_leave_ip' | 'shop_chat_leave_shop'
+export type LimitKey = 'offers' | 'checkout' | 'mcp' | 'mcp_partner_preflight' | 'supply_import' | 'stamps' | 'catalog_extract' | 'embed' | 'sweepstakes' | 'telegram_webhook' | 'telegram_link' | 'promoter_apply' | 'claim_request' | 'artwork_upload' | 'launchpad' | 'launchpad_vote' | 'comparator_analyze' | 'relationship' | 'fundadoras_apply' | 'fundadoras_track' | 'p2s_generate_ip' | 'p2s_generate_device' | 'p2s_intake_ip' | 'p2s_intake_device' | 'p2s_mail_link' | 'p2s_mail_link_device' | 'p2s_photo' | 'catalog_pdf_shop' | 'catalog_pdf_ip' | 'shop_chat_ip' | 'shop_chat_shop' | 'shop_chat_leave_ip' | 'shop_chat_leave_shop'
 
 function limiterFor(key: LimitKey): Ratelimit | null {
   const getLimiter = key === 'offers'          ? offerLimiter
@@ -315,6 +330,8 @@ function limiterFor(key: LimitKey): Ratelimit | null {
     : key === 'fundadoras_track' ? fundadorasTrackLimiter
     : key === 'p2s_generate_ip' ? p2sGenerateIpLimiter
     : key === 'p2s_generate_device' ? p2sGenerateDeviceLimiter
+    : key === 'p2s_intake_ip' ? p2sIntakeIpLimiter
+    : key === 'p2s_intake_device' ? p2sIntakeDeviceLimiter
     : key === 'p2s_mail_link' ? p2sMailLinkLimiter
     : key === 'p2s_mail_link_device' ? p2sMailLinkDeviceLimiter
     : key === 'p2s_photo' ? p2sPhotoLimiter

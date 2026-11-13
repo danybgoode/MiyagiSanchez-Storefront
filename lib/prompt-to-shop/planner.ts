@@ -22,6 +22,7 @@ import {
   type IdentityBlock,
 } from './blocks'
 import { RESPONSE_SCHEMAS, catalogPrompt, identityPrompt, wordsPrompt, type Tone } from './prompts'
+import { currencyFor, type P2sMarketHint } from './locale'
 import { emptyNumbers, numbersPrompt, type ExampleRef } from './numbers'
 import { shapeOf, type BusinessShape } from '../business-shape'
 
@@ -63,13 +64,14 @@ export function buildBlockRequest(
   tone?: Tone,
   shapeHint?: BusinessShape,
   examples: ExampleRef[] = [],
+  market: P2sMarketHint | null = null,
 ): ModelRequest {
   const id = identity ?? fallbackIdentity(description, shapeHint)
   const prompt =
     key === 'identity' ? identityPrompt(description, shapeHint)
     : key === 'words' ? wordsPrompt(description, id, tone)
-    : key === 'numbers' ? numbersPrompt(description, id.name, examples, shapeOf(id))
-    : catalogPrompt(description, id, shapeOf(id))
+    : key === 'numbers' ? numbersPrompt(description, id.name, examples, shapeOf(id), market)
+    : catalogPrompt(description, id, shapeOf(id), market)
   return {
     block: key,
     body: {
@@ -107,9 +109,10 @@ export async function generateBlock<K extends BlockKey>(
   tone?: Tone,
   shapeHint?: BusinessShape,
   examples: ExampleRef[] = [],
+  market: P2sMarketHint | null = null,
 ): Promise<BlockEvent<K>> {
   const now = deps.now ?? Date.now
-  const req = buildBlockRequest(key, description, identity, tone, shapeHint, examples)
+  const req = buildBlockRequest(key, description, identity, tone, shapeHint, examples, market)
   for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_BLOCK; attempt++) {
     const started = now()
     let result: ModelResult
@@ -128,10 +131,16 @@ export async function generateBlock<K extends BlockKey>(
     if (parsed?.ok) {
       // The merchant's own pick wins over the model's (D3): a re-run asked for this shape, so the shop IS this shape.
       const data = key === 'identity' && shapeHint ? ({ ...(parsed.data as IdentityBlock), shape: shapeHint } as BlockData[K]) : (parsed.data as BlockData[K])
-      return { key, status: 'ok', data }
+      return { key, status: 'ok', data: withCurrency(key, data, market) }
     }
   }
-  return { key, status: 'fallback', data: fallbackFor(key, description, identity, shapeHint) }
+  return { key, status: 'fallback', data: withCurrency(key, fallbackFor(key, description, identity, shapeHint), market) }
+}
+
+/** The example rows carry the currency their prices were asked in (D12); no hint keeps the rows as they were. */
+function withCurrency<K extends BlockKey>(key: K, data: BlockData[K], market: P2sMarketHint | null): BlockData[K] {
+  if (key !== 'catalog' || !market) return data
+  return (data as ExampleRow[]).map((r) => ({ ...r, currency: currencyFor(market) })) as BlockData[K]
 }
 
 export type GenerationOutcome = { ok: true; events: BlockEvent[] } | { ok: false; reason: 'save_failed'; failedBlock: BlockKey }
@@ -141,12 +150,12 @@ export type GenerationOutcome = { ok: true; events: BlockEvent[] } | { ok: false
  * land stops the run there: emitting a block the draft does not hold would show the merchant a shop that a reload
  * cannot bring back.
  */
-export async function generateDraft(description: string, deps: PlannerDeps, options: { tone?: Tone; shape?: BusinessShape } = {}): Promise<GenerationOutcome> {
+export async function generateDraft(description: string, deps: PlannerDeps, options: { tone?: Tone; shape?: BusinessShape; market?: P2sMarketHint | null } = {}): Promise<GenerationOutcome> {
   const events: BlockEvent[] = []
   let identity: IdentityBlock | undefined
   let examples: ExampleRef[] = []
   for (const key of BLOCK_KEYS) {
-    const event = await generateBlock(key, description, identity, deps, options.tone, options.shape, examples)
+    const event = await generateBlock(key, description, identity, deps, options.tone, options.shape, examples, options.market ?? null)
     if (key === 'identity') identity = event.data as IdentityBlock
     if (key === 'catalog') examples = (event.data as ExampleRow[]).map((r) => ({ title: r.title, price: r.price }))
     const saved = await deps.saveBlock(event)

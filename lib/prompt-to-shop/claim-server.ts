@@ -102,7 +102,7 @@ export interface KeptDraft {
   sellerId: string | null
 }
 
-const KEPT_COLUMNS = 'id, identity, words, catalog, numbers, block_status, claimed_seller_id'
+const KEPT_COLUMNS = 'id, identity, words, catalog, numbers, block_status, claimed_seller_id, seed_rows, locale, market'
 
 export async function findKeptDraft(userId: string, draftId: string | null): Promise<KeptDraft | null | 'unavailable'> {
   let query = db.from('shop_drafts').select(KEPT_COLUMNS).eq('claimed_by', userId)
@@ -110,6 +110,6 @@ export async function findKeptDraft(userId: string, draftId: string | null): Pro
   const { data, error } = await query.maybeSingle()
   if (error) return 'unavailable'
   if (!data) return null
-  const row = data as { id: string; identity: unknown; words: unknown; catalog: unknown; numbers?: unknown; block_status: unknown; claimed_seller_id: string | null }
+  const row = data as { id: string; identity: unknown; words: unknown; catalog: unknown; numbers?: unknown; block_status: unknown; claimed_seller_id: string | null; seed_rows?: unknown }
   return { id: row.id, blocks: coerceBlocks(row), sellerId: row.claimed_seller_id }
 }

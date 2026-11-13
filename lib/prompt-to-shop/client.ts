@@ -52,7 +52,57 @@ export function parseSseFrames(buffer: string): { frames: StreamFrame[]; rest: s
   return { frames, rest }
 }
 
-export type DraftRequestBody = { description?: string; draft_id?: string; turnstile_token: string; tone?: string; shape?: string }
+export type DraftRequestBody = {
+  description?: string; draft_id?: string; turnstile_token: string; tone?: string; shape?: string
+  /** one-front-door-both-markets D11/D12/D19/D9 — the page's language, the market hint, how it started, own rows. */
+  locale?: 'es' | 'en'; market_hint?: 'mx' | 'us' | null; input?: 'text' | 'photo' | 'file' | 'url'; seed_rows?: unknown[]
+}
+
+/** What an intake hands back to the describe box (D6–D8). */
+export type IntakeAnswer =
+  | { ok: true; description: string; seedRows: Array<{ title: string; price?: number; currency?: string; images?: string[] }>; sourceName: string | null; input: 'photo' | 'file' | 'url' }
+  | { ok: false; message: string; code: string | null }
+
+/**
+ * `POST /api/p2s/intake/{photo|file|link}`. A refusal's `error` is visitor-facing and shown verbatim; a dead
+ * connection is a generic failure in the visitor's language.
+ */
+export async function runIntake(
+  kind: 'photo' | 'file' | 'link',
+  payload: { file?: File; url?: string; turnstileToken: string; locale: 'es' | 'en'; marketHint: 'mx' | 'us' | null },
+  failed: string,
+  deps: DraftRequestDeps = { fetch: (...args) => fetch(...args) },
+): Promise<IntakeAnswer> {
+  try {
+    let res: Response
+    if (kind === 'link') {
+      res = await deps.fetch('/api/p2s/intake/link', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: payload.url, turnstile_token: payload.turnstileToken, locale: payload.locale, market_hint: payload.marketHint }),
+      })
+    } else {
+      const form = new FormData()
+      if (payload.file) form.append('file', payload.file)
+      form.append('turnstile_token', payload.turnstileToken)
+      form.append('locale', payload.locale)
+      if (payload.marketHint) form.append('market_hint', payload.marketHint)
+      res = await deps.fetch(`/api/p2s/intake/${kind}`, { method: 'POST', credentials: 'same-origin', body: form })
+    }
+    const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    if (res.ok && data?.ok === true && typeof data.description === 'string') {
+      return {
+        ok: true,
+        description: data.description,
+        seedRows: Array.isArray(data.seed_rows) ? (data.seed_rows as IntakeAnswer extends { seedRows: infer R } ? R : never) : [],
+        sourceName: typeof data.source_name === 'string' ? data.source_name : null,
+        input: data.input === 'photo' || data.input === 'file' ? data.input : 'url',
+      }
+    }
+    return { ok: false, message: typeof data?.error === 'string' ? data.error : failed, code: typeof data?.code === 'string' ? data.code : null }
+  } catch {
+    return { ok: false, message: failed, code: null }
+  }
+}
 
 export type DraftOutcome =
   /** The server said no, in plain es-MX, with no stream. `message` is the server's own text, verbatim. */

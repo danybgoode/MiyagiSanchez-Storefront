@@ -7,6 +7,8 @@
 
 import { shapeOf } from '@/lib/business-shape'
 import 'server-only'
+import { screenText } from './screen'
+import { screenDeps } from './screen-server'
 import { resolveMyPlan } from '@/lib/plan-server'
 import { allowanceFor } from '@/lib/plan-allowances'
 import { db } from '@/lib/supabase'
@@ -231,6 +233,7 @@ export function confirmDeps(userId: string, clerkJwt: string): ConfirmDeps {
   return {
     resolveOwner: () => resolvePhotoOwner(userId, clerkJwt),
     mutate: (draftId, fn) => mutateKept(userId, draftId, fn),
+    screen: (text) => screenText(text, screenDeps()),
     // The owner's plan sets the month's photos (D8); a plan that cannot be read gets Gratis's (fail closed).
     photoCap: () => ownerPhotoCap(userId),
     spend: async (cap: number) => {

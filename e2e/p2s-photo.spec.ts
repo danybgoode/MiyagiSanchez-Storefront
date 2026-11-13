@@ -576,3 +576,22 @@ test('analysis: a Negocio owner past Gratis\'s 20 photos is NOT refused — the 
   expect(out.status).toBe(200)
   if (out.status === 200) expect((out.body as { photos_left: number }).photos_left).toBe(60 - P2S_LIMITS.photosPerMonth)
 })
+
+// one-front-door-both-markets S1.2 — the confirmed card goes through the prohibited-goods half of the screen.
+test('a prohibited card is refused BEFORE the reserve and the spend: no photo spent, no product', async () => {
+  const w = confirmWorld()
+  const seen: string[] = []
+  w.deps.screen = async (text) => { seen.push(text); return { verdict: 'refuse', kind: 'prohibited' } }
+  const out = await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
+  expect(out).toMatchObject({ status: 422, body: { ok: false, code: 'prohibited' } })
+  expect(w.trace).toEqual(['owner'])
+  expect(w.products).toHaveLength(0)
+  expect(seen[0]).toContain(CARD.title)
+})
+
+test('only PROHIBITED blocks a card: an "off task" verdict on a product title confirms as before', async () => {
+  const w = confirmWorld()
+  w.deps.screen = async () => ({ verdict: 'refuse', kind: 'off_task' })
+  const out = await confirmPhoto({ userId: USER, body: body(), hosts: HOSTS }, w.deps)
+  expect(out.status).toBe(200)
+})

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { runDraftRequest } from '@/lib/prompt-to-shop/client'
 import { NARRATION, SHAPING_COPY } from '@/lib/prompt-to-shop/copy'
-import { draftView, type DraftBlocks } from '@/lib/prompt-to-shop/view'
+import { draftView, seedCards, type DraftBlocks, type SeedRow } from '@/lib/prompt-to-shop/view'
 import ShopCanvas from './ShopCanvas'
 
 /**
@@ -31,6 +31,10 @@ export default function TakingShape({
   shape,
   onBack,
   onDone,
+  locale = 'es',
+  marketHint = null,
+  input = 'text',
+  seedRows,
 }: {
   description?: string
   turnstileToken: string
@@ -42,6 +46,11 @@ export default function TakingShape({
   onBack: () => void
   /** Overrides the default navigation to the owner canvas (used when «Otra versión» runs in place). */
   onDone?: (result: { draftId: string; versionsLeft: number }) => void
+  /** one-front-door-both-markets D11/D12/D19/D9 — sent with a FIRST generation only; a re-run keeps the draft's own. */
+  locale?: 'es' | 'en'
+  marketHint?: 'mx' | 'us' | null
+  input?: 'text' | 'photo' | 'file' | 'url'
+  seedRows?: unknown[]
 }) {
   const router = useRouter()
   const [blocks, setBlocks] = useState<DraftBlocks>(EMPTY)
@@ -52,7 +61,10 @@ export default function TakingShape({
     if (started.current) return
     started.current = true
     void runDraftRequest(
-      { turnstile_token: turnstileToken, ...(description ? { description } : {}), ...(draftId ? { draft_id: draftId } : {}), ...(tone ? { tone } : {}), ...(shape ? { shape } : {}) },
+      {
+        turnstile_token: turnstileToken, ...(description ? { description } : {}), ...(draftId ? { draft_id: draftId } : {}), ...(tone ? { tone } : {}), ...(shape ? { shape } : {}),
+        ...(draftId ? {} : { locale, market_hint: marketHint, input, ...(seedRows?.length ? { seed_rows: seedRows } : {}) }),
+      },
       (event) =>
         setBlocks((prev) => ({
           ...prev,
@@ -99,7 +111,7 @@ export default function TakingShape({
           </div>
         ) : null}
       </div>
-      <ShopCanvas view={view} mode="shaping" />
+      <ShopCanvas view={view} mode="shaping" ownCards={seedCards(seedRows as SeedRow[] | undefined)} />
     </div>
     </BodyPortal>
   )
