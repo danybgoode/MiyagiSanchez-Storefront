@@ -9,7 +9,7 @@
  * where the screen (D2) judges the description and the rows' titles before any generation budget is spent.
  *
  * What costs money here: the photo (Gemini vision) and a PDF (Gemini reads it). Both spend ONE signed-out AI intake
- * per device and a share of a separate daily budget FIRST (`anon_intake` / `anon_intake_budget`, D6). CSV, XLSX and
+ * per device and a share of a separate daily budget FIRST (`ANON_INTAKE` below, D6). CSV, XLSX and
  * links are parsed in code and cost nothing.
  */
 
@@ -286,3 +286,28 @@ export function nextHop(current: string, location: string | null): string | null
 /** The file picker's `accept` (kept here, out of the screens, so the copy guard never reads file-type words). */
 export const INTAKE_FILE_ACCEPT = '.csv,.tsv,.txt,.json,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'
 export const INTAKE_PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif'
+
+/**
+ * Read at most `max` bytes, counting AS IT READS (fresh review, PR #498): checking the size after `arrayBuffer()`
+ * would let one link make the server hold a stranger's multi-hundred-MB body. A declared length over the cap is
+ * refused before reading anything; a body that grows past it is cancelled mid-stream.
+ */
+export async function readCappedBody(body: ReadableStream<Uint8Array> | null, contentLength: string | null, max: number): Promise<Uint8Array | null> {
+  const declared = Number(contentLength ?? '')
+  if (Number.isFinite(declared) && declared > max) { await body?.cancel().catch(() => {}); return null }
+  if (!body) return new Uint8Array()
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > max) { await reader.cancel().catch(() => {}); return null }
+    chunks.push(value)
+  }
+  const out = new Uint8Array(total)
+  let at = 0
+  for (const c of chunks) { out.set(c, at); at += c.byteLength }
+  return out
+}

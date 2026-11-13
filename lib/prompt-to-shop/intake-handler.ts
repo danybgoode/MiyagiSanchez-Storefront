@@ -7,12 +7,15 @@
  *   csv / xlsx  : validate → Turnstile → burst → parse in code → result            (nothing to spend)
  *   link        : validate → Turnstile → burst → plan → fetch (SSRF-pinned) → result (nothing to spend)
  *
- * An intake never creates a draft and never screens: what it returns goes into the describe box, and the box's own
+ * An intake never creates a draft. A PHOTO is screened after the model describes it (Jev reads text, not images) and
+ * before anything is stored or returned, so a prohibited photo is never hosted on our bucket; everything an intake
+ * returns then goes into the describe box, and the box's own
  * `POST /api/p2s/drafts` screens the description AND the rows' titles before any generation is spent (D2).
  */
 
 import { parseCatalogFile, type CatalogImportRow, type ImportCurrency } from '../catalog-import'
 import type { TurnstileVerdict } from './turnstile'
+import type { ScreenVerdict } from './screen'
 import { validateSuggestion, PHOTO_MAX_BYTES, PHOTO_MIME, type PhotoSuggestion } from './photo'
 import {
   ANON_INTAKE, INTAKE_FILE_MAX_BYTES, SEED_ROWS_MAX, bigCartelRows, describeFromPage, describeFromRows, fileKindOf,
@@ -31,6 +34,7 @@ export const INTAKE_COPY = {
     unavailable: 'No pudimos leerlo ahora. Describe tu negocio en una frase o inténtalo en un momento.',
     empty: 'No encontramos productos ahí. Revisa que tenga nombre y precio, o describe tu negocio en una frase.',
     link: 'Ese link no se puede abrir. Pega la dirección pública de tu tienda (por ejemplo tutienda.myshopify.com).',
+    prohibited: 'No podemos armar tiendas para productos que los pagos en línea no aceptan (por ejemplo medicamentos controlados, armas o réplicas).',
     silentPage: 'Esa página no dice qué vende. Cuéntanos en una frase qué ofreces.',
   },
   en: {
@@ -43,6 +47,7 @@ export const INTAKE_COPY = {
     unavailable: "We couldn't read it right now. Describe your business in a sentence or try again in a moment.",
     empty: "We didn't find products there. Check it has names and prices, or describe your business in a sentence.",
     link: "That link can't be opened. Paste your store's public address (for example yourstore.myshopify.com).",
+    prohibited: "We can't build shops for products online payments don't accept (for example controlled drugs, weapons or replicas).",
     silentPage: "That page doesn't say what it sells. Tell us in a sentence what you offer.",
   },
 } as const
@@ -71,9 +76,9 @@ export interface IntakeCommon {
 export interface IntakeDeps {
   verifyTurnstile: (token: unknown) => Promise<TurnstileVerdict>
   burstAllowed: (deviceId: string) => Promise<boolean>
-  /** `spend_ai_allowance(device:<id>, anon_intake, all, 1)` — the new count, or null at the cap. Throws = unavailable. */
+  /** `spend_ai_allowance(ANON_INTAKE.deviceSubject(id), ANON_INTAKE.kind, 'all', 1)` — the new count, or null at the cap. Throws = unavailable. */
   spendDevice: (deviceId: string) => Promise<number | null>
-  /** `spend_ai_allowance(global, anon_intake_budget, <MX day>, N)` — the new count, or null at the cap. */
+  /** `spend_ai_allowance(ANON_INTAKE.budgetSubject, ANON_INTAKE.budgetKind, <MX day>, N)` — the new count, or null at the cap. */
   spendDay: () => Promise<number | null>
   /** Give the device's intake back when the DAY refused it: the visitor got nothing. Best effort. */
   refundDevice: (deviceId: string) => Promise<void>
@@ -86,6 +91,8 @@ export interface IntakeDeps {
   fetchJson: (url: string) => Promise<unknown | null>
   fetchHtml: (url: string) => Promise<string | null>
   log?: (line: Record<string, unknown>) => void
+  /** The screen (D1), for what a photo's model reply SAYS. Omitted → not screened (the drafts request still is). */
+  screen?: (text: string) => Promise<ScreenVerdict>
 }
 
 async function gate(common: IntakeCommon, deps: IntakeDeps, locale: P2sLocale): Promise<IntakeOutcome | null> {
@@ -201,6 +208,11 @@ export async function handlePhotoIntake(
   const card = validateSuggestion(parsed)
   deps.log?.({ event: 'intake_photo', ok: !!business && card.ok })
   if (!business) return refuse(502, 'unavailable', locale)
+  // Prohibited goods are refused HERE, before the photo is stored on our public bucket (fresh review, PR #498).
+  if (deps.screen) {
+    const verdict = await deps.screen(`${business}\n${card.ok ? `${card.suggestion.title}\n${card.suggestion.description}` : ''}`)
+    if (verdict.verdict === 'refuse' && verdict.kind === 'prohibited') return refuse(422, 'prohibited', locale)
+  }
   const url = card.ok ? await deps.storePhoto(input.deviceId, file.bytes, file.mime).catch(() => null) : null
   const rows = card.ok ? sanitizeSeedRows([photoRow(card.suggestion, url, currencyFor(market))], currencyFor(market)) : []
   return ok({ description: business, seedRows: rows, sourceName: null }, 'photo')
@@ -274,10 +286,12 @@ export async function handleLinkIntake(input: IntakeCommon & { url: unknown }, d
   if (gated) return gated
 
   const origin = plan.kind === 'shopify' ? `https://${plan.domain}` : plan.kind === 'bigcartel' ? plan.origin : new URL(plan.url).origin
-  // Products first: Shopify and Big Cartel both publish `/products.json` (any domain — a Shopify shop on its own
-  // domain is still Shopify), so ONE pinned read tells us whether the link is a store. Then the page, for its words.
-  const json = await deps.fetchJson(`${origin}/products.json`).catch(() => null)
-  const [pageHtml] = await Promise.all([deps.fetchHtml(plan.kind === 'page' ? plan.url : `${origin}/`).catch(() => null)])
+  // Products and the page together: Shopify and Big Cartel both publish `/products.json` (any domain — a Shopify shop
+  // on its own domain is still Shopify), so ONE pinned read tells us whether the link is a store; the page gives words.
+  const [json, pageHtml] = await Promise.all([
+    deps.fetchJson(`${origin}/products.json`).catch(() => null),
+    deps.fetchHtml(plan.kind === 'page' ? plan.url : `${origin}/`).catch(() => null),
+  ])
   const meta = pageHtml === null ? { title: null, description: null } : readPageMeta(pageHtml)
   const sourceName = describeFromPage({ title: meta.title, description: null })
   const shopRows = shopifyJsonRows(json) ?? (plan.kind === 'bigcartel' ? bigCartelRows(json) : null)

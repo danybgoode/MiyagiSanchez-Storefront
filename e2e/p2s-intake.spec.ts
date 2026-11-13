@@ -233,8 +233,8 @@ test('seed rows show as the merchant\'s own cards (never EJEMPLO), priced in the
 })
 
 test('the import payload carries a stable external id per row, so a second upload updates instead of duplicating', () => {
-  const a = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Vela' }, { title: 'Jabón', category: 'hogar' }])
-  const b = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Vela' }, { title: 'Jabón', category: 'hogar' }])
+  const a = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Vela' }, { title: 'Jabón', category: 'hogar' }], 'MXN')
+  const b = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Vela' }, { title: 'Jabón', category: 'hogar' }], 'MXN')
   expect(a.map((r) => r.external_id)).toEqual(['p2s-7f2a1b3c-1', 'p2s-7f2a1b3c-2'])
   expect(a).toEqual(b)
   expect(a[1]).toMatchObject({ category: 'hogar', listing_type: 'product', quantity: 1 })
@@ -290,4 +290,43 @@ test('the screen sees EVERY row title, so a list cannot hide prohibited items pa
 test('an out-of-range numeric entity on a stranger\'s page does not crash the read', () => {
   expect(() => readPageMeta('<title>a &#99999999; b &#x110000; c &#xD800;</title>')).not.toThrow()
   expect(readPageMeta('<title>Velas &#241; &#x1F56F;</title>').title).toBe('Velas ñ 🕯')
+})
+
+// ── Fresh review, PR #498 ────────────────────────────────────────────────────────────────────────────────────────
+
+import { readCappedBody } from '../lib/prompt-to-shop/intake'
+
+test('a price in another currency than the SHOP\'s is dropped at import, never relabelled (US$95 must not become MX$95)', () => {
+  const rows = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Wool runner', price: 95, currency: 'USD' }, { title: 'Vela', price: 180, currency: 'MXN' }], 'MXN')
+  expect(rows[0].currency).toBe('MXN')
+  expect(rows[0].price).toBeUndefined()
+  expect(JSON.parse(JSON.stringify(rows[0]))).not.toHaveProperty('price')
+  expect(rows[1]).toMatchObject({ currency: 'MXN', price: 180 })
+})
+
+test('photo: a prohibited description is refused BEFORE the photo is stored on our bucket', async () => {
+  const w = world({ model: JSON.stringify({ ...CARD, business: 'Vendo pistolas sin papeles', title: 'Pistola 9mm' }) })
+  ;(w.deps as IntakeDeps).screen = async () => { w.trace.push('screen'); return { verdict: 'refuse', kind: 'prohibited' } }
+  const out = await handlePhotoIntake({ ...common, file: PNG }, w.deps)
+  expect(out).toMatchObject({ status: 422, body: { code: 'prohibited' } })
+  expect(w.trace).toEqual(['turnstile', 'burst', 'spend:device', 'spend:day', 'model', 'screen'])
+})
+
+function streamOf(chunks: number[]): ReadableStream<Uint8Array> {
+  let i = 0
+  let cancelled = false
+  const s = new ReadableStream<Uint8Array>({
+    pull(c) { if (i < chunks.length) c.enqueue(new Uint8Array(chunks[i++])); else c.close() },
+    cancel() { cancelled = true },
+  })
+  ;(s as unknown as { wasCancelled: () => boolean }).wasCancelled = () => cancelled
+  return s
+}
+
+test('a page body is capped AS IT IS READ: a declared length over the cap reads nothing; a growing body is cancelled', async () => {
+  expect(await readCappedBody(streamOf([10]), String(5_000_000), 1000)).toBeNull()
+  const growing = streamOf([600, 600, 600])
+  expect(await readCappedBody(growing, null, 1000)).toBeNull()
+  expect((growing as unknown as { wasCancelled: () => boolean }).wasCancelled()).toBe(true)
+  expect((await readCappedBody(streamOf([300, 300]), null, 1000))?.byteLength).toBe(600)
 })

@@ -198,7 +198,6 @@ export async function handleCreateDraft(
   if (parsed.description) {
     const verdict = await deps.screen(screenTextFor(parsed.description, parsed.seedRows ?? []))
     if (verdict.verdict === 'refuse') {
-      deps.log?.({ event: 'screen_refused', kind: verdict.kind, input: parsed.input })
       return withDevice(refuse(422, refusalCopyKey(verdict.kind), L))
     }
   }

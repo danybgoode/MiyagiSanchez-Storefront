@@ -223,7 +223,7 @@ export default function KeptShop({
         )}
       />
 
-      {seedRows && seedRows.length ? <SeedImport draftId={draftId} rows={seedRows} /> : null}
+      {seedRows && seedRows.length ? <SeedImport draftId={draftId} rows={seedRows} currency={market === 'us' ? 'USD' : 'MXN'} /> : null}
 
       {sheet?.kind === 'photo' ? (
         <PhotoSheet replace={sheet.replace} photosLeft={photosLeft} onClose={close} onAdded={() => router.refresh()} />

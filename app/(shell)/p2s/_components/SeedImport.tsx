@@ -14,10 +14,10 @@ import { seedImportRows, SEED_IMPORT_CHUNK, type SeedRow } from '@/lib/prompt-to
  * importer's own chunk size. Each row carries an external id derived from the draft, so a second tap UPDATES the
  * products it made instead of creating them twice.
  */
-export default function SeedImport({ draftId, rows }: { draftId: string; rows: SeedRow[] }) {
+export default function SeedImport({ draftId, rows, currency }: { draftId: string; rows: SeedRow[]; currency: 'MXN' | 'USD' }) {
   const router = useRouter()
   const [state, setState] = useState<{ kind: 'idle' | 'busy' } | { kind: 'done'; created: number; failed: number } | { kind: 'error'; message: string }>({ kind: 'idle' })
-  const payload = seedImportRows(draftId, rows)
+  const payload = seedImportRows(draftId, rows, currency)
 
   async function upload() {
     setState({ kind: 'busy' })
