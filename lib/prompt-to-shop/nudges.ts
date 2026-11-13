@@ -42,6 +42,8 @@ export interface NudgeCandidate {
   draftId: string
   /** The shop's name as the draft holds it, for the message. */
   shopName: string
+  /** The draft's language; absent is Spanish. Only `'en'` is carried onto the send. */
+  locale?: 'es' | 'en'
   /** The Clerk user who kept it; null for a draft nobody kept. */
   claimedBy: string | null
   claimedAt: string | null
@@ -67,7 +69,7 @@ export type SkipReason =
   | 'opted_out'
 
 export type NudgeDecision =
-  | { draftId: string; send: { day: NudgeDay; clerkUserId: string; step: NudgeStep; shopName: string } }
+  | { draftId: string; send: { day: NudgeDay; clerkUserId: string; step: NudgeStep; shopName: string; locale?: 'en' } }
   | { draftId: string; skip: SkipReason }
 
 /** Whole days since the keep. */
@@ -114,7 +116,7 @@ function decide(c: NudgeCandidate, now: Date): NudgeDecision {
   if (step === null) return skip('state_unavailable')
   if (c.prefs === null) return skip('state_unavailable')
   if (!onboardingReachable(c.prefs)) return skip('opted_out')
-  return { draftId: c.draftId, send: { day, clerkUserId: c.claimedBy, step, shopName: c.shopName } }
+  return { draftId: c.draftId, send: { day, clerkUserId: c.claimedBy, step, shopName: c.shopName, ...(c.locale === 'en' ? { locale: 'en' as const } : {}) } }
 }
 
 /** One decision per candidate, in the order given. */
@@ -150,7 +152,7 @@ export interface NudgeCronDeps {
   loadCandidates: (now: Date) => Promise<NudgeCandidate[] | null>
   /** Record the milestone on the draft, conditionally. true = this run owns the send. */
   claim: (draftId: string, day: NudgeDay, at: string) => Promise<boolean>
-  send: (n: { draftId: string; clerkUserId: string; day: NudgeDay; step: NudgeStep; shopName: string }) => Promise<void>
+  send: (n: { draftId: string; clerkUserId: string; day: NudgeDay; step: NudgeStep; shopName: string; locale?: 'en' }) => Promise<void>
   now: () => Date
   log: (line: Record<string, unknown>) => void
 }

@@ -1,6 +1,6 @@
 import type { ExampleRow } from '@/lib/prompt-to-shop/blocks'
 import type { NumbersBlock } from '@/lib/prompt-to-shop/numbers'
-import { NUMBERS_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy, useP2sLocale } from './P2sLocale'
 
 /**
  * «Tus números» on the owner's canvas (business-infrastructure S2.2). The draft's ESTIMATES, read-only, each marked
@@ -10,9 +10,12 @@ import { NUMBERS_COPY } from '@/lib/prompt-to-shop/copy'
  * Owner-only: the shared preview never reads the `numbers` column (`read.ts` SHARED_COLUMNS), so a link someone was
  * sent cannot show the merchant's costs.
  */
-const pesos = (n: number) => `$${Math.round(n).toLocaleString('es-MX')}`
+const money = (n: number, locale: string) => `$${Math.round(n).toLocaleString(locale === 'en' ? 'en-US' : 'es-MX')}`
 
 export default function NumbersCard({ numbers, catalog }: { numbers: NumbersBlock | null | undefined; catalog: ExampleRow[] | null }) {
+  const { NUMBERS: NUMBERS_COPY } = useBuilderCopy()
+  const locale = useP2sLocale()
+  const pesos = (n: number) => money(n, locale)
   if (numbers === undefined) return null
   const empty = !numbers || numbers.offers.length === 0
   return (

@@ -19,6 +19,10 @@ import type { BlockKey, BlockStatus, ExampleRow, IdentityBlock, IllustrationKey,
 
 /** The tag every example card carries (epic: an example must never be mistaken for a real product). */
 export const EXAMPLE_TAG = 'EJEMPLO'
+/** The same tag in English (one-front-door-both-markets D11). */
+export const EXAMPLE_TAG_EN = 'EXAMPLE'
+
+import type { P2sLocale } from './locale'
 
 /** What the canvas needs from a draft row. Blocks are null until they land. */
 export interface DraftBlocks {
@@ -67,11 +71,11 @@ export function seedImportRows(draftId: string, rows: readonly SeedRow[]): Array
 }
 
 /** The merchant's own rows as cards: never «EJEMPLO», shown before the examples, «not published yet». */
-export function seedCards(rows: readonly SeedRow[] | null | undefined): OwnProductCardView[] {
+export function seedCards(rows: readonly SeedRow[] | null | undefined, locale: P2sLocale = 'es'): OwnProductCardView[] {
   return (rows ?? []).map((r, i) => ({
     id: `seed-${i}`,
     title: r.title,
-    priceLabel: typeof r.price === 'number' ? formatSuggestedPrice(r.price, r.currency) : null,
+    priceLabel: typeof r.price === 'number' ? formatSuggestedPrice(r.price, r.currency, locale) : null,
     imageUrl: r.images?.[0] ?? null,
     published: false,
   }))
@@ -86,7 +90,7 @@ export interface ExampleCardView {
   /** Formatted es-MX, e.g. «$1,850» — a SUGGESTED price, labelled as such by the canvas. */
   priceLabel: string
   illustration: IllustrationKey
-  tag: typeof EXAMPLE_TAG
+  tag: typeof EXAMPLE_TAG | typeof EXAMPLE_TAG_EN
 }
 
 export interface CanvasView {
@@ -117,20 +121,20 @@ export interface CanvasView {
 const DEFAULT_ACCENT = 'var(--color-accent)'
 
 /** «$1,850» — whole pesos for a suggestion; cents on an example price would read as a quote. */
-export function formatSuggestedPrice(price: number, currency: string | undefined): string {
+export function formatSuggestedPrice(price: number, currency: string | undefined, locale: P2sLocale = 'es'): string {
   const code = currency === 'USD' ? 'USD' : 'MXN'
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(price)
+  return new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'es-MX', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(price)
 }
 
-export function exampleCards(rows: ExampleRow[]): ExampleCardView[] {
+export function exampleCards(rows: ExampleRow[], locale: P2sLocale = 'es'): ExampleCardView[] {
   return rows.map((row, i) => ({
     key: `example-${i}`,
     index: i,
     title: row.title,
     description: row.description ?? '',
-    priceLabel: formatSuggestedPrice(row.price ?? 0, row.currency),
+    priceLabel: formatSuggestedPrice(row.price ?? 0, row.currency, locale),
     illustration: row.illustration,
-    tag: EXAMPLE_TAG,
+    tag: locale === 'en' ? EXAMPLE_TAG_EN : EXAMPLE_TAG,
   }))
 }
 
@@ -154,7 +158,7 @@ function shopFor(draftId: string, identity: IdentityBlock | null): Shop {
   }
 }
 
-export function draftView(draftId: string, draft: DraftBlocks): CanvasView {
+export function draftView(draftId: string, draft: DraftBlocks, locale: P2sLocale = 'es'): CanvasView {
   const { identity, words, catalog, block_status: status } = draft
   // The exact settings shape the live shop feeds `resolveTheme`: ONE preset field, and the accent beside it.
   const settings: Record<string, unknown> = identity
@@ -173,7 +177,7 @@ export function draftView(draftId: string, draft: DraftBlocks): CanvasView {
     headline: words?.headline ?? null,
     about: words?.about ?? null,
     announcement: words?.announcement ?? null,
-    cards: catalog ? exampleCards(catalog) : null,
+    cards: catalog ? exampleCards(catalog, locale) : null,
     pending: { identity: !identity, words: !words, catalog: !catalog, numbers: !draft.numbers },
     fallback: {
       identity: !!identity && status.identity === 'fallback',
@@ -193,11 +197,11 @@ export interface OwnProductCardView {
   published: boolean
 }
 
-export function ownProductCards(listings: Array<{ id: string; title: string; price_cents: number | null; currency: string | null; status: string; images?: Array<{ url: string }> }>): OwnProductCardView[] {
+export function ownProductCards(listings: Array<{ id: string; title: string; price_cents: number | null; currency: string | null; status: string; images?: Array<{ url: string }> }>, locale: P2sLocale = 'es'): OwnProductCardView[] {
   return listings.map((l) => ({
     id: l.id,
     title: l.title,
-    priceLabel: typeof l.price_cents === 'number' ? formatSuggestedPrice(l.price_cents / 100, l.currency ?? undefined) : null,
+    priceLabel: typeof l.price_cents === 'number' ? formatSuggestedPrice(l.price_cents / 100, l.currency ?? undefined, locale) : null,
     imageUrl: l.images?.[0]?.url ?? null,
     // The seller listing projects Medusa `published` as `active` (backend `_utils/listing.ts`).
     published: l.status === 'active',

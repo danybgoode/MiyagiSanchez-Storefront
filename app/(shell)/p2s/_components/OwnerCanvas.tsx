@@ -2,14 +2,14 @@
 
 import NumbersCard from './NumbersCard'
 import FaqCard from './FaqCard'
-import { BUSINESS_SHAPES, SHAPE_DEFAULTS, rerunShape, shapeOf } from '@/lib/business-shape'
+import { BUSINESS_SHAPES, rerunShape, shapeOf } from '@/lib/business-shape'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { versionsLeftCopy } from '@/lib/prompt-to-shop/allowance'
 import { patchDraft } from '@/lib/prompt-to-shop/client'
-import { DESCRIBE_COPY, OWNER_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy, useP2sLocale } from './P2sLocale'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 import { draftView, seedCards, type DraftBlocks } from '@/lib/prompt-to-shop/view'
 import type { CanvasControl } from '@/lib/prompt-to-shop/access'
@@ -49,6 +49,8 @@ export default function OwnerCanvas({
   /** From the server's `auth()`: a signed-in owner keeps the draft with one tap, no sheet (S3.1). */
   signedIn: boolean
 }) {
+  const { DESCRIBE: DESCRIBE_COPY, OWNER: OWNER_COPY, SHAPE_LABELS } = useBuilderCopy()
+  const locale = useP2sLocale()
   const router = useRouter()
   const [blocks, setBlocks] = useState(initial)
   const [name, setName] = useState(initial.identity?.name ?? '')
@@ -111,7 +113,7 @@ export default function OwnerCanvas({
   }
 
   // The preview shows the name as it is typed; storage catches up on the debounce.
-  const view = draftView(draftId, blocks.identity && name.trim() ? { ...blocks, identity: { ...blocks.identity, name: name.trim() } } : blocks)
+  const view = draftView(draftId, blocks.identity && name.trim() ? { ...blocks, identity: { ...blocks.identity, name: name.trim() } } : blocks, locale)
   const outOfVersions = versionsLeft <= 0
   const currentShape = shapeOf(blocks.identity)
 
@@ -119,6 +121,7 @@ export default function OwnerCanvas({
     return (
       <TakingShape
         draftId={draftId}
+        locale={locale}
         turnstileToken={rerun.token}
         tone={rerun.tone || undefined}
         shape={rerun.shape || undefined}
@@ -197,7 +200,7 @@ export default function OwnerCanvas({
         {can('version') ? (
           <div className="grid gap-2" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--s-3)' }}>
             <p className="t-small" style={{ margin: 0 }} data-testid="p2s-shape">
-              {OWNER_COPY.shapeLabel}: <strong>{SHAPE_DEFAULTS[currentShape].label}</strong>
+              {OWNER_COPY.shapeLabel}: <strong>{SHAPE_LABELS[currentShape]}</strong>
             </p>
             <p className="t-small" style={{ margin: 0, fontWeight: 600 }} data-testid="p2s-versions-left">{versionsLeftCopy(versionsLeft)}</p>
             {!outOfVersions ? (
@@ -215,9 +218,9 @@ export default function OwnerCanvas({
                   <div className="flex items-center gap-2">
                     <label htmlFor="p2s-shape-pick" className="t-small">{OWNER_COPY.shapeLabel}</label>
                     <select id="p2s-shape-pick" className="input" style={{ width: 'auto' }} value={shape} onChange={(e) => setShape(e.target.value)} data-testid="p2s-shape-pick">
-                      <option value="">{OWNER_COPY.shapeSame(SHAPE_DEFAULTS[currentShape].label)}</option>
+                      <option value="">{OWNER_COPY.shapeSame(SHAPE_LABELS[currentShape])}</option>
                       {BUSINESS_SHAPES.filter((s) => s !== currentShape).map((s) => (
-                        <option key={s} value={s}>{SHAPE_DEFAULTS[s].label}</option>
+                        <option key={s} value={s}>{SHAPE_LABELS[s]}</option>
                       ))}
                     </select>
                   </div>
@@ -277,7 +280,7 @@ export default function OwnerCanvas({
   const landed = !view.pending.identity && !view.pending.words && !view.pending.catalog
   return (
     <>
-      <ShopCanvas view={view} mode="owner" toolbar={toolbar} ownCards={seedCards(blocks.seedRows)} />
+      <ShopCanvas view={view} mode="owner" toolbar={toolbar} ownCards={seedCards(blocks.seedRows, locale)} />
       {can('keep') ? <KeepSheet draftId={draftId} shopName={view.name} signedIn={signedIn} ready={landed} /> : null}
     </>
   )

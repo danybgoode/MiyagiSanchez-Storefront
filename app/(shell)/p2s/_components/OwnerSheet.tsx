@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import BodyPortal from '@/components/ui/BodyPortal'
-import { CHECKLIST_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 
 /**
  * A bottom sheet over the kept-shop canvas (epic prompt-to-shop S4.1). Every checklist item opens one of these on
@@ -23,6 +23,7 @@ export default function OwnerSheet({
   children: React.ReactNode
   testId?: string
 }) {
+  const { CHECKLIST: CHECKLIST_COPY } = useBuilderCopy()
   const closeRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {

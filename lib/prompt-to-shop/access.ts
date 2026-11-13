@@ -16,6 +16,7 @@
 
 import { coerceNumbers } from './numbers'
 import { readDeviceId } from './handler'
+import { readLocale, type P2sLocale } from './locale'
 import type { ExampleRow, IdentityBlock, WordsBlock } from './blocks'
 import type { DraftBlocks } from './view'
 
@@ -108,10 +109,10 @@ function coerceSeedRows(v: unknown): DraftBlocks['seedRows'] {
 }
 
 export type OwnerResolution =
-  | { kind: 'ok'; access: Extract<DraftAccess, { kind: 'owner' }>; blocks: DraftBlocks; versionsUsed: number; updatedAt: string; viewToken: string }
+  | { kind: 'ok'; access: Extract<DraftAccess, { kind: 'owner' }>; blocks: DraftBlocks; versionsUsed: number; updatedAt: string; viewToken: string; locale: P2sLocale }
   | { kind: 'gone' }
 
-export type ViewerResolution = { kind: 'ok'; access: Extract<DraftAccess, { kind: 'viewer' }>; blocks: DraftBlocks } | { kind: 'gone' }
+export type ViewerResolution = { kind: 'ok'; access: Extract<DraftAccess, { kind: 'viewer' }>; blocks: DraftBlocks; locale: P2sLocale } | { kind: 'gone' }
 
 /**
  * Not found, not yours, expired and malformed all answer the SAME `gone`: the page must not tell a stranger
@@ -132,6 +133,7 @@ export async function resolveOwnerPage(
     versionsUsed: row.versions_used,
     updatedAt: row.updated_at,
     viewToken: row.view_token,
+    locale: readLocale(row.locale),
   }
 }
 
@@ -139,7 +141,7 @@ export async function resolveViewerPage(input: { token: string }, deps: Pick<Rea
   if (!UUID.test(input.token)) return { kind: 'gone' }
   const row = await deps.findByViewToken(input.token.toLowerCase())
   if (!row) return { kind: 'gone' }
-  return { kind: 'ok', access: { kind: 'viewer' }, blocks: coerceBlocks(row) }
+  return { kind: 'ok', access: { kind: 'viewer' }, blocks: coerceBlocks(row), locale: readLocale(row.locale) }
 }
 
 /** The link «Compartir vista previa» copies. */

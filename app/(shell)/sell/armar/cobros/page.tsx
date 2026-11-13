@@ -9,7 +9,9 @@ import { isEnabled } from '@/lib/flags'
 import { getMySeller } from '@/lib/get-my-seller'
 import { findKeptDraft } from '@/lib/prompt-to-shop/claim-server'
 import { readChooserState, type CobrosSettings } from '@/lib/prompt-to-shop/cobros'
-import { COBROS_COPY } from '@/lib/prompt-to-shop/copy'
+import { P2sLocaleProvider } from '@/app/(shell)/p2s/_components/P2sLocale'
+import { builderCopy } from '@/lib/prompt-to-shop/copy-en'
+import { COBROS_COPY as COBROS_ES } from '@/lib/prompt-to-shop/copy'
 import { fetchGuideShop } from '@/lib/setup-guide-server'
 
 /**
@@ -23,7 +25,7 @@ import { fetchGuideShop } from '@/lib/setup-guide-server'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: COBROS_COPY.pageTitle,
+  title: COBROS_ES.pageTitle,
   robots: { index: false, follow: false },
 }
 
@@ -39,8 +41,11 @@ export default async function CobrosPage() {
   ])
   const settings = ((guideShop?.metadata as { settings?: CobrosSettings } | null)?.settings ?? null)
   const draftId = kept && kept !== 'unavailable' ? kept.id : null
+  const locale = kept && kept !== 'unavailable' ? kept.locale : 'es'
+  const COBROS_COPY = builderCopy(locale).COBROS
 
   return (
+    <P2sLocaleProvider locale={locale}>
     <div className="max-w-2xl mx-auto px-4 py-6 grid gap-4" data-testid="p2s-cobros-page">
       <div className="grid gap-1">
         <h1 className="t-h3" style={{ margin: 0, letterSpacing: 0 }}>{COBROS_COPY.pageTitle}</h1>
@@ -62,5 +67,6 @@ export default async function CobrosPage() {
         <Link href="/sell/armar" prefetch={false} className="btn btn-secondary">{COBROS_COPY.back}</Link>
       </div>
     </div>
+    </P2sLocaleProvider>
   )
 }

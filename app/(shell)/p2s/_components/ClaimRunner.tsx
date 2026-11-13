@@ -9,7 +9,7 @@ import { Banner } from '@/components/feedback/Banner'
 import type { ClaimOutcome } from '@/lib/prompt-to-shop/claim'
 import { claimDraft } from '@/lib/prompt-to-shop/client'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
-import { ARMAR_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 
 /**
  * Runs the keep from the browser (epic S3.2): `POST /api/p2s/claim/[id]`, then shows what happened.
@@ -32,6 +32,7 @@ function Panel({ title, lead, children }: { title: string; lead: string; childre
 }
 
 export default function ClaimRunner({ draftId, initial }: { draftId: string | null; initial?: ClaimOutcome }) {
+  const { ARMAR: ARMAR_COPY } = useBuilderCopy()
   const router = useRouter()
   const [outcome, setOutcome] = useState<ClaimOutcome | null>(initial ?? null)
   const [attempt, setAttempt] = useState(0)

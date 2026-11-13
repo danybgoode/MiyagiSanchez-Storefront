@@ -10,7 +10,7 @@ import { Banner } from '@/components/feedback/Banner'
 import { patchShop, publishShop } from '@/lib/prompt-to-shop/client'
 import { READINESS_COPY } from '@/lib/listing-readiness'
 import type { ChooserState } from '@/lib/prompt-to-shop/cobros'
-import { ARMAR_COPY, CHECKLIST_COPY, CHECKLIST_LABELS, PHOTO_COPY, PUBLISH_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 import type { PublishState } from '@/lib/prompt-to-shop/photo'
 import type { CanvasView, OwnProductCardView } from '@/lib/prompt-to-shop/view'
@@ -76,6 +76,7 @@ export default function KeptShop({
   /** one-front-door-both-markets D9 — the merchant's own rows still to upload (none once their titles are products). */
   seedRows?: SeedRow[]
 }) {
+  const { ARMAR: ARMAR_COPY, CHECKLIST: CHECKLIST_COPY, CHECKLIST_LABELS, PHOTO: PHOTO_COPY, PUBLISH: PUBLISH_COPY } = useBuilderCopy()
   const router = useRouter()
   const [sheet, setSheet] = useState<SheetState>(null)
   const close = useCallback(() => setSheet(null), [])
@@ -261,6 +262,7 @@ export default function KeptShop({
 }
 
 function PerfilSheet({ profile, onClose, onSaved }: { profile: { name: string; description: string }; onClose: () => void; onSaved: () => void }) {
+  const { CHECKLIST: CHECKLIST_COPY } = useBuilderCopy()
   const [name, setName] = useState(profile.name)
   const [description, setDescription] = useState(profile.description)
   const [state, setState] = useState<{ kind: 'idle' | 'saving' | 'saved' | 'error'; message?: string }>({ kind: 'idle' })
@@ -297,6 +299,7 @@ function PerfilSheet({ profile, onClose, onSaved }: { profile: { name: string; d
 }
 
 function ShareSheet({ publicPath, onClose, onShared }: { publicPath: string | null; onClose: () => void; onShared: () => void }) {
+  const { CHECKLIST: CHECKLIST_COPY } = useBuilderCopy()
   const [copied, setCopied] = useState<'idle' | 'copied' | 'manual'>('idle')
   const [url, setUrl] = useState<string | null>(null)
 

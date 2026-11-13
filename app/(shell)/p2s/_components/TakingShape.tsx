@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { runDraftRequest } from '@/lib/prompt-to-shop/client'
-import { NARRATION, SHAPING_COPY } from '@/lib/prompt-to-shop/copy'
+import { builderCopy } from '@/lib/prompt-to-shop/copy-en'
 import { draftView, seedCards, type DraftBlocks, type SeedRow } from '@/lib/prompt-to-shop/view'
 import ShopCanvas from './ShopCanvas'
+import { P2sLocaleProvider } from './P2sLocale'
 
 /**
  * The taking-shape screen (epic S2.3): the shop skeleton filling in, block by block, with a narration line per step.
@@ -53,6 +54,7 @@ export default function TakingShape({
   seedRows?: unknown[]
 }) {
   const router = useRouter()
+  const { NARRATION, SHAPING: SHAPING_COPY } = builderCopy(locale)
   const [blocks, setBlocks] = useState<DraftBlocks>(EMPTY)
   const [message, setMessage] = useState<string | null>(null)
   const started = useRef(false)
@@ -83,9 +85,10 @@ export default function TakingShape({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const view = draftView(draftId ?? 'nuevo', blocks)
+  const view = draftView(draftId ?? 'nuevo', blocks, locale)
 
   return (
+    <P2sLocaleProvider locale={locale}>
     <BodyPortal>
     <div className="fixed inset-0 overflow-y-auto" style={{ zIndex: 'var(--z-overlay)', background: 'var(--bg)' }} data-testid="p2s-taking-shape">
       <div className="max-w-2xl mx-auto px-4 pt-6 pb-4">
@@ -114,5 +117,6 @@ export default function TakingShape({
       <ShopCanvas view={view} mode="shaping" ownCards={seedCards(seedRows as SeedRow[] | undefined)} />
     </div>
     </BodyPortal>
+    </P2sLocaleProvider>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { SuccessCard } from '@/components/SuccessCard'
-import { PUBLISH_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 import { patchShop } from '@/lib/prompt-to-shop/client'
 import type { OwnProductCardView } from '@/lib/prompt-to-shop/view'
 import { isShopSlug, shopShortLink } from '@/lib/share-link'
@@ -40,6 +40,7 @@ export default function PublishedMoment({
   cards: OwnProductCardView[]
   onShared?: () => void
 }) {
+  const { PUBLISH: PUBLISH_COPY } = useBuilderCopy()
   // A slug that is not a shop slug gets no short link; the shop page link is always there.
   const shortLink = shopShortLink(shopSlug) ?? publicPath
   const [copied, setCopied] = useState<'idle' | 'copied' | 'manual'>('idle')

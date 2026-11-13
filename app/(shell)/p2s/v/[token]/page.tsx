@@ -4,6 +4,7 @@ import { controlsFor, resolveViewerPage } from '@/lib/prompt-to-shop/access'
 import { readDeps } from '@/lib/prompt-to-shop/read'
 import { draftView } from '@/lib/prompt-to-shop/view'
 import ShopCanvas from '../../_components/ShopCanvas'
+import { P2sLocaleProvider } from '../../_components/P2sLocale'
 
 /**
  * The view-only link (epic prompt-to-shop S2.5, D15).
@@ -30,5 +31,9 @@ export default async function ViewerCanvasPage({ params }: { params: Promise<{ t
   if (controlsFor(resolved.access).length > 0) notFound()
 
   // The shop's id is not the viewer's business: the placeholder id keeps the real one out of the page.
-  return <ShopCanvas view={draftView('vista-previa', resolved.blocks)} mode="viewer" />
+  return (
+    <P2sLocaleProvider locale={resolved.locale}>
+      <ShopCanvas view={draftView('vista-previa', resolved.blocks, resolved.locale)} mode="viewer" />
+    </P2sLocaleProvider>
+  )
 }

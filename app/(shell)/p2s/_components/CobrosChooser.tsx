@@ -9,7 +9,7 @@ import { CLABE_LENGTH, MX_BANKS, OTHER_BANK, clabeComplete, initialBankPick, nor
 import type { CheckoutPreview } from '@/lib/checkout-options'
 import { fetchCheckoutPreview, patchShop } from '@/lib/prompt-to-shop/client'
 import { MP_CONNECT_HREF, cashPatch, correosPatch, handDeliveryPatch, speiOffPatch, speiPatch, type ChooserState, type SettingsPatch } from '@/lib/prompt-to-shop/cobros'
-import { COBROS_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 import { trackFunnel } from '@/lib/prompt-to-shop/funnel'
 
 /**
@@ -48,6 +48,7 @@ export default function CobrosChooser({
   draftId: string | null
   onSaved?: () => void
 }) {
+  const { COBROS: COBROS_COPY } = useBuilderCopy()
   const [state, setState] = useState(initial)
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
@@ -217,6 +218,7 @@ export default function CobrosChooser({
 }
 
 function Choice({ mark, name, lead, on, testId, children }: { mark: React.ReactNode; name: string; lead: string; on: boolean; testId: string; children?: React.ReactNode }) {
+  const { COBROS: COBROS_COPY } = useBuilderCopy()
   return (
     <div className="card-panel grid gap-2" style={{ padding: 'var(--s-3)', borderColor: on ? 'var(--accent)' : undefined }} data-testid={testId} data-on={on}>
       <div className="flex items-start gap-3">
@@ -237,6 +239,7 @@ function Choice({ mark, name, lead, on, testId, children }: { mark: React.ReactN
 }
 
 function Toggle({ on, busy, disabled, onToggle }: { on: boolean; busy: boolean; disabled: boolean; onToggle: (next: boolean) => void }) {
+  const { COBROS: COBROS_COPY } = useBuilderCopy()
   return (
     <div>
       <Button type="button" variant={on ? 'ghost' : 'secondary'} size="sm" disabled={disabled} onClick={() => onToggle(!on)}>
@@ -248,6 +251,7 @@ function Toggle({ on, busy, disabled, onToggle }: { on: boolean; busy: boolean; 
 
 /** The buyer's side: exactly the methods checkout answered with, nothing re-derived here. */
 function CheckoutPreviewCard({ preview }: { preview: CheckoutPreview | 'loading' }) {
+  const { COBROS: COBROS_COPY } = useBuilderCopy()
   return (
     <section className="card-panel grid gap-3" style={{ padding: 'var(--s-4)', background: 'var(--bg-sunk)' }} aria-labelledby="p2s-preview-title" data-testid="p2s-checkout-preview">
       <h3 id="p2s-preview-title" className="t-small" style={{ margin: 0, fontWeight: 700 }}>

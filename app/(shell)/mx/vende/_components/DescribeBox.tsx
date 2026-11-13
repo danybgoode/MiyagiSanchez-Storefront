@@ -6,8 +6,8 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { MAX_DESCRIPTION_CHARS } from '@/lib/prompt-to-shop/constants'
-import { characterCounter, OWNER_COPY } from '@/lib/prompt-to-shop/copy'
-import { describeCopy } from '@/lib/prompt-to-shop/copy-en'
+import { characterCounter } from '@/lib/prompt-to-shop/copy'
+import { builderCopy, describeCopy } from '@/lib/prompt-to-shop/copy-en'
 import { runIntake } from '@/lib/prompt-to-shop/client'
 import { INTAKE_FILE_ACCEPT, INTAKE_PHOTO_ACCEPT } from '@/lib/prompt-to-shop/intake'
 import { browserMarketHint, type P2sLocale, type P2sMarketHint } from '@/lib/prompt-to-shop/locale'
@@ -83,6 +83,7 @@ export default function DescribeBox({
   examples?: ReadonlyArray<{ label: string; text: string }>
 }) {
   const DESCRIBE_COPY = describeCopy(locale)
+  const OWNER_COPY = builderCopy(locale).OWNER
   const chips = examples ?? DESCRIBE_COPY.examples
   // D12 — a page of one market states it; a page of no market asks the browser, at the moment of a tap (never at
   // render: the server cannot know, and a hydration-time read would flash the wrong currency).

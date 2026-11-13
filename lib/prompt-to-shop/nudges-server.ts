@@ -15,7 +15,8 @@ import { DELETED_STATUS } from '@/lib/listing-lifecycle'
 import { isShopSlug } from '@/lib/share-link'
 import { GUIDE_SHOP_COLUMNS, guideProductCount, guideStepsFor, type GuideShopRow } from '@/lib/setup-guide-source'
 import type { PrefRow } from '@/lib/notifications/preferences'
-import { NUDGE_COPY, NUDGE_STEP_COPY } from './copy'
+import { nudgeCopy } from './copy-en'
+import { readLocale } from './locale'
 import { NUDGE_WINDOW_DAYS, sentNudges, withNudge, type NudgeCandidate, type NudgeCronDeps, type NudgeDay } from './nudges'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
@@ -34,6 +35,7 @@ interface DraftRow {
   claimed_at: string | null
   identity: { name?: unknown } | null
   block_status: unknown
+  locale?: unknown
 }
 
 type ShopRow = GuideShopRow & { id: string; slug: string }
@@ -69,6 +71,7 @@ async function candidateFor(row: DraftRow): Promise<NudgeCandidate> {
   const base: NudgeCandidate = {
     draftId: row.id,
     shopName: typeof row.identity?.name === 'string' ? row.identity.name : '',
+    locale: readLocale(row.locale),
     claimedBy: row.claimed_by,
     claimedAt: row.claimed_at,
     email: null,
@@ -108,7 +111,7 @@ async function candidateFor(row: DraftRow): Promise<NudgeCandidate> {
 async function loadCandidates(now: Date): Promise<NudgeCandidate[] | null> {
   const { data, error } = await db
     .from('shop_drafts')
-    .select('id, claimed_by, claimed_at, identity, block_status')
+    .select('id, claimed_by, claimed_at, identity, block_status, locale')
     .not('claimed_by', 'is', null)
     .not('claimed_seller_id', 'is', null)
     .gte('claimed_at', new Date(now.getTime() - NUDGE_WINDOW_DAYS * DAY_MS).toISOString())
@@ -158,13 +161,14 @@ export function nudgeCronDeps(): NudgeCronDeps {
   return {
     loadCandidates,
     claim,
-    send: async ({ draftId, clerkUserId, day, step, shopName: name }) => {
-      const shopName = name || 'Tu tienda'
-      const copy = NUDGE_STEP_COPY[step]
+    send: async ({ draftId, clerkUserId, day, step, shopName: name, locale }) => {
+      const { NUDGE: NUDGE_COPY, STEP } = nudgeCopy(locale)
+      const shopName = name || (locale === 'en' ? 'Your shop' : 'Tu tienda')
+      const copy = STEP[step]
       await dispatchToSeller(clerkUserId, {
         group: 'onboarding',
         email: async (to) => {
-          const r = await sendP2sNudge({ to, shopName, step, day, draftId })
+          const r = await sendP2sNudge({ to, shopName, step, day, draftId, locale })
           if (!r.ok) console.error('[p2s] nudge email failed', r.reason)
         },
         push: { kind: 'onboarding_nudge', title: NUDGE_COPY.pushTitle(shopName), body: copy.title, url: '/sell/armar', tag: `p2s-nudge-${draftId}` },

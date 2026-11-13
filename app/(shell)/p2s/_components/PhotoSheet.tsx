@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Banner } from '@/components/feedback/Banner'
 import { CATEGORIES } from '@/lib/types'
 import { analyzePhotoRequest, confirmPhotoRequest, uploadPhoto } from '@/lib/prompt-to-shop/client'
-import { CHECKLIST_COPY, PHOTO_COPY } from '@/lib/prompt-to-shop/copy'
+import { useBuilderCopy } from './P2sLocale'
 import { photosLeftCopy } from '@/lib/prompt-to-shop/allowance'
 import type { PhotoSuggestion } from '@/lib/prompt-to-shop/photo'
 import OwnerSheet from './OwnerSheet'
@@ -92,6 +92,7 @@ export default function PhotoSheet({
   onClose: () => void
   onAdded: () => void
 }) {
+  const { CHECKLIST: CHECKLIST_COPY, PHOTO: PHOTO_COPY } = useBuilderCopy()
   const [phase, setPhase] = useState<Phase>({ kind: 'pick' })
   const [card, setCard] = useState<PhotoSuggestion>(emptyCard)
   const [error, setError] = useState<string | null>(null)

@@ -12,7 +12,7 @@ import { ticketQrPath, type EventTicket } from '@/lib/event-ticket-state'
 import { buildMerchantCloseReceipt, type CloseReceiptItem } from '@/lib/promoter-close-receipt'
 import { isRenderableArtworkUrl, isImageLikeArtworkUrl } from '@/lib/personalization'
 import { formatRentalBookingLines, type RentalBookingLike } from '@/lib/rental-booking'
-import { NUDGE_COPY, NUDGE_STEP_COPY } from '@/lib/prompt-to-shop/copy'
+import { nudgeCopy } from '@/lib/prompt-to-shop/copy-en'
 import type { NudgeDay, NudgeStep } from '@/lib/prompt-to-shop/nudges'
 import { CHECKIN_COPY } from '@/lib/business-plan/copy'
 import { NEGOCIO_PRICE_MONTHLY_MXN, NEGOCIO_PRICE_YEARLY_MXN, NEGOCIO_TRIAL_DAYS } from '@/lib/negocio-pricing'
@@ -528,15 +528,16 @@ export async function sendP2sDraftLink(ctx: { to: string; shopName: string; draf
  * `p2s-nudges` cron through `dispatchToSeller` (group `onboarding`), so the merchant's channel choices hold. The
  * idempotency key makes a retried send of the same milestone one email at Resend too.
  */
-export async function sendP2sNudge(ctx: { to: string; shopName: string; step: NudgeStep; day: NudgeDay; draftId: string }): Promise<EmailSendResult> {
-  const shopName = plainLine(ctx.shopName) || 'Tu tienda'
-  const step = NUDGE_STEP_COPY[ctx.step]
+export async function sendP2sNudge(ctx: { to: string; shopName: string; step: NudgeStep; day: NudgeDay; draftId: string; locale?: 'en' }): Promise<EmailSendResult> {
+  const { NUDGE: NUDGE_COPY, STEP } = nudgeCopy(ctx.locale)
+  const shopName = plainLine(ctx.shopName) || (ctx.locale === 'en' ? 'Your shop' : 'Tu tienda')
+  const step = STEP[ctx.step]
   return sendWithResult(ctx.to, NUDGE_COPY.subject(shopName, step.title), [
     h1(NUDGE_COPY.heading(shopName)),
     p(`<strong>${esc(step.title)}.</strong> ${esc(step.lead)}`),
     cta(NUDGE_COPY.cta, `${SITE}/sell/armar`),
     p(esc(NUDGE_COPY.footer)),
-  ].join(''), undefined, undefined, 'es', `p2s-nudge/${ctx.draftId}/${ctx.day}`)
+  ].join(''), undefined, undefined, ctx.locale === 'en' ? 'en' : 'es', `p2s-nudge/${ctx.draftId}/${ctx.day}`)
 }
 
 /**
