@@ -420,7 +420,7 @@ test('the signed-in mode is a SHOP OWNER\'s: every intake route asks for one, fr
   }
   // …and a merchant's AI read is a PLAN photo: the canvas's subject, kind and cap — one pool, not two.
   const server = readFileSync(join(process.cwd(), 'lib/prompt-to-shop/intake-server.ts'), 'utf8')
-  expect(server).toContain("spendAllowance(userSubject(who.id), 'photo', monthPeriod(new Date()), await ownerPhotoCap(who.id))")
+  expect(server).toContain("spendAllowance(userSubject(who.id), 'photo', month, await ownerPhotoCap(who.id))")
 })
 
 test('seed prices keep their cents (149.50 stays 149.50)', () => {
@@ -449,6 +449,14 @@ test('the bulk importer itself refuses prohibited goods — the one door every i
   const src = readFileSync(join(process.cwd(), 'app/api/sell/import/route.ts'), 'utf8')
   const screened = src.indexOf('screenChunksFor(')
   expect(screened).toBeGreaterThan(src.indexOf('validateRows(body.rows)'))
-  expect(screened).toBeLessThan(src.indexOf("medusaFetch('/store/sellers/me/products"))
+  // After the seller lookup (a caller with no shop never spends a screen), before any product write.
+  expect(screened).toBeGreaterThan(src.indexOf('listRes.status === 404'))
+  expect(screened).toBeLessThan(src.indexOf('for (const s of staged)') > 0 ? src.indexOf('for (const s of staged)') : src.length)
   expect(src).toContain("verdict.kind === 'prohibited'")
+})
+
+test('a signed-in refund gives back the month it was spent in (one month per request)', () => {
+  const src = readFileSync(join(process.cwd(), 'lib/prompt-to-shop/intake-server.ts'), 'utf8')
+  expect(src.match(/monthPeriod\(new Date\(\)\)/g)?.length).toBe(1)
+  expect(src).toContain("spendAllowance(userSubject(who.id), 'photo', month,")
 })

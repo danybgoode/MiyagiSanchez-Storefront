@@ -64,6 +64,9 @@ async function spendAllowance(subject: string, kind: string, period: string, cap
 
 export function intakeDeps(ip: string): IntakeDeps & { base64: (b: Uint8Array) => string; categories: readonly string[]; extractionPrompt: string } {
   const period = budgetPeriod(new Date())
+  // One month per request, shared by the spend and its refund: a refund that ran after midnight on the 1st must give
+  // back the month it was spent in, not the new one (Codex security, PR #501).
+  const month = monthPeriod(new Date())
   return {
     verifyTurnstile: (token) => verifyTurnstile({ secret: process.env.TURNSTILE_SECRET_KEY, token, ip }),
     burstAllowed: async (deviceId) => {
@@ -74,7 +77,7 @@ export function intakeDeps(ip: string): IntakeDeps & { base64: (b: Uint8Array) =
     // canvas's PhotoSheet spends (`userSubject`, `photo`, the month, `ownerPhotoCap`), so a plan's 20 or 60 holds
     // across both doors and there is no second pool (fresh review, PR #501).
     spendDevice: async (who) => who.kind === 'user'
-      ? spendAllowance(userSubject(who.id), 'photo', monthPeriod(new Date()), await ownerPhotoCap(who.id))
+      ? spendAllowance(userSubject(who.id), 'photo', month, await ownerPhotoCap(who.id))
       : spendAllowance(ANON_INTAKE.deviceSubject(who.id), ANON_INTAKE.kind, 'all', ANON_INTAKE.perDevice),
     spendDay: () => spendAllowance(ANON_INTAKE.budgetSubject, ANON_INTAKE.budgetKind, period, resolveAnonIntakeBudget(process.env.P2S_ANON_INTAKE_DAILY_BUDGET)),
     refundDevice: async (who) => {
@@ -82,7 +85,6 @@ export function intakeDeps(ip: string): IntakeDeps & { base64: (b: Uint8Array) =
       // decrement through the same read-then-write the RPC would do — best effort, never below zero).
       if (who.kind === 'user') {
         const subject = userSubject(who.id)
-        const month = monthPeriod(new Date())
         // Optimistic and RE-TRIED: two failed reads at once both see the same count; the conditional update lets one
         // land, and the other re-reads and tries again instead of silently losing its refund (Codex, PR #501).
         for (let attempt = 0; attempt < 4; attempt++) {
