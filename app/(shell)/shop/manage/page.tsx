@@ -12,7 +12,7 @@ import { fetchDeletedListingIds, fetchGuideShop } from '@/lib/setup-guide-server
 import { getTenantIntake } from '@/lib/tenant-intake'
 
 export const metadata = {
-  title: 'Mi tienda — Miyagi Sánchez',
+  title: { absolute: 'Mi tienda — Miyagi Sánchez' },
 }
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'

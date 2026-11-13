@@ -3,7 +3,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import SettingsImportClient from './SettingsImportClient'
 
 export const metadata = {
-  title: 'Importar configuración — Miyagi Sánchez',
+  title: { absolute: 'Importar configuración — Miyagi Sánchez' },
 }
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'

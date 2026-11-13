@@ -8,7 +8,7 @@ import { computeShopCompletion, type ShopRow } from '@/lib/setup-guide'
 import ImportClient from './ImportClient'
 
 export const metadata = {
-  title: 'Importar catálogo — Miyagi Sánchez',
+  title: { absolute: 'Importar catálogo — Miyagi Sánchez' },
 }
 
 export default async function ImportPage() {

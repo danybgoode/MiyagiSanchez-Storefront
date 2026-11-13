@@ -25,7 +25,8 @@ const BASE_URL = 'https://miyagisanchez.com'
 const meta = es.sellerAcquisition.us.metadata
 
 export const metadata: Metadata = {
-  title: meta.title,
+  // The title already ends with the brand; `absolute` stops the layout template appending it twice.
+  title: { absolute: meta.title },
   description: meta.description,
   alternates: {
     canonical: `${BASE_URL}/us/vende`,

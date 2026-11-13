@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { currentUser } from '@clerk/nextjs/server'
 import BuyerNotificationPreferences from './BuyerNotificationPreferences'
 
-export const metadata = { title: 'Notificaciones — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Notificaciones — Miyagi Sánchez' } }
 
 // Buyer preference center (epic #5b). Signed-in buyers only — prefs are
 // clerk_user_id-keyed; guests keep today's transactional emails to their order

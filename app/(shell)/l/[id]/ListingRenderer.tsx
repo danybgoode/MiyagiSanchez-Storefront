@@ -75,6 +75,7 @@ import type { Metadata } from 'next'
 import type { MarketCode } from '@/lib/markets'
 import { getDictionary } from '@/lib/dictionary'
 import { formatPresentationCurrency, resolveMarketPresentation } from '@/lib/market-presentation'
+import type { SiteLanguage } from '@/lib/site-language'
 import { marketCatalogCanonical } from '@/lib/market-seo'
 import { resolveCommerceReadiness } from '@/lib/commerce-readiness'
 import { shopWhatsAppNumber } from '@/lib/share-kit/whatsapp'
@@ -95,6 +96,8 @@ export type ListingRequestContext = {
   buyerPrefill?: { name: string; email: string } | null
   favorited?: boolean
   activeDeal?: ActiveDeal | null
+  /** The visitor's stored ES/EN choice, read by the dynamic wrapper. Absent on the public-read cache ⇒ market language. */
+  language?: SiteLanguage | null
 }
 
 export async function generateListingMetadata({
@@ -204,7 +207,7 @@ export async function ListingPage({
     isEnabled('configurator.enabled'),
   ])
   if (!listing) notFound()
-  const presentation = resolveMarketPresentation(market)
+  const presentation = resolveMarketPresentation(market, requestContext.language)
   const english = presentation.language === 'en'
   const buyerCopy = (await getDictionary(presentation.language)).buyerCopy
   const formatCents = (cents: number, currency: string) =>

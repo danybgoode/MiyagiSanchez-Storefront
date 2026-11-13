@@ -2,6 +2,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import { headers } from 'next/headers'
 import { getActiveDealForBuyer } from '@/lib/active-deal'
 import { db } from '@/lib/supabase'
+import { getLanguagePreference } from '@/lib/site-language-server'
 import {
   ListingPage as renderListingPage,
   generateListingMetadata as renderListingMetadata,
@@ -60,10 +61,11 @@ export function ShopScopedListingPage(args: PageArgs, scope: ShopScope) {
 }
 
 async function listingPage(args: PageArgs, scope?: ShopScope) {
-  const [{ id }, channel, user] = await Promise.all([
+  const [{ id }, channel, user, language] = await Promise.all([
     args.params,
     channelFor(scope),
     currentUser(),
+    getLanguagePreference(),
   ])
   const [favorite, activeDeal] = user
     ? await Promise.all([
@@ -82,6 +84,7 @@ async function listingPage(args: PageArgs, scope?: ShopScope) {
     requestContext: {
       mode: 'dynamic',
       ...channel,
+      language,
       userId: user?.id ?? null,
       favorited: !!favorite.data,
       activeDeal,

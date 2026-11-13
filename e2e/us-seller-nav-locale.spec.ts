@@ -88,7 +88,7 @@ test.describe('the language reaches the rail from Medusa, through the seller pre
     // The market now DEFAULTS the locale rather than being passed down as the
     // language itself; the rail receives the resolved locale.
     expect(chrome).toMatch(/resolveSellerLocale\(\{/)
-    expect(chrome).toMatch(/preference: \(await cookies\(\)\)\.get\(SELLER_LOCALE_COOKIE\)\?\.value/)
+    expect(chrome).toMatch(/preference: await getLanguagePreference\(\)/)
     expect(chrome).toMatch(/locale=\{locale\}/)
     expect(chrome).not.toMatch(/market=\{market\}/)
   })

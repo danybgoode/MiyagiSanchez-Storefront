@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { headers } from 'next/headers'
 import SellerShellChrome from '@/app/(shell)/shop/manage/_components/SellerShellChrome'
 import SellerCopyBoundary from '@/app/components/SellerCopyBoundary'
@@ -5,8 +6,7 @@ import SellerFormatProvider from '@/app/components/SellerFormatProvider'
 import { getDictionary } from '@/lib/dictionary'
 import { getMySeller } from '@/lib/get-my-seller'
 import { sellShellEligible } from '@/lib/seller-shell-gate'
-import { cookies } from 'next/headers'
-import { SELLER_LOCALE_COOKIE, resolveSellerLocale, sellerCopyBoundaryNeeded } from '@/lib/seller-locale'
+import { resolveSellerLocale, sellerCopyBoundaryNeeded } from '@/lib/seller-locale'
 import { sellerFormatContextForMarket } from '@/lib/seller-format'
 
 /**
@@ -38,7 +38,7 @@ export default async function SellLayout({ children }: { children: React.ReactNo
   const seller = await getMySeller()
   const market = seller?.market ?? 'mx'
   const locale = resolveSellerLocale({
-    preference: (await cookies()).get(SELLER_LOCALE_COOKIE)?.value,
+    preference: await getLanguagePreference(),
     market,
   })
 

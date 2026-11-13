@@ -1,7 +1,5 @@
 import Link from 'next/link'
 import { marketBasePath } from '@/lib/markets'
-import RootEnglishLink from './RootEnglishLink'
-import RootLanguageSwitch from './RootLanguageSwitch'
 
 type MarketLinksCopy = { label: string; mx: string; us: string; en: string }
 
@@ -13,10 +11,9 @@ type MarketLinksCopy = { label: string; mx: string; us: string; en: string }
  * document at `/en` (which still renders the full picker). It lives in this page rather than in
  * `PlatformShell` so no other page's chrome changes.
  *
- * The English link is `RootEnglishLink`, a client island, because it must store the choice that
- * stops `/en` from hopping a Spanish browser straight back here.
+ * Language is not one of these doors any more: the ES/EN switch is in the header of every page (2026-11-13).
  */
-export default function RootMarketLinks({ copy, language = 'es' }: { copy: MarketLinksCopy; language?: 'es' | 'en' }) {
+export default function RootMarketLinks({ copy }: { copy: MarketLinksCopy }) {
   const links = [
     { href: marketBasePath('mx'), label: copy.mx, testId: 'root-market-link-mx' },
     { href: marketBasePath('us'), label: copy.us, testId: 'root-market-link-us' },
@@ -45,9 +42,6 @@ export default function RootMarketLinks({ copy, language = 'es' }: { copy: Marke
           {link.label}
         </Link>
       ))}
-      {/* Client islands. On `/`, the English link stores the choice; on `/en`, the switch to Spanish does, and it also
-          runs the one-time hop (one-front-door-both-markets D16). `/` runs the hop through its own switch below. */}
-      {language === 'es' ? <RootEnglishLink label={copy.en} style={linkStyle} /> : <RootLanguageSwitch current="en" />}
     </nav>
   )
 }

@@ -3,7 +3,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import PrintAdBuilder, { type BuilderEdition, type BuilderListing, type SellerPrefill } from './PrintAdBuilder'
 import { listingUrlFor, shopUrlFor } from '@/lib/market-url'
 
-export const metadata = { title: 'Diseña tu anuncio impreso — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Diseña tu anuncio impreso — Miyagi Sánchez' } }
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''

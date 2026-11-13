@@ -30,7 +30,7 @@ const PAST_LIMIT = 6
 
 export default async function EventsIndexBody({ ctx }: { ctx: ShopPresentationContext }) {
   const market = readPublicSellerMarket(ctx.shop)?.market_code ?? 'mx'
-  const presentation = resolveMarketPresentation(market)
+  const presentation = resolveMarketPresentation(market, ctx.language)
   const dict = await getDictionary(presentation.language)
   const copy = dict.buyerCopy
 

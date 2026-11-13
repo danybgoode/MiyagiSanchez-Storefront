@@ -6,6 +6,7 @@ import ShopThemeShell from '@/app/(shell)/_shop-sections/ShopThemeShell'
 import { resolveShopNav } from '@/lib/shop-presentation/context'
 import { getDictionary } from '@/lib/dictionary'
 import { resolveMarketPresentation } from '@/lib/market-presentation'
+import type { SiteLanguage } from '@/lib/site-language'
 import { readPublicSellerMarket } from '@/lib/owned-market'
 import { authoredAboutBody } from '@/lib/shop-content'
 import type { Shop } from '@/lib/types'
@@ -20,12 +21,12 @@ import type { Shop } from '@/lib/types'
  * Unauthored (`about.body` empty) → notFound() — never a dead nav link, since
  * the nav only links here when `about.body` is truthy.
  */
-export default async function AcercaBody({ shop, basePath }: { shop: Shop; basePath: string }) {
+export default async function AcercaBody({ shop, basePath, language }: { shop: Shop; basePath: string; language?: SiteLanguage | null }) {
   // Story 3.5 — this page is part of the shop site, not an orphan footer link,
   // so it renders the SAME nav as the Wall and the catalog.
   const nav = await resolveShopNav(shop)
   const market = readPublicSellerMarket(shop)?.market_code ?? 'mx'
-  const navCopy = (await getDictionary(resolveMarketPresentation(market).language)).buyerCopy
+  const navCopy = (await getDictionary(resolveMarketPresentation(market, language).language)).buyerCopy
   const settings = ((shop.metadata as Record<string, unknown> | null)?.settings ?? {}) as Record<string, unknown>
   const about = settings.about as { body?: string } | null | undefined
   const body = authoredAboutBody(about)

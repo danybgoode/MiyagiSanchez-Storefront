@@ -8,7 +8,7 @@ import type { Metadata } from 'next'
  * nothing here can mark anything paid. `?estado=cancelado` is the "you backed out" variant.
  */
 export const metadata: Metadata = {
-  title: 'Pago — Miyagi Sánchez',
+  title: { absolute: 'Pago — Miyagi Sánchez' },
   robots: { index: false, follow: false },
 }
 

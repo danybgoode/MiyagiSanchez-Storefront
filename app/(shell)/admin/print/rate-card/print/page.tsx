@@ -10,7 +10,7 @@ import PrintAdBlock from '@/app/components/PrintAdBlock'
 import PrintToolbar from '../../[editionId]/print/PrintToolbar'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Tarifario — Miyagi Prints' }
+export const metadata = { title: { absolute: 'Tarifario — Miyagi Prints' } }
 
 const BLEED = 3 // mm
 

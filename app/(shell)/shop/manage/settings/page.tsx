@@ -8,7 +8,7 @@ import { isEnabled } from '@/lib/flags'
 import { computeShopCompletion, completedSectionKeys, type ShopRow } from '@/lib/setup-guide'
 import GuideRestoreToggle from './GuideRestoreToggle'
 
-export const metadata = { title: 'Configuración — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Configuración — Miyagi Sánchez' } }
 
 // ── Section definitions ────────────────────────────────────────────────────────
 // Sourced from the one canonical taxonomy (lib/shop-settings/taxonomy.ts).

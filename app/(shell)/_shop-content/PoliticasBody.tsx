@@ -6,6 +6,7 @@ import ShopThemeShell from '@/app/(shell)/_shop-sections/ShopThemeShell'
 import { resolveShopNav } from '@/lib/shop-presentation/context'
 import { getDictionary } from '@/lib/dictionary'
 import { resolveMarketPresentation } from '@/lib/market-presentation'
+import type { SiteLanguage } from '@/lib/site-language'
 import { readPublicSellerMarket } from '@/lib/owned-market'
 import { returnsWindowLabel } from '@/lib/trust-signals'
 import type { Shop } from '@/lib/types'
@@ -22,7 +23,7 @@ import type { Shop } from '@/lib/types'
  * PDP trust chip uses, so the two surfaces can't drift on the window label.
  * Unauthored (no window set) → notFound() — never a dead nav link.
  */
-export default async function PoliticasBody({ shop, basePath, returnsLabel: localizedReturnsLabel }: { shop: Shop; basePath: string; returnsLabel?: string }) {
+export default async function PoliticasBody({ shop, basePath, returnsLabel: localizedReturnsLabel, language }: { shop: Shop; basePath: string; returnsLabel?: string; language?: SiteLanguage | null }) {
   const settings = ((shop.metadata as Record<string, unknown> | null)?.settings ?? {}) as Record<string, unknown>
   const returnsPolicy = settings.returns_policy as
     | { window?: string; conditions?: string; shipping_paid_by?: 'buyer' | 'seller'; custom_note?: string | null }
@@ -34,7 +35,7 @@ export default async function PoliticasBody({ shop, basePath, returnsLabel: loca
   // Story 3.5 — part of the shop site, so it renders the same nav as the Wall.
   const nav = await resolveShopNav(shop)
   const market = readPublicSellerMarket(shop)?.market_code ?? 'mx'
-  const navCopy = (await getDictionary(resolveMarketPresentation(market).language)).buyerCopy
+  const navCopy = (await getDictionary(resolveMarketPresentation(market, language).language)).buyerCopy
 
   return (
     <ShopThemeShell theme={nav.theme} accent={nav.accent}>

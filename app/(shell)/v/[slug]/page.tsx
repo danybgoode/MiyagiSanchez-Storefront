@@ -16,9 +16,9 @@ const EXCERPT_SNIPPET = 400
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  if (!(await isEnabled('launchpad.enabled'))) return { title: 'Campaña — Miyagi Sánchez' }
+  if (!(await isEnabled('launchpad.enabled'))) return { title: { absolute: 'Campaña — Miyagi Sánchez' } }
   const campaign = await getCampaignBySlug(slug)
-  if (!campaign) return { title: 'Campaña — Miyagi Sánchez' }
+  if (!campaign) return { title: { absolute: 'Campaña — Miyagi Sánchez' } }
   return {
     title: `${campaign.title ?? 'Vota'} — Miyagi Sánchez`,
     description: campaign.description ?? undefined,

@@ -8,6 +8,7 @@ import { readPublicSellerMarket } from '@/lib/owned-market'
 import { marketCatalogCanonical } from '@/lib/market-seo'
 import PoliticasBody from '../../../_shop-content/PoliticasBody'
 import type { MarketCode } from '@/lib/markets'
+import type { SiteLanguage } from '@/lib/site-language'
 import type { Metadata } from 'next'
 import { getDictionary } from '@/lib/dictionary'
 import { resolveMarketPresentation } from '@/lib/market-presentation'
@@ -48,10 +49,13 @@ export async function ShopPoliticasPage({
   params,
   market,
   marketBasePath = '',
+  language,
 }: {
   params: Promise<{ slug: string }>
   market?: MarketCode
   marketBasePath?: string
+  /** The visitor's stored ES/EN choice, from the dynamic market route. The public-read cache passes none. */
+  language?: SiteLanguage | null
 }) {
   const { slug } = await params
   if (!isLikelyShopSlug(slug)) notFound()
@@ -71,14 +75,14 @@ export async function ShopPoliticasPage({
   }
 
   const presentationMarket = market ?? readPublicSellerMarket(shop)?.market_code ?? 'mx'
-  const buyerCopy = (await getDictionary(resolveMarketPresentation(presentationMarket).language)).buyerCopy
+  const buyerCopy = (await getDictionary(resolveMarketPresentation(presentationMarket, language).language)).buyerCopy
   const settings = ((shop.metadata as Record<string, unknown> | null)?.settings ?? {}) as Record<string, unknown>
   const returnsPolicy = settings.returns_policy as { window?: string } | null | undefined
   const returnsLabel = returnsPolicy?.window === '7d' ? buyerCopy['listing.returnWindow7']
     : returnsPolicy?.window === '14d' ? buyerCopy['listing.returnWindow14']
     : returnsPolicy?.window === '30d' ? buyerCopy['listing.returnWindow30']
     : undefined
-  return <PoliticasBody shop={shop} basePath={`${marketBasePath}/s/${shop.slug}`} returnsLabel={returnsLabel} />
+  return <PoliticasBody shop={shop} basePath={`${marketBasePath}/s/${shop.slug}`} language={language} returnsLabel={returnsLabel} />
 }
 
 export default ShopPoliticasPage

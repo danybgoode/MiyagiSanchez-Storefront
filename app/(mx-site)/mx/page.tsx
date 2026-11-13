@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import Link from 'next/link'
 import Image from 'next/image'
 import { getOverriddenDictionary } from '@/lib/copy-overrides'
@@ -47,7 +48,9 @@ import { PendingMark } from '@/app/components/LinkPending'
 // because the ISR split it belongs to is what killed a ~30 s cold start
 // (marketplace-static-shell). The only edits are the internal marketplace links,
 // which now build from MX below instead of hard-coding the bare paths.
-export const revalidate = 60
+// 2026-11-13: per request, not ISR. The chrome follows the visitor's stored ES/EN choice (`lib/site-language.ts`),
+// and a cookie-dependent render must never be cached for the next visitor. Data stays cached at the fetch layer.
+export const dynamic = 'force-dynamic'
 
 /**
  * The market this page IS. A literal, not a lookup: `app/(site)/mx/` is a
@@ -86,7 +89,7 @@ export default function HomePage() {
 
 /** One marketplace home implementation; literal market roots provide context. */
 export async function MarketHomePage({ market }: { market: MarketCode }) {
-  const presentation = resolveMarketPresentation(market)
+  const presentation = resolveMarketPresentation(market, await getLanguagePreference())
   const marketPath = marketBasePath(market)
   const publishableKey = resolvePublishableKeyForMarket(market, PROCESS_MARKET_ENV)
   // One timestamp for both the featured pick and the grid so their selection is

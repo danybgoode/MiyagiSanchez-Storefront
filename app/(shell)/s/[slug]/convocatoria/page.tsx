@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
 import Link from 'next/link'
 import type { Metadata } from 'next'
@@ -66,7 +67,7 @@ export async function ConvocatoriaPage({
     getShop(slug, market),
   ])
   const presentationMarket = market ?? readPublicSellerMarket(seller)?.market_code ?? 'mx'
-  const copy = (await getDictionary(resolveMarketPresentation(presentationMarket).language)).buyerCopy
+  const copy = (await getDictionary(resolveMarketPresentation(presentationMarket, await getLanguagePreference()).language)).buyerCopy
 
   if (!enabled) {
     return <StateMessage title={copy['s.slug.convocatoria.page.d8d969db']} body={copy['shop.submissionsUnavailableBody']} />

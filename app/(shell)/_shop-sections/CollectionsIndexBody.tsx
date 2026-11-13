@@ -24,7 +24,7 @@ import type { ShopPresentationContext } from '@/lib/shop-presentation/context'
 
 export default async function CollectionsIndexBody({ ctx }: { ctx: ShopPresentationContext }) {
   const market = readPublicSellerMarket(ctx.shop)?.market_code ?? 'mx'
-  const dict = await getDictionary(resolveMarketPresentation(market).language)
+  const dict = await getDictionary(resolveMarketPresentation(market, ctx.language).language)
   const copy = dict.buyerCopy
 
   const listings = await getShopListings(ctx.shop.slug)

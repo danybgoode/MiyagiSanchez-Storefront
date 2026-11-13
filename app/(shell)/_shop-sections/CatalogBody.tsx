@@ -27,6 +27,16 @@ export const CATALOG_COPY = {
   emptyLink: 'Ver la tienda',
 } as const
 
+/** The page body follows the visitor's language (`ctx.language`); metadata stays Spanish, the crawler's default. */
+const CATALOG_COPY_EN: Record<keyof typeof CATALOG_COPY, string> = {
+  title: 'Catalog',
+  orderWhatsApp: 'Order on WhatsApp',
+  buy: 'Buy',
+  seeShop: 'See the full shop',
+  empty: 'This shop has not published any products yet.',
+  emptyLink: 'See the shop',
+}
+
 export function catalogMetadata(ctx: ShopPresentationContext | null, model: CatalogModel | null): Metadata {
   if (!ctx || !model) return { title: 'Página no encontrada' }
   const image = model.shop.logoUrl ?? model.items.find((item) => item.imageUrl)?.imageUrl ?? null
@@ -46,6 +56,7 @@ export function catalogMetadata(ctx: ShopPresentationContext | null, model: Cata
 
 export default async function CatalogBody({ ctx }: { ctx: ShopPresentationContext }) {
   const model = await catalogFor(ctx)
+  const copy = ctx.language === 'en' ? CATALOG_COPY_EN : CATALOG_COPY
   if (!model) notFound()
   const shopHref = ctx.basePath || '/'
 
@@ -73,14 +84,14 @@ export default async function CatalogBody({ ctx }: { ctx: ShopPresentationContex
           )}
           <div className="min-w-0">
             <h1 className="text-xl font-bold leading-tight">{model.shop.name}</h1>
-            <p className="text-sm text-[var(--color-muted)]">{CATALOG_COPY.title}</p>
+            <p className="text-sm text-[var(--color-muted)]">{copy.title}</p>
           </div>
         </header>
 
         {model.items.length === 0 ? (
           <div className="text-center py-16" data-testid="catalogo-empty">
-            <p className="text-[var(--color-muted)] mb-4">{CATALOG_COPY.empty}</p>
-            <a href={shopHref} className="btn btn-secondary">{CATALOG_COPY.emptyLink}</a>
+            <p className="text-[var(--color-muted)] mb-4">{copy.empty}</p>
+            <a href={shopHref} className="btn btn-secondary">{copy.emptyLink}</a>
           </div>
         ) : (
           <ul className="grid gap-5 list-none p-0 m-0">
@@ -121,7 +132,7 @@ export default async function CatalogBody({ ctx }: { ctx: ShopPresentationContex
                         data-order="whatsapp"
                         data-product={item.id}
                       >
-                        <i className="iconoir-chat-bubble" aria-hidden="true" /> {CATALOG_COPY.orderWhatsApp}
+                        <i className="iconoir-chat-bubble" aria-hidden="true" /> {copy.orderWhatsApp}
                       </a>
                     ) : (
                       <a
@@ -132,7 +143,7 @@ export default async function CatalogBody({ ctx }: { ctx: ShopPresentationContex
                         data-order="buy"
                         data-product={item.id}
                       >
-                        <i className="iconoir-shopping-bag" aria-hidden="true" /> {CATALOG_COPY.buy}
+                        <i className="iconoir-shopping-bag" aria-hidden="true" /> {copy.buy}
                       </a>
                     )}
                   </div>
@@ -143,7 +154,7 @@ export default async function CatalogBody({ ctx }: { ctx: ShopPresentationContex
         )}
 
         <p className="text-center mt-8">
-          <a href={shopHref} className="btn btn-ghost">{CATALOG_COPY.seeShop}</a>
+          <a href={shopHref} className="btn btn-ghost">{copy.seeShop}</a>
         </p>
         <CatalogOrderTracker shopSlug={model.shop.slug} />
       </main>

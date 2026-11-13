@@ -78,28 +78,15 @@ test.describe('market route population', () => {
     expect(mx.some((tail) => tail.startsWith('vende/'))).toBe(false)
   })
 
-  test('the root selector is a zero-catalog static surface', () => {
-    // The selector markup is mounted by `/en` only since root-shop-builder-home (`/` is
-    // the Mexico shop builder now), so the no-catalog proof is asserted on the component
-    // AND on the route that mounts it — a root that imported listings would otherwise be
-    // invisible to this guard.
-    const source = readFileSync(path.join(ROOT, 'app/(site)/MarketSelector.tsx'), 'utf8')
-    expect(source).toContain('data-testid="market-selector"')
-    // One href expression, derived per market from the registry — not two literals.
-    expect(source).toContain('href={marketBasePath(code)}')
-    // Since one-front-door-both-markets D16 `/en` is the English builder; no route mounts the selector, and the
-    // markets are reached from the strip at the end of both builders. The no-catalog proof still holds for `/en`.
+  test('the English root holds no catalog, and the retired selector stays retired', () => {
+    // No route mounted `MarketSelector` after one-front-door-both-markets D16, and it was deleted on 2026-11-13 with the
+    // old front-door language islands it carried. The no-catalog proof still holds for `/en`.
+    expect(existsSync(path.join(ROOT, 'app/(site)/MarketSelector.tsx'))).toBe(false)
     const en = readFileSync(path.join(ROOT, 'app/(en-site)/en/page.tsx'), 'utf8')
     expect(en).not.toMatch(/^import .*MarketSelector/m)
+    // The honest no-catalog proof is the absence of a data import — never "no revalidate", which once pinned `/`
+    // at the edge for a week (no `revalidate` ⇒ `s-maxage=31536000`).
     expect(en).not.toMatch(/from ['"]@\/lib\/(?:listings|medusa|supabase)['"]/)
-    // The honest no-catalog proof is the absence of a data import. This spec used
-    // to ALSO assert `not.toMatch(/export const revalidate/)`, using "no
-    // revalidate" as a proxy for "no data reads" — and that proxy pinned a live
-    // defect in place: no `revalidate` means Next serves `s-maxage=31536000`, the
-    // edge pinned `/` for a week, and its build-hashed CSS 404'd into an unstyled
-    // homepage. Data-freshness and asset-freshness are different needs; only the
-    // import check speaks to the first.
-    expect(source).not.toMatch(/from ['"]@\/lib\/(?:listings|medusa|supabase)['"]/)
   })
 
   test('the root is the Mexico shop builder and still holds no catalog', () => {

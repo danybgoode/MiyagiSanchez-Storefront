@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { headers } from 'next/headers'
 import { normalizeLocale } from '@/lib/dictionary'
 import { ABOUT_PAGE, aboutCopy } from '@/lib/about-content'
@@ -56,7 +57,7 @@ export default async function AcercaPage({ searchParams }: AcercaPageProps) {
     // serve it directly — middleware rewrites only `/` and `/convocatoria`), so
     // it needs the guard independently of the /s/[slug]/acerca variant.
     await assertShopNotPreviewPrivate(shop)
-    return <AcercaBody shop={shop} basePath="" />
+    return <AcercaBody shop={shop} basePath="" language={await getLanguagePreference()} />
   }
 
   const { lang } = await searchParams

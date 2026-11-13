@@ -59,7 +59,9 @@ import Link from 'next/link'
  * `e2e/market-route-population.spec.ts` guards the whole `*-site` population, and
  * it is what caught this file.
  */
-export const revalidate = 60
+// 2026-11-13: per request, not ISR. The chrome follows the visitor's stored ES/EN choice (`lib/site-language.ts`),
+// and a cookie-dependent render must never be cached for the next visitor. Data stays cached at the fetch layer.
+export const dynamic = 'force-dynamic'
 
 const BASE_URL = 'https://miyagisanchez.com'
 const PAGE_PATH = '/us/sell'
@@ -70,7 +72,8 @@ const meta = en.sellerAcquisition.us.metadata
 // Next's file-convention metadata resolution. A hardcoded `${PAGE_PATH}/opengraph-image`
 // URL 404s: Next serves these at a content-hashed path.
 export const metadata: Metadata = {
-  title: meta.title,
+  // The title already ends with the brand; `absolute` stops the layout template appending it twice.
+  title: { absolute: meta.title },
   description: meta.description,
   alternates: { canonical: `${BASE_URL}${PAGE_PATH}`, languages: { "en-US": `${BASE_URL}${PAGE_PATH}`, "es-US": `${BASE_URL}/us/vende` } },
   openGraph: {

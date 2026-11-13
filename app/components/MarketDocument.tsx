@@ -8,6 +8,7 @@ import SiteAnalytics from '@/app/components/SiteAnalytics'
 import { getDictionary } from '@/lib/dictionary'
 import { DEFAULT_MARKET, isMarketplaceOpen, marketBasePath, type MarketCode } from '@/lib/markets'
 import { resolveMarketPresentation } from '@/lib/market-presentation'
+import type { SiteLanguage } from '@/lib/site-language'
 import { PLATFORM_OG_COLORS } from '@/lib/platform-theme'
 import RouteProgress from '@/app/components/RouteProgress'
 import CounterCacheGuard from '@/app/components/CounterCacheGuard'
@@ -53,10 +54,12 @@ const MX_ROOT_METADATA: Metadata = {
     statusBarStyle: 'default',
     title: 'Miyagi Sánchez',
   },
+  // No `url` here on purpose (2026-11-13): a layout-level og:url is inherited by every page that sets none, and it
+  // told link previews that `/mx`, `/mx/l`, `/us/l` and others were the homepage. Without it, a crawler uses the URL
+  // it fetched — which is the right answer for every page that does not state its own.
   openGraph: {
     type: 'website',
     locale: 'es_MX',
-    url: BASE_URL,
     siteName: 'Miyagi Sánchez',
     title: 'Miyagi Sánchez — Abre tu tienda, compra y vende',
     description:
@@ -87,7 +90,6 @@ const US_ROOT_METADATA: Metadata = {
   openGraph: {
     ...MX_ROOT_METADATA.openGraph,
     locale: 'en_US',
-    url: `${BASE_URL}/us`,
     title: 'Miyagi Sánchez — Independent shops in the United States',
     description: 'Discover and buy from independent shops in the United States with Miyagi Sánchez.',
   },
@@ -147,12 +149,19 @@ export const ROOT_VIEWPORT: Viewport = {
  */
 export default async function MarketDocument({
   market,
+  language,
   children,
 }: {
   market: MarketCode
+  /**
+   * The language this document renders in — the visitor's stored choice on a per-request layout
+   * (`getLanguagePreference()`), or the address's own on `/` and `/en`. Absent ⇒ the market's. It sets `<html lang>`,
+   * Clerk's localization and every `BuyerCopyText` beneath, so a layout passes the same value to `PlatformShell`.
+   */
+  language?: SiteLanguage | null
   children: React.ReactNode
 }) {
-  const presentation = resolveMarketPresentation(market)
+  const presentation = resolveMarketPresentation(market, language)
   const dictionary = await getDictionary(presentation.language)
   const postAuthHome = marketBasePath(isMarketplaceOpen(market) ? market : DEFAULT_MARKET)
   const clerkLocalization = presentation.language === 'en' ? enUS : esMX

@@ -13,7 +13,7 @@ import PayClient from './PayClient'
  * choose only among the shop's own payment methods.
  */
 export const metadata: Metadata = {
-  title: 'Pagar — Miyagi Sánchez',
+  title: { absolute: 'Pagar — Miyagi Sánchez' },
   robots: { index: false, follow: false },
 }
 

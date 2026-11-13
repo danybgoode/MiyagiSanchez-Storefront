@@ -12,7 +12,8 @@ test.describe('market root documents · server-owned language', () => {
 
   test('the shared document renders html lang and Clerk locale from market presentation', () => {
     const document = source('app/components/MarketDocument.tsx')
-    expect(document).toContain('resolveMarketPresentation(market)')
+    // The market decides presentation; the visitor's stored ES/EN choice (passed in by the layout) only swaps words.
+    expect(document).toContain('resolveMarketPresentation(market, language)')
     expect(document).toContain('<html lang={presentation.htmlLang}')
     expect(document).toContain("presentation.language === 'en' ? enUS : esMX")
     expect(document).not.toContain('next/headers')
@@ -21,8 +22,8 @@ test.describe('market root documents · server-owned language', () => {
   test('static MX and US roots state their market without request or client inference', () => {
     const mx = source('app/(mx-site)/layout.tsx')
     const us = source('app/(us-site)/layout.tsx')
-    expect(mx).toContain('<MarketDocument market="mx">')
-    expect(us).toContain('<MarketDocument market="us">')
+    expect(mx).toContain('<MarketDocument market="mx" language={language}>')
+    expect(us).toContain('<MarketDocument market="us" language={language}>')
     expect(us).toContain("marketRootMetadata('us')")
     for (const layout of [mx, us]) {
       expect(layout).not.toContain('next/headers')
@@ -48,10 +49,10 @@ test.describe('market root documents · server-owned language', () => {
   test('the current dynamic shell remains explicitly es-MX; S3 owns a sibling US shell', () => {
     const shell = source('app/(shell)/layout.tsx')
     const usShell = source('app/(us-shell)/layout.tsx')
-    expect(shell).toContain('<MarketDocument market="mx">')
-    expect(shell).toContain('<PlatformShell market="mx"')
-    expect(usShell).toContain('<MarketDocument market="us">')
-    expect(usShell).toContain('<PlatformShell market="us"')
+    expect(shell).toContain('<MarketDocument market="mx" language={language}>')
+    expect(shell).toContain('<PlatformShell market="mx" language={language}')
+    expect(usShell).toContain('<MarketDocument market="us" language={language}>')
+    expect(usShell).toContain('<PlatformShell market="us" language={language}')
     expect(usShell).not.toContain('next/headers')
   })
 })

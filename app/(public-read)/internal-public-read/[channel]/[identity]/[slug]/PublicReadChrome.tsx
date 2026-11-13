@@ -48,6 +48,9 @@ export default async function PublicReadChrome({ children, params, surface }: Pr
       // visitors land, so this path must read the plan too (pr-reviewer, #472).
       showBadge={await shopShowsBadge(shop.slug)}
       badgeHref={badgeHref(shop.slug)}
+      // Request-neutral by contract: only visitors with NO stored language reach this render (middleware), so it is
+      // always the market default. Choosing a language here sets the cookie, and the refresh takes the dynamic route.
+      language="es"
     >
       {children}
     </ChannelLayout>

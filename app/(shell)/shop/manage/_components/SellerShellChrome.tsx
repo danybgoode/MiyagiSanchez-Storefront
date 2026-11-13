@@ -1,3 +1,5 @@
+import { marketBasePath } from '@/lib/markets'
+import { getLanguagePreference } from '@/lib/site-language-server'
 import Link from 'next/link'
 import { currentUser } from '@clerk/nextjs/server'
 import SellerNav from '../SellerNav'
@@ -9,9 +11,8 @@ import { db } from '@/lib/supabase'
 import { computeShopCompletion, completedSectionKeys, type ShopRow } from '@/lib/setup-guide'
 import { orderedSections } from '@/lib/shop-settings/taxonomy'
 import { getMySeller } from '@/lib/get-my-seller'
-import { cookies } from 'next/headers'
-import { SELLER_LOCALE_COOKIE, resolveSellerLocale } from '@/lib/seller-locale'
-import SellerLanguageToggle from '@/components/seller/SellerLanguageToggle'
+import { resolveSellerLocale } from '@/lib/seller-locale'
+import LanguageSwitch from '@/app/components/LanguageSwitch'
 
 /**
  * The seller-distinct shell chrome — dark brand top bar ("Volver a comprar") +
@@ -74,7 +75,7 @@ export default async function SellerShellChrome({ children }: { children: React.
   const seller = await getMySeller()
   const market = seller?.market ?? 'mx'
   const locale = resolveSellerLocale({
-    preference: (await cookies()).get(SELLER_LOCALE_COOKIE)?.value,
+    preference: await getLanguagePreference(),
     market,
   })
 
@@ -140,9 +141,11 @@ export default async function SellerShellChrome({ children }: { children: React.
           </span>
 
           <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <SellerLanguageToggle locale={locale} />
+            <LanguageSwitch current={locale} variant="inverse" />
+            {/* The seller's own marketplace, not `/` — `/` is the shop builder now, not shopping, and it used to hop the
+                visitor by browser language, dropping the language they had just chosen here (2026-11-13). */}
             <Link
-              href="/"
+              href={marketBasePath(market)}
               title={locale === 'en' ? 'Back to shopping' : 'Volver a comprar'}
               style={{
                 display: 'flex',

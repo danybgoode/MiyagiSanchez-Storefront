@@ -1,4 +1,6 @@
 import { BuyerCopyText } from '@/app/components/BuyerPresentationContext'
+import LanguageSwitch from '@/app/components/LanguageSwitch'
+import type { SiteLanguage } from '@/lib/site-language'
 /* eslint-disable @next/next/no-img-element -- seller-hosted logos are rendered from arbitrary remote domains. */
 /**
  * ChannelLayout — white-label shell for custom domain ("own channel") requests.
@@ -31,6 +33,8 @@ interface Props {
   showBadge?: boolean
   /** Where the badge links, tagged with the shop's campaign (`badgeHref` in lib/plan.ts). */
   badgeHref?: string
+  /** The language the document rendered in, so the shop's own header carries the same ES/EN switch as the platform's. */
+  language: SiteLanguage
   children: ReactNode
 }
 
@@ -41,6 +45,7 @@ export default function ChannelLayout({
   trust,
   showBadge = true,
   badgeHref = 'https://miyagisanchez.com',
+  language,
   children,
 }: Props) {
   return (
@@ -78,6 +83,7 @@ export default function ChannelLayout({
               {shopName}
             </span>
           </Link>
+          <LanguageSwitch current={language} />
         </div>
       </header>
 

@@ -47,8 +47,10 @@ export function sellerCopyKey(source: string): string {
   return `s_${createHash('sha256').update(source).digest('hex').slice(0, 16)}`
 }
 
+// `absolute` is Next's `title: { absolute: '…' }` — the form a page title takes when it already carries the brand
+// and must not get the layout template's second copy (2026-11-13). It is still the tab title the seller reads.
 const COPY_PROPERTY_NAMES = new Set([
-  'action', 'body', 'bullets', 'caption', 'cta', 'description', 'desc', 'eyebrow',
+  'absolute', 'action', 'body', 'bullets', 'caption', 'cta', 'description', 'desc', 'eyebrow',
   'empty', 'error', 'features', 'helper', 'hint', 'items', 'label', 'lead',
   'errorMsg', 'message', 'name', 'note', 'placeholder', 'steps', 'sub', 'subtitle', 'success',
   'text', 'title', 'warning',

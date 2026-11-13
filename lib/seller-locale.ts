@@ -3,8 +3,8 @@ import type { MarketCode } from './markets'
 /** The two languages the seller portal is authored and translated into. */
 export type SellerLocale = 'es' | 'en'
 
-/** The cookie the seller's explicit choice is stored in. Readable on both sides. */
-export const SELLER_LOCALE_COOKIE = 'seller_locale'
+// The choice itself is the site-wide `ms_lang` cookie now (`lib/site-language.ts`): the portal and every buyer page
+// read ONE preference, so picking English here still reads English on the way back to the shop.
 
 export function isSellerLocale(value: unknown): value is SellerLocale {
   return value === 'es' || value === 'en'

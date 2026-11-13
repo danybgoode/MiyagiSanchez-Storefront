@@ -16,7 +16,7 @@ import { getDictionary, type Locale } from '@/lib/dictionary'
 import PartnerPortfolio from './PartnerPortfolio'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Miyagi Partners', robots: { index: false } }
+export const metadata = { title: { absolute: 'Miyagi Partners' }, robots: { index: false } }
 
 interface GrantedShop {
   grantId: string

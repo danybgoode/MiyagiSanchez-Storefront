@@ -8,6 +8,7 @@ import { readPublicSellerMarket } from '@/lib/owned-market'
 import { marketCatalogCanonical } from '@/lib/market-seo'
 import FaqBody from '../../../_shop-content/FaqBody'
 import type { MarketCode } from '@/lib/markets'
+import type { SiteLanguage } from '@/lib/site-language'
 import type { Metadata } from 'next'
 
 export async function generateShopFaqMetadata({
@@ -46,10 +47,13 @@ export async function ShopFaqPage({
   params,
   market,
   marketBasePath = '',
+  language,
 }: {
   params: Promise<{ slug: string }>
   market?: MarketCode
   marketBasePath?: string
+  /** The visitor's stored ES/EN choice, from the dynamic market route. The public-read cache passes none. */
+  language?: SiteLanguage | null
 }) {
   const { slug } = await params
   if (!isLikelyShopSlug(slug)) notFound()
@@ -68,7 +72,7 @@ export async function ShopFaqPage({
     if (domain) permanentRedirect(`https://${domain}/faq`)
   }
 
-  return <FaqBody shop={shop} basePath={`${marketBasePath}/s/${shop.slug}`} />
+  return <FaqBody shop={shop} basePath={`${marketBasePath}/s/${shop.slug}`} language={language} />
 }
 
 export default ShopFaqPage

@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { BuyerCopyText, BuyerPresentationProvider } from '@/app/components/BuyerPresentationContext'
 /* eslint-disable @next/next/no-img-element -- checkout previews preserve arbitrary seller-hosted image URLs */
 import { redirect, notFound } from 'next/navigation'
@@ -127,7 +128,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   if (resolved.kind === 'absent') notFound()
   const listing = resolved.listing
   const ownedShopSlug = resolved.kind === 'owned' ? resolved.shopSlug : null
-  const presentation = resolveMarketPresentation(listing.shop?.market_code ?? 'mx')
+  const presentation = resolveMarketPresentation(listing.shop?.market_code ?? 'mx', await getLanguagePreference())
   const buyerCopy = (await getDictionary(presentation.language)).buyerCopy
   const formatCents = (cents: number, currency: string) =>
     formatPresentationCurrency(presentation, cents, currency, { maximumFractionDigits: 0 })

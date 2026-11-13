@@ -34,17 +34,16 @@ test.describe('US marketplace Sprint 3 contract', () => {
         expect(value).not.toMatch(/Piloto privado|Conocer el piloto|Private pilot/)
       }
     }
-    // And the selector component still renders that copy rather than a literal. Since one-front-door-both-markets
-    // D16 no route mounts it (`/en` is the English builder), but the component and its copy stay true.
-    expect(source('app/(site)/MarketSelector.tsx')).toContain('page.marketCardUsLede')
+    // The selector component that rendered this copy was deleted on 2026-11-13 (no route had mounted it since
+    // one-front-door-both-markets D16); the copy above stays true for anything that renders it next.
   })
 
   test('US has its own en-US shell and browse adapter while partner recruiting remains intact', () => {
     const layout = source('app/(us-shell)/layout.tsx')
     const browse = source('app/(us-shell)/us/l/page.tsx')
 
-    expect(layout).toContain('<MarketDocument market="us">')
-    expect(layout).toContain('<PlatformShell market="us"')
+    expect(layout).toContain('<MarketDocument market="us" language={language}>')
+    expect(layout).toContain('<PlatformShell market="us" language={language}')
     expect(browse).toContain("market: 'us'")
     // Recruiting kept its own reachable ROUTE, not merely a surviving component file:
     // opening `/us` as the marketplace displaced the flag gate that used to live there,

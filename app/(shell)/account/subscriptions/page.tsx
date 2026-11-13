@@ -3,7 +3,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
 import AccountSubscriptionsClient from './AccountSubscriptionsClient'
 
-export const metadata = { title: 'Mis suscripciones — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Mis suscripciones — Miyagi Sánchez' } }
 
 export default async function AccountSubscriptionsPage() {
   const user = await currentUser()

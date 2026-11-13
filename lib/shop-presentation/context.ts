@@ -28,6 +28,7 @@ import { resolveSectionAvailability } from './availability'
 import type { SectionConfig, SectionAvailability, ResolvedTheme } from './types'
 import type { Shop } from '@/lib/types'
 import type { MarketCode } from '@/lib/markets'
+import type { SiteLanguage } from '@/lib/site-language'
 
 export interface ShopPresentationContext {
   shop: Shop
@@ -50,6 +51,12 @@ export interface ShopPresentationContext {
   accent: string
   accentTextColor: string
   htmlLang: string
+  /**
+   * The language every section body renders its words in: the visitor's stored ES/EN choice when the route passed
+   * one (`options.language`), else the shop's market language. Bodies read THIS, never the market, so a Mexican shop
+   * can be read in English (2026-11-13).
+   */
+  language: SiteLanguage
   onOwnedHost: boolean
 }
 
@@ -111,13 +118,18 @@ export interface ShopPresentationOptions {
   market?: MarketCode
   /** Explicit tenant identity supplied only by a dynamic owned-host adapter. */
   ownedShopSlug?: string | null
+  /**
+   * The visitor's stored language choice, read by the DYNAMIC route wrapper (`request-context.ts`). A request-neutral
+   * route (the public-read cache) never passes it, and gets the market's language — which is also what a crawler sees.
+   */
+  language?: SiteLanguage | null
 }
 
 export async function resolveShopPresentation(
   slug: string | null,
   options: ShopPresentationOptions = {},
 ): Promise<ShopPresentationContext | null> {
-  const { marketBasePath = '', market, ownedShopSlug: channelSlug = null } = options
+  const { marketBasePath = '', market, ownedShopSlug: channelSlug = null, language = null } = options
   const onOwnedHost = !!channelSlug
   const resolvedSlug = channelSlug ?? slug
 
@@ -148,6 +160,7 @@ export async function resolveShopPresentation(
   const theme = (settings.theme ?? {}) as { accent_color?: string | null }
   const accent = theme.accent_color ?? 'var(--color-accent)'
   const presentationMarket = market ?? readPublicSellerMarket(shop)?.market_code ?? 'mx'
+  const presentation = resolveMarketPresentation(presentationMarket, language)
 
   return {
     shop,
@@ -161,7 +174,8 @@ export async function resolveShopPresentation(
     listingBase: shopListingBase({ onOwnedHost, marketBasePath, shopSlug: shop.slug }),
     accent,
     accentTextColor: readableTextOn(theme.accent_color ?? undefined),
-    htmlLang: resolveMarketPresentation(presentationMarket).htmlLang,
+    htmlLang: presentation.htmlLang,
+    language: presentation.language,
     onOwnedHost,
   }
 }

@@ -1,11 +1,11 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { headers } from 'next/headers'
 import SellerShellChrome from './_components/SellerShellChrome'
 import SellerCopyBoundary from '@/app/components/SellerCopyBoundary'
 import SellerFormatProvider from '@/app/components/SellerFormatProvider'
 import { getDictionary } from '@/lib/dictionary'
 import { getMySeller } from '@/lib/get-my-seller'
-import { cookies } from 'next/headers'
-import { SELLER_LOCALE_COOKIE, resolveSellerLocale, sellerCopyBoundaryNeeded } from '@/lib/seller-locale'
+import { resolveSellerLocale, sellerCopyBoundaryNeeded } from '@/lib/seller-locale'
 import { sellerFormatContextForMarket } from '@/lib/seller-format'
 import { PendingListingDeleteProvider } from '@/components/seller/PendingListingDeleteProvider'
 import { retryShopCreatedWelcome } from '@/lib/shop-created-welcome'
@@ -51,7 +51,7 @@ export default async function SellerManageLayout({ children }: { children: React
   }
   const market = seller?.market ?? 'mx'
   const locale = resolveSellerLocale({
-    preference: (await cookies()).get(SELLER_LOCALE_COOKIE)?.value,
+    preference: await getLanguagePreference(),
     market,
   })
 

@@ -29,7 +29,8 @@ const meta = {
 
 // No manual `images` — the sibling opengraph-image.tsx is picked up by Next's file convention.
 export const metadata: Metadata = {
-  title: meta.title,
+  // The title already ends with the brand; `absolute` stops the layout template appending it twice.
+  title: { absolute: meta.title },
   description: meta.description,
   alternates: { canonical: `${BASE_URL}${PAGE_PATH}` },
   openGraph: {

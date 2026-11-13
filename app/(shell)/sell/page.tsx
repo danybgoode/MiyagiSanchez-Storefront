@@ -1,5 +1,5 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import { currentUser } from '@clerk/nextjs/server'
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import SellWizard from './SellWizard'
@@ -9,7 +9,7 @@ import { getDictionary } from '@/lib/dictionary'
 import { getMySeller } from '@/lib/get-my-seller'
 import { isEnabled } from '@/lib/flags'
 import { resolveSellerSignupMarket } from '@/lib/seller-signup-market'
-import { SELLER_LOCALE_COOKIE, resolveSellerLocale, sellerCopyBoundaryNeeded } from '@/lib/seller-locale'
+import { resolveSellerLocale, sellerCopyBoundaryNeeded } from '@/lib/seller-locale'
 import { sellerLandingRedirectPath } from '@/lib/seller-acquisition'
 import { isEventoTipo } from '@/lib/evento-preset'
 
@@ -53,7 +53,7 @@ function AgentSetupNudge() {
  * behind an account, and the only thing a crawler can reach is the redirect.
  */
 export const metadata = {
-  title: 'Publicar anuncio — Miyagi Sánchez',
+  title: { absolute: 'Publicar anuncio — Miyagi Sánchez' },
   description: 'Publica tu producto, servicio o renta en segundos. Sin comisiones, sin complicaciones.',
   robots: { index: false, follow: true },
 }
@@ -80,7 +80,7 @@ export default async function SellPage({
   // `?market=us`. Market therefore picks the PAGE (below) and the resolved
   // locale picks the LANGUAGE.
   const locale = resolveSellerLocale({
-    preference: (await cookies()).get(SELLER_LOCALE_COOKIE)?.value,
+    preference: await getLanguagePreference(),
     market: signupMarket,
   })
   const user = await currentUser()

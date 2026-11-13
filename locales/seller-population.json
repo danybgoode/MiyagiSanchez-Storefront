@@ -24,6 +24,7 @@
     "app/(shell)/sell/print/[editionId]/page.tsx",
     "app/(shell)/sell/setup/SetupClient.tsx",
     "app/(shell)/sell/setup/page.tsx",
+    "app/(shell)/shop/manage/CreateWithAiCard.tsx",
     "app/(shell)/shop/manage/ManageDashboard.tsx",
     "app/(shell)/shop/manage/PrintEditionCard.tsx",
     "app/(shell)/shop/manage/SellerAnnouncementStrip.tsx",
@@ -141,7 +142,6 @@
     "app/(shell)/shop/manage/tienda/WallTab.tsx",
     "app/(shell)/shop/manage/tienda/page.tsx",
     "components/seller/PendingListingDeleteProvider.tsx",
-    "components/seller/SellerLanguageToggle.tsx",
     "components/seller/SellerPageHeader.tsx",
     "components/seller/SellerPageSkeleton.tsx"
   ],
@@ -676,6 +676,19 @@
       "keys": [
         "s_328c0bb19d0db121",
         "s_56ff3ab1b763bcbf"
+      ]
+    },
+    {
+      "file": "app/(shell)/shop/manage/CreateWithAiCard.tsx",
+      "keys": [
+        "s_565542767b63bc9b",
+        "s_1c5ba0e094a921b6",
+        "s_8b88e8d8bd78e5a5",
+        "s_aff25596da0ff465",
+        "s_9a7d7c20d11f6afd",
+        "s_c444edb18b3d793d",
+        "s_45632ab4639cd420",
+        "s_86c46712683d97e8"
       ]
     },
     {
@@ -1585,20 +1598,26 @@
         "s_40d47dc8d8efc3b7",
         "s_d38ec149b0ba76cf",
         "s_51e1283b5af55bc1",
+        "s_1c5ba0e094a921b6",
         "s_66a6bc8695aef704",
         "s_a84859d63b70900a",
         "s_874d557fcd2d6687",
+        "s_e5a36f002961f218",
+        "s_c0c07854208d905b",
         "s_956df690c19d1168",
         "s_aadae01b7dbc1aec",
         "s_89ffa2cad7a42869",
+        "s_18c81be05677762c",
         "s_9c909a0b920fad87",
         "s_965c5ee08a7c347f",
         "s_c4c924457dc19612",
         "s_903bf72e7d4b9feb",
         "s_474de2dddb12059f",
         "s_6334e1df8575ef08",
+        "s_c3529f99a82d63a6",
         "s_6bcf403de4a440ea",
         "s_26a6bdfdb3c08277",
+        "s_418250a825233650",
         "s_a4eec83c2f2a72ef",
         "s_5f7f0e5a278375d6",
         "s_6ef1609ed41c3cbe",
@@ -1621,8 +1640,11 @@
         "s_3868d2843d5924c1",
         "s_bfb3e36d906afcb2",
         "s_6fdc37477d9d5e54",
+        "s_02bf333e47d50c20",
+        "s_ed670002f6e54899",
         "s_4c08a5d5feb22ce2",
         "s_d20f1e8c18c13a98",
+        "s_cc8b035ab736b2e6",
         "s_9a6d06d737c11b04",
         "s_4fd4a8345beb042e",
         "s_a1d5bc5e9a8b41c0",
@@ -3112,13 +3134,6 @@
       ]
     },
     {
-      "file": "components/seller/SellerLanguageToggle.tsx",
-      "keys": [
-        "s_e28d9bf145b3fdb6",
-        "s_ed7e6f81519f2c9e"
-      ]
-    },
-    {
       "file": "components/seller/SellerPageSkeleton.tsx",
       "keys": [
         "s_1dc176d9ec6f5315",
@@ -3194,6 +3209,10 @@
     {
       "key": "s_02be0d4be8db15bf",
       "source": "No se pudo cancelar."
+    },
+    {
+      "key": "s_02bf333e47d50c20",
+      "source": "Traer productos"
     },
     {
       "key": "s_0304bdb3a0d93208",
@@ -3852,6 +3871,10 @@
       "source": "Otra / Mensajero local"
     },
     {
+      "key": "s_18c81be05677762c",
+      "source": "Empieza con lo que ya tienes: una foto de un producto, tu lista en Excel o PDF, o el link de tu tienda anterior. Revisas todo aquí abajo antes de que se cree nada."
+    },
+    {
       "key": "s_18c8b281c38cf909",
       "source": "Tu dominio aún no apunta a nosotros — última comprobación:"
     },
@@ -3994,6 +4017,10 @@
     {
       "key": "s_1c44736d3f8391e5",
       "source": "Incluye LADA · p. ej. 55 1234 5678 (CDMX) ó 33 1234 5678 (GDL)"
+    },
+    {
+      "key": "s_1c5ba0e094a921b6",
+      "source": "Crear con IA"
     },
     {
       "key": "s_1ce0cee583e62ea2",
@@ -5104,6 +5131,10 @@
       "source": "No pudimos enviar tu respuesta."
     },
     {
+      "key": "s_418250a825233650",
+      "source": "No encontramos productos ahí. Prueba con tu lista en Excel o pega el texto abajo."
+    },
+    {
       "key": "s_41baea6210e38e95",
       "source": "Desconectando…"
     },
@@ -5210,6 +5241,10 @@
     {
       "key": "s_45536fb6e8ade65f",
       "source": "Pago directo"
+    },
+    {
+      "key": "s_45632ab4639cd420",
+      "source": "Toma una foto de lo que vendes y llenamos la ficha."
     },
     {
       "key": "s_4569403333ead76c",
@@ -5690,6 +5725,10 @@
     {
       "key": "s_5645164bab8c7f1f",
       "source": "campo(s)"
+    },
+    {
+      "key": "s_565542767b63bc9b",
+      "source": "Agrega productos a tu tienda en segundos, con lo que ya tienes."
     },
     {
       "key": "s_565568466bf94243",
@@ -7248,6 +7287,10 @@
       "source": "aplicado"
     },
     {
+      "key": "s_86c46712683d97e8",
+      "source": "Tu Excel, tu PDF o tu lista en texto."
+    },
+    {
       "key": "s_86ee2f80b663beca",
       "source": "Sin preguntas todavía — el enlace \"Preguntas frecuentes\" no aparecerá en tu tienda."
     },
@@ -7402,6 +7445,10 @@
     {
       "key": "s_8b4e93e928dfd6ca",
       "source": "Desde"
+    },
+    {
+      "key": "s_8b88e8d8bd78e5a5",
+      "source": "Desde tu lista"
     },
     {
       "key": "s_8b94e8c95143c0a5",
@@ -7862,6 +7909,10 @@
     {
       "key": "s_9a75b6208fa7b0a9",
       "source": "Importar catálogo — Miyagi Sánchez"
+    },
+    {
+      "key": "s_9a7d7c20d11f6afd",
+      "source": "Desde una foto"
     },
     {
       "key": "s_9a9622986dd016d9",
@@ -8636,6 +8687,10 @@
       "source": "Pendiente SPEI"
     },
     {
+      "key": "s_aff25596da0ff465",
+      "source": "Desde tu tienda anterior"
+    },
+    {
       "key": "s_aff4d19d6ee43b20",
       "source": "Todas"
     },
@@ -9160,6 +9215,10 @@
       "source": "es"
     },
     {
+      "key": "s_c0c07854208d905b",
+      "source": "El link de tu tienda: tutienda.myshopify.com"
+    },
+    {
       "key": "s_c17f500461608105",
       "source": "Ya no tienes que pagarlo: tu suscripción termina al final del periodo que ya pagaste, sin ningún otro cargo."
     },
@@ -9244,6 +9303,10 @@
       "source": "Adelanto — &quot;Lee un adelanto&quot;"
     },
     {
+      "key": "s_c3529f99a82d63a6",
+      "source": "Leyendo…"
+    },
+    {
       "key": "s_c3c68929a0f00a33",
       "source": "Primero elige estado"
     },
@@ -9262,6 +9325,10 @@
     {
       "key": "s_c44380e4e66ddc74",
       "source": "Para servicios, rentas, creadores y cualquier negocio que trabaje por cita."
+    },
+    {
+      "key": "s_c444edb18b3d793d",
+      "source": "Pega el link de tu tienda en Shopify, Big Cartel u otra."
     },
     {
       "key": "s_c452a565dfcd1ca7",
@@ -9562,6 +9629,10 @@
     {
       "key": "s_cc71e31fd369f2c9",
       "source": "Hasta 4 fotos en alta resolución (mejor para impresión)."
+    },
+    {
+      "key": "s_cc8b035ab736b2e6",
+      "source": "Una foto"
     },
     {
       "key": "s_ccbe02c345169519",
@@ -10308,10 +10379,6 @@
       "source": "Desactivado"
     },
     {
-      "key": "s_e28d9bf145b3fdb6",
-      "source": "Idioma del portal"
-    },
-    {
       "key": "s_e29381208055a18b",
       "source": "Cal.com — Agentes de IA"
     },
@@ -10414,6 +10481,10 @@
     {
       "key": "s_e59cac143e012b6c",
       "source": "Lote no encontrado."
+    },
+    {
+      "key": "s_e5a36f002961f218",
+      "source": "El link de tu tienda"
     },
     {
       "key": "s_e5ff868db76bce77",
@@ -10644,12 +10715,12 @@
       "source": "— nosotros manejamos todo el comercio por atrás."
     },
     {
-      "key": "s_ed6b6d2f8c3e509b",
-      "source": "Error al traer el catálogo."
+      "key": "s_ed670002f6e54899",
+      "source": "Tu lista en Excel o PDF"
     },
     {
-      "key": "s_ed7e6f81519f2c9e",
-      "source": "Portal language"
+      "key": "s_ed6b6d2f8c3e509b",
+      "source": "Error al traer el catálogo."
     },
     {
       "key": "s_ed8ba6bbffe55317",

@@ -1,3 +1,4 @@
+import { getLanguagePreference } from '@/lib/site-language-server'
 import {
   ShopAcercaPage,
   generateShopAcercaMetadata,
@@ -9,6 +10,6 @@ export function generateMetadata({ params }: Props) {
   return generateShopAcercaMetadata({ params, market: 'mx', marketBasePath: '/mx' })
 }
 
-export default function MexicoShopAcercaPage({ params }: Props) {
-  return ShopAcercaPage({ params, market: 'mx', marketBasePath: '/mx' })
+export default async function MexicoShopAcercaPage({ params }: Props) {
+  return ShopAcercaPage({ params, market: 'mx', marketBasePath: '/mx', language: await getLanguagePreference() })
 }

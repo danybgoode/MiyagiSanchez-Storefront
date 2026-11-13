@@ -8,10 +8,12 @@ import {
 import { ShopAcercaPage, generateShopAcercaMetadata } from '@/app/(shell)/s/[slug]/acerca/page'
 import { ShopFaqPage, generateShopFaqMetadata } from '@/app/(shell)/s/[slug]/faq/page'
 import { ShopPoliticasPage, generateShopPoliciesMetadata } from '@/app/(shell)/s/[slug]/politicas/page'
-import CollectionsPage, { generateMetadata as generateCollectionsMetadata } from '@/app/(shell)/mx/s/[slug]/colecciones/page'
-import EventsPage, { generateMetadata as generateEventsMetadata } from '@/app/(shell)/mx/s/[slug]/eventos/page'
-import ShopIndexPage, { generateMetadata as generateShopIndexMetadata } from '@/app/(shell)/mx/s/[slug]/tienda/page'
-import CatalogPage, { generateMetadata as generateCatalogMetadata } from '@/app/(shell)/mx/s/[slug]/catalogo/page'
+import { resolveShopPresentation } from '@/lib/shop-presentation/context'
+import { navSections } from '@/lib/shop-presentation/sections'
+import CollectionsIndexBody from '@/app/(shell)/_shop-sections/CollectionsIndexBody'
+import EventsIndexBody from '@/app/(shell)/_shop-sections/EventsIndexBody'
+import ShopIndexBody from '@/app/(shell)/_shop-sections/ShopIndexBody'
+import CatalogBody, { catalogFor, catalogMetadata } from '@/app/(shell)/_shop-sections/CatalogBody'
 import EmbedShopPage, { generateMetadata as generateEmbedMetadata } from '@/app/(shell)/embed/s/[slug]/page'
 import { isPublicReadChannel, type PublicReadChannel } from '@/lib/public-read'
 
@@ -22,6 +24,40 @@ export const revalidate = 120
 // generateStaticParams returns an empty population (or force-static is set).
 export function generateStaticParams() {
   return []
+}
+
+/**
+ * The four Living Shop sections, rendered here through the request-neutral `context.ts` rather than by importing the
+ * `/mx/s/[slug]/<section>` route files: those read the visitor's language cookie (2026-11-13), and anything this cached
+ * route imports must not (`lib/revalidate-truth.ts`). Same bodies, same nav gate, same metadata as those routes.
+ */
+type SectionKey = 'collections' | 'events' | 'shop'
+
+const mxShopContext = (slug: string) => resolveShopPresentation(slug, { marketBasePath: '/mx', market: 'mx' })
+
+async function sectionMetadata(slug: string): Promise<Metadata> {
+  const ctx = await mxShopContext(slug)
+  return ctx ? { title: ctx.shop.name } : { title: 'Página no encontrada' }
+}
+
+async function sectionPage(slug: string, key: SectionKey) {
+  const ctx = await mxShopContext(slug)
+  if (!ctx) notFound()
+  if (!navSections(ctx.sections, ctx.availability).includes(key)) notFound()
+  if (key === 'collections') return <CollectionsIndexBody ctx={ctx} />
+  if (key === 'events') return <EventsIndexBody ctx={ctx} />
+  return <ShopIndexBody ctx={ctx} />
+}
+
+async function catalogMetadataFor(slug: string): Promise<Metadata> {
+  const ctx = await mxShopContext(slug)
+  return catalogMetadata(ctx, ctx ? await catalogFor(ctx) : null)
+}
+
+async function catalogPage(slug: string) {
+  const ctx = await mxShopContext(slug)
+  if (!ctx) notFound()
+  return <CatalogBody ctx={ctx} />
 }
 
 type Props = {
@@ -59,12 +95,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   switch (rest[0]) {
     case 'acerca': return generateShopAcercaMetadata({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
-    case 'colecciones': return generateCollectionsMetadata({ params: routeParams })
-    case 'eventos': return generateEventsMetadata({ params: routeParams })
+    case 'colecciones': return sectionMetadata(slug)
+    case 'eventos': return sectionMetadata(slug)
     case 'faq': return generateShopFaqMetadata({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
     case 'politicas': return generateShopPoliciesMetadata({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
-    case 'tienda': return generateShopIndexMetadata({ params: routeParams })
-    case 'catalogo': return generateCatalogMetadata({ params: routeParams })
+    case 'tienda': return sectionMetadata(slug)
+    case 'catalogo': return catalogMetadataFor(slug)
     default: return { title: 'Página no encontrada' }
   }
 }
@@ -91,12 +127,12 @@ export default async function PublicShopPage({ params }: Props) {
 
   switch (rest[0]) {
     case 'acerca': return ShopAcercaPage({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
-    case 'colecciones': return CollectionsPage({ params: routeParams })
-    case 'eventos': return EventsPage({ params: routeParams })
+    case 'colecciones': return sectionPage(slug, 'collections')
+    case 'eventos': return sectionPage(slug, 'events')
     case 'faq': return ShopFaqPage({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
     case 'politicas': return ShopPoliticasPage({ params: routeParams, market: 'mx', marketBasePath: '/mx' })
-    case 'tienda': return ShopIndexPage({ params: routeParams })
-    case 'catalogo': return CatalogPage({ params: routeParams })
+    case 'tienda': return sectionPage(slug, 'shop')
+    case 'catalogo': return catalogPage(slug)
     default: notFound()
   }
 }

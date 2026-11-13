@@ -5,7 +5,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import LazyUserButton from '@/app/components/clerk-lazy/LazyUserButton'
 import { ACCOUNT_HUB_LINKS } from '@/lib/account-hub-links'
 
-export const metadata = { title: 'Mi cuenta — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Mi cuenta — Miyagi Sánchez' } }
 
 // Account hub. Reachable from the PWA "Perfil" tab and the desktop user menu.
 // Previously /account had no page → the mobile nav linked here and 404'd.

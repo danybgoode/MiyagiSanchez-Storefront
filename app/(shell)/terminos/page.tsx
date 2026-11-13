@@ -7,7 +7,8 @@ const PAGE_PATH = '/terminos'
 const TITLE = 'Términos de uso - Miyagi Sánchez'
 
 export const metadata: Metadata = {
-  title: TITLE,
+  // The title already ends with the brand; `absolute` stops the layout template appending it twice.
+  title: { absolute: TITLE },
   // Had no openGraph override (agent-readability-marketing-surface Story 1.2)
   // — inherited the root layout's og:url pointing at `/` instead of itself.
   alternates: { canonical: `${BASE_URL}${PAGE_PATH}` },

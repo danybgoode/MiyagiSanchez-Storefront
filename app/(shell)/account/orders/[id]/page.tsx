@@ -3,7 +3,7 @@ import { currentUser, auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
 import OrderTrackingClient from './OrderTrackingClient'
 
-export const metadata = { title: 'Detalle de compra — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Detalle de compra — Miyagi Sánchez' } }
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const MEDUSA_PUB_KEY = process.env.MEDUSA_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''

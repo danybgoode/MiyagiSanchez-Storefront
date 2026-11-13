@@ -8,6 +8,7 @@ import { readPublicSellerMarket } from '@/lib/owned-market'
 import { marketCatalogCanonical } from '@/lib/market-seo'
 import AcercaBody from '../../../_shop-content/AcercaBody'
 import type { MarketCode } from '@/lib/markets'
+import type { SiteLanguage } from '@/lib/site-language'
 import type { Metadata } from 'next'
 
 export async function generateShopAcercaMetadata({
@@ -46,10 +47,13 @@ export async function ShopAcercaPage({
   params,
   market,
   marketBasePath = '',
+  language,
 }: {
   params: Promise<{ slug: string }>
   market?: MarketCode
   marketBasePath?: string
+  /** The visitor's stored ES/EN choice, from the dynamic market route. The public-read cache passes none. */
+  language?: SiteLanguage | null
 }) {
   const { slug } = await params
   if (!isLikelyShopSlug(slug)) notFound()
@@ -70,7 +74,7 @@ export async function ShopAcercaPage({
     if (domain) permanentRedirect(`https://${domain}/acerca`)
   }
 
-  return <AcercaBody shop={shop} basePath={`${marketBasePath}/s/${shop.slug}`} />
+  return <AcercaBody shop={shop} basePath={`${marketBasePath}/s/${shop.slug}`} language={language} />
 }
 
 export default ShopAcercaPage

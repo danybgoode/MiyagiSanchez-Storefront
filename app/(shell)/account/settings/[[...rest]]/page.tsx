@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { currentUser } from '@clerk/nextjs/server'
 import LazyUserProfile from '@/app/components/clerk-lazy/LazyUserProfile'
 
-export const metadata = { title: 'Configuración de cuenta — Miyagi Sánchez' }
+export const metadata = { title: { absolute: 'Configuración de cuenta — Miyagi Sánchez' } }
 
 // Clerk-hosted account management (email, password, sessions, delete account).
 // `/account` has no middleware.ts auth gate (only /shop/manage(.*) is in
