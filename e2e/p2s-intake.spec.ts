@@ -358,3 +358,38 @@ test('a spreadsheet\'s declared expansion is read from the zip directory before 
   expect(zipDeclaredUncompressedSize(bomb)!).toBeGreaterThan(XLSX_MAX_UNCOMPRESSED)
   expect(zipDeclaredUncompressedSize(new TextEncoder().encode('not a zip at all, just text'))).toBeNull()
 })
+
+// ── S4.1 / D20 — «Crear con IA» from the dashboard: a signed-in merchant ─────────────────────────────────────────
+
+test('signed in: no Turnstile, the merchant\'s own monthly allowance (not the device\'s one try)', async () => {
+  const seen: unknown[] = []
+  const w = world({ spendDevice: async (who) => { seen.push(who); w.trace.push('spend:who'); return 3 } })
+  const out = await handlePhotoIntake({ ...common, turnstileToken: null, userId: 'user_9', file: PNG }, w.deps)
+  expect(out.status).toBe(200)
+  expect(w.trace[0]).toBe('burst')
+  expect(seen).toEqual([{ kind: 'user', id: 'user_9' }])
+})
+
+test('signed in: a month that is used up says so (not "create your account")', async () => {
+  const w = world({ device: null })
+  const out = await handlePhotoIntake({ ...common, userId: 'user_9', file: PNG }, w.deps)
+  expect(out).toMatchObject({ status: 429, body: { code: 'usedMonth' } })
+})
+
+test('signed in: rows from a file or a link are screened HERE — they go straight to the importer', async () => {
+  const csv = new TextEncoder().encode('title,price,category\nRéplica AAA Rolex,900,otros\nVela de soya lavanda,180,otros\n')
+  const w = world()
+  ;(w.deps as IntakeDeps).screen = async (text) => { w.trace.push('screen'); return text.includes('Réplica') ? { verdict: 'refuse', kind: 'prohibited' } : { verdict: 'allow' } }
+  const out = await handleFileIntake({ ...common, userId: 'user_9', file: { bytes: csv, mime: 'text/csv', name: 'x.csv' } }, w.deps)
+  expect(out).toMatchObject({ status: 422, body: { code: 'prohibited' } })
+  // Signed out, the same file is returned — its screen runs in the drafts request that follows.
+  const anon = world()
+  ;(anon.deps as IntakeDeps).screen = async () => { anon.trace.push('screen'); return { verdict: 'refuse', kind: 'prohibited' } }
+  expect((await handleFileIntake({ ...common, file: { bytes: csv, mime: 'text/csv', name: 'x.csv' } }, anon.deps)).status).toBe(200)
+  expect(anon.trace).not.toContain('screen')
+})
+
+test('signed out still needs Turnstile even when a userId-shaped value is absent', async () => {
+  const w = world({ verifyTurnstile: async () => ({ ok: false as const, reason: 'rejected' }) })
+  expect((await handleLinkIntake({ ...common, userId: null, url: 'https://shop.com' }, w.deps)).status).toBe(403)
+})

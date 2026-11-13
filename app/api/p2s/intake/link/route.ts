@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getClientIp } from '@/lib/ratelimit'
+import { auth } from '@clerk/nextjs/server'
 import { handleLinkIntake } from '@/lib/prompt-to-shop/intake-handler'
 import { intakeDeps } from '@/lib/prompt-to-shop/intake-server'
 import { intakeDevice, intakeResponse } from '@/lib/prompt-to-shop/intake-route'
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
   let body: Record<string, unknown> | null = null
   try { body = raw ? (JSON.parse(new TextDecoder().decode(raw)) as Record<string, unknown>) : null } catch { body = null }
   const outcome = await handleLinkIntake(
-    { url: body?.url, locale: body?.locale, marketHint: body?.market_hint, turnstileToken: body?.turnstile_token, deviceId: device.deviceId },
+    { url: body?.url, locale: body?.locale, marketHint: body?.market_hint, turnstileToken: body?.turnstile_token, deviceId: device.deviceId, userId: (await auth()).userId },
     intakeDeps(getClientIp(req)),
   )
   return intakeResponse(outcome, device)
