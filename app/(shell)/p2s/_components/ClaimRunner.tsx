@@ -68,6 +68,7 @@ export default function ClaimRunner({ draftId, initial, marketHint = null }: {
       if (result.kind === 'market_required' && market) {
         try { window.sessionStorage.removeItem(marketKey(draftId)) } catch { /* nothing stored */ }
         setChosen(null)
+        setPicked(null) // the radio must not still hold the choice the backend refused (Codex, PR #499)
       }
       setOutcome(result)
       // Funnel step 4 (S5.3): counted on the keep itself — the claim's answer — never on a later visit to the shop.

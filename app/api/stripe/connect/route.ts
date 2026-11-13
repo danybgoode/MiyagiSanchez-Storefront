@@ -5,7 +5,7 @@ import { db } from '@/lib/supabase'
 import { syncMedusaSellerProfile } from '@/lib/medusa-seller-sync'
 import { resolveOrigin } from '@/lib/request-origin'
 import { getMySeller } from '@/lib/get-my-seller'
-import { connectPlanFor, isCrossSiteNavigation, usOnboardingUrl } from '@/lib/stripe-connect-market'
+import { connectPlanFor, isAllowedConnectNavigation, usOnboardingUrl } from '@/lib/stripe-connect-market'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -35,12 +35,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/sell', req.url))
   }
 
+
+  const meta = (shop.metadata ?? {}) as Record<string, unknown>
+  const settings = (meta.settings ?? {}) as Record<string, unknown>
+  const stripeSettings = getShopStripe(shop.metadata as Record<string, unknown> | null)
+
+  let origin: string
+  try {
+    origin = resolveOrigin({ siteUrl: process.env.NEXT_PUBLIC_SITE_URL, host: req.headers.get('host') })
+  } catch (e) {
+    return errorRedirect(e instanceof Error ? e.message : 'origin_unresolvable')
+  }
+
   // A US shop onboards through the backend's Accounts v2 route; everything below is the Mexican Express flow
   // (`lib/stripe-connect-market.ts` has the why). An unreadable market is refused, never treated as Mexico.
   const plan = connectPlanFor(await getMySeller().catch(() => null))
   if (plan.kind === 'unknown_market') return errorRedirect('market_unavailable')
   if (plan.kind === 'us_v2') {
-    if (isCrossSiteNavigation(req.headers.get('sec-fetch-site'))) return errorRedirect('cross_site')
+    if (!isAllowedConnectNavigation({ secFetchSite: req.headers.get('sec-fetch-site'), referer: req.headers.get('referer'), siteHost: new URL(origin).host })) {
+      return errorRedirect('cross_site')
+    }
     const jwt = await getToken()
     if (!jwt) return NextResponse.redirect(new URL('/sign-in', req.url))
     const res = await fetch(`${MEDUSA_BASE}/store/sellers/me/stripe-connect`, {
@@ -55,17 +69,6 @@ export async function GET(req: NextRequest) {
       return errorRedirect('us_onboarding_failed')
     }
     return NextResponse.redirect(url)
-  }
-
-  const meta = (shop.metadata ?? {}) as Record<string, unknown>
-  const settings = (meta.settings ?? {}) as Record<string, unknown>
-  const stripeSettings = getShopStripe(shop.metadata as Record<string, unknown> | null)
-
-  let origin: string
-  try {
-    origin = resolveOrigin({ siteUrl: process.env.NEXT_PUBLIC_SITE_URL, host: req.headers.get('host') })
-  } catch (e) {
-    return errorRedirect(e instanceof Error ? e.message : 'origin_unresolvable')
   }
 
   // ── Create or retrieve Connect account ───────────────────────────────────

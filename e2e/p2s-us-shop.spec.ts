@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { connectPlanFor, isCrossSiteNavigation, usOnboardingUrl } from '../lib/stripe-connect-market'
+import { connectPlanFor, isAllowedConnectNavigation, usOnboardingUrl } from '../lib/stripe-connect-market'
 import { nudgeCopy } from '../lib/prompt-to-shop/copy-en'
 
 // one-front-door-both-markets D15 + the fresh review on PR #499 — a US shop the builder makes can actually get paid.
@@ -49,10 +49,17 @@ test('the kept shop offers a US shop Stripe only, at its /us address, and its pa
   for (const locale of ['es', 'en'] as const) expect(nudgeCopy(locale, 'us').STEP.pagos.lead).toContain('Stripe')
 })
 
-test('another site cannot start a seller\'s US Stripe onboarding (Sec-Fetch-Site), and the route checks it first', () => {
-  expect(isCrossSiteNavigation('cross-site')).toBe(true)
-  for (const v of ['same-origin', 'same-site', 'none', null]) expect(isCrossSiteNavigation(v)).toBe(false)
+test('only our own pages (or a typed URL) can start a seller\'s US Stripe onboarding, checked before the token', () => {
+  const host = 'miyagisanchez.com'
+  const ok = (secFetchSite: string | null, referer: string | null = null) => isAllowedConnectNavigation({ secFetchSite, referer, siteHost: host })
+  expect(ok('same-origin')).toBe(true)
+  expect(ok('none')).toBe(true)
+  expect(ok('same-site')).toBe(false)
+  expect(ok('cross-site')).toBe(false)
+  expect(ok(null, 'https://miyagisanchez.com/shop/manage/settings/pagos')).toBe(true)
+  expect(ok(null, 'https://evil.example/')).toBe(false)
+  expect(ok(null, null)).toBe(false)
   const src = read('app/api/stripe/connect/route.ts')
   const v2 = src.slice(src.indexOf("plan.kind === 'us_v2'"))
-  expect(v2.indexOf('isCrossSiteNavigation(')).toBeLessThan(v2.indexOf('getToken()'))
+  expect(v2.indexOf('isAllowedConnectNavigation(')).toBeLessThan(v2.indexOf('getToken()'))
 })
