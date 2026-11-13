@@ -16,15 +16,16 @@ import { pinnedFetch } from '@/lib/ssrf-fetch'
 import { CATALOG_CATEGORY_KEYS, buildExtractionPrompt } from '@/lib/catalog-import'
 import { budgetPeriod } from './allowance'
 import { verifyTurnstile } from './turnstile'
+import { screenText } from './screen'
+import { screenDeps } from './screen-server'
 import { callModelBody, MODEL_CONFIGURED } from './server'
-import { ANON_INTAKE, INTAKE_FETCH_TIMEOUT_MS, INTAKE_MAX_REDIRECTS, INTAKE_PAGE_MAX_BYTES, nextHop, resolveAnonIntakeBudget } from './intake'
+import { ANON_INTAKE, readCappedBody, zipDeclaredUncompressedSize, XLSX_MAX_UNCOMPRESSED, SEED_ROWS_MAX, INTAKE_FETCH_TIMEOUT_MS, INTAKE_MAX_REDIRECTS, INTAKE_PAGE_MAX_BYTES, nextHop, resolveAnonIntakeBudget } from './intake'
 import type { IntakeDeps } from './intake-handler'
 
 const VISION_TIMEOUT_MS = 25_000
 
-async function readCapped(res: { body: unknown; arrayBuffer: () => Promise<ArrayBuffer> }, max: number): Promise<Uint8Array | null> {
-  const buf = new Uint8Array(await res.arrayBuffer())
-  return buf.byteLength > max ? null : buf
+async function readCapped(res: { headers: { get: (k: string) => string | null }; body: unknown }, max: number): Promise<Uint8Array | null> {
+  return readCappedBody(res.body as ReadableStream<Uint8Array> | null, res.headers.get('content-length'), max)
 }
 
 /** GET a public URL through the pinned fetch, following at most N redirects by hand. Null on anything but a 200. */
@@ -88,8 +89,12 @@ export function intakeDeps(ip: string): IntakeDeps & { base64: (b: Uint8Array) =
       return uploadToR2(copy.buffer, `p2s/${deviceId}/${randomUUID()}.${ext}`, mime)
     },
     xlsxToCsv: (bytes) => {
+      const declared = zipDeclaredUncompressedSize(bytes)
+      if (declared === null || declared > XLSX_MAX_UNCOMPRESSED) return null
       try {
-        const wb = XLSX.read(bytes, { type: 'array' })
+        // Bounded parse: the first sheet only, at most the rows a draft can carry (plus a header), no formulas,
+        // styles or macros — so a sheet that lies about its size still cannot make us read a million rows.
+        const wb = XLSX.read(bytes, { type: 'array', sheets: 0, sheetRows: SEED_ROWS_MAX * 2 + 1, cellFormula: false, cellHTML: false, cellStyles: false, bookVBA: false })
         const first = wb.SheetNames[0]
         return first ? XLSX.utils.sheet_to_csv(wb.Sheets[first]) : null
       } catch {
@@ -110,5 +115,6 @@ export function intakeDeps(ip: string): IntakeDeps & { base64: (b: Uint8Array) =
     categories: CATALOG_CATEGORY_KEYS,
     extractionPrompt: buildExtractionPrompt(),
     log: (line) => console.info('[p2s-intake]', JSON.stringify(line)),
+    screen: (text) => screenText(text, screenDeps()),
   }
 }

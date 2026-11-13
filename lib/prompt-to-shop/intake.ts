@@ -9,7 +9,7 @@
  * where the screen (D2) judges the description and the rows' titles before any generation budget is spent.
  *
  * What costs money here: the photo (Gemini vision) and a PDF (Gemini reads it). Both spend ONE signed-out AI intake
- * per device and a share of a separate daily budget FIRST (`anon_intake` / `anon_intake_budget`, D6). CSV, XLSX and
+ * per device and a share of a separate daily budget FIRST (`ANON_INTAKE` below, D6). CSV, XLSX and
  * links are parsed in code and cost nothing.
  */
 
@@ -85,9 +85,13 @@ export function sanitizeSeedRows(raw: unknown, currency: ImportCurrency): Catalo
   return rows
 }
 
-/** The text the screen judges for a draft that carries rows: the description plus the first rows' titles. */
+/**
+ * The text the screen judges for a draft that carries rows: the description plus EVERY row's title. Every row a
+ * draft can carry is a product the merchant can later upload, so screening only the first few would let a list hide
+ * its prohibited items past position 15 (security lens, PR #498). 60 titles × 100 chars stays under SCREEN_MAX_CHARS.
+ */
 export function screenTextFor(description: string, rows: readonly CatalogImportRow[]): string {
-  const titles = rows.slice(0, 15).map((r) => r.title).join('; ')
+  const titles = rows.slice(0, SEED_ROWS_MAX).map((r) => r.title).join('; ')
   return titles ? `${description}\n${titles}` : description
 }
 
@@ -162,12 +166,17 @@ const NAMED: Record<string, string> = {
   Oacute: 'Ó', Uacute: 'Ú', Ntilde: 'Ñ', uuml: 'ü', copy: '©', reg: '®', trade: '™', iexcl: '¡', iquest: '¿',
 }
 
+/** A stranger's page can carry `&#99999999;`: `String.fromCodePoint` throws on it (security lens, PR #498). */
+function safeCodePoint(n: number, original: string): string {
+  return Number.isInteger(n) && n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff) ? String.fromCodePoint(n) : original
+}
+
 function decodeEntities(s: string): string {
   return s
     .replace(/&([a-zA-Z]+);/g, (m, name: string) => (name in NAMED ? NAMED[name] : m))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#x([0-9a-f]+);/gi, (m, h) => safeCodePoint(parseInt(h, 16), m))
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#(\d+);/g, (m, d) => safeCodePoint(Number(d), m))
 }
 
 function metaContent(html: string, key: string): string | null {
@@ -263,6 +272,10 @@ export function nextHop(current: string, location: string | null): string | null
   try {
     const next = new URL(location, current)
     if (next.protocol !== 'https:' && next.protocol !== 'http:') return null
+    // The same door as `planLink`: a redirect must not reach a port or carry credentials the first URL could not
+    // (security lens, PR #498 — a 443 page redirecting to :9000 or :6379 on a public host).
+    if (next.username || next.password) return null
+    if (next.port && next.port !== '443' && next.port !== '80') return null
     if (!isPublicDomainShape(next.hostname)) return null
     return next.toString()
   } catch {
@@ -273,3 +286,58 @@ export function nextHop(current: string, location: string | null): string | null
 /** The file picker's `accept` (kept here, out of the screens, so the copy guard never reads file-type words). */
 export const INTAKE_FILE_ACCEPT = '.csv,.tsv,.txt,.json,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'
 export const INTAKE_PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif'
+
+/**
+ * Read at most `max` bytes, counting AS IT READS (fresh review, PR #498): checking the size after `arrayBuffer()`
+ * would let one link make the server hold a stranger's multi-hundred-MB body. A declared length over the cap is
+ * refused before reading anything; a body that grows past it is cancelled mid-stream.
+ */
+export async function readCappedBody(body: ReadableStream<Uint8Array> | null, contentLength: string | null, max: number): Promise<Uint8Array | null> {
+  const declared = Number(contentLength ?? '')
+  if (Number.isFinite(declared) && declared > max) { await body?.cancel().catch(() => {}); return null }
+  if (!body) return new Uint8Array()
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > max) { await reader.cancel().catch(() => {}); return null }
+    chunks.push(value)
+  }
+  const out = new Uint8Array(total)
+  let at = 0
+  for (const c of chunks) { out.set(c, at); at += c.byteLength }
+  return out
+}
+
+/** What a spreadsheet may expand to before we parse it (Codex security, PR #498): a 5 MB upload can be a zip bomb. */
+export const XLSX_MAX_UNCOMPRESSED = 40 * 1024 * 1024
+
+/**
+ * The total UNCOMPRESSED size an .xlsx (a zip) declares in its central directory, or null when it is not a readable
+ * zip. Read from the end-of-central-directory record; never inflates anything. A declared size can lie, so the parse
+ * that follows is ALSO bounded (`sheetRows`) — this refuses the honest-but-huge and the obviously hostile cheaply.
+ */
+export function zipDeclaredUncompressedSize(bytes: Uint8Array): number | null {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const minEocd = 22
+  if (bytes.byteLength < minEocd) return null
+  let eocd = -1
+  for (let i = bytes.byteLength - minEocd; i >= Math.max(0, bytes.byteLength - minEocd - 0xffff); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break }
+  }
+  if (eocd < 0) return null
+  const entries = view.getUint16(eocd + 10, true)
+  let at = view.getUint32(eocd + 16, true)
+  let total = 0
+  for (let n = 0; n < entries; n++) {
+    if (at + 46 > bytes.byteLength || view.getUint32(at, true) !== 0x02014b50) return null
+    const size = view.getUint32(at + 24, true)
+    if (size === 0xffffffff) return Number.POSITIVE_INFINITY // zip64: refuse rather than read a second format
+    total += size
+    at += 46 + view.getUint16(at + 28, true) + view.getUint16(at + 30, true) + view.getUint16(at + 32, true)
+  }
+  return total
+}

@@ -87,10 +87,20 @@ test('photo: in English for a US visitor, prices in dollars', async () => {
   expect(out.body.seed_rows[0]).toMatchObject({ currency: 'USD', price: 24 })
 })
 
-test('photo: a model that returned no business sentence is a failure the visitor can retry by typing', async () => {
+test('photo: a model that returned no business sentence gives the visitor their one try back', async () => {
   const w = world({ model: 'not json' })
   const out = await handlePhotoIntake({ ...common, file: PNG }, w.deps)
   expect(out).toMatchObject({ status: 502, body: { code: 'unavailable' } })
+  expect(w.trace).toEqual(['turnstile', 'burst', 'spend:device', 'spend:day', 'model', 'refund:device'])
+})
+
+test('pdf: a model call that failed gives the try back; one that read nothing usable keeps it (the read happened)', async () => {
+  const f = world({ model: null })
+  expect((await handleFileIntake({ ...common, file: { bytes: new Uint8Array([1]), mime: 'application/pdf', name: 'm.pdf' } }, f.deps)).status).toBe(502)
+  expect(f.trace).toContain('refund:device')
+  const e = world({ model: '[]' })
+  expect((await handleFileIntake({ ...common, file: { bytes: new Uint8Array([1]), mime: 'application/pdf', name: 'm.pdf' } }, e.deps)).status).toBe(422)
+  expect(e.trace).not.toContain('refund:device')
 })
 
 // ── File ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -233,8 +243,8 @@ test('seed rows show as the merchant\'s own cards (never EJEMPLO), priced in the
 })
 
 test('the import payload carries a stable external id per row, so a second upload updates instead of duplicating', () => {
-  const a = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Vela' }, { title: 'Jabón', category: 'hogar' }])
-  const b = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Vela' }, { title: 'Jabón', category: 'hogar' }])
+  const a = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Vela' }, { title: 'Jabón', category: 'hogar' }], 'MXN')
+  const b = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Vela' }, { title: 'Jabón', category: 'hogar' }], 'MXN')
   expect(a.map((r) => r.external_id)).toEqual(['p2s-7f2a1b3c-1', 'p2s-7f2a1b3c-2'])
   expect(a).toEqual(b)
   expect(a[1]).toMatchObject({ category: 'hogar', listing_type: 'product', quantity: 1 })
@@ -271,4 +281,80 @@ test('the intake spends only allowance kinds the database accepts, on subjects o
   // Not the generation budget's subject, and not a signed-in merchant's photo subject.
   expect(ANON_INTAKE.budgetSubject).not.toBe('global')
   expect(ANON_INTAKE.deviceSubject('x')).not.toMatch(/^(device|user):/)
+})
+
+// ── Security lens, PR #498 ───────────────────────────────────────────────────────────────────────────────────────
+
+test('a redirect cannot reach another port or carry credentials (the same door as the first URL)', () => {
+  expect(nextHop('https://shop.com/', 'http://shop.com:9000/admin')).toBeNull()
+  expect(nextHop('https://shop.com/', 'https://shop.com:6379/')).toBeNull()
+  expect(nextHop('https://shop.com/', 'https://u:p@shop.com/')).toBeNull()
+  expect(nextHop('https://shop.com/', 'https://shop.com:443/ok')).toBe('https://shop.com/ok')
+})
+
+test('the screen sees EVERY row title, so a list cannot hide prohibited items past the first few', () => {
+  const rows = [...Array.from({ length: 40 }, (_, i) => ({ title: `Vela aromática ${i + 1}`, category: 'otros' as const })), { title: 'Réplica AAA Rolex', category: 'otros' as const }]
+  expect(screenTextFor('una tienda', rows)).toContain('Réplica AAA Rolex')
+})
+
+test('an out-of-range numeric entity on a stranger\'s page does not crash the read', () => {
+  expect(() => readPageMeta('<title>a &#99999999; b &#x110000; c &#xD800;</title>')).not.toThrow()
+  expect(readPageMeta('<title>Velas &#241; &#x1F56F;</title>').title).toBe('Velas ñ 🕯')
+})
+
+// ── Fresh review, PR #498 ────────────────────────────────────────────────────────────────────────────────────────
+
+import { readCappedBody } from '../lib/prompt-to-shop/intake'
+
+test('a price in another currency than the SHOP\'s is dropped at import, never relabelled (US$95 must not become MX$95)', () => {
+  const rows = seedImportRows('7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', [{ title: 'Wool runner', price: 95, currency: 'USD' }, { title: 'Vela', price: 180, currency: 'MXN' }], 'MXN')
+  expect(rows[0].currency).toBe('MXN')
+  expect(rows[0].price).toBeUndefined()
+  expect(JSON.parse(JSON.stringify(rows[0]))).not.toHaveProperty('price')
+  expect(rows[1]).toMatchObject({ currency: 'MXN', price: 180 })
+})
+
+test('photo: a prohibited description is refused BEFORE the photo is stored on our bucket', async () => {
+  const w = world({ model: JSON.stringify({ ...CARD, business: 'Vendo pistolas sin papeles', title: 'Pistola 9mm' }) })
+  ;(w.deps as IntakeDeps).screen = async () => { w.trace.push('screen'); return { verdict: 'refuse', kind: 'prohibited' } }
+  const out = await handlePhotoIntake({ ...common, file: PNG }, w.deps)
+  expect(out).toMatchObject({ status: 422, body: { code: 'prohibited' } })
+  expect(w.trace).toEqual(['turnstile', 'burst', 'spend:device', 'spend:day', 'model', 'screen'])
+})
+
+function streamOf(chunks: number[]): ReadableStream<Uint8Array> {
+  let i = 0
+  let cancelled = false
+  const s = new ReadableStream<Uint8Array>({
+    pull(c) { if (i < chunks.length) c.enqueue(new Uint8Array(chunks[i++])); else c.close() },
+    cancel() { cancelled = true },
+  })
+  ;(s as unknown as { wasCancelled: () => boolean }).wasCancelled = () => cancelled
+  return s
+}
+
+test('a page body is capped AS IT IS READ: a declared length over the cap reads nothing; a growing body is cancelled', async () => {
+  expect(await readCappedBody(streamOf([10]), String(5_000_000), 1000)).toBeNull()
+  const growing = streamOf([600, 600, 600])
+  expect(await readCappedBody(growing, null, 1000)).toBeNull()
+  expect((growing as unknown as { wasCancelled: () => boolean }).wasCancelled()).toBe(true)
+  expect((await readCappedBody(streamOf([300, 300]), null, 1000))?.byteLength).toBe(600)
+})
+
+import * as XLSX from 'xlsx'
+import { zipDeclaredUncompressedSize, XLSX_MAX_UNCOMPRESSED } from '../lib/prompt-to-shop/intake'
+
+test('a spreadsheet\'s declared expansion is read from the zip directory before any parse (zip-bomb guard)', () => {
+  const ws = XLSX.utils.aoa_to_sheet([['title', 'price'], ['Vela de soya lavanda', 180]])
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'A')
+  const bytes = new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer)
+  const size = zipDeclaredUncompressedSize(bytes)
+  expect(size).toBeGreaterThan(100)
+  expect(size!).toBeLessThan(XLSX_MAX_UNCOMPRESSED)
+  // Patch the first central-directory entry to declare 2 GB: the guard must see it without inflating anything.
+  const bomb = bytes.slice()
+  const v = new DataView(bomb.buffer)
+  for (let i = 0; i < bomb.length - 4; i++) if (v.getUint32(i, true) === 0x02014b50) { v.setUint32(i + 24, 0x7fffffff, true); break }
+  expect(zipDeclaredUncompressedSize(bomb)!).toBeGreaterThan(XLSX_MAX_UNCOMPRESSED)
+  expect(zipDeclaredUncompressedSize(new TextEncoder().encode('not a zip at all, just text'))).toBeNull()
 })

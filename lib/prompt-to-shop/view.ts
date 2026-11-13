@@ -60,9 +60,18 @@ export const SEED_IMPORT_CHUNK = 25
  * D9 — the rows `/api/sell/import` receives. The external id is derived from the draft and the row's position, so
  * importing twice UPDATES what the first import made (the importer's own re-upload rule) instead of duplicating it.
  */
-export function seedImportRows(draftId: string, rows: readonly SeedRow[]): Array<SeedRow & { external_id: string; quantity: number; listing_type: string; category: string }> {
+export function seedImportRows(
+  draftId: string,
+  rows: readonly SeedRow[],
+  shopCurrency: string,
+): Array<SeedRow & { external_id: string; quantity: number; listing_type: string; category: string; currency: string }> {
+  // The row's currency is the market HINT the visitor had when the draft started; the shop's is the market they
+  // CHOSE. When they differ, a price in the hint's currency would be mislabelled in the shop's (US$95 → MX$95), so
+  // the price is dropped and the merchant sets it — never converted, never relabelled (fresh review, PR #498).
   return rows.map((r, i) => ({
     ...r,
+    currency: shopCurrency,
+    ...(r.currency && r.currency !== shopCurrency ? { price: undefined } : {}),
     category: r.category ?? 'otros',
     listing_type: 'product',
     quantity: 1,

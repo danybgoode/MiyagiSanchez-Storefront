@@ -59,8 +59,8 @@ test('three states: a malformed answer, an unknown choice and a thrown call are 
 })
 
 test('the description is STATE, never instructions, and is cut before it is sent', () => {
-  const body = screenRequestBody('x'.repeat(5000)) as { state: { merchant_description: string }; questions: unknown }
-  expect(body.state.merchant_description.length).toBe(2000)
+  const body = screenRequestBody("x".repeat(9000)) as { state: { merchant_description: string }; questions: unknown }
+  expect(body.state.merchant_description.length).toBe(7000)
   expect(body.questions).toBe(SCREEN_QUESTIONS)
 })
 
@@ -121,4 +121,16 @@ test('a body with an unknown input kind or a non-array of rows is malformed, ref
     expect(r).toMatchObject({ status: 400 })
     expect(trace).toEqual([])
   }
+})
+
+test('a re-run keeps the draft\'s own market: «Otra versión» on a US draft still prices in dollars (Codex, PR #498)', async () => {
+  const { d } = deps({ verdict: 'allow' })
+  let seenMarket: unknown = 'unset'
+  d.findOwnedDraft = async () => ({ id: '7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', description: 'Candles', market: 'us', locale: 'en' })
+  d.startVersion = async () => true
+  d.callModel = async (req) => { seenMarket = JSON.stringify(req.body).includes('US dollars') || JSON.stringify(req.body).includes('dólares'); return { ok: false, error: 'stop' } }
+  const r = await handleCreateDraft({ body: { draft_id: '7f2a1b3c-4d5e-4f60-8a71-b2c3d4e5f607', turnstile_token: 't', locale: 'en' }, deviceCookie: '0b9e8c1e-3c2a-4d8e-9a51-6f1f2b3c4d5e' }, d)
+  if (r.kind !== 'stream') throw new Error('expected a stream')
+  await r.run(() => {})
+  expect(seenMarket).toBe(true)
 })

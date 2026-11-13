@@ -63,6 +63,9 @@ export function p2sCopy(locale: P2sLocale): Record<keyof typeof P2S_COPY, string
 export interface DraftRef {
   id: string
   description: string
+  /** The draft's stored hint and language (D10). A re-run reuses them: the canvas sends neither (Codex, PR #498). */
+  market?: P2sMarketHint | null
+  locale?: P2sLocale
 }
 
 export interface DraftsDeps {
@@ -195,7 +198,6 @@ export async function handleCreateDraft(
   if (parsed.description) {
     const verdict = await deps.screen(screenTextFor(parsed.description, parsed.seedRows ?? []))
     if (verdict.verdict === 'refuse') {
-      deps.log?.({ event: 'screen_refused', kind: verdict.kind, input: parsed.input })
       return withDevice(refuse(422, refusalCopyKey(verdict.kind), L))
     }
   }
@@ -223,6 +225,7 @@ export async function handleCreateDraft(
   }
 
   const draftId = draft.id
+  const market = parsed.marketHint ?? draft.market ?? null
   const version = spend.versionsUsed
   const versionsLeft = spend.versionsLeft
   return withDevice({
@@ -245,7 +248,7 @@ export async function handleCreateDraft(
           saveBlock: (event) => deps.saveBlock(draftId, deviceId, version, event),
           emit: (event) => send('block', event),
           log: (line) => deps.log?.({ event: 'block', draft_id: draftId, ...line }),
-        }, { tone: parsed.tone ?? undefined, shape: parsed.shape ?? undefined, market: parsed.marketHint })
+        }, { tone: parsed.tone ?? undefined, shape: parsed.shape ?? undefined, market })
         if (outcome.ok) send('done', { draft_id: draftId, versions_left: versionsLeft })
         else send('error', { message: p2sCopy(L).unavailable, block: outcome.failedBlock })
       } catch (e) {
