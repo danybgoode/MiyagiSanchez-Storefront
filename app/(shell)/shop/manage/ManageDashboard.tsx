@@ -4,6 +4,7 @@ import { createSellerFormat } from '@/lib/seller-format'
 import { getSellerFormatContext } from '@/lib/seller-format-server'
 import Link from 'next/link'
 import PrintEditionCard from './PrintEditionCard'
+import CreateWithAiCard from './CreateWithAiCard'
 import SellerPageHeader from '@/components/seller/SellerPageHeader'
 import SetupGuideCard from './SetupGuideCard'
 import { Banner } from '@/components/feedback/Banner'
@@ -152,6 +153,9 @@ export default async function ManageDashboard({
         initialSatisfactionAnswered={guideSatisfactionAnswered}
         shopSlug={shop.slug}
       />
+
+      {/* ── «Crear con IA» — the builder's tools for a merchant who already has a shop (S4.1) ─────────── */}
+      <CreateWithAiCard />
 
       {/* ── Stats row ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">

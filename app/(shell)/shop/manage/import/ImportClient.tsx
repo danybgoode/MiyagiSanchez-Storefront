@@ -3,6 +3,8 @@
 import { useSellerFormat } from '@/app/components/SellerFormatProvider'
 
 import { useRef, useState } from 'react'
+import { runIntake } from '@/lib/prompt-to-shop/client'
+import { INTAKE_FILE_ACCEPT, INTAKE_PHOTO_ACCEPT } from '@/lib/prompt-to-shop/intake'
 import Link from 'next/link'
 import { SellerBreadcrumb } from '../SellerBreadcrumb'
 import {
@@ -112,6 +114,41 @@ function Uploader({ shopSlug, pagosConfigured }: { shopSlug: string | null; pago
     }
   }
 
+  // ── «Crear con IA» (one-front-door-both-markets S4.1, D20) ── the builder's own intakes, signed in: one photo, a
+  // spreadsheet or PDF, or the shop's old store link. The routes know the session, so no Turnstile; every row they
+  // return is screened for prohibited goods, then lands in THIS staging grid, reviewed before anything is created.
+  const [aiBusy, setAiBusy] = useState<'photo' | 'file' | 'link' | null>(null)
+  const [aiLink, setAiLink] = useState('')
+  const aiPhotoRef = useRef<HTMLInputElement>(null)
+  const aiFileRef = useRef<HTMLInputElement>(null)
+
+  async function handleIntake(kind: 'photo' | 'file' | 'link', payload: { file?: File; url?: string }) {
+    setError(null)
+    setResult(null)
+    setEditRows([])
+    setFileName(payload.file?.name ?? null)
+    setAiBusy(kind)
+    // A CSV or JSON list is read HERE by the same parser as the upload below — every column kept, no 60-row cap
+    // (fresh review, PR #501). Only a spreadsheet, a PDF, a photo or a link needs the server.
+    if (kind === 'file' && payload.file && /\.(csv|tsv|txt|json)$/i.test(payload.file.name)) {
+      setAiBusy(null)
+      await handleFile(payload.file)
+      return
+    }
+    // The shop's own market: a US shop's rows are priced in dollars (the backend refuses a currency mismatch).
+    const answer = await runIntake(kind, { ...payload, turnstileToken: '', locale: 'es', marketHint: fmt.currency === 'USD' ? 'us' : 'mx' }, 'No pudimos leerlo. Inténtalo de nuevo en un momento.')
+    setAiBusy(null)
+    if (!answer.ok) {
+      setError(answer.message)
+      return
+    }
+    if (!answer.seedRows.length) {
+      setError('No encontramos productos ahí. Prueba con tu lista en Excel o pega el texto abajo.')
+      return
+    }
+    await applyResult({ format: 'json', staged: validateRows(answer.seedRows), fileErrors: [] })
+  }
+
   async function handleExtract() {
     if (!pasteText.trim() || pasteText.length > EXTRACT_CHAR_LIMIT) return
     setError(null)
@@ -212,6 +249,42 @@ function Uploader({ shopSlug, pagosConfigured }: { shopSlug: string | null; pago
       />
 
       {/* Paste & publish (Sprint 2) — the easy, native path */}
+      <section id="crear-con-ia" data-testid="import-crear-con-ia" className="border border-[var(--color-border)] rounded-[var(--r-lg)] p-5 mb-4">
+        <h2 className="font-semibold mb-1 flex items-center gap-2">
+          <i className="iconoir-magic-wand text-xl" aria-hidden /> Crear con IA
+        </h2>
+        <p className="text-sm text-[var(--color-muted)] mb-3">
+          Empieza con lo que ya tienes: una foto de un producto, tu lista en Excel o PDF, o el link de tu tienda anterior.
+          Revisas todo aquí abajo antes de que se cree nada.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn btn-secondary" disabled={!!aiBusy} onClick={() => aiPhotoRef.current?.click()} data-testid="import-ai-photo">
+            <i className="iconoir-camera" aria-hidden /> {aiBusy === 'photo' ? 'Leyendo…' : 'Una foto'}
+          </button>
+          <button type="button" className="btn btn-secondary" disabled={!!aiBusy} onClick={() => aiFileRef.current?.click()} data-testid="import-ai-file">
+            <i className="iconoir-page" aria-hidden /> {aiBusy === 'file' ? 'Leyendo…' : 'Tu lista en Excel o PDF'}
+          </button>
+        </div>
+        <input ref={aiPhotoRef} type="file" accept={INTAKE_PHOTO_ACCEPT} hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void handleIntake('photo', { file: f }) }} />
+        <input ref={aiFileRef} type="file" accept={INTAKE_FILE_ACCEPT} hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void handleIntake('file', { file: f }) }} />
+        <div className="flex flex-wrap gap-2 mt-3">
+          <label htmlFor="import-ai-link" className="sr-only">El link de tu tienda</label>
+          <input
+            id="import-ai-link"
+            type="url"
+            inputMode="url"
+            value={aiLink}
+            onChange={(e) => setAiLink(e.target.value)}
+            placeholder="El link de tu tienda: tutienda.myshopify.com"
+            className="flex-1 min-w-0 text-sm p-2 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--fg)]"
+            data-testid="import-ai-link"
+          />
+          <button type="button" className="btn btn-secondary" disabled={!!aiBusy || !aiLink.trim()} onClick={() => void handleIntake('link', { url: aiLink.trim() })}>
+            {aiBusy === 'link' ? 'Leyendo…' : 'Traer productos'}
+          </button>
+        </div>
+      </section>
+
       <section className="border border-[var(--color-border)] rounded-[var(--r-lg)] p-5 mb-4">
         <h2 className="font-semibold mb-1 flex items-center gap-2">
           <i className="iconoir-sparks text-xl" aria-hidden /> Pega y publica

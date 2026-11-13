@@ -69,7 +69,7 @@ export function sanitizeSeedRows(raw: unknown, currency: ImportCurrency): Catalo
   for (const s of staged) {
     if (!s.valid) continue
     const images = (s.row.images ?? []).filter((u) => typeof u === 'string' && /^https:\/\//i.test(u)).slice(0, 4)
-    const price = typeof s.row.price === 'number' && Number.isFinite(s.row.price) && s.row.price > 0 ? Math.round(s.row.price) : undefined
+    const price = typeof s.row.price === 'number' && Number.isFinite(s.row.price) && s.row.price > 0 ? Math.round(s.row.price * 100) / 100 : undefined
     rows.push({
       title: s.row.title,
       ...(s.row.description ? { description: s.row.description.slice(0, 2000) } : {}),
@@ -340,4 +340,17 @@ export function zipDeclaredUncompressedSize(bytes: Uint8Array): number | null {
     at += 46 + view.getUint16(at + 28, true) + view.getUint16(at + 30, true) + view.getUint16(at + 32, true)
   }
   return total
+}
+
+/**
+ * D20 — every row's title and description, in chunks of 15 rows (≤ 15 × (100 + 300) chars, under SCREEN_MAX_CHARS),
+ * each led by the description. Used where rows go straight to the importer (a signed-in «Crear con IA»).
+ */
+export function screenChunksFor(description: string, rows: readonly CatalogImportRow[]): string[] {
+  const out: string[] = []
+  for (let i = 0; i < Math.min(rows.length, SEED_ROWS_MAX); i += 15) {
+    const lines = rows.slice(i, i + 15).map((r) => `${r.title}${r.description ? ` — ${r.description.slice(0, 300)}` : ''}`)
+    out.push(`${description}\n${lines.join('\n')}`)
+  }
+  return out.length ? out : [description]
 }

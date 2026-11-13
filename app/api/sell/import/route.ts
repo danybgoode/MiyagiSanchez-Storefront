@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit } from '@/lib/ratelimit'
+import { screenText } from '@/lib/prompt-to-shop/screen'
+import { screenDeps } from '@/lib/prompt-to-shop/screen-server'
+import { screenChunksFor } from '@/lib/prompt-to-shop/intake'
+
+const IMPORT_PROHIBITED = 'Este lote tiene productos que los pagos en línea no aceptan (por ejemplo medicamentos controlados, armas o réplicas). Quítalos e inténtalo de nuevo.'
 import { auth } from '@clerk/nextjs/server'
 import { validateRows, type CatalogImportRow } from '@/lib/catalog-import'
 import { ingestImageUrls } from '@/lib/image-ingest'
@@ -86,11 +92,26 @@ export async function POST(req: NextRequest) {
   // Re-validate server-side — never trust the client.
   const staged = validateRows(body.rows)
 
+
   // Authoritative external_id → product_id map for upsert (fetched per request).
   const map = new Map<string, string>()
   const listRes = await medusaFetch('/store/sellers/me/products?limit=200', clerkJwt)
   if (listRes.status === 404) {
     return NextResponse.json({ error: 'No tienes una tienda. Crea una antes de importar.' }, { status: 404 })
+  }
+
+  // one-front-door-both-markets D20 (Codex security, PR #501) — the ONE door every bulk import walks through (a file,
+  // a paste, «Crear con IA», the builder's «Subir mis productos»), so prohibited goods are refused HERE rather than at
+  // each of its doors. After the seller lookup: an account with no shop never reaches the screen (Codex security). Prohibited only; an `unavailable` screen proceeds as the import always has (D4), and logs it.
+  if (!(await checkRateLimit('sell_import', userId)).allowed) {
+    return NextResponse.json({ error: 'Vas muy rápido. Espera unos minutos e inténtalo de nuevo.' }, { status: 429 })
+  }
+  const screenRows = staged.filter((s) => s.valid).map((s) => s.row)
+  for (const text of screenChunksFor('Productos para importar a una tienda en línea', screenRows)) {
+    const verdict = await screenText(text, screenDeps()).catch(() => ({ verdict: 'unavailable' as const, reason: 'threw' }))
+    if (verdict.verdict === 'refuse' && verdict.kind === 'prohibited') {
+      return NextResponse.json({ error: IMPORT_PROHIBITED, code: 'prohibited' }, { status: 422 })
+    }
   }
   if (listRes.ok) {
     const data = (await listRes.json()) as {

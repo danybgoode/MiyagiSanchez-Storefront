@@ -19,7 +19,7 @@ import type { ScreenVerdict } from './screen'
 import { validateSuggestion, PHOTO_MAX_BYTES, PHOTO_MIME, type PhotoSuggestion } from './photo'
 import {
   ANON_INTAKE, INTAKE_FILE_MAX_BYTES, SEED_ROWS_MAX, bigCartelRows, describeFromPage, describeFromRows, fileKindOf,
-  planLink, readPageMeta, sanitizeSeedRows, shopifyJsonRows, type FileKind, type IntakeResult, type LinkPlan,
+  planLink, readPageMeta, sanitizeSeedRows, screenChunksFor, shopifyJsonRows, type FileKind, type IntakeResult, type LinkPlan,
 } from './intake'
 import { currencyFor, currencyWords, readLocale, readMarketHint, type P2sLocale, type P2sMarketHint } from './locale'
 
@@ -30,6 +30,7 @@ export const INTAKE_COPY = {
     rateLimited: 'Vas muy rápido. Espera un momento e inténtalo de nuevo.',
     tooBig: 'El archivo es muy grande. Sube uno de menos de 5 MB (las fotos, de menos de 8 MB).',
     used: 'Ya usaste tu foto o archivo de prueba. Crea tu cuenta para subir más.',
+    usedMonth: 'Ya usaste tus lecturas con IA de este mes. Puedes subir tu lista en Excel sin límite.',
     budget: 'Hoy ya leímos muchas fotos y archivos. Describe tu negocio en una frase o vuelve mañana.',
     unavailable: 'No pudimos leerlo ahora. Describe tu negocio en una frase o inténtalo en un momento.',
     empty: 'No encontramos productos ahí. Revisa que tenga nombre y precio, o describe tu negocio en una frase.',
@@ -43,6 +44,7 @@ export const INTAKE_COPY = {
     rateLimited: "You're going fast. Wait a moment and try again.",
     tooBig: 'That file is too big. Upload one under 5 MB (photos under 8 MB).',
     used: "You've used your free photo or file. Create your account to upload more.",
+    usedMonth: "You've used this month's AI reads. You can still upload your list in Excel without a limit.",
     budget: "We've read a lot of photos and files today. Describe your business in a sentence or come back tomorrow.",
     unavailable: "We couldn't read it right now. Describe your business in a sentence or try again in a moment.",
     empty: "We didn't find products there. Check it has names and prices, or describe your business in a sentence.",
@@ -62,6 +64,24 @@ function refuse(status: Exclude<IntakeOutcome['status'], 200>, code: CopyKey, lo
   return { status, body: { ok: false, code, error: INTAKE_COPY[locale][code] } }
 }
 
+/**
+ * D20 — a signed-in merchant's rows go straight to the importer, not through a draft's screened generation, so they
+ * are screened here (prohibited goods) before they are handed back. A signed-out result is screened by the drafts
+ * request that follows it, as before.
+ */
+async function finish(common: IntakeCommon, deps: IntakeDeps, result: IntakeResult, input: 'file' | 'url', locale: P2sLocale): Promise<IntakeOutcome> {
+  if (common.userId && deps.screen && result.seedRows.length) {
+    // Titles AND descriptions, in chunks that fit the screen's state (Codex security, PR #501): a benign title over a
+    // prohibited description must not slip through on the direct-import path.
+    for (const text of screenChunksFor(result.description, result.seedRows)) {
+      // A screen that throws is `unavailable` (Codex, PR #501): never an escaped error after a paid PDF read.
+      const verdict = await deps.screen(text).catch((): ScreenVerdict => ({ verdict: 'unavailable', reason: 'threw' }))
+      if (verdict.verdict === 'refuse' && verdict.kind === 'prohibited') return refuse(422, 'prohibited', locale)
+    }
+  }
+  return ok(result, input)
+}
+
 function ok(result: IntakeResult, input: 'photo' | 'file' | 'url'): IntakeOutcome {
   return { status: 200, body: { ok: true, description: result.description, seed_rows: result.seedRows, source_name: result.sourceName, input } }
 }
@@ -71,17 +91,33 @@ export interface IntakeCommon {
   marketHint: unknown
   turnstileToken: unknown
   deviceId: string
+  /**
+   * S4.1 / D20 — a signed-in merchant WHO OWNS A SHOP, from the Clerk session (never the body); the route sets it only
+   * for a shop owner, so an account with no shop is treated as signed out (fresh review, PR #501). It needs no
+   * Turnstile (the session IS the identity), spends the merchant's PLAN photos for the month (the same pool as the
+   * canvas's PhotoSheet, `ownerPhotoCap`) instead of the device's single try, and its rows are screened HERE for prohibited goods, because
+   * they go straight to the importer instead of through a draft's screened generation. Absent = signed out.
+   */
+  userId?: string | null
+}
+
+/** Whose allowance an intake spends: the device's one signed-out try, or the merchant's month. */
+export type IntakeIdentity = { kind: 'device'; id: string } | { kind: 'user'; id: string }
+
+function identityOf(common: IntakeCommon): IntakeIdentity {
+  return common.userId ? { kind: 'user', id: common.userId } : { kind: 'device', id: common.deviceId }
 }
 
 export interface IntakeDeps {
   verifyTurnstile: (token: unknown) => Promise<TurnstileVerdict>
   burstAllowed: (deviceId: string) => Promise<boolean>
-  /** `spend_ai_allowance(ANON_INTAKE.deviceSubject(id), ANON_INTAKE.kind, 'all', 1)` — the new count, or null at the cap. Throws = unavailable. */
-  spendDevice: (deviceId: string) => Promise<number | null>
+  /** The identity's allowance: a device's one try (`ANON_INTAKE.deviceSubject`, period `all`, cap 1) or a signed-in
+   *  merchant's month (`intake-user:<id>`, `YYYY-MM`, cap `SIGNED_IN_INTAKES_PER_MONTH`). New count, or null at the cap. Throws = unavailable. */
+  spendDevice: (who: IntakeIdentity) => Promise<number | null>
   /** `spend_ai_allowance(ANON_INTAKE.budgetSubject, ANON_INTAKE.budgetKind, <MX day>, N)` — the new count, or null at the cap. */
   spendDay: () => Promise<number | null>
   /** Give the device's intake back when the DAY refused it: the visitor got nothing. Best effort. */
-  refundDevice: (deviceId: string) => Promise<void>
+  refundDevice: (who: IntakeIdentity) => Promise<void>
   modelConfigured: boolean
   /** One vision/PDF call. Resolves the model's text, or null on any failure. */
   callModel: (body: object) => Promise<string | null>
@@ -96,26 +132,29 @@ export interface IntakeDeps {
 }
 
 async function gate(common: IntakeCommon, deps: IntakeDeps, locale: P2sLocale): Promise<IntakeOutcome | null> {
-  const verdict = await deps.verifyTurnstile(common.turnstileToken)
-  if (!verdict.ok) {
-    deps.log?.({ event: 'intake_turnstile_refused', reason: verdict.reason })
-    return refuse(403, 'verify', locale)
+  if (!common.userId) {
+    const verdict = await deps.verifyTurnstile(common.turnstileToken)
+    if (!verdict.ok) {
+      deps.log?.({ event: 'intake_turnstile_refused', reason: verdict.reason })
+      return refuse(403, 'verify', locale)
+    }
   }
   if (!(await deps.burstAllowed(common.deviceId))) return refuse(429, 'rateLimited', locale)
   return null
 }
 
 /** D6: device first, then the day; a day that refuses gives the device its intake back. Fails CLOSED. */
-async function spendIntake(deviceId: string, deps: IntakeDeps, locale: P2sLocale): Promise<IntakeOutcome | null> {
+async function spendIntake(who: IntakeIdentity, deps: IntakeDeps, locale: P2sLocale): Promise<IntakeOutcome | null> {
   if (!deps.modelConfigured) return refuse(503, 'unavailable', locale)
   let device: number | null
   try {
-    device = await deps.spendDevice(deviceId)
+    device = await deps.spendDevice(who)
   } catch {
     return refuse(503, 'unavailable', locale)
   }
-  if (device === null) return refuse(429, 'used', locale)
-  if (!Number.isInteger(device) || device < 1 || device > ANON_INTAKE.perDevice) return refuse(503, 'unavailable', locale)
+  if (device === null) return refuse(429, who.kind === 'user' ? 'usedMonth' : 'used', locale)
+  // A merchant's cap is their PLAN's monthly photos (read server-side); only the device's single try has a fixed bound.
+  if (!Number.isInteger(device) || device < 1 || (who.kind === 'device' && device > ANON_INTAKE.perDevice)) return refuse(503, 'unavailable', locale)
   let day: number | null
   try {
     day = await deps.spendDay()
@@ -123,7 +162,7 @@ async function spendIntake(deviceId: string, deps: IntakeDeps, locale: P2sLocale
     day = -1
   }
   if (day === null || day === -1 || !Number.isInteger(day) || day < 1) {
-    await deps.refundDevice(deviceId).catch(() => {})
+    await deps.refundDevice(who).catch(() => {})
     return refuse(503, day === null ? 'budget' : 'unavailable', locale)
   }
   return null
@@ -199,7 +238,7 @@ export async function handlePhotoIntake(
   if (file.bytes.byteLength > PHOTO_MAX_BYTES) return refuse(413, 'tooBig', locale)
   const gated = await gate(input, deps, locale)
   if (gated) return gated
-  const spent = await spendIntake(input.deviceId, deps, locale)
+  const spent = await spendIntake(identityOf(input), deps, locale)
   if (spent) return spent
 
   const text = await deps.callModel(anonPhotoRequest({ mimeType: file.mime, base64: deps.base64(file.bytes) }, locale, market, deps.categories))
@@ -210,7 +249,7 @@ export async function handlePhotoIntake(
   if (!business) {
     // The visitor got nothing, so their one try comes back — the copy invites a retry (Codex, PR #498). The day's
     // budget keeps the spend: the model call was made.
-    await deps.refundDevice(input.deviceId).catch(() => {})
+    await deps.refundDevice(identityOf(input)).catch(() => {})
     return refuse(502, 'unavailable', locale)
   }
   // Prohibited goods are refused HERE, before the photo is stored on our public bucket (fresh review, PR #498).
@@ -265,11 +304,11 @@ export async function handleFileIntake(
 
   let raw: unknown[] = []
   if (kind === 'pdf') {
-    const spent = await spendIntake(input.deviceId, deps, locale)
+    const spent = await spendIntake(identityOf(input), deps, locale)
     if (spent) return spent
     const text = await deps.callModel(pdfRequest(deps.base64(file.bytes), deps.extractionPrompt))
     if (text === null) {
-      await deps.refundDevice(input.deviceId).catch(() => {})
+      await deps.refundDevice(identityOf(input)).catch(() => {})
       return refuse(502, 'unavailable', locale)
     }
     raw = jsonArray(text)
@@ -282,7 +321,7 @@ export async function handleFileIntake(
   deps.log?.({ event: 'intake_file', kind, rows: rows.length })
   if (!rows.length) return refuse(422, 'empty', locale)
   const name = file.name.replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' ').trim()
-  return ok({ description: describeFromRows(rows, locale, null), seedRows: rows, sourceName: name || null }, 'file')
+  return finish(input, deps, { description: describeFromRows(rows, locale, null), seedRows: rows, sourceName: name || null }, 'file', locale)
 }
 
 // ── Link ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -307,7 +346,7 @@ export async function handleLinkIntake(input: IntakeCommon & { url: unknown }, d
   const shopRows = shopifyJsonRows(json) ?? (plan.kind === 'bigcartel' ? bigCartelRows(json) : null)
   const rows = sanitizeSeedRows(shopRows ?? [], currency)
   deps.log?.({ event: 'intake_link', kind: plan.kind, rows: rows.length, page: pageHtml !== null })
-  if (rows.length) return ok({ description: describeFromRows(rows, locale, sourceName), seedRows: rows, sourceName }, 'url')
+  if (rows.length) return finish(input, deps, { description: describeFromRows(rows, locale, sourceName), seedRows: rows, sourceName }, 'url', locale)
   if (pageHtml === null) return refuse(422, 'link', locale)
   const description = describeFromPage(meta)
   if (!description) return refuse(422, 'silentPage', locale)

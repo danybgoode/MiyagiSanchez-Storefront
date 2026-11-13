@@ -358,3 +358,108 @@ test('a spreadsheet\'s declared expansion is read from the zip directory before 
   expect(zipDeclaredUncompressedSize(bomb)!).toBeGreaterThan(XLSX_MAX_UNCOMPRESSED)
   expect(zipDeclaredUncompressedSize(new TextEncoder().encode('not a zip at all, just text'))).toBeNull()
 })
+
+// ── S4.1 / D20 — «Crear con IA» from the dashboard: a signed-in merchant ─────────────────────────────────────────
+
+test('signed in: no Turnstile, the merchant\'s own monthly allowance (not the device\'s one try)', async () => {
+  const seen: unknown[] = []
+  const w = world({ spendDevice: async (who) => { seen.push(who); w.trace.push('spend:who'); return 3 } })
+  const out = await handlePhotoIntake({ ...common, turnstileToken: null, userId: 'user_9', file: PNG }, w.deps)
+  expect(out.status).toBe(200)
+  expect(w.trace[0]).toBe('burst')
+  expect(seen).toEqual([{ kind: 'user', id: 'user_9' }])
+})
+
+test('signed in: a month that is used up says so (not "create your account")', async () => {
+  const w = world({ device: null })
+  const out = await handlePhotoIntake({ ...common, userId: 'user_9', file: PNG }, w.deps)
+  expect(out).toMatchObject({ status: 429, body: { code: 'usedMonth' } })
+})
+
+test('signed in: rows from a file or a link are screened HERE — they go straight to the importer', async () => {
+  const csv = new TextEncoder().encode('title,price,category\nRéplica AAA Rolex,900,otros\nVela de soya lavanda,180,otros\n')
+  const w = world()
+  ;(w.deps as IntakeDeps).screen = async (text) => { w.trace.push('screen'); return text.includes('Réplica') ? { verdict: 'refuse', kind: 'prohibited' } : { verdict: 'allow' } }
+  const out = await handleFileIntake({ ...common, userId: 'user_9', file: { bytes: csv, mime: 'text/csv', name: 'x.csv' } }, w.deps)
+  expect(out).toMatchObject({ status: 422, body: { code: 'prohibited' } })
+  // Signed out, the same file is returned — its screen runs in the drafts request that follows.
+  const anon = world()
+  ;(anon.deps as IntakeDeps).screen = async () => { anon.trace.push('screen'); return { verdict: 'refuse', kind: 'prohibited' } }
+  expect((await handleFileIntake({ ...common, file: { bytes: csv, mime: 'text/csv', name: 'x.csv' } }, anon.deps)).status).toBe(200)
+  expect(anon.trace).not.toContain('screen')
+})
+
+test('signed out still needs Turnstile even when a userId-shaped value is absent', async () => {
+  const w = world({ verifyTurnstile: async () => ({ ok: false as const, reason: 'rejected' }) })
+  expect((await handleLinkIntake({ ...common, userId: null, url: 'https://shop.com' }, w.deps)).status).toBe(403)
+})
+
+// Fresh review, PR #501 ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('signed in: a model failure gives the MERCHANT their read back (not a device)', async () => {
+  const refunded: unknown[] = []
+  const w = world({ model: 'not json', refundDevice: async (who) => { refunded.push(who) } })
+  await handlePhotoIntake({ ...common, userId: 'user_9', file: PNG }, w.deps)
+  expect(refunded).toEqual([{ kind: 'user', id: 'user_9' }])
+})
+
+test('signed in: a link\'s rows are screened too', async () => {
+  const w = world({ fetchJson: async () => ({ products: [{ title: 'Pistola 9mm sin papeles', variants: [{ price: '500' }] }] }) })
+  ;(w.deps as IntakeDeps).screen = async () => ({ verdict: 'refuse', kind: 'prohibited' })
+  expect(await handleLinkIntake({ ...common, userId: 'user_9', url: 'https://shop.example' }, w.deps)).toMatchObject({ status: 422, body: { code: 'prohibited' } })
+})
+
+test('the signed-in mode is a SHOP OWNER\'s: every intake route asks for one, from the session', () => {
+  const route = readFileSync(join(process.cwd(), 'lib/prompt-to-shop/intake-route.ts'), 'utf8')
+  // The seller is Medusa's (AGENTS rule 1), never the Supabase mirror.
+  expect(route).toContain('await getMySeller()')
+  expect(route).not.toContain("from('marketplace_shops')")
+  for (const kind of ['photo', 'file', 'link']) {
+    const src = readFileSync(join(process.cwd(), `app/api/p2s/intake/${kind}/route.ts`), 'utf8')
+    expect(src, kind).toContain('userId: await intakeShopOwner()')
+  }
+  // …and a merchant's AI read is a PLAN photo: the canvas's subject, kind and cap — one pool, not two.
+  const server = readFileSync(join(process.cwd(), 'lib/prompt-to-shop/intake-server.ts'), 'utf8')
+  expect(server).toContain("spendAllowance(userSubject(who.id), 'photo', month, await ownerPhotoCap(who.id))")
+})
+
+test('seed prices keep their cents (149.50 stays 149.50)', () => {
+  expect(sanitizeSeedRows([{ title: 'Vela de soya lavanda', price: 149.5, category: 'otros' }], 'MXN')[0].price).toBe(149.5)
+})
+
+import { screenChunksFor } from '../lib/prompt-to-shop/intake'
+test('signed in: a benign title over a prohibited DESCRIPTION is refused; every row is screened in chunks', async () => {
+  const rows = Array.from({ length: 40 }, (_, i) => ({ title: `Accesorio número ${i + 1}`, description: i === 33 ? 'Cartuchos calibre 9mm sin papeles' : 'Accesorio de cuero', category: 'otros' as const }))
+  const chunks = screenChunksFor('una tienda', rows)
+  expect(chunks).toHaveLength(3)
+  expect(chunks.some((c) => c.includes('Cartuchos calibre 9mm'))).toBe(true)
+  for (const c of chunks) expect(c.length).toBeLessThan(7000)
+  const w = world({ fetchJson: async () => ({ products: rows.map((r) => ({ title: r.title, body_html: r.description, variants: [{ price: '100' }] })) }) })
+  ;(w.deps as IntakeDeps).screen = async (text) => (text.includes('Cartuchos') ? { verdict: 'refuse', kind: 'prohibited' } : { verdict: 'allow' })
+  expect(await handleLinkIntake({ ...common, userId: 'user_9', url: 'https://shop.example' }, w.deps)).toMatchObject({ status: 422 })
+})
+
+test('a screen that throws is unavailable on the direct-import path, never an escaped error (Codex, PR #501)', async () => {
+  const w = world({ fetchJson: async () => ({ products: [{ title: 'Vela de soya grande', variants: [{ price: '300' }] }] }) })
+  ;(w.deps as IntakeDeps).screen = async () => { throw new Error('jev down') }
+  expect((await handleLinkIntake({ ...common, userId: 'user_9', url: 'https://shop.example' }, w.deps)).status).toBe(200)
+})
+
+test('the bulk importer itself refuses prohibited goods — the one door every import walks through', () => {
+  const src = readFileSync(join(process.cwd(), 'app/api/sell/import/route.ts'), 'utf8')
+  const screened = src.indexOf('screenChunksFor(')
+  expect(screened).toBeGreaterThan(src.indexOf('validateRows(body.rows)'))
+  // After the seller lookup (a caller with no shop never spends a screen), before any product write.
+  expect(screened).toBeGreaterThan(src.indexOf('listRes.status === 404'))
+  expect(screened).toBeLessThan(src.indexOf('for (const s of staged)') > 0 ? src.indexOf('for (const s of staged)') : src.length)
+  expect(src).toContain("verdict.kind === 'prohibited'")
+  // …and it is rate-limited per seller before it spends a screen (Codex security, PR #501).
+  expect(src.indexOf("checkRateLimit('sell_import', userId)")).toBeGreaterThan(0)
+  expect(src.indexOf("checkRateLimit('sell_import', userId)")).toBeLessThan(screened)
+})
+
+test('a signed-in refund gives back the month it was spent in (one month per request)', () => {
+  const src = readFileSync(join(process.cwd(), 'lib/prompt-to-shop/intake-server.ts'), 'utf8')
+  expect(src.match(/monthPeriod\(new Date\(\)\)/g)?.length).toBe(1)
+  expect(src).toContain("spendAllowance(userSubject(who.id), 'photo', month,")
+})

@@ -5,6 +5,8 @@
  */
 
 import 'server-only'
+import { auth } from '@clerk/nextjs/server'
+import { getMySeller } from '@/lib/get-my-seller'
 import { randomUUID } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { DEVICE_COOKIE, DEVICE_COOKIE_MAX_AGE, readDeviceId } from './handler'
@@ -41,4 +43,17 @@ export async function readUpload(req: NextRequest): Promise<{ form: FormData; fi
   const f = form.get('file')
   if (!f || typeof f === 'string') return { form, file: null }
   return { form, file: { bytes: new Uint8Array(await f.arrayBuffer()), mime: f.type, name: f.name } }
+}
+
+/**
+ * D20 — the signed-in mode is for a merchant WHO OWNS A SHOP (fresh review, PR #501): an account with no shop is
+ * treated as signed out, so throwaway accounts cannot skip Turnstile or draw on anyone's plan. The seller is read from
+ * MEDUSA (`getMySeller`, AGENTS rule 1 — sellers live there; Codex, PR #501), from the session's Clerk user. Any
+ * failure reads as "no shop": signed-out rules, never a free pass.
+ */
+export async function intakeShopOwner(): Promise<string | null> {
+  const { userId } = await auth()
+  if (!userId) return null
+  const seller = await getMySeller().catch(() => null)
+  return seller ? userId : null
 }
