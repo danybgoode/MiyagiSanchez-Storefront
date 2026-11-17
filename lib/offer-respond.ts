@@ -11,10 +11,9 @@
 
 import { offerCanProceed, offerCollectRefusal } from './shop-collect'
 import { db } from './supabase'
-import { stripe } from './stripe'
 import { dispatchToBuyer } from './notifications/dispatch'
 import { buildBuyerMessage } from './notifications/buyer-messages'
-import { offerQuality, formatOfferAmount, timeUntil, canAccept, canCounter, canDecline, type OfferStatus } from './offers'
+import { offerQuality, formatOfferAmount, timeUntil, canAccept, canCounter, canDecline, offerPaymentDeadline, type OfferStatus } from './offers'
 import { listingUrlFor } from './market-url'
 import {
   sendOfferDeclined, sendOfferCountered, sendOfferAccepted,
@@ -316,56 +315,13 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
 
   // ── Accept ────────────────────────────────────────────────────────────────────
   if (action === 'accept') {
-    // Claim FIRST, so a losing concurrent request never creates a Stripe session; the session is attached below.
-    if (!(await claim({ status: 'accepted' }, { unexpired: true }))) return lostRace
+    // The payment deadline rides in the claim itself (offerPaymentDeadline): one write, so an accepted offer never
+    // exists without its deadline. No Stripe session is created here any more — its URL was never sent to anyone.
+    const checkoutExpires = offerPaymentDeadline()
+    if (!(await claim({ status: 'accepted', checkout_expires_at: checkoutExpires }, { unexpired: true }))) return lostRace
     cancelSellerReminders()
     const acceptedCents = offer.offer_amount_cents
     const listingUrl = listingUrlFor(origin, listing.id)
-    const shopMeta = listing.marketplace_shops.metadata as Record<string, unknown> | null
-    const stripeSettings = (shopMeta?.settings as Record<string, unknown> | undefined)?.stripe as
-      { enabled?: boolean; account_id?: string; charges_enabled?: boolean } | undefined
-
-    let checkoutSessionId: string | null = null
-    let checkoutExpires: string | null = null
-
-    if (stripeSettings?.enabled !== false && stripeSettings?.charges_enabled && stripeSettings?.account_id) {
-      try {
-        const expiresAt = Math.floor(Date.now() / 1000) + 24 * 3600
-        const session = await stripe.checkout.sessions.create({
-          mode: 'payment',
-          customer_email: offer.buyer_email,
-          expires_at: expiresAt,
-          line_items: [{
-            price_data: {
-              currency: listing.currency.toLowerCase(),
-              unit_amount: acceptedCents,
-              product_data: {
-                name: `${listing.title} (oferta aceptada)`,
-                images: listing.images?.[0]?.url ? [listing.images[0].url] : [],
-              },
-            },
-            quantity: 1,
-          }],
-          payment_intent_data: {
-            transfer_data: { destination: stripeSettings.account_id },
-            application_fee_amount: 0,
-            metadata: { listing_id: listing.id, shop_id: listing.marketplace_shops.id, listing_type: listing.listing_type, offer_id: id },
-          },
-          metadata: { listing_id: listing.id, shop_id: listing.marketplace_shops.id, listing_type: listing.listing_type, offer_id: id },
-          success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${listingUrl}?offer=cancelled`,
-        })
-        checkoutSessionId = session.id
-        checkoutExpires = new Date(expiresAt * 1000).toISOString()
-      } catch (err) {
-        console.error('Failed to create offer checkout session:', err)
-      }
-    }
-
-    await db.from('marketplace_offers').update({
-      checkout_session_id: checkoutSessionId,
-      checkout_expires_at: checkoutExpires,
-    }).eq('id', id).eq('status', 'accepted')
 
     emitConvEvent('offer_accepted', 'system', { amount_cents: offer.offer_amount_cents, currency: listing.currency }, true).catch(e => console.error('[conv] accept event:', e))
     const conversationUrl = await getConversationUrl()
@@ -386,7 +342,7 @@ export async function respondToOffer(p: RespondParams): Promise<RespondResult> {
           offerPct: Math.round((offer.offer_amount_cents / listing.price_cents) * 100),
           buyerName: offer.buyer_name, buyerEmail: to,
           currency: listing.currency, offerId: id,
-          expiresAt: checkoutExpires ?? new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+          expiresAt: checkoutExpires,
           checkoutUrl: conversationUrl ?? listingUrl,
           checkoutExpiresAt: checkoutExpires,
           conversationUrl,

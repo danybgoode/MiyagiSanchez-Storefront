@@ -59,6 +59,19 @@ export function canWithdraw(offer: Pick<Offer, 'status'>): boolean {
   return offer.status === 'pending' || offer.status === 'countered'
 }
 
+/** How long a buyer has to pay an accepted offer — the same for every shop and every payment method. */
+export const OFFER_PAYMENT_WINDOW_MS = 24 * 3600 * 1000
+
+/**
+ * The payment deadline an accepted offer gets, written in the SAME conditional update that accepts it.
+ * Until 2026-11-17 it was set only when accept also created a Stripe Checkout session — a session whose
+ * URL was never stored or sent (the buyer always pays from the conversation, through the reserving
+ * checkout routes). So a shop with Stripe gave buyers 24h and a shop without gave them forever.
+ */
+export function offerPaymentDeadline(now: Date = new Date()): string {
+  return new Date(now.getTime() + OFFER_PAYMENT_WINDOW_MS).toISOString()
+}
+
 export function canAcceptCounter(offer: Pick<Offer, 'status' | 'counter_expires_at'>): boolean {
   return offer.status === 'countered' && !isCounterExpired(offer)
 }
@@ -66,7 +79,8 @@ export function canAcceptCounter(offer: Pick<Offer, 'status' | 'counter_expires_
 /**
  * Has this deal run out? Each status has ONE clock, and only its own:
  *   pending → `expires_at` (the seller's time to answer) · countered → `counter_expires_at` (the buyer's time to accept)
- *   accepted → `checkout_expires_at` (the time to pay; `null` = no deadline — a shop without Stripe sets none).
+ *   accepted → `checkout_expires_at` (the time to pay: 24h from acceptance for every offer since 2026-11-17; older
+ *   offers accepted at a shop without Stripe have `null` = no deadline).
  * Reported live 2026-11-12 (miel-verduras): an ACCEPTED offer showed «Trato expirado» because the conversation also
  * checked the counter's 24h window, which had passed after the buyer accepted. The PDP (lib/active-deal.ts) already
  * read it this way; the conversation now shares this.

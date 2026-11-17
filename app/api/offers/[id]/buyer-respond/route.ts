@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
-import { canAcceptCounter, canWithdraw, formatOfferAmount } from '@/lib/offers'
-import { stripe } from '@/lib/stripe'
+import { canAcceptCounter, canWithdraw, formatOfferAmount, offerPaymentDeadline } from '@/lib/offers'
 import { sendOfferAccepted, sendCounterAccepted, sendOfferWithdrawn, sendBuyerPaymentExpiryWarning, cancelScheduledEmail, getSellerEmail } from '@/lib/email'
 import { notify } from '@/lib/notify'
 import { dispatchToBuyer } from '@/lib/notifications/dispatch'
@@ -137,14 +136,13 @@ export async function PATCH(
 
     const acceptedCents = offer.counter_amount_cents!
     const listingUrl = listingUrlFor(origin, listing.id)
-    const shopMeta = listing.marketplace_shops.metadata as Record<string, unknown> | null
-    const stripeSettings = (shopMeta?.settings as Record<string, unknown> | undefined)?.stripe as
-      { enabled?: boolean; account_id?: string; charges_enabled?: boolean } | undefined
 
+    const checkoutExpires = offerPaymentDeadline()
     // Claim countered → accepted BEFORE any side effect (security lens on PR 497): the seller may decline in the same
     // instant, and a blind write here used to overwrite that decline with «accepted». The loser gets a 409.
     const { data: claimed, error: claimError } = await db.from('marketplace_offers')
-      .update({ status: 'accepted' }).eq('id', id).eq('status', 'countered')
+      // The 24h payment deadline is written in the same claim (lib/offers.ts offerPaymentDeadline).
+      .update({ status: 'accepted', checkout_expires_at: checkoutExpires }).eq('id', id).eq('status', 'countered')
       // The deadline is part of the claim (cross-family + security lens): the readiness read above can outlast it.
       .gt('counter_expires_at', new Date().toISOString())
       .select('id')
@@ -152,62 +150,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Esta oferta acaba de cambiar. Actualiza la página.' }, { status: 409 })
     }
 
-    let checkoutSessionId: string | null = null
-    let checkoutExpires: string | null = null
-
-    if (stripeSettings?.enabled !== false && stripeSettings?.charges_enabled && stripeSettings?.account_id) {
-      try {
-        const expiresAt = Math.floor(Date.now() / 1000) + 24 * 3600
-        const session = await stripe.checkout.sessions.create({
-          mode: 'payment',
-          customer_email: offer.buyer_email,
-          expires_at: expiresAt,
-          line_items: [{
-            price_data: {
-              currency: listing.currency.toLowerCase(),
-              unit_amount: acceptedCents,
-              product_data: {
-                name: `${listing.title} (contraoferta aceptada)`,
-                images: listing.images?.[0]?.url ? [listing.images[0].url] : [],
-              },
-            },
-            quantity: 1,
-          }],
-          payment_intent_data: {
-            transfer_data: { destination: stripeSettings.account_id },
-            application_fee_amount: 0,
-            metadata: {
-              listing_id: listing.id,
-              shop_id: listing.marketplace_shops.id,
-              listing_type: listing.listing_type,
-              offer_id: id,
-            },
-          },
-          metadata: {
-            listing_id: listing.id,
-            shop_id: listing.marketplace_shops.id,
-            listing_type: listing.listing_type,
-            offer_id: id,
-          },
-          success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${listingUrl}?offer=cancelled`,
-        })
-        checkoutSessionId = session.id
-        checkoutExpires = new Date(expiresAt * 1000).toISOString()
-      } catch (err) {
-        console.error('Checkout session error on counter-accept:', err)
-      }
-    }
-
     // Cancel counter-expiry reminder — buyer has responded
     if (scheduledIds.buyer_counter_expiry) {
       cancelScheduledEmail(scheduledIds.buyer_counter_expiry).catch(() => {})
     }
-
-    await db.from('marketplace_offers').update({
-      checkout_session_id: checkoutSessionId,
-      checkout_expires_at: checkoutExpires,
-    }).eq('id', id).eq('status', 'accepted')
 
     const conversationUrl = await getConversationUrl()
 
@@ -240,7 +186,7 @@ export async function PATCH(
             offerPct: Math.round((offer.offer_amount_cents / listing.price_cents) * 100),
             buyerName: offer.buyer_name, buyerEmail: to,
             currency: listing.currency, offerId: id,
-            expiresAt: checkoutExpires ?? new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+            expiresAt: checkoutExpires,
             checkoutUrl: conversationUrl ?? listingUrl,
             checkoutExpiresAt: checkoutExpires,
             conversationUrl,
@@ -264,7 +210,7 @@ export async function PATCH(
       }).catch(e => console.error('[email] counter-accept seller:', e))
     }
 
-    // Schedule buyer payment-expiry reminder at checkoutExpires − 4h (Stripe flow only)
+    // Schedule buyer payment-expiry reminder at checkoutExpires − 4h (every accepted offer has a deadline)
     if (checkoutExpires) {
       sendBuyerPaymentExpiryWarning({
         buyerEmail: offer.buyer_email,
