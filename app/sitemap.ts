@@ -5,12 +5,13 @@ import { shortCollectionSlug } from '@/lib/collection-derive'
 import { normalizeSections, navEntries } from '@/lib/shop-presentation/sections'
 import { resolveSectionAvailability } from '@/lib/shop-presentation/availability'
 import { resolvePublicWallShop } from '@/lib/wall/store'
-import { PLATFORM_SITEMAP_ENTRIES } from '@/lib/market-sitemap'
+import { PLATFORM_SITEMAP_ENTRIES, type CatalogSitemapEntry } from '@/lib/market-sitemap'
+import { catalogSitemap } from '@/lib/market-sitemap-server'
 import { listingUrlFor, marketplaceUrl } from '@/lib/market-url'
 
-export function platformSitemap(): MetadataRoute.Sitemap {
+export function platformSitemap(catalog: readonly CatalogSitemapEntry[] = []): MetadataRoute.Sitemap {
   const base = 'https://miyagisanchez.com'
-  return PLATFORM_SITEMAP_ENTRIES.map(({ path, changeFrequency, priority }) => ({
+  return [...PLATFORM_SITEMAP_ENTRIES, ...catalog].map(({ path, changeFrequency, priority }) => ({
     url: `${base}${path}`,
     changeFrequency,
     priority,
@@ -25,8 +26,10 @@ export function platformSitemap(): MetadataRoute.Sitemap {
  * domain, so search engines index the brand domain as an independent store and
  * avoid duplicate-content penalties against the marketplace mirror.
  *
- * On the platform host we emit a small marketplace sitemap (key entry points
- * only — we deliberately don't enumerate the full multi-seller catalog here).
+ * On the platform host we emit the entry points plus every market's listings and
+ * the shops behind them, at their canonical `/<market>/…` URLs (Daniel 2026-11-16 —
+ * this reverses the earlier "entry points only" choice). If the catalog read fails,
+ * the entry points still ship: a sitemap must never 500.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const h = await headers()
@@ -93,5 +96,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ]
   }
 
-  return platformSitemap()
+  let catalog: CatalogSitemapEntry[] = []
+  try {
+    catalog = await catalogSitemap()
+  } catch (error) {
+    console.error('[sitemap] catalog unavailable; serving entry points only', error)
+  }
+  return platformSitemap(catalog)
 }

@@ -39,3 +39,54 @@ export function platformSitemapUrls(origin = 'https://miyagisanchez.com'): strin
   const base = origin.replace(/\/+$/, '')
   return PLATFORM_SITEMAP_ENTRIES.map(({ path }) => `${base}${path}`)
 }
+
+/**
+ * The marketplace catalog half of the platform sitemap (Daniel 2026-11-16: "add shops and
+ * listings to the sitemap"). Until then the platform sitemap named only entry points and
+ * crawlers had to discover every product and shop through `/mx/l` pagination.
+ *
+ * Each URL is the one its page declares canonical, so the sitemap never names a mirror:
+ *   - a listing → `/<market>/l/<id>` (ListingRenderer's market branch);
+ *   - a shop    → `/<market>/s/<slug>` (ShopRenderer's market branch) — one per shop that has
+ *     at least one visible listing in that market. A shop with nothing on sale is a thin page,
+ *     and the listing feed is the only population that is already market-scoped and
+ *     visibility-filtered by the backend.
+ * `hidden` is the set of shop slugs whose pages 404 (unapproved private previews): neither
+ * the shop nor its listings may be listed, or the sitemap asks crawlers to index a 404.
+ */
+export type CatalogSitemapListing = {
+  id: string
+  shop?: { slug?: string | null } | null
+}
+
+export type CatalogSitemapEntry = {
+  path: string
+  changeFrequency: 'daily' | 'weekly'
+  priority: number
+}
+
+export function catalogSitemapEntries(
+  markets: ReadonlyArray<{ market: string; listings: ReadonlyArray<CatalogSitemapListing> }>,
+  hidden: ReadonlySet<string> = new Set(),
+): CatalogSitemapEntry[] {
+  const out: CatalogSitemapEntry[] = []
+  const seen = new Set<string>()
+  const push = (entry: CatalogSitemapEntry) => {
+    if (seen.has(entry.path)) return
+    seen.add(entry.path)
+    out.push(entry)
+  }
+  for (const { market, listings } of markets) {
+    const shops: string[] = []
+    for (const listing of listings) {
+      const slug = listing.shop?.slug ?? null
+      if (slug && hidden.has(slug)) continue
+      push({ path: `/${market}/l/${encodeURIComponent(listing.id)}`, changeFrequency: 'weekly', priority: 0.7 })
+      if (slug && !shops.includes(slug)) shops.push(slug)
+    }
+    for (const slug of shops) {
+      push({ path: `/${market}/s/${encodeURIComponent(slug)}`, changeFrequency: 'daily', priority: 0.8 })
+    }
+  }
+  return out
+}
