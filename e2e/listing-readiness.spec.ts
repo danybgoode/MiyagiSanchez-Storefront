@@ -17,6 +17,7 @@ import { shopAcceptsAnyPayment, publicShopPaymentAvailability } from '../lib/pub
 import { offerCanProceed, offerCollectRefusal } from '../lib/shop-collect'
 import { isNotReadyAnswer, readinessChecklist } from '../lib/readiness-view'
 import { isSeatedEvent } from '../lib/event-seats'
+import { listingActivationBlock } from '../lib/seller-products'
 
 /**
  * Epic listing-readiness — every product sells online or is deliberately «Solo catálogo».
@@ -166,7 +167,7 @@ test.describe('readiness · publish/activate (S1.2, D4)', () => {
     // The flag is read only AFTER auth (security lens, PR 497).
     const p2s = read('app/api/p2s/publish/route.ts')
     expect(p2s.indexOf('await auth()')).toBeLessThan(p2s.indexOf('await req.text()'))
-    expect(read('lib/seller-products.ts')).toContain('listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(shopMeta) })')
+    expect(read('lib/seller-products.ts')).toContain('listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(shopMeta), ...facts })')
   })
 })
 
@@ -413,6 +414,17 @@ test.describe('readiness · services, rentals and events (coordinated-sales-read
     expect(read('app/(shell)/shop/manage/page.tsx')).toContain('priced: (l.price_cents ?? 0) > 0,')
     expect(read('app/(shell)/shop/manage/catalogo/CatalogTable.tsx')).toContain('priced: (listing.price_cents ?? 0) > 0,')
     expect(read('app/(shell)/sell/ReadinessPanel.tsx')).toContain("new Set(['product', 'service', 'rental'])")
+  })
+
+  test('🚨 the MCP doors gate a priced service/rental too — create and set_listing_status (fresh review, PR 505)', () => {
+    const mcp = read('app/api/ucp/mcp/route.ts')
+    expect(mcp).toContain("    : (listingType === 'service' || listingType === 'rental')\n      ? listingActivationBlock(shop.metadata, listingType, null, {")
+    expect(mcp).toContain('isEvent: isEventCapableType(listingType) && isSeatedEvent({ attrs: listingAttrs, quantity: eventFields.quantity }),')
+    expect(mcp).toContain('const block = listingActivationBlock(shop.metadata, owned.listing_type, undefined, live ? {')
+    expect(listingActivationBlock({ settings: { stripe: { connected: true, charges_enabled: true } } }, 'service', null, { priced: true }))
+      .toMatch(/SPEI o efectivo/)
+    expect(listingActivationBlock({ settings: { stripe: { connected: true, charges_enabled: true } } }, 'service', null, { priced: true, isEvent: true }))
+      .toBeNull()
   })
 
   test('🚨 checkout ASKS the backend with the seated-event hint, or a ticket buyer still sees only SPEI/cash', () => {

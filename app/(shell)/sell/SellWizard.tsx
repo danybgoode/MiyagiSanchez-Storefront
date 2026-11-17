@@ -1700,7 +1700,7 @@ export default function SellWizard({
                 // coordinated-sales-readiness: a service/rental is gated only with a positive price, and a seated
                 // Evento takes any rail — the same price the publish sends and the same seats rule as the server.
                 priced={(formPriceCents ?? 0) > 0}
-                isEvent={evento && seats.trim() !== '' && isSeatedEvent({ attrs, quantity: Number(seats) })}
+                isEvent={seats.trim() !== '' && isSeatedEvent({ attrs, quantity: Number(seats) })}
                 refreshKey={readinessRefresh}
                 submitting={submitting}
                 onPublishAsCatalog={() => { void handleSubmit({ asCatalog: true }) }}

@@ -461,6 +461,8 @@ export function listingActivationBlock(
   shopMeta: Record<string, unknown> | null,
   listingType: string,
   deliveryMode?: DeliveryMode,
+  /** coordinated-sales-readiness: a service/rental is gated only when priced; a seated Evento takes any rail. */
+  facts: { priced?: boolean; isEvent?: boolean } = {},
 ): string | null {
-  return readinessMessage(listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(shopMeta) }))
+  return readinessMessage(listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(shopMeta), ...facts }))
 }
