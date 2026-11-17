@@ -618,6 +618,12 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
       // Imported dynamically because the target is `server-only` (it sends email) and
       // four 'use client' components import types from this module — a static import
       // would drag a server-only module into a client bundle at build time.
+      // An offer ordered by direct payment is no longer waiting to be paid: drop its scheduled
+      // «time is running out» email (lib/offer-state.ts). Same dynamic import reason as below.
+      if (offerId) {
+        void import('./offer-state').then(({ cancelPaymentReminderForDirectOrder }) => cancelPaymentReminderForDirectOrder(offerId, buyerClerkUserId))
+          .catch((e) => console.error('[startCheckout] offer reminder cancel threw:', e))
+      }
       if (!suppressManualEmail) {
         void import('./orders/manual-order-emails')
           .then(({ sendManualOrderEmails }) => sendManualOrderEmails({

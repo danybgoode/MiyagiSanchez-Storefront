@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { offerCanProceed, offerCollectRefusal } from '@/lib/shop-collect'
 import { currentUser } from '@clerk/nextjs/server'
 import { db } from '@/lib/supabase'
-import { validateOfferAmount, formatOfferAmount } from '@/lib/offers'
+import { validateOfferAmount, formatOfferAmount, effectivePaymentDeadline } from '@/lib/offers'
 import { sendOfferConfirmed, sendNewOfferToSeller, sendSellerOfferReminder, sendSellerExpiryWarning, getSellerEmail } from '@/lib/email'
 import { computeTrustScore, levelToMinScore, type TrustLevel } from '@/lib/ucp/identity'
 import { checkRateLimit, getClientIp } from '@/lib/ratelimit'
@@ -74,7 +74,9 @@ export async function GET(req: NextRequest) {
     conversationId = conv?.id ?? null
   }
 
-  return NextResponse.json({ offer: data ?? null, conversationId })
+  // The buyer sees no payment deadline once they ordered by direct payment (lib/offers.ts).
+  const offer = data ? { ...data, checkout_expires_at: effectivePaymentDeadline(data) } : null
+  return NextResponse.json({ offer, conversationId })
 }
 
 // ── POST — create a new offer ─────────────────────────────────────────────────

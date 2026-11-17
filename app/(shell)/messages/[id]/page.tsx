@@ -14,6 +14,7 @@ import { returnsWindowLabel } from '@/lib/trust-signals'
 import { marketCodeForCurrency, resolveMarketPresentation } from '@/lib/market-presentation'
 import { getDictionary } from '@/lib/dictionary'
 import { resolveConversationCheckout } from '@/lib/conversation-checkout'
+import { effectivePaymentDeadline } from '@/lib/offers'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
@@ -78,7 +79,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       .order('created_at', { ascending: true }),
     offerId
       ? db.from('marketplace_offers')
-          .select('id, status, offer_amount_cents, counter_amount_cents, counter_message, expires_at, counter_expires_at, checkout_expires_at')
+          .select('id, status, offer_amount_cents, counter_amount_cents, counter_message, expires_at, counter_expires_at, checkout_expires_at, checkout_reserved_at')
           .eq('id', offerId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -86,7 +87,9 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   // Attach currency (from listing) to the offer object for the client
   const offerWithCurrency = offerResult.data
-    ? { ...offerResult.data, currency: listingCurrency }
+    // The deadline the buyer sees is the EFFECTIVE one: none once ordered by direct payment (lib/offers.ts).
+    // Mapped here, at the source, so the deal bar, its countdown and the ledger all read the same value.
+    ? { ...offerResult.data, currency: listingCurrency, checkout_expires_at: effectivePaymentDeadline(offerResult.data) }
     : null
 
   const shopRaw = conv.marketplace_shops as unknown as {
