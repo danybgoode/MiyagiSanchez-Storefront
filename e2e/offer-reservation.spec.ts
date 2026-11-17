@@ -43,6 +43,26 @@ test.describe('offer reservation gate', () => {
     expect(await gate({ user: 'user_2' })).toMatchObject({ ok: false, status: 403 })
     expect(await gate({ offer: offer({ buyer_clerk_user_id: null }) })).toMatchObject({ ok: false, status: 403 })
   })
+  test('an offer past its 24h payment window is refused before any claim (security lens, PR 506)', async () => {
+    let claimed = false
+    const res = await gateOfferPurchase({
+      offerId: 'off_1', listingId: 'lst_1', clerkUserId: 'user_1', now: NOW,
+      lookup: async () => offer({ checkout_expires_at: '2026-11-11T11:59:59Z' }),
+      claim: async () => { claimed = true; return true },
+    })
+    expect(res).toMatchObject({ ok: false, status: 410, code: 'OFFER_EXPIRED' })
+    expect(claimed).toBe(false)
+    expect(await gate({ offer: offer({ checkout_expires_at: 'not-a-date' }) })).toMatchObject({ ok: false, status: 410 })
+  })
+  test('inside the window, or with no window (older offers), the buyer pays', async () => {
+    expect(await gate({ offer: offer({ checkout_expires_at: '2026-11-11T12:00:01Z' }) })).toMatchObject({ ok: true, priceCents: 80000 })
+    expect(await gate({ offer: offer({ checkout_expires_at: null }) })).toMatchObject({ ok: true, priceCents: 80000 })
+  })
+  test('the claim itself requires the window to be open, and the lookup reads it', () => {
+    const src = readFileSync(join(import.meta.dirname, '..', 'lib', 'offer-reservation.ts'), 'utf8')
+    expect(src).toMatch(/\.or\(`checkout_expires_at\.is\.null,checkout_expires_at\.gt\.\$\{nowIso\}`\)/)
+    expect(src).toMatch(/select\('status, offer_amount_cents, counter_amount_cents, buyer_clerk_user_id, checkout_expires_at'\)/)
+  })
   test('a second checkout loses with 409 and the new copy', async () => {
     const r = await gate({ claim: false })
     expect(r).toMatchObject({ ok: false, status: 409, code: 'OFFER_IN_CHECKOUT', error: OFFER_IN_CHECKOUT_MESSAGE })

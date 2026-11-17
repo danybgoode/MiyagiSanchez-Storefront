@@ -7,8 +7,9 @@
  *
  *   decide (pure) -> claim (conditional update, read back with .select()) -> create the session
  *
- * The claim uses `checkout_reserved_at`, NOT checkout_session_id / checkout_expires_at: those are
- * written at accept time for the offer's own pay link and drive the 24h payment window. The
+ * The claim uses `checkout_reserved_at`; `checkout_expires_at` is the 24h payment window written when
+ * the offer is accepted (lib/offers.ts offerPaymentDeadline) — an offer past it cannot be paid here,
+ * exactly as the backend refuses it (security lens, PR 506). The
  * constants and the 409 copy mirror the backend on purpose; they are one reservation shared by
  * both rails, so a reservation made by one blocks the other.
  *
@@ -26,11 +27,15 @@ export type PurchasableOffer = {
   offer_amount_cents: number | null
   counter_amount_cents: number | null
   buyer_clerk_user_id: string | null
+  /** The 24h window to pay. NULL only on offers accepted before 2026-11-17 at a shop without Stripe: no deadline. */
+  checkout_expires_at?: string | null
 }
+
+export const OFFER_EXPIRED_MESSAGE = 'El plazo para pagar esta oferta ya venció. Haz una nueva oferta.'
 
 export type OfferGate =
   | { ok: true; offerId: string | null; priceCents: number | null; reservedAt: string | null }
-  | { ok: false; status: 401 | 403 | 409 | 503; code: string; error: string }
+  | { ok: false; status: 401 | 403 | 409 | 410 | 503; code: string; error: string }
 
 /** A THROW = could not look / could not claim (unavailable, never "free to pay"). */
 export type OfferLookup = (offerId: string, listingId: string) => Promise<PurchasableOffer | null>
@@ -63,6 +68,12 @@ export async function gateOfferPurchase(input: {
   }
   if (!offer.buyer_clerk_user_id || offer.buyer_clerk_user_id !== input.clerkUserId) {
     return { ok: false, status: 403, code: 'OFFER_NOT_YOURS', error: 'Esta oferta no es tuya.' }
+  }
+  if (offer.checkout_expires_at) {
+    const exp = Date.parse(offer.checkout_expires_at)
+    if (!Number.isFinite(exp) || exp <= input.now.getTime()) {
+      return { ok: false, status: 410, code: 'OFFER_EXPIRED', error: OFFER_EXPIRED_MESSAGE }
+    }
   }
   const agreed = offer.counter_amount_cents ?? offer.offer_amount_cents
   if (typeof agreed !== 'number' || !Number.isInteger(agreed) || agreed <= 0) {
@@ -104,7 +115,7 @@ export function dbOfferLookup(db: Db): OfferLookup {
   return async (offerId, listingId) => {
     const { data, error } = await db
       .from('marketplace_offers')
-      .select('status, offer_amount_cents, counter_amount_cents, buyer_clerk_user_id')
+      .select('status, offer_amount_cents, counter_amount_cents, buyer_clerk_user_id, checkout_expires_at')
       .eq('id', offerId)
       .eq('listing_id', listingId)
       .maybeSingle()
@@ -121,6 +132,9 @@ export function dbOfferClaim(db: Db): OfferClaim {
       .eq('id', offerId)
       .eq('status', 'accepted')
       .or(`checkout_reserved_at.is.null,checkout_reserved_at.lt.${staleBeforeIso}`)
+      // The window is part of the claim too (the read above can outlast it). Two `or=` params are ANDed by
+      // PostgREST (verified live 2026-11-12); the backend claims with the same pair.
+      .or(`checkout_expires_at.is.null,checkout_expires_at.gt.${nowIso}`)
       .select('id')
     if (error) throw new Error(error.message ?? 'offer claim failed')
     return Array.isArray(data) && data.length > 0
