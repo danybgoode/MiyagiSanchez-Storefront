@@ -169,3 +169,23 @@ export function mcpUpdateQuantity(input: {
   }
   return { ok: true, quantity }
 }
+
+/**
+ * A SEATED event — an event block AND a seat limit. That is what a ticket is, and only a ticket checks out like an
+ * ordinary sale (card, MP, SPEI, DiMo); a plain service, a rental, or an event with no seat limit is a coordinated sale
+ * (SPEI or cash). Mirrors the backend's `isSeatedEvent` (`_utils/inventory.ts`, coordinated-sales-readiness D1): on a
+ * saved listing the seat limit is `manage_inventory`; before it exists (the create form) it is the seats sent.
+ */
+export function isSeatedEvent(listing: {
+  attrs?: Record<string, unknown> | null
+  manage_inventory?: boolean | null
+  /** A backorder listing can reserve past its seats — not capped, so not a ticket (backend parity). */
+  allow_backorder?: boolean | null
+  /** Create-time only: the «Lugares disponibles» the form sends, before any inventory exists. */
+  quantity?: number | null
+}): boolean {
+  if (!hasEventBlock(listing.attrs)) return false
+  if (listing.allow_backorder === true) return false
+  if (listing.manage_inventory === true) return true
+  return typeof listing.quantity === 'number' && Number.isFinite(listing.quantity) && listing.quantity >= 0
+}

@@ -6,6 +6,7 @@ import { ensureSupabaseShopMirror, syncSupabaseListingMirror, type MedusaSellerF
 import { filterOutDeleted } from '@/lib/listing-lifecycle'
 import ManageDashboard from './ManageDashboard'
 import { deliveryModeOf, ownerShopFacts, shopCatalogOnly } from '@/lib/listing-readiness'
+import { isSeatedEvent } from '@/lib/event-seats'
 import { personalizeSetupSteps } from '@/lib/setup-guide'
 import { guideProductCount, guideStepsFor } from '@/lib/setup-guide-source'
 import { fetchDeletedListingIds, fetchGuideShop } from '@/lib/setup-guide-server'
@@ -30,8 +31,11 @@ interface MedusaListingForManage {
   views: number
   images: Array<{ url: string; alt?: string | null }>
   created_at: string
-  /** The product's metadata — read here only for `delivery_mode` (listing-readiness). */
+  /** The product's metadata — read here for `delivery_mode` and the event block (listing-readiness). */
   metadata?: Record<string, unknown> | null
+  /** Seat-managed, capped stock — a SEATED event is a ticket (coordinated-sales-readiness). */
+  manage_inventory?: boolean
+  allow_backorder?: boolean
 }
 
 function medusaFetch(path: string, clerkJwt: string) {
@@ -149,12 +153,21 @@ export default async function ManagePage() {
 
   // listing-readiness S2.2: live products on a shop that cannot collect — from the MEDUSA seller's own settings, the
   // facts publish and activation check (never the mirror).
-  const modeById = new Map((productsData.listings ?? []).map((l) => [l.id, deliveryModeOf(l.metadata)]))
+  // Per-listing sale facts the rule needs: delivery mode, and for a service/rental whether it is a seated event.
+  const factsById = new Map((productsData.listings ?? []).map((l) => [l.id, {
+    delivery_mode: deliveryModeOf(l.metadata),
+    is_event: isSeatedEvent({ attrs: (l.metadata?.attrs ?? null) as Record<string, unknown> | null, manage_inventory: l.manage_inventory, allow_backorder: l.allow_backorder }),
+  }]))
   const shopFacts = ownerShopFacts((seller.metadata ?? null) as Record<string, unknown> | null)
   // The banner names WHAT is missing for the live products nobody can buy online (payment, delivery, or SPEI/cash).
   const catalogReason = shopCatalogOnly({
     shop: shopFacts,
-    listings: listings.map((l) => ({ ...l, delivery_mode: modeById.get(l.id) ?? null })),
+    listings: listings.map((l) => ({
+      ...l,
+      delivery_mode: factsById.get(l.id)?.delivery_mode ?? null,
+      is_event: factsById.get(l.id)?.is_event ?? false,
+      priced: (l.price_cents ?? 0) > 0,
+    })),
   })
   const catalogOnly = catalogReason !== null
 

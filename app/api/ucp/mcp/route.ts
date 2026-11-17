@@ -91,8 +91,8 @@ import { applyStoreConfig } from '@/lib/apply-config-manifest'
 import { recordAgentConfigChange, recordAgentOfferAction, recordAgentListingAction, recordAgentListingCreate } from '@/lib/agent-audit'
 import { listShopOffers, respondToOffer } from '@/lib/offer-respond'
 import { listShopOrdersViaInternal } from '@/lib/agent-orders'
-import { mcpEventFields, mcpUpdateQuantity, isEventCapableType } from '@/lib/event-seats'
-import { listShopListings, shopOwnsProduct, patchSellerProductViaInternal, createSellerProductViaInternal, createSellerCollectionViaInternal, listingActivationBlock, deleteSellerProductViaInternal, applySellerPriceViaInternal, freeEventPriceBlock, renameSellerCollectionViaInternal, deleteSellerCollectionViaInternal, reorderSellerCollectionsViaInternal, patchSellerSlugViaInternal, type SellerProductPatch } from '@/lib/seller-products'
+import { mcpEventFields, mcpUpdateQuantity, isEventCapableType, isSeatedEvent } from '@/lib/event-seats'
+import { listShopListings, shopOwnsProduct, patchSellerProductViaInternal, createSellerProductViaInternal, createSellerCollectionViaInternal, listingActivationBlock, readActivationSaleFacts, ACTIVATION_UNVERIFIED, deleteSellerProductViaInternal, applySellerPriceViaInternal, freeEventPriceBlock, renameSellerCollectionViaInternal, deleteSellerCollectionViaInternal, reorderSellerCollectionsViaInternal, patchSellerSlugViaInternal, type SellerProductPatch } from '@/lib/seller-products'
 import { validateSlug, buildSlugAliasHistory } from '@/lib/slug'
 import { SLUG_REDIRECT_TAG } from '@/lib/slug-redirect'
 import { resolvePrefs, audienceTelegramInUse, EVENT_GROUPS, CHANNELS, type PrefRow } from '@/lib/notifications/preferences'
@@ -2784,7 +2784,16 @@ async function handleCreateListing(args: Record<string, unknown>, authHeader?: s
   // Viability guardrail: a physical product the shop can't actually sell yet
   // (no delivery AND/OR no payment) is created as a draft, never a live listing
   // no buyer could check out.
-  const block = isStockable ? listingActivationBlock(shop.metadata, 'product') : null
+  const priceCents = row.price != null ? Math.round(row.price * 100) : null
+  // A priced service/rental is gated too (coordinated-sales-readiness S2.2): manual rail, or any rail for a seated Evento.
+  const block = isStockable
+    ? listingActivationBlock(shop.metadata, 'product')
+    : (listingType === 'service' || listingType === 'rental')
+      ? listingActivationBlock(shop.metadata, listingType, null, {
+          priced: (priceCents ?? 0) > 0,
+          isEvent: isEventCapableType(listingType) && isSeatedEvent({ attrs: listingAttrs, quantity: eventFields.quantity }),
+        })
+      : null
   // Consent-safe previews: a shop still awaiting its merchant's approval must
   // never receive a PUBLISHED listing, from any writer. This seam matters
   // specifically because `autoGrantPartnerOnClose` hands a partner MCP credential
@@ -2795,7 +2804,6 @@ async function handleCreateListing(args: Record<string, unknown>, authHeader?: s
   const previewPrivate = await shopMustStayPrivate(shop.id)
   const status: 'published' | 'draft' = block || previewPrivate ? 'draft' : 'published'
 
-  const priceCents = row.price != null ? Math.round(row.price * 100) : null
   const location = [row.city?.trim(), row.state?.trim()].filter(Boolean).join(', ') || null
 
   const result = await createSellerProductViaInternal(shop.slug, {
@@ -3922,7 +3930,12 @@ async function handleSetListingStatus(args: Record<string, unknown>, authHeader?
     const marketRefused = await refuseMarketplacePublication(shop, 'activar un anuncio')
     if (marketRefused) return marketRefused
 
-    const block = listingActivationBlock(shop.metadata, owned.listing_type)
+    // A service/rental needs its price + seated-event facts, read from the DRAFT (coordinated-sales-readiness S2.2).
+    // Unreadable → refuse: a public read 404s on drafts, which failed open (fresh review, PR 505).
+    const coordinated = owned.listing_type === 'service' || owned.listing_type === 'rental'
+    const facts = coordinated ? await readActivationSaleFacts(shop.slug, productId) : {}
+    if (facts === null) return { isError: true, content: [{ type: 'text', text: ACTIVATION_UNVERIFIED }] }
+    const block = listingActivationBlock(shop.metadata, owned.listing_type, undefined, facts)
     if (block) return { isError: true, content: [{ type: 'text', text: block }] }
   }
 

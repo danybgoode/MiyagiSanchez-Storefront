@@ -56,8 +56,6 @@ export function hasManualPayment(payments: PaymentFacts): boolean {
   return payments.bankTransfer || payments.cash
 }
 
-/** Listing types checkout always treats as coordinated (backend `isCoordinatedListing`): manual payment only. */
-export const COORDINATED_TYPES: ReadonlySet<string> = new Set(['service', 'rental'])
 
 /** The shop can take a payment for an ordinary checkout (card, Mercado Pago, transfer or DiMo). Offers need this. */
 export function canCollect(payments: PaymentFacts): boolean {
@@ -73,8 +71,18 @@ export function listingReadiness(input: {
   listingType: string | null | undefined
   deliveryMode: DeliveryMode
   shop: ShopFacts
+  /**
+   * coordinated-sales-readiness: does it carry a POSITIVE price? `false` = «precio a consultar» or a free event —
+   * contact/RSVP, no checkout, never gated. `undefined` = not known at this door (MCP) — not gated either, so nothing
+   * regresses where the price cannot be seen.
+   */
+  priced?: boolean
+  /** The listing has an event block (`hasEventBlock` — a date or a venue; the backend's own predicate). */
+  isEvent?: boolean
 }): ListingReadiness {
-  if ((input.listingType ?? 'product') !== 'product') return { mode: 'online' }
+  const type = input.listingType ?? 'product'
+  if (type === 'service' || type === 'rental') return coordinatedTypeReadiness(type, input)
+  if (type !== 'product') return { mode: 'online' }
   const { payments, delivery } = input.shop
   // An arranged product is a COORDINATED sale: with `shipping.arranged_only_enabled` on (production since 2026-09-22)
   // checkout drops carrier shipping and `start-checkout` refuses every non-manual rail (backend delivery-catalog.ts
@@ -91,12 +99,28 @@ export function listingReadiness(input: {
   return { mode: 'catalog', missing }
 }
 
+/**
+ * A service or a rental (coordinated-sales-readiness, D1 Daniel 2026-11-16). Checkout (backend `isCoordinatedListing`)
+ * takes only SPEI or cash for a plain service or a rental, and ANY rail for an event ticket (a service with an event
+ * block). Only a positive price opens a checkout; anything else is contact/RSVP and never gated.
+ */
+function coordinatedTypeReadiness(
+  type: 'service' | 'rental',
+  input: { shop: ShopFacts; priced?: boolean; isEvent?: boolean },
+): ListingReadiness {
+  if (input.priced !== true) return { mode: 'online' }
+  if (type === 'service' && input.isEvent === true) {
+    return canCollect(input.shop.payments) ? { mode: 'online' } : { mode: 'catalog', missing: ['payment'] }
+  }
+  return hasManualPayment(input.shop.payments) ? { mode: 'online' } : { mode: 'catalog', missing: ['manual_payment'] }
+}
+
 /** The es-MX sentence a merchant sees for a catalog result; `null` when the listing sells online. */
 export function readinessMessage(readiness: ListingReadiness): string | null {
   if (readiness.mode === 'online') return null
   if (readiness.missing.includes('manual_payment')) {
-    return 'Para activar este anuncio con entrega acordada, configura al menos un método de pago ' +
-      'manual (SPEI o recolección con efectivo). Ve a Mi tienda → Configuración → Pagos.'
+    return 'Para activar este anuncio configura al menos un método de pago manual (SPEI o efectivo): la entrega ' +
+      'acordada, los servicios y las rentas se pagan así. Ve a Mi tienda → Configuración → Pagos.'
   }
   const parts: string[] = []
   if (readiness.missing.includes('delivery')) parts.push('una forma de entrega (envío a domicilio o recolección en mano)')
@@ -193,7 +217,7 @@ export const READINESS_COPY = {
   missing: {
     payment: 'Cobro: activa al menos una forma de cobro',
     delivery: 'Entrega: activa envíos o recolección',
-    manual_payment: 'Cobro manual: activa SPEI o efectivo para la entrega acordada',
+    manual_payment: 'Cobro manual: activa SPEI o efectivo (así se pagan la entrega acordada, los servicios y las rentas)',
   } satisfies Record<ReadinessMissing, string>,
   ready: { payment: 'Cobro', delivery: 'Entrega' },
   fixPayments: 'Activar cobros',
@@ -205,7 +229,7 @@ export const READINESS_COPY = {
   bannerDeliveryTitle: 'Tus productos aún no se pueden comprar en línea',
   bannerDeliveryBody: 'Falta cómo entregarlos: activa envíos a domicilio o recolección en mano para que tus clientes puedan comprar.',
   bannerManualTitle: 'Algunos productos aún no se pueden pagar',
-  bannerManualBody: 'Tus productos con entrega acordada solo se pagan por SPEI o en efectivo al entregar. Activa uno de los dos para venderlos en línea.',
+  bannerManualBody: 'Tus servicios, rentas y productos con entrega acordada solo se pagan por SPEI o en efectivo. Activa uno de los dos para venderlos en línea.',
   catalogBadge: 'Solo catálogo',
   catalogBadgeHint: 'Se ve en tu tienda; tus clientes te escriben para comprar.',
   sellerOffersBlocked: 'Activa cómo cobrar para aceptar ofertas: hoy nadie podría pagarte el precio acordado.',
@@ -224,7 +248,7 @@ export const PAYMENTS_SETTINGS_PATH = '/shop/manage/settings/pagos'
  */
 export function shopCatalogOnly(input: {
   shop: ShopFacts
-  listings: ReadonlyArray<{ listing_type?: string | null; status?: string | null; delivery_mode?: DeliveryMode }>
+  listings: ReadonlyArray<{ listing_type?: string | null; status?: string | null; delivery_mode?: DeliveryMode; priced?: boolean; is_event?: boolean }>
 }): ReadinessMissing | null {
   // Per LISTING with the one rule (review on PR 497): a cash-at-pickup shop selling an arranged product CAN collect for
   // it, and a card shop's arranged product cannot — a shop-wide "can collect?" got both wrong. Returns WHAT is missing
@@ -232,7 +256,7 @@ export function shopCatalogOnly(input: {
   const missing = new Set<ReadinessMissing>()
   for (const l of input.listings) {
     if (l.status !== 'active') continue
-    const r = listingReadiness({ listingType: l.listing_type, deliveryMode: l.delivery_mode, shop: input.shop })
+    const r = listingReadiness({ listingType: l.listing_type, deliveryMode: l.delivery_mode, shop: input.shop, priced: l.priced, isEvent: l.is_event })
     if (r.mode === 'catalog') r.missing.forEach((m) => missing.add(m))
   }
   // The most fundamental gap first: no way to collect at all, then delivery, then a manual method for arranged sales.
@@ -251,9 +275,18 @@ export function deliveryModeOf(metadata: unknown): DeliveryMode {
  * (`lib/shop-collect.ts`) and the PDP's «Hacer oferta», so the button never promises what the server refuses.
  * Products: the one rule. Services/rentals: coordinated, manual only. Other types: any rail.
  */
-export function listingCanBePaid(input: { listingType: string | null | undefined; deliveryMode: DeliveryMode; shop: ShopFacts }): boolean {
+export function listingCanBePaid(input: {
+  listingType: string | null | undefined
+  deliveryMode: DeliveryMode
+  shop: ShopFacts
+  priced?: boolean
+  isEvent?: boolean
+}): boolean {
   const type = input.listingType ?? 'product'
-  if (COORDINATED_TYPES.has(type)) return hasManualPayment(input.shop.payments)
-  if (type !== 'product') return canCollect(input.shop.payments)
-  return listingReadiness({ listingType: 'product', deliveryMode: input.deliveryMode, shop: input.shop }).mode === 'online'
+  // Products, services and rentals: the ONE rule (with price + event). Other types (auto, inmueble, digital…) only
+  // need a shop that can collect.
+  // A PAYMENT always has a positive amount — an offer on a «precio a consultar» service becomes a priced deal — so this
+  // asks the rule as priced. Only the PUBLISH gate leaves an unpriced listing ungated (codex review, PR 505).
+  if (type === 'product' || type === 'service' || type === 'rental') return listingReadiness({ ...input, priced: true }).mode === 'online'
+  return canCollect(input.shop.payments)
 }

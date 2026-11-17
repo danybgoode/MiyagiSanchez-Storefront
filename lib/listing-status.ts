@@ -72,15 +72,22 @@ export async function readListingReadiness(listingId: string, clerkJwt: string):
       medusaFetch('/store/sellers/me', clerkJwt),
     ])
     if (!productRes.ok || !sellerRes.ok) return null
-    const product = await productRes.json() as { listing_type?: string; delivery_mode?: 'carrier' | 'arranged' | null }
+    const product = await productRes.json() as {
+      listing_type?: string; delivery_mode?: 'carrier' | 'arranged' | null; is_event?: boolean; priced?: boolean
+    }
     // An older backend does not send these fields: "could not read", not "a carrier product" — otherwise a service or
     // event draft would get a wrong 422 (fresh-review catch, PR 497). Fail open, per D3.
     if (typeof product.listing_type !== 'string') return null
+    // A service/rental needs `priced` + `is_event` (backend coordinated-sales-readiness S1.2); an older backend → unknown.
+    const coordinated = product.listing_type === 'service' || product.listing_type === 'rental'
+    if (coordinated && (typeof product.priced !== 'boolean' || typeof product.is_event !== 'boolean')) return null
     const { seller } = await sellerRes.json() as { seller: Record<string, unknown> }
     return listingReadiness({
       listingType: product.listing_type,
       deliveryMode: product.delivery_mode ?? null,
       shop: ownerShopFacts((seller?.metadata ?? null) as Record<string, unknown> | null),
+      priced: product.priced,
+      isEvent: product.is_event,
     })
   } catch {
     return null

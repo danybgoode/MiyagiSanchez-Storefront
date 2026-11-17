@@ -23,6 +23,7 @@ import CheckoutExperience from './CheckoutExperience'
 import { admittedOwnerShopSlug, type CheckoutProvider } from '@/lib/cart'
 import { getDictionary } from '@/lib/dictionary'
 import { DEFAULT_MARKET, isMarketCode } from '@/lib/markets'
+import { isSeatedEvent } from '@/lib/event-seats'
 
 type SearchParams = {
   listingId?: string
@@ -309,6 +310,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
           currency={listing.currency}
           quantity={quantity}
           listingType={listing.listing_type}
+          isEvent={isSeatedEvent({ attrs: listing.attrs, manage_inventory: listing.manage_inventory, allow_backorder: listing.allow_backorder })}
           isDigital={isDigital}
           deliveryMode={deliveryMode}
           offerId={offerId}

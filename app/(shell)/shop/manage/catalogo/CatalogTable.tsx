@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { deliveryModeOf, listingReadiness, READINESS_COPY, type ShopFacts } from '@/lib/listing-readiness'
+import { isSeatedEvent } from '@/lib/event-seats'
 import { isNotReadyAnswer } from '@/lib/readiness-view'
 import { catalogStatusToToken, publicationStateToToken } from '@/lib/status-badge'
 import { rsvpEventSlug } from '@/lib/evento-preset'
@@ -686,6 +687,8 @@ export default function CatalogTable({
                       listingType: listing.listing_type,
                       deliveryMode: deliveryModeOf(listing.metadata),
                       shop: shopFacts,
+                      priced: (listing.price_cents ?? 0) > 0,
+                      isEvent: isSeatedEvent({ attrs: (listing.metadata?.attrs ?? null) as Record<string, unknown> | null, manage_inventory: listing.manage_inventory, allow_backorder: listing.allow_backorder }),
                     }).mode === 'catalog' && (
                       <StatusBadge token="warning" title={READINESS_COPY.catalogBadgeHint}>
                         <span data-testid="badge-catalog-only">{READINESS_COPY.catalogBadge}</span>

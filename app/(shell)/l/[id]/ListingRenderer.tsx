@@ -31,6 +31,7 @@ import OfferCheckoutButton from '@/app/components/OfferCheckoutButton'
 import SellerBundleSection from '@/app/components/SellerBundleSection'
 import { shopListingBase } from '@/lib/shop-presentation/chrome'
 import { deliveryModeOf, listingCanBePaid, publicShopFacts } from '@/lib/listing-readiness'
+import { isSeatedEvent } from '@/lib/event-seats'
 import SpecsTable from './SpecsTable'
 import { listingSpecs } from '@/lib/listing-attributes'
 import SellerTrustCard from '@/app/components/SellerTrustCard'
@@ -417,6 +418,8 @@ export async function ListingPage({
     listingType: listing.listing_type,
     deliveryMode: deliveryModeOf(listing.metadata),
     shop: pdpShopFacts,
+    priced: (listing.price_cents ?? 0) > 0,
+    isEvent: isSeatedEvent({ attrs: listing.attrs, manage_inventory: listing.manage_inventory, allow_backorder: listing.allow_backorder }),
   })
   const hasAnyPayment = commerceReadiness.ready && listingPayable
   // listing-readiness D5: a buyer may OPEN an offer only where a checkout could finish. The server refuses too

@@ -39,6 +39,7 @@ import { resolveUcpRentalQuote, rentalPricingHint, type UcpRentalQuote } from '@
 import { normalizeShippingDestination, projectUcpFulfillment, type UcpFulfillment } from '@/lib/ucp/fulfillment'
 import { fetchBackendCheckoutOptions, fetchBackendShippingRates } from '@/lib/ucp/fulfillment-server'
 import type { Listing, Shop } from '@/lib/types'
+import { isSeatedEvent } from '@/lib/event-seats'
 import { randomUUID } from 'crypto'
 
 const CORS = {
@@ -370,6 +371,7 @@ export async function POST(req: NextRequest) {
     listingType: listing.listing_type ?? 'product',
     isDigital,
     deliveryMode,
+    isEvent: isSeatedEvent({ attrs: listing.attrs, manage_inventory: listing.manage_inventory, allow_backorder: listing.allow_backorder }),
   })
   const beMethods = checkoutOptionsSource.state === 'available' ? new Set<PaymentMethodKey>() : null
   if (checkoutOptionsSource.state === 'available') {

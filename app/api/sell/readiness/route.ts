@@ -32,6 +32,9 @@ export async function GET(req: NextRequest) {
   const listingType = req.nextUrl.searchParams.get('listing_type') ?? 'product'
   const mode = req.nextUrl.searchParams.get('delivery_mode')
   const deliveryMode: DeliveryMode = mode === 'arranged' || mode === 'carrier' ? mode : null
+  // Display-only hints from the form (coordinated-sales-readiness); POST /api/sell/create re-derives both from the body.
+  const priced = req.nextUrl.searchParams.get('priced') === 'true'
+  const isEvent = req.nextUrl.searchParams.get('is_event') === 'true'
 
   try {
     const sellerRes = await fetch(`${MEDUSA_BASE}/store/sellers/me`, {
@@ -42,7 +45,7 @@ export async function GET(req: NextRequest) {
     if (!sellerRes.ok) return NextResponse.json({ state: 'unavailable' } satisfies ReadinessView, { headers: NO_STORE })
     const { seller } = await sellerRes.json() as { seller: { slug: string; metadata?: Record<string, unknown> | null } }
     const metadata = seller.metadata ?? null
-    const readiness = listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(metadata) })
+    const readiness = listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(metadata), priced, isEvent })
 
     const [guideShop, kept, correosAvailable] = await Promise.all([
       fetchGuideShop(userId),
