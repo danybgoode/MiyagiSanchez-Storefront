@@ -285,6 +285,8 @@ export function listingCanBePaid(input: {
   const type = input.listingType ?? 'product'
   // Products, services and rentals: the ONE rule (with price + event). Other types (auto, inmueble, digital…) only
   // need a shop that can collect.
-  if (type === 'product' || type === 'service' || type === 'rental') return listingReadiness(input).mode === 'online'
+  // A PAYMENT always has a positive amount — an offer on a «precio a consultar» service becomes a priced deal — so this
+  // asks the rule as priced. Only the PUBLISH gate leaves an unpriced listing ungated (codex review, PR 505).
+  if (type === 'product' || type === 'service' || type === 'rental') return listingReadiness({ ...input, priced: true }).mode === 'online'
   return canCollect(input.shop.payments)
 }

@@ -218,6 +218,14 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     expect(await ask({ settings: {} }, null, 'auto')).toBe('no')
   })
 
+  test('🚨 an offer on an UNPRICED service still needs a manual rail — the deal is priced (codex, PR 505)', async () => {
+    expect(await ask(cardOnly, null, 'service', { priced: false })).toBe('no')
+    expect(await ask({ settings: {} }, null, 'rental')).toBe('no')
+    expect(await ask(transfer, null, 'service', { priced: false })).toBe('yes')
+    // …while PUBLISHING it stays ungated (contact-only).
+    expect(listingReadiness({ listingType: 'service', deliveryMode: null, shop: shop({}), priced: false }).mode).toBe('online')
+  })
+
   test('🚨 a seated event ticket takes ANY rail (coordinated-sales-readiness D1) — the card shop can take the offer', async () => {
     expect(await ask(cardOnly, null, 'service', { priced: true, isEvent: true })).toBe('yes')
     expect(await ask({ settings: {} }, null, 'service', { priced: true, isEvent: true })).toBe('no')
