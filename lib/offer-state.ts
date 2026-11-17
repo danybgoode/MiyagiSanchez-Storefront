@@ -1,5 +1,6 @@
 import { db } from '@/lib/supabase'
 import { cancelScheduledEmail } from '@/lib/email'
+import { orderedByDirectPayment } from '@/lib/offers'
 
 function isUuid(value: string) {
   return /^[0-9a-f-]{36}$/i.test(value)
@@ -62,4 +63,25 @@ export async function markListingPurchased({
   await db.from('marketplace_listings')
     .update({ status: 'sold' })
     .eq('id', mirrorListingId)
+}
+
+/**
+ * A buyer ordered an accepted offer by Pago directo: the money arrives off-platform, so the offer stays
+ * `accepted`, but the «your payment window closes» email scheduled at accept time must not reach someone
+ * who already ordered (fresh review, PR 506). Cancels it only when the backend's permanent reservation is
+ * really there — the reservation, not the caller, says the offer was ordered. Best-effort: logged, never thrown.
+ */
+export async function cancelPaymentReminderForDirectOrder(offerId: string): Promise<void> {
+  try {
+    const { data } = await db
+      .from('marketplace_offers')
+      .select('checkout_reserved_at, scheduled_reminder_ids')
+      .eq('id', offerId)
+      .maybeSingle()
+    if (!data || !orderedByDirectPayment(data)) return
+    const reminderId = ((data.scheduled_reminder_ids ?? {}) as Record<string, string>).buyer_payment_expiry
+    if (reminderId) await cancelScheduledEmail(reminderId)
+  } catch (e) {
+    console.error('[offer-state] could not cancel the payment reminder for a direct-payment order', offerId, e)
+  }
 }

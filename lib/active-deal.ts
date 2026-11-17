@@ -1,5 +1,5 @@
 import { db } from '@/lib/supabase'
-import type { Offer } from '@/lib/offers'
+import { effectivePaymentDeadline, type Offer } from '@/lib/offers'
 
 export type ActiveDealStatus =
   | 'none'
@@ -88,8 +88,10 @@ export async function getActiveDealForBuyer(
     expiresAt = typedOffer.counter_expires_at
     dealPriceCents = typedOffer.counter_amount_cents
   } else if (typedOffer.status === 'accepted') {
-    status = typedOffer.checkout_expires_at && new Date(typedOffer.checkout_expires_at).getTime() < now ? 'expired' : 'accepted_unpaid'
-    expiresAt = typedOffer.checkout_expires_at
+    // An offer the buyer already ORDERED by direct payment has no deadline left (lib/offers.ts).
+    const deadline = effectivePaymentDeadline(typedOffer as Offer & { checkout_reserved_at?: string | null })
+    status = deadline && new Date(deadline).getTime() < now ? 'expired' : 'accepted_unpaid'
+    expiresAt = deadline
     dealPriceCents = typedOffer.counter_amount_cents ?? typedOffer.offer_amount_cents
   } else {
     status = 'paid'

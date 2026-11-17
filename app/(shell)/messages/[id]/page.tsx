@@ -14,6 +14,7 @@ import { returnsWindowLabel } from '@/lib/trust-signals'
 import { marketCodeForCurrency, resolveMarketPresentation } from '@/lib/market-presentation'
 import { getDictionary } from '@/lib/dictionary'
 import { resolveConversationCheckout } from '@/lib/conversation-checkout'
+import { effectivePaymentDeadline } from '@/lib/offers'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
@@ -78,7 +79,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       .order('created_at', { ascending: true }),
     offerId
       ? db.from('marketplace_offers')
-          .select('id, status, offer_amount_cents, counter_amount_cents, counter_message, expires_at, counter_expires_at, checkout_expires_at')
+          .select('id, status, offer_amount_cents, counter_amount_cents, counter_message, expires_at, counter_expires_at, checkout_expires_at, checkout_reserved_at')
           .eq('id', offerId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -136,7 +137,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         counter_amount_cents: offerWithCurrency.counter_amount_cents,
         expires_at: offerWithCurrency.expires_at,
         counter_expires_at: offerWithCurrency.counter_expires_at,
-        checkout_expires_at: offerWithCurrency.checkout_expires_at,
+        checkout_expires_at: effectivePaymentDeadline(offerWithCurrency),
         currency: offerWithCurrency.currency,
       }
     : null

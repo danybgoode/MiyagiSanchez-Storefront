@@ -4,6 +4,7 @@ import { db } from '@/lib/supabase'
 import { resolveConversationCheckout } from '@/lib/conversation-checkout'
 import { resolveConversationLedger } from '@/lib/conversation-ledger'
 import type { LedgerOffer } from '@/lib/transaction-ledger'
+import { effectivePaymentDeadline } from '@/lib/offers'
 
 // ── GET — full conversation thread ────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ export async function GET(
       .order('created_at', { ascending: true }),
     offerId
       ? db.from('marketplace_offers')
-          .select('id, status, offer_amount_cents, counter_amount_cents, counter_message, expires_at, counter_expires_at, checkout_expires_at')
+          .select('id, status, offer_amount_cents, counter_amount_cents, counter_message, expires_at, counter_expires_at, checkout_expires_at, checkout_reserved_at')
           .eq('id', offerId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -80,7 +81,7 @@ export async function GET(
         counter_amount_cents: offerWithCurrency.counter_amount_cents,
         expires_at: offerWithCurrency.expires_at,
         counter_expires_at: offerWithCurrency.counter_expires_at,
-        checkout_expires_at: offerWithCurrency.checkout_expires_at,
+        checkout_expires_at: effectivePaymentDeadline(offerWithCurrency),
         currency: offerWithCurrency.currency,
       }
     : null

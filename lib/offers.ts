@@ -59,6 +59,28 @@ export function canWithdraw(offer: Pick<Offer, 'status'>): boolean {
   return offer.status === 'pending' || offer.status === 'countered'
 }
 
+/**
+ * The reservation the BACKEND writes when a buyer orders an accepted offer by Pago directo (SPEI, cash, DiMo):
+ * a permanent `checkout_reserved_at` (backend src/lib/offer-checkout.ts OFFER_RESERVATION_PERMANENT_ISO).
+ * Such an offer stays `accepted` — the money arrives off-platform — but it is ORDERED, not waiting to be paid.
+ */
+export const OFFER_RESERVATION_PERMANENT_ISO = '9999-12-31T00:00:00.000Z'
+
+/** Did the buyer already order this offer by direct payment? Compared by instant: Postgres prints `+00:00`. */
+export function orderedByDirectPayment(offer: { checkout_reserved_at?: string | null }): boolean {
+  const at = offer.checkout_reserved_at ? Date.parse(offer.checkout_reserved_at) : NaN
+  return Number.isFinite(at) && at >= Date.parse(OFFER_RESERVATION_PERMANENT_ISO)
+}
+
+/**
+ * The payment deadline a reader should SHOW and ENFORCE in the UI: none once the buyer has ordered by direct
+ * payment. Without this, the 24h window (2026-11-17) would mark a buyer who already ordered by transfer as
+ * «Trato expirado» (fresh review, PR 506). Every producer of an offer for display maps through this.
+ */
+export function effectivePaymentDeadline(offer: { checkout_expires_at?: string | null; checkout_reserved_at?: string | null }): string | null {
+  return orderedByDirectPayment(offer) ? null : (offer.checkout_expires_at ?? null)
+}
+
 /** How long a buyer has to pay an accepted offer — the same for every shop and every payment method. */
 export const OFFER_PAYMENT_WINDOW_MS = 24 * 3600 * 1000
 
@@ -86,7 +108,7 @@ export function canAcceptCounter(offer: Pick<Offer, 'status' | 'counter_expires_
  * read it this way; the conversation now shares this.
  */
 export function isDealExpired(
-  offer: { status: OfferStatus | string; expires_at: string | null; counter_expires_at: string | null; checkout_expires_at?: string | null },
+  offer: { status: OfferStatus | string; expires_at: string | null; counter_expires_at: string | null; checkout_expires_at?: string | null; checkout_reserved_at?: string | null },
   now: Date = new Date(),
 ): boolean {
   const past = (iso: string | null | undefined) => !!iso && new Date(iso).getTime() < now.getTime()
@@ -94,7 +116,7 @@ export function isDealExpired(
     case 'expired': return true
     case 'pending': return past(offer.expires_at)
     case 'countered': return past(offer.counter_expires_at)
-    case 'accepted': return past(offer.checkout_expires_at)
+    case 'accepted': return past(effectivePaymentDeadline(offer))
     default: return false
   }
 }
@@ -184,6 +206,7 @@ export function offerTurn(
     expires_at: string
     counter_expires_at?: string | null
     checkout_expires_at?: string | null
+    checkout_reserved_at?: string | null
   },
   role: OfferRole,
 ): OfferTurn {
@@ -202,10 +225,10 @@ export function offerTurn(
         ? { line: 'Te toca responder', deadlineIso: offer.counter_expires_at ?? null }
         : { line: 'Esperando tu respuesta', deadlineIso: offer.counter_expires_at ?? null }
     case 'accepted':
-      if (past(offer.checkout_expires_at)) return { line: 'Trato expirado', deadlineIso: null }
+      if (past(effectivePaymentDeadline(offer))) return { line: 'Trato expirado', deadlineIso: null }
       return role === 'buyer'
-        ? { line: 'Te toca pagar', deadlineIso: offer.checkout_expires_at ?? null }
-        : { line: 'Esperando el pago del comprador', deadlineIso: offer.checkout_expires_at ?? null }
+        ? { line: 'Te toca pagar', deadlineIso: effectivePaymentDeadline(offer) }
+        : { line: 'Esperando el pago del comprador', deadlineIso: effectivePaymentDeadline(offer) }
     case 'paid':      return { line: 'Compra realizada', deadlineIso: null }
     case 'declined':  return { line: 'Oferta rechazada', deadlineIso: null }
     case 'withdrawn': return { line: 'Oferta retirada', deadlineIso: null }
