@@ -77,7 +77,8 @@ test.describe('offer · a buyer who ordered by direct payment is never shown an 
     test(`${file} reads the reservation and serves the effective deadline`, () => {
       const code = src(file)
       expect(code).toMatch(/checkout_expires_at, checkout_reserved_at'\)/)
-      expect(code).toMatch(/checkout_expires_at: effectivePaymentDeadline\(offerWithCurrency\)/)
+      // At the source row, so the conversation's countdown reads it too, not only the ledger (fresh review, PR 506).
+      expect(code).toMatch(/currency: listingCurrency, checkout_expires_at: effectivePaymentDeadline\(offerResult\.data\)/)
     })
   }
 

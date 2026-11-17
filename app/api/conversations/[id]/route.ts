@@ -59,7 +59,9 @@ export async function GET(
   ])
 
   const offerWithCurrency = offerResult.data
-    ? { ...offerResult.data, currency: listingCurrency }
+    // The deadline the buyer sees is the EFFECTIVE one: none once ordered by direct payment (lib/offers.ts).
+    // Mapped here, at the source, so the deal bar, its countdown and the ledger all read the same value.
+    ? { ...offerResult.data, currency: listingCurrency, checkout_expires_at: effectivePaymentDeadline(offerResult.data) }
     : null
 
   const shopRaw = conv.marketplace_shops as unknown as {
@@ -81,7 +83,7 @@ export async function GET(
         counter_amount_cents: offerWithCurrency.counter_amount_cents,
         expires_at: offerWithCurrency.expires_at,
         counter_expires_at: offerWithCurrency.counter_expires_at,
-        checkout_expires_at: effectivePaymentDeadline(offerWithCurrency),
+        checkout_expires_at: offerWithCurrency.checkout_expires_at,
         currency: offerWithCurrency.currency,
       }
     : null
