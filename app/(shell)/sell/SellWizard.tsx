@@ -1,5 +1,7 @@
 'use client'
 
+import { isSeatedEvent } from '@/lib/event-seats'
+
 import React, { useState, useRef, useCallback, useId, useEffect } from 'react'
 import { CATEGORIES, CITIES_BY_STATE } from '@/lib/types'
 import { ESTADOS, ESTADO_INEGI_BY_NAME } from '@/lib/mx-locations'
@@ -1698,7 +1700,7 @@ export default function SellWizard({
                 // coordinated-sales-readiness: a service/rental is gated only with a positive price, and a seated
                 // Evento takes any rail — the same price the publish sends and the same seats rule as the server.
                 priced={(formPriceCents ?? 0) > 0}
-                isEvent={evento && seats.trim() !== '' && Number.isFinite(Number(seats)) && Number(seats) >= 0}
+                isEvent={evento && seats.trim() !== '' && isSeatedEvent({ attrs, quantity: Number(seats) })}
                 refreshKey={readinessRefresh}
                 submitting={submitting}
                 onPublishAsCatalog={() => { void handleSubmit({ asCatalog: true }) }}
