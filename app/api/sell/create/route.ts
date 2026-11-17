@@ -10,7 +10,7 @@ import { sellerListingCurrency } from '@/lib/seller-listing-currency'
 import { db } from '@/lib/supabase'
 import { uniqueEventSlug } from '@/lib/events'
 import { buildRsvpEventDraft, isFreeEventListing, MAX_EVENT_SEATS, EVENT_SEATS_TOO_MANY_MESSAGE, type RsvpEventDraft } from '@/lib/evento-preset'
-import { createQuantityForBackend, hasEventBlock, isEventCapableType, SEATS_NEGATIVE_MESSAGE } from '@/lib/event-seats'
+import { createQuantityForBackend, hasEventBlock, isEventCapableType, isSeatedEvent, SEATS_NEGATIVE_MESSAGE } from '@/lib/event-seats'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const PUB_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ?? ''
@@ -241,6 +241,9 @@ export async function POST(req: NextRequest) {
       listingType: body.listing.listing_type,
       deliveryMode: body.listing.delivery_mode ?? null,
       shop: ownerShopFacts(sellerForMirror?.metadata ?? null),
+      // A service/rental is gated only when it opens a checkout (a positive price); an event takes any rail.
+      priced: typeof body.listing.price_cents === 'number' && body.listing.price_cents > 0,
+      isEvent: isEventCapableType(body.listing.listing_type) && isSeatedEvent({ attrs: body.listing.attrs, quantity: body.listing.quantity }),
     }),
     body.publish_as_catalog === true,
   )

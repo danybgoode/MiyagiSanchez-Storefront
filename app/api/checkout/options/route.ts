@@ -33,7 +33,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'sellerId requerido.' }, { status: 400 })
   }
 
-  const qs = new URLSearchParams({ listing_type: listingType, is_digital: isDigital, delivery_mode: deliveryMode, market })
+  // A seated Evento takes any rail (coordinated-sales-readiness D5) — a display hint; start-checkout re-derives it.
+  const isEvent = searchParams.get('isEvent') === 'true' ? 'true' : 'false'
+  const qs = new URLSearchParams({ listing_type: listingType, is_digital: isDigital, delivery_mode: deliveryMode, market, is_event: isEvent })
   const key = resolvePublishableKeyForMarket(market, PROCESS_MARKET_ENV)
   if (key.status !== 'resolved') {
     return NextResponse.json({ error: 'No se pudo resolver el mercado de pago.' }, { status: 503 })

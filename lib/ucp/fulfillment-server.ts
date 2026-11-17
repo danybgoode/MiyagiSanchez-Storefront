@@ -40,6 +40,8 @@ export async function fetchBackendCheckoutOptions(
     listingType: string
     isDigital: boolean
     deliveryMode: 'carrier' | 'arranged'
+    /** A seated Evento (coordinated-sales-readiness D5): a display hint; start-checkout re-derives it. */
+    isEvent?: boolean
   },
   deps: FulfillmentServerDeps = DEFAULT_DEPS,
 ): Promise<BackendCheckoutOptionsSource> {
@@ -48,6 +50,7 @@ export async function fetchBackendCheckoutOptions(
       listing_type: input.listingType,
       is_digital: String(input.isDigital),
       delivery_mode: input.deliveryMode,
+      is_event: String(input.isEvent === true),
     })
     const response = await deps.fetch(
       `${deps.medusaBase}/store/sellers/${encodeURIComponent(input.sellerRef)}/checkout-options?${qs}`,

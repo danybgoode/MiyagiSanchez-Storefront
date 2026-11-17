@@ -74,6 +74,7 @@ export default function CheckoutExperience({
   offerAmountCents,
   quantity = 1,
   listingType = 'product',
+  isEvent = false,
   isDigital = false,
   deliveryMode = 'carrier',
   originDomain,
@@ -94,6 +95,8 @@ export default function CheckoutExperience({
   /** Event admissions: units for the single-item path (default 1). */
   quantity?: number
   listingType?: string
+  /** A seated Evento — its ticket takes any rail (coordinated-sales-readiness D5). */
+  isEvent?: boolean
   isDigital?: boolean
   /** Arranged-only delivery (epic, S1.3) — the backend ignores this off-flag. */
   deliveryMode?: 'carrier' | 'arranged'
@@ -123,7 +126,7 @@ export default function CheckoutExperience({
 
   useEffect(() => {
     let cancelled = false
-    const qs = new URLSearchParams({ sellerId, listingType, isDigital: String(isDigital), deliveryMode, market })
+    const qs = new URLSearchParams({ sellerId, listingType, isDigital: String(isDigital), deliveryMode, market, isEvent: String(isEvent) })
     fetch(`/api/checkout/options?${qs}`)
       .then(r => r.json())
       .then((data: CheckoutOptions & { error?: string }) => {
@@ -135,7 +138,7 @@ export default function CheckoutExperience({
       })
       .catch(() => { if (!cancelled) setOptionsError('No se pudieron cargar las opciones de pago.') })
     return () => { cancelled = true }
-  }, [sellerId, listingType, isDigital, deliveryMode, market])
+  }, [sellerId, listingType, isDigital, deliveryMode, market, isEvent])
 
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<CheckoutFulfillmentMethod>('none')
   const [selectedPickupSpotId, setSelectedPickupSpotId] = useState<string | null>(null)

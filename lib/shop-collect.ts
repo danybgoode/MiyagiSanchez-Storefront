@@ -11,15 +11,19 @@
  * never "accepted" on a guess and never "this shop can't take payment" on an outage.
  */
 
-import { listingCanBePaid, publicShopFacts, READINESS_COPY, type DeliveryMode } from './listing-readiness'
+import { deliveryModeOf, listingCanBePaid, publicShopFacts, READINESS_COPY, type DeliveryMode } from './listing-readiness'
+import { isSeatedEvent } from './event-seats'
+
+/** What a listing's checkout depends on, read fresh from Medusa. */
+export type ProductSaleFacts = { deliveryMode: DeliveryMode; priced?: boolean; isEvent?: boolean }
 
 export type CollectAnswer = 'yes' | 'no' | 'unavailable'
 
 export type ShopCollectDeps = {
   /** The Medusa seller's PUBLIC metadata by slug; `null` = not found / unreadable. May throw. */
   readonly sellerMetadata: (slug: string) => Promise<Record<string, unknown> | null>
-  /** The product's delivery mode from Medusa (`null` = carrier/unset); `undefined` = unreadable. May throw. */
-  readonly productDeliveryMode: (slug: string, productId: string) => Promise<DeliveryMode | undefined>
+  /** The product's sale facts from Medusa, fresh; `undefined` = unreadable. May throw. */
+  readonly productSaleFacts: (slug: string, productId: string) => Promise<ProductSaleFacts | undefined>
 }
 
 // Lazy: `lib/listings` pulls in `next/cache`, which keeps this module out of the node test runner if imported on top.
@@ -32,13 +36,17 @@ const defaultDeps: ShopCollectDeps = {
     return read.state === 'resolved' ? ((read.shop.metadata ?? {}) as Record<string, unknown>) : null
   },
   // FRESH (security lens on PR 497): the cached read could serve a stale `carrier` for a minute after a switch to arranged.
-  productDeliveryMode: async (slug, productId) => {
+  productSaleFacts: async (slug, productId) => {
     const { readOwnedShopListingFresh } = await import('@/lib/listings')
     const listing = await readOwnedShopListingFresh(slug, productId)
     if (!listing) return undefined
-    const mode = (listing.metadata as Record<string, unknown> | null | undefined)?.delivery_mode
-    return mode === 'arranged' || mode === 'carrier' ? mode : null
+    return {
+      deliveryMode: deliveryModeOf(listing.metadata),
+      priced: typeof listing.price_cents === 'number' && listing.price_cents > 0,
+      isEvent: isSeatedEvent({ attrs: listing.attrs, manage_inventory: listing.manage_inventory, allow_backorder: listing.allow_backorder }),
+    }
   },
+
 }
 
 /**
@@ -57,15 +65,16 @@ export async function offerCanProceed(
     if (!metadata) return 'unavailable'
     const shop = publicShopFacts(metadata)
     const listingType = input.listingType ?? 'product'
-    // Only a product's delivery mode changes the answer; read it (fail closed when unreadable).
-    let deliveryMode: DeliveryMode = null
-    if (listingType === 'product') {
+    // A product's delivery mode, and a service/rental's price and event-ness, change the answer: read them FRESH
+    // (fail closed when unreadable). Other types need only a shop that can collect.
+    let facts: ProductSaleFacts = { deliveryMode: null }
+    if (listingType === 'product' || listingType === 'service' || listingType === 'rental') {
       if (!input.productId) return 'unavailable'
-      const read = await deps.productDeliveryMode(input.slug, input.productId)
+      const read = await deps.productSaleFacts(input.slug, input.productId)
       if (read === undefined) return 'unavailable'
-      deliveryMode = read
+      facts = read
     }
-    return listingCanBePaid({ listingType, deliveryMode, shop }) ? 'yes' : 'no'
+    return listingCanBePaid({ listingType, shop, ...facts }) ? 'yes' : 'no'
   } catch {
     return 'unavailable'
   }

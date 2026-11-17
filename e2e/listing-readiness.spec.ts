@@ -16,6 +16,7 @@ import { deriveCheckoutViability } from '../lib/checkout-viability'
 import { shopAcceptsAnyPayment, publicShopPaymentAvailability } from '../lib/public-shop-commerce'
 import { offerCanProceed, offerCollectRefusal } from '../lib/shop-collect'
 import { isNotReadyAnswer, readinessChecklist } from '../lib/readiness-view'
+import { isSeatedEvent } from '../lib/event-seats'
 
 /**
  * Epic listing-readiness — every product sells online or is deliberately «Solo catálogo».
@@ -170,12 +171,13 @@ test.describe('readiness · publish/activate (S1.2, D4)', () => {
 })
 
 test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5)', () => {
-  const deps = (metadata: Record<string, unknown> | null, mode: 'carrier' | 'arranged' | null | undefined = null) => ({
+  type Facts = { deliveryMode: 'carrier' | 'arranged' | null; priced?: boolean; isEvent?: boolean }
+  const deps = (metadata: Record<string, unknown> | null, facts: Facts | undefined = { deliveryMode: null }) => ({
     sellerMetadata: async () => metadata,
-    productDeliveryMode: async () => mode,
+    productSaleFacts: async () => facts,
   })
-  const ask = (metadata: Record<string, unknown> | null, mode?: 'carrier' | 'arranged' | null, listingType = 'product') =>
-    offerCanProceed({ slug: 's', productId: 'prod_1', listingType }, deps(metadata, mode))
+  const ask = (metadata: Record<string, unknown> | null, mode: 'carrier' | 'arranged' | null = null, listingType = 'product', extra: Omit<Facts, 'deliveryMode'> = {}) =>
+    offerCanProceed({ slug: 's', productId: 'prod_1', listingType }, deps(metadata, { deliveryMode: mode, ...extra }))
   // Both deliver by pickup. The card-only shop turns cash off, so it really is card-only.
   const transfer = { settings: { checkout: { bank_transfer: { configured: true } }, shipping: { local_pickup: true } } }
   const cardOnly = { settings: { stripe: { connected: true, charges_enabled: true }, shipping: { local_pickup: true }, checkout: { cash_pickup: { enabled: false } } } }
@@ -205,21 +207,26 @@ test.describe('readiness · offers only where THIS listing can be paid (S1.3, D5
     expect(await ask(cardOnly, 'carrier')).toBe('yes')
     // The delivery mode is READ per listing: an unreadable product fails closed instead of guessing.
     expect(await offerCanProceed({ slug: 's', productId: 'p', listingType: 'product' },
-      { sellerMetadata: async () => transfer, productDeliveryMode: async () => undefined })).toBe('unavailable')
+      { sellerMetadata: async () => transfer, productSaleFacts: async () => undefined })).toBe('unavailable')
   })
 
-  test('services and rentals are coordinated (manual only); other non-products need any rail', async () => {
-    expect(await ask(cardOnly, null, 'service')).toBe('no')
-    expect(await ask(transfer, null, 'service')).toBe('yes')
-    expect(await ask(cardOnly, null, 'rental')).toBe('no')
+  test('a PRICED service or rental is coordinated (manual only); other non-products need any rail', async () => {
+    expect(await ask(cardOnly, null, 'service', { priced: true })).toBe('no')
+    expect(await ask(transfer, null, 'service', { priced: true })).toBe('yes')
+    expect(await ask(cardOnly, null, 'rental', { priced: true })).toBe('no')
     expect(await ask(cardOnly, null, 'auto')).toBe('yes')
     expect(await ask({ settings: {} }, null, 'auto')).toBe('no')
+  })
+
+  test('🚨 a seated event ticket takes ANY rail (coordinated-sales-readiness D1) — the card shop can take the offer', async () => {
+    expect(await ask(cardOnly, null, 'service', { priced: true, isEvent: true })).toBe('yes')
+    expect(await ask({ settings: {} }, null, 'service', { priced: true, isEvent: true })).toBe('no')
   })
 
   test('anything unreadable FAILS CLOSED (503), never "accepted" and never "cannot collect"', async () => {
     expect(await ask(null)).toBe('unavailable')
     expect(await offerCanProceed({ slug: 's', productId: 'p', listingType: 'product' },
-      { sellerMetadata: async () => { throw new Error('down') }, productDeliveryMode: async () => null })).toBe('unavailable')
+      { sellerMetadata: async () => { throw new Error('down') }, productSaleFacts: async () => ({ deliveryMode: null }) })).toBe('unavailable')
     expect(await offerCanProceed({ slug: null, productId: 'p', listingType: 'product' }, deps(transfer))).toBe('unavailable')
     expect(offerCollectRefusal('unavailable', 'buyer')).toMatchObject({ status: 503, code: 'COLLECT_UNVERIFIED' })
     expect(offerCollectRefusal('yes', 'seller')).toBeNull()
@@ -317,7 +324,7 @@ test.describe('readiness · guided and visible (S2)', () => {
     expect(wizard).toContain('<ReadinessPanel')
     expect(wizard).toContain('isNotReadyAnswer(res.status, data)')
     expect(wizard).toContain('publish_as_catalog: true')
-    expect(read('app/api/sell/readiness/route.ts')).toContain('listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(metadata) })')
+    expect(read('app/api/sell/readiness/route.ts')).toContain('listingReadiness({ listingType, deliveryMode, shop: ownerShopFacts(metadata), priced, isEvent })')
     expect(read('app/(shell)/sell/ReadinessPanel.tsx')).toContain('<CobrosChooser')
     expect(read('app/(shell)/shop/manage/page.tsx')).toContain('shopCatalogOnly({')
     expect(read('app/(shell)/shop/manage/ManageDashboard.tsx')).toContain('title={BANNER[catalogReason].title}')
@@ -343,5 +350,69 @@ test.describe('readiness · guided and visible (S2)', () => {
     expect(read('lib/listing-status.ts')).toContain("if (typeof product.listing_type !== 'string') return null")
     // The form keeps the server's sentence when the panel cannot render.
     expect(read('app/(shell)/sell/SellWizard.tsx')).toContain('setSubmitError(data.error ?? null)')
+  })
+})
+
+
+test.describe('readiness · services, rentals and events (coordinated-sales-readiness, D1–D3)', () => {
+  const cardOnly = shop({ stripe: true })
+  const manual = shop({ bankTransfer: true })
+  const r = (listingType: string, s: ShopFacts, priced?: boolean, isEvent?: boolean) =>
+    listingReadiness({ listingType, deliveryMode: null, shop: s, priced, isEvent })
+
+  test('🚨 a PRICED plain service or rental needs SPEI or cash — a card shop publishes it as catalog', () => {
+    expect(r('service', cardOnly, true)).toEqual({ mode: 'catalog', missing: ['manual_payment'] })
+    expect(r('rental', cardOnly, true)).toEqual({ mode: 'catalog', missing: ['manual_payment'] })
+    expect(r('service', manual, true).mode).toBe('online')
+    expect(r('service', shop({ cash: true }), true).mode).toBe('online')
+  })
+
+  test('🚨 a paid SEATED event takes any rail; with none it is catalog naming «cobro»', () => {
+    expect(r('service', cardOnly, true, true).mode).toBe('online')
+    expect(r('service', shop({ dimo: true }), true, true).mode).toBe('online')
+    expect(r('service', shop({}), true, true)).toEqual({ mode: 'catalog', missing: ['payment'] })
+    // A rental with an event block is still a rental (manual only), as on the backend.
+    expect(r('rental', cardOnly, true, true).mode).toBe('catalog')
+  })
+
+  test('contact-only and free are never gated: «precio a consultar», a free event, an unknown price (MCP)', () => {
+    expect(r('service', shop({}), false).mode).toBe('online')
+    expect(r('service', shop({}), false, true).mode).toBe('online')
+    expect(r('service', shop({}), undefined).mode).toBe('online')
+  })
+
+  test('the manual message names services and rentals, not only arranged delivery', () => {
+    expect(readinessMessage(r('service', cardOnly, true))).toMatch(/servicios y las rentas/)
+  })
+
+  test('a SEATED event: an event block AND seats — mirrors the backend isSeatedEvent (security lens, PR 237)', () => {
+    expect(isSeatedEvent({ attrs: { event_date: '2026-12-01' }, manage_inventory: true })).toBe(true)
+    expect(isSeatedEvent({ attrs: { venue_name: 'Teatro' }, quantity: 40 })).toBe(true)
+    expect(isSeatedEvent({ attrs: { venue_name: 'Teatro' }, manage_inventory: false })).toBe(false)
+    expect(isSeatedEvent({ attrs: { event_date: '  ' }, manage_inventory: true })).toBe(false)
+    expect(isSeatedEvent({ attrs: {}, manage_inventory: true })).toBe(false)
+    // A backorder listing can sell past its seats — not capped, not a ticket (backend parity).
+    expect(isSeatedEvent({ attrs: { event_date: '2026-12-01' }, manage_inventory: true, allow_backorder: true })).toBe(false)
+  })
+
+  test('every door passes price + seated-event to the rule', () => {
+    expect(read('app/api/sell/create/route.ts')).toContain('isEvent: isEventCapableType(body.listing.listing_type) && isSeatedEvent({ attrs: body.listing.attrs, quantity: body.listing.quantity }),')
+    const status = read('lib/listing-status.ts')
+    expect(status).toContain('priced: product.priced,')
+    expect(status).toContain("if (coordinated && (typeof product.priced !== 'boolean' || typeof product.is_event !== 'boolean')) return null")
+    expect(read('app/(shell)/l/[id]/ListingRenderer.tsx')).toContain('isEvent: isSeatedEvent({ attrs: listing.attrs, manage_inventory: listing.manage_inventory, allow_backorder: listing.allow_backorder }),')
+    expect(read('lib/shop-collect.ts')).toContain("if (listingType === 'product' || listingType === 'service' || listingType === 'rental') {")
+    expect(read('app/(shell)/shop/manage/page.tsx')).toContain('priced: (l.price_cents ?? 0) > 0,')
+    expect(read('app/(shell)/shop/manage/catalogo/CatalogTable.tsx')).toContain('priced: (listing.price_cents ?? 0) > 0,')
+    expect(read('app/(shell)/sell/ReadinessPanel.tsx')).toContain("new Set(['product', 'service', 'rental'])")
+  })
+
+  test('🚨 checkout ASKS the backend with the seated-event hint, or a ticket buyer still sees only SPEI/cash', () => {
+    const seated = 'isSeatedEvent({ attrs: listing.attrs, manage_inventory: listing.manage_inventory, allow_backorder: listing.allow_backorder })'
+    expect(read('app/(shell)/checkout/page.tsx')).toContain(`isEvent={${seated}}`)
+    expect(read('app/(shell)/checkout/CheckoutExperience.tsx')).toContain('market, isEvent: String(isEvent) })')
+    expect(read('app/api/checkout/options/route.ts')).toContain('market, is_event: isEvent })')
+    expect(read('app/api/ucp/checkout-session/route.ts')).toContain(`isEvent: ${seated},`)
+    expect(read('lib/ucp/fulfillment-server.ts')).toContain('is_event: String(input.isEvent === true),')
   })
 })

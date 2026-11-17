@@ -13,9 +13,11 @@ import { readinessChecklist, type ReadinessView } from '@/lib/readiness-view'
  * listing sells online or when it cannot tell — the server still decides at publish, and a LISTING_NOT_READY answer
  * bumps `refreshKey` to re-open this panel.
  */
-async function fetchReadiness(listingType: string, deliveryMode: string): Promise<ReadinessView | null> {
+async function fetchReadiness(listingType: string, deliveryMode: string, priced: boolean, isEvent: boolean): Promise<ReadinessView | null> {
   try {
-    const qs = new URLSearchParams({ listing_type: listingType, delivery_mode: deliveryMode })
+    const qs = new URLSearchParams({
+      listing_type: listingType, delivery_mode: deliveryMode, priced: String(priced), is_event: String(isEvent),
+    })
     const res = await fetch(`/api/sell/readiness?${qs}`, { cache: 'no-store' })
     return res.ok ? await res.json() as ReadinessView : null
   } catch {
@@ -23,15 +25,23 @@ async function fetchReadiness(listingType: string, deliveryMode: string): Promis
   }
 }
 
+const GATED_TYPES: ReadonlySet<string> = new Set(['product', 'service', 'rental'])
+
 export default function ReadinessPanel({
   listingType,
   deliveryMode,
   refreshKey,
   submitting,
   onPublishAsCatalog,
+  priced = false,
+  isEvent = false,
 }: {
   listingType: string
   deliveryMode: 'carrier' | 'arranged'
+  /** A positive price (a service/rental without one is contact-only and never gated). */
+  priced?: boolean
+  /** A seated Evento (any rail pays a ticket). */
+  isEvent?: boolean
   refreshKey: number
   submitting: boolean
   onPublishAsCatalog: () => void
@@ -42,14 +52,14 @@ export default function ReadinessPanel({
   const [savedTick, setSavedTick] = useState(0)
 
   useEffect(() => {
-    // Not a product: nothing to ask (the render below also ignores any earlier answer).
-    if (listingType !== 'product') return
+    // Only types the rule can gate (coordinated-sales-readiness added services and rentals).
+    if (!GATED_TYPES.has(listingType)) return
     let cancelled = false
-    fetchReadiness(listingType, deliveryMode).then((next) => { if (!cancelled) setView(next) })
+    fetchReadiness(listingType, deliveryMode, priced, isEvent).then((next) => { if (!cancelled) setView(next) })
     return () => { cancelled = true }
-  }, [listingType, deliveryMode, refreshKey, savedTick])
+  }, [listingType, deliveryMode, priced, isEvent, refreshKey, savedTick])
 
-  const rows = listingType === 'product' ? readinessChecklist(view) : null
+  const rows = GATED_TYPES.has(listingType) ? readinessChecklist(view) : null
   if (!rows || !view || view.state !== 'ok') return null
 
   return (
