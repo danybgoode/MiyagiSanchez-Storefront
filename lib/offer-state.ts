@@ -71,12 +71,15 @@ export async function markListingPurchased({
  * who already ordered (fresh review, PR 506). Cancels it only when the backend's permanent reservation is
  * really there — the reservation, not the caller, says the offer was ordered. Best-effort: logged, never thrown.
  */
-export async function cancelPaymentReminderForDirectOrder(offerId: string): Promise<void> {
+export async function cancelPaymentReminderForDirectOrder(offerId: string, buyerClerkUserId: string | null | undefined): Promise<void> {
+  // Only the offer's own buyer (security lens, PR 506): any caller can name an offer id at /api/checkout/start.
+  if (!buyerClerkUserId) return
   try {
     const { data } = await db
       .from('marketplace_offers')
       .select('checkout_reserved_at, scheduled_reminder_ids')
       .eq('id', offerId)
+      .eq('buyer_clerk_user_id', buyerClerkUserId)
       .maybeSingle()
     if (!data || !orderedByDirectPayment(data)) return
     const reminderId = ((data.scheduled_reminder_ids ?? {}) as Record<string, string>).buyer_payment_expiry

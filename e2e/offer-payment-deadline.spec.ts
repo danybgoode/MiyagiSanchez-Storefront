@@ -87,7 +87,10 @@ test.describe('offer · a buyer who ordered by direct payment is never shown an 
   })
 
   test('a direct-payment order of an offer cancels its scheduled reminder', () => {
-    expect(src('lib/cart.ts')).toMatch(/cancelPaymentReminderForDirectOrder\(offerId\)/)
+    expect(src('lib/cart.ts')).toMatch(/cancelPaymentReminderForDirectOrder\(offerId, buyerClerkUserId\)/)
+    // Only the offer's own buyer can trigger it (security lens, PR 506).
+    expect(src('lib/offer-state.ts')).toMatch(/\.eq\('buyer_clerk_user_id', buyerClerkUserId\)/)
+    expect(src('lib/offer-state.ts')).toMatch(/if \(!buyerClerkUserId\) return/)
     // The reservation, not the caller, decides the offer was ordered.
     expect(src('lib/offer-state.ts')).toMatch(/if \(!data \|\| !orderedByDirectPayment\(data\)\) return/)
   })

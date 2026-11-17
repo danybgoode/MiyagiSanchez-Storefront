@@ -621,7 +621,7 @@ export async function startCheckout(params: StartCheckoutParams): Promise<StartC
       // An offer ordered by direct payment is no longer waiting to be paid: drop its scheduled
       // «time is running out» email (lib/offer-state.ts). Same dynamic import reason as below.
       if (offerId) {
-        void import('./offer-state').then(({ cancelPaymentReminderForDirectOrder }) => cancelPaymentReminderForDirectOrder(offerId))
+        void import('./offer-state').then(({ cancelPaymentReminderForDirectOrder }) => cancelPaymentReminderForDirectOrder(offerId, buyerClerkUserId))
           .catch((e) => console.error('[startCheckout] offer reminder cancel threw:', e))
       }
       if (!suppressManualEmail) {
