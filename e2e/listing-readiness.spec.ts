@@ -17,7 +17,7 @@ import { shopAcceptsAnyPayment, publicShopPaymentAvailability } from '../lib/pub
 import { offerCanProceed, offerCollectRefusal } from '../lib/shop-collect'
 import { isNotReadyAnswer, readinessChecklist } from '../lib/readiness-view'
 import { isSeatedEvent } from '../lib/event-seats'
-import { listingActivationBlock } from '../lib/seller-products'
+import { listingActivationBlock, readActivationSaleFacts } from '../lib/seller-products'
 
 /**
  * Epic listing-readiness — every product sells online or is deliberately «Solo catálogo».
@@ -420,11 +420,34 @@ test.describe('readiness · services, rentals and events (coordinated-sales-read
     const mcp = read('app/api/ucp/mcp/route.ts')
     expect(mcp).toContain("    : (listingType === 'service' || listingType === 'rental')\n      ? listingActivationBlock(shop.metadata, listingType, null, {")
     expect(mcp).toContain('isEvent: isEventCapableType(listingType) && isSeatedEvent({ attrs: listingAttrs, quantity: eventFields.quantity }),')
-    expect(mcp).toContain('const block = listingActivationBlock(shop.metadata, owned.listing_type, undefined, live ? {')
+    expect(mcp).toContain('const facts = coordinated ? await readActivationSaleFacts(shop.slug, productId) : {}')
+    expect(mcp).toContain('if (facts === null) return { isError: true, content: [{ type: \'text\', text: ACTIVATION_UNVERIFIED }] }')
+    expect(mcp).toContain('const block = listingActivationBlock(shop.metadata, owned.listing_type, undefined, facts)')
     expect(listingActivationBlock({ settings: { stripe: { connected: true, charges_enabled: true } } }, 'service', null, { priced: true }))
       .toMatch(/SPEI o efectivo/)
     expect(listingActivationBlock({ settings: { stripe: { connected: true, charges_enabled: true } } }, 'service', null, { priced: true, isEvent: true }))
       .toBeNull()
+  })
+
+  test('🚨 MCP activation reads a DRAFT\'s facts (the public read 404s on drafts → failed open) and fails CLOSED', async () => {
+    const card = { settings: { stripe: { connected: true, charges_enabled: true } } }
+    const draft = { id: 'p1', price_cents: 50000, attrs: {}, manage_inventory: false }
+    const ticket = { id: 'p2', price_cents: 50000, attrs: { event_date: '2026-12-01' }, manage_inventory: true }
+    const deps = (drafts: Array<Record<string, unknown>> | null, mirror: { price_cents: number | null } | null | undefined = null) =>
+      ({ drafts: async () => drafts, mirror: async () => mirror })
+    // THE BYPASS: a draft priced service on a card-only shop is refused activation.
+    const f = await readActivationSaleFacts('s', 'p1', deps([draft]))
+    expect(f).toEqual({ priced: true, isEvent: false })
+    expect(listingActivationBlock(card, 'service', undefined, f!)).toMatch(/SPEI o efectivo/)
+    // A draft seated ticket activates on the card shop.
+    const t = await readActivationSaleFacts('s', 'p2', deps([ticket]))
+    expect(listingActivationBlock(card, 'service', undefined, t!)).toBeNull()
+    // A paused listing (not in drafts) falls back to the mirror price, conservatively not a ticket.
+    expect(await readActivationSaleFacts('s', 'p9', deps([], { price_cents: 100 }))).toEqual({ priced: true, isEvent: false })
+    // Unreadable anywhere → null (the route refuses with ACTIVATION_UNVERIFIED).
+    expect(await readActivationSaleFacts('s', 'p1', deps(null))).toBeNull()
+    expect(await readActivationSaleFacts('s', 'p9', deps([], undefined))).toBeNull()
+    expect(await readActivationSaleFacts('s', 'p9', deps([], null))).toBeNull()
   })
 
   test('🚨 checkout ASKS the backend with the seated-event hint, or a ticket buyer still sees only SPEI/cash', () => {

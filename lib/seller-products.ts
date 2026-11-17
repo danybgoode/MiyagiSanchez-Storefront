@@ -11,6 +11,7 @@ import { db } from './supabase'
 import { formatOfferAmount } from './offers'
 import { freeEventPriceRefusal } from './evento-preset'
 import { listingReadiness, ownerShopFacts, readinessMessage, type DeliveryMode } from './listing-readiness'
+import { isSeatedEvent } from './event-seats'
 
 const MEDUSA_BASE = process.env.MEDUSA_STORE_URL ?? 'http://localhost:9000'
 const INTERNAL_SECRET = process.env.MEDUSA_INTERNAL_SECRET ?? ''
@@ -451,6 +452,63 @@ export async function patchSellerSlugViaInternal(
     return { ok: false, status: 500, error: String(e) }
   }
 }
+
+export type SaleFacts = { priced: boolean; isEvent: boolean }
+export type ActivationFactsDeps = {
+  readonly drafts: (slug: string) => Promise<Array<Record<string, unknown>> | null>
+  readonly mirror: (productId: string) => Promise<{ price_cents: number | null } | null | undefined>
+}
+
+const DEFAULT_ACTIVATION_DEPS: ActivationFactsDeps = {
+  drafts: async (slug) => {
+    if (!INTERNAL_SECRET) return null
+    try {
+      const res = await fetch(`${MEDUSA_BASE}/internal/seller-products/drafts?seller_slug=${encodeURIComponent(slug)}`,
+        { headers: { 'x-internal-secret': INTERNAL_SECRET }, cache: 'no-store' })
+      if (!res.ok) return null
+      const data = (await res.json()) as { products?: Array<Record<string, unknown>> }
+      return Array.isArray(data.products) ? data.products : null
+    } catch { return null }
+  },
+  mirror: async (productId) => {
+    const { data, error } = await db.from('marketplace_listings').select('price_cents').eq('medusa_product_id', productId).maybeSingle()
+    if (error) return undefined
+    return data ? { price_cents: typeof data.price_cents === 'number' ? data.price_cents : null } : null
+  },
+}
+
+/**
+ * The price + seated-event facts of a NOT-YET-LIVE service/rental, for MCP set_listing_status (coordinated-sales-
+ * readiness S2.2). The public product read only sees PUBLISHED products, so a draft read through it failed OPEN —
+ * the create gate could be bypassed in two calls (fresh review, PR 505). Reads Medusa's internal drafts route (the
+ * listing shape: price, attrs, seats); a PAUSED listing is not in it, so it falls back to the mirror price with no
+ * seat facts — conservative (a paused paid event on a card-only shop is asked for SPEI/cash). Unreadable → null:
+ * the caller REFUSES (fails closed), never "online".
+ */
+export async function readActivationSaleFacts(
+  slug: string,
+  productId: string,
+  deps: ActivationFactsDeps = DEFAULT_ACTIVATION_DEPS,
+): Promise<SaleFacts | null> {
+  const drafts = await deps.drafts(slug)
+  if (drafts === null) return null
+  const draft = drafts.find((p) => p.id === productId)
+  if (draft) {
+    return {
+      priced: typeof draft.price_cents === 'number' && draft.price_cents > 0,
+      isEvent: isSeatedEvent({
+        attrs: draft.attrs as Record<string, unknown> | null | undefined,
+        manage_inventory: draft.manage_inventory as boolean | undefined,
+        allow_backorder: draft.allow_backorder as boolean | undefined,
+      }),
+    }
+  }
+  const mirror = await deps.mirror(productId)
+  if (!mirror) return null
+  return { priced: (mirror.price_cents ?? 0) > 0, isEvent: false }
+}
+
+export const ACTIVATION_UNVERIFIED = 'No pude verificar si tu tienda puede cobrar este anuncio. Inténtalo de nuevo en un momento.'
 
 /**
  * Returns a plain-language reason a product listing can't be activated, or null if it's OK. The MCP door's adapter

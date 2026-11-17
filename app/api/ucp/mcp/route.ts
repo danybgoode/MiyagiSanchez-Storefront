@@ -23,7 +23,7 @@
  *   get_shop              Seller profile + their listings
  */
 
-import { readShopFresh, readOwnedShopListingFresh } from '@/lib/listings'
+import { readShopFresh } from '@/lib/listings'
 import { readInputs as readBusinessInputs } from '@/lib/business-plan/model'
 import { computePlan as computeBusinessPlan } from '@/lib/business-plan/engine'
 import { explainTemplate as explainPlanTemplate } from '@/lib/business-plan/explain'
@@ -92,7 +92,7 @@ import { recordAgentConfigChange, recordAgentOfferAction, recordAgentListingActi
 import { listShopOffers, respondToOffer } from '@/lib/offer-respond'
 import { listShopOrdersViaInternal } from '@/lib/agent-orders'
 import { mcpEventFields, mcpUpdateQuantity, isEventCapableType, isSeatedEvent } from '@/lib/event-seats'
-import { listShopListings, shopOwnsProduct, patchSellerProductViaInternal, createSellerProductViaInternal, createSellerCollectionViaInternal, listingActivationBlock, deleteSellerProductViaInternal, applySellerPriceViaInternal, freeEventPriceBlock, renameSellerCollectionViaInternal, deleteSellerCollectionViaInternal, reorderSellerCollectionsViaInternal, patchSellerSlugViaInternal, type SellerProductPatch } from '@/lib/seller-products'
+import { listShopListings, shopOwnsProduct, patchSellerProductViaInternal, createSellerProductViaInternal, createSellerCollectionViaInternal, listingActivationBlock, readActivationSaleFacts, ACTIVATION_UNVERIFIED, deleteSellerProductViaInternal, applySellerPriceViaInternal, freeEventPriceBlock, renameSellerCollectionViaInternal, deleteSellerCollectionViaInternal, reorderSellerCollectionsViaInternal, patchSellerSlugViaInternal, type SellerProductPatch } from '@/lib/seller-products'
 import { validateSlug, buildSlugAliasHistory } from '@/lib/slug'
 import { SLUG_REDIRECT_TAG } from '@/lib/slug-redirect'
 import { resolvePrefs, audienceTelegramInUse, EVENT_GROUPS, CHANNELS, type PrefRow } from '@/lib/notifications/preferences'
@@ -3930,14 +3930,12 @@ async function handleSetListingStatus(args: Record<string, unknown>, authHeader?
     const marketRefused = await refuseMarketplacePublication(shop, 'activar un anuncio')
     if (marketRefused) return marketRefused
 
-    // A service/rental needs its price + seated-event facts (coordinated-sales-readiness S2.2); an unreadable product
-    // fails open to the old answer, as the portal's activation gate does.
+    // A service/rental needs its price + seated-event facts, read from the DRAFT (coordinated-sales-readiness S2.2).
+    // Unreadable → refuse: a public read 404s on drafts, which failed open (fresh review, PR 505).
     const coordinated = owned.listing_type === 'service' || owned.listing_type === 'rental'
-    const live = coordinated ? await readOwnedShopListingFresh(shop.slug, productId).catch(() => null) : null
-    const block = listingActivationBlock(shop.metadata, owned.listing_type, undefined, live ? {
-      priced: (live.price_cents ?? 0) > 0,
-      isEvent: isSeatedEvent({ attrs: live.attrs, manage_inventory: live.manage_inventory, allow_backorder: live.allow_backorder }),
-    } : {})
+    const facts = coordinated ? await readActivationSaleFacts(shop.slug, productId) : {}
+    if (facts === null) return { isError: true, content: [{ type: 'text', text: ACTIVATION_UNVERIFIED }] }
+    const block = listingActivationBlock(shop.metadata, owned.listing_type, undefined, facts)
     if (block) return { isError: true, content: [{ type: 'text', text: block }] }
   }
 
