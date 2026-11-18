@@ -5,6 +5,7 @@ import { enUS, esMX } from '@clerk/localizations'
 import { CartProvider } from '@/app/components/CartContext'
 import CartDrawer from '@/app/components/CartDrawer'
 import SiteAnalytics from '@/app/components/SiteAnalytics'
+import MetaPixel from '@/app/components/MetaPixel'
 import { getDictionary } from '@/lib/dictionary'
 import { DEFAULT_MARKET, isMarketplaceOpen, marketBasePath, type MarketCode } from '@/lib/markets'
 import { resolveMarketPresentation } from '@/lib/market-presentation'
@@ -207,6 +208,8 @@ export default async function MarketDocument({
           {/* Site-wide GTM container (GA4 + Clarity as tags inside GTM). Client-gated
               on hostname/path so the static root layout reads no headers. */}
           <SiteAnalytics />
+          {/* Meta Pixel for paid seller-acquisition campaigns — production hosts only, same white-label exclusions. */}
+          <MetaPixel />
           {/* Mounted at the ONE <body> every layout goes through, not in
               PlatformShell: the seller portal renders a bare <main> branch and the
               white-label channel renders ChannelLayout, so a shell-level mount would

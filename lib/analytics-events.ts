@@ -15,6 +15,7 @@
  */
 
 import { shouldLoadAnalytics } from './analytics-gating'
+import { forwardToMetaPixel } from './meta-pixel'
 
 const DEDUPE_PREFIX = 'miyagi_evt_'
 
@@ -39,4 +40,7 @@ export function pushAnalyticsEvent(
 
   window.dataLayer = window.dataLayer || []
   window.dataLayer.push({ event: name, ...params })
+  // The few funnel steps paid campaigns optimise on also reach the Meta Pixel (an allow-list, name only — see
+  // lib/meta-pixel.ts). A no-op wherever the Pixel is not loaded.
+  forwardToMetaPixel(name, window.fbq)
 }
