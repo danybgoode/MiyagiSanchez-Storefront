@@ -1,0 +1,16 @@
+{
+ "schema": "edge-oncall/1",
+ "notes": "Rules for the VM's on-call agents in this repo (oracle-edge oncall/PROTOCOL.md). The GitHub guard reads this file from main, never from the branch it judges, and so does the VM after every sync. Recovery actions live in oracle-edge oncall/runbooks/.",
+ "fix": {
+  "never_edit": [
+   ".github/**",
+   "ONCALL.json",
+   "Dockerfile",
+   ".dockerignore"
+  ],
+  "protected": [],
+  "max_changed_lines": 250,
+  "auto_merge": false,
+  "why_review": "the storefront has no unit suite yet (only Playwright against live services); on-call PRs wait for review until node --test covers it"
+ }
+}
