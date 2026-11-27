@@ -133,10 +133,10 @@ async function summary(days: number) {
   const since = new Date(Date.now() - days * 864e5).toISOString()
   const today = new Date(Date.now() - 864e5).toISOString()
   const client = await clerk()
-  const users: Array<{ createdAt: number; lastActiveAt: number | null }> = []
+  const users: Array<{ id: string; createdAt: number; lastActiveAt: number | null }> = []
   for (let offset = 0; offset < 20000; offset += 500) {
     const { data } = await client.users.getUserList({ limit: 500, offset, orderBy: '-created_at' })
-    users.push(...data.map((u) => ({ createdAt: u.createdAt, lastActiveAt: u.lastActiveAt })))
+    users.push(...data.map((u) => ({ id: u.id, createdAt: u.createdAt, lastActiveAt: u.lastActiveAt })))
     if (data.length < 500) break
   }
   const { shops, listings, perShop } = await shopsAndListings()
@@ -150,6 +150,8 @@ async function summary(days: number) {
   const newUsers = users.filter((u) => u.createdAt >= sinceMs)
   const active = users.filter((u) => (u.lastActiveAt ?? 0) >= sinceMs).length
   const claimed = shops.filter((s) => s.clerk_user_id)
+  const owners = new Set(claimed.map((s) => s.clerk_user_id))
+  const withShop = users.filter((u) => owners.has(u.id)).length
   const stocked = shops.filter((s) => (perShop.get(s.id) ?? 0) >= 3).length
   const daily = new Map<string, number>()
   for (const u of newUsers) {
@@ -178,7 +180,7 @@ async function summary(days: number) {
           ['Total', users.length],
           ['New in range', newUsers.length],
           ['Active in range', active],
-          ['Own a shop', claimed.length],
+          ['Own a shop', withShop],
         ],
       },
       {
